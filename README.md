@@ -28,3 +28,5 @@ OMIM `APIs` are used to get all the OMIM reference PubMed articles for rare dise
 # Neo4j Data Model
 ![Data Model](./img/pubmed-neo4j-data-model.png)
 
+# Publication
+[Q. Zhu et al., "Scientific Evidence Based Knowledge Graph in Rare Diseases," 2021 IEEE International Conference on Bioinformatics and Biomedicine (BIBM), 2021, pp. 2614-2617, doi: 10.1109/BIBM52615.2021.9669645.](https://ieeexplore.ieee.org/document/9669645)
