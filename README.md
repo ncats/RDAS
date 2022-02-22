@@ -4,5 +4,5 @@
 
 
 # Neo4j Data Model
-![Data Model](pubmed-neo4j-data-model.png)
+![Data Model](./img/pubmed-neo4j-data-model.png)
 
