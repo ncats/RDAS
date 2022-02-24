@@ -23,10 +23,14 @@ Pubtator `API` is used to get further annotations such as MESH term and Gene for
 OMIM `APIs` are used to get all the OMIM reference PubMed articles for rare diseases. These articles are then checked against what have loaded into the Neo4j, and the missing ones are loaded using the same procedure.
 
 ## Data Flow
+The following chart gives the how and what kind of data is collected and load into Neo4j:
 ![Architecture](./img/pubmed-neo4j-architecture.png)
 
 # Neo4j Data Model
+The data model or schema show all the nodes and their relationships.
 ![Data Model](./img/pubmed-neo4j-data-model.png)
+
+# Source Codes
 
 # Publication
 [Q. Zhu et al., "Scientific Evidence Based Knowledge Graph in Rare Diseases," 2021 IEEE International Conference on Bioinformatics and Biomedicine (BIBM), 2021, pp. 2614-2617, doi: 10.1109/BIBM52615.2021.9669645.](https://ieeexplore.ieee.org/document/9669645)
