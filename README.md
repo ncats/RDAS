@@ -31,6 +31,21 @@ The data model or schema show all the nodes and their relationships.
 ![Data Model](./img/pubmed-neo4j-data-model.png)
 
 # Source Codes
+## Python packages required for runnin the PubMed article loading program
+The following packages and their versions from `alert-requirements.txt` file are the required python packages for running the loading program to laod PubMed articles related information to Neo4j:
+```
+certifi==2021.10.8
+charset-normalizer==2.0.7
+idna==3.3
+jmespath==0.10.0
+neo4j==1.7.6
+neobolt==1.7.17
+neotime==1.7.4
+pytz==2021.3
+requests==2.26.0
+six==1.16.0
+urllib3==1.26.7
+```
 
 # Publication
 [Q. Zhu et al., "Scientific Evidence Based Knowledge Graph in Rare Diseases," 2021 IEEE International Conference on Bioinformatics and Biomedicine (BIBM), 2021, pp. 2614-2617, doi: 10.1109/BIBM52615.2021.9669645.](https://ieeexplore.ieee.org/document/9669645)
