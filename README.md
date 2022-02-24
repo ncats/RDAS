@@ -138,7 +138,9 @@ zipp==3.6.0
 ```
 ## `initial_loading.py`
 The is the main program to run for laoding PubMed articles for all rare diseases. The rare diseases list comes from Neo4j data lake at https://disease.ncats.io
+
 `from_disease` and `to_disease` control what's the range of disease to handle. For testing, these can be set to a small range. For handle all the rare diseases, set them to `0` and `None`
+
 `mindate` and `maxdate` control the time period of PubMed articles. The first run of this program has values `1900/01/01` and `2021/08/31`
 
 ## `load-substance.py`
