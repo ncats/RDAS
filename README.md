@@ -150,6 +150,11 @@ The `initial_loading.py` code did not load "substance" from the API call. This p
 Again, the `initial_loading.py` code did not load "pubtype" from the API call. This program - `load-pubtype.py` loop through all the pubmedIDs in current Neo4j database and call the EBI API to get pubType information from `pubTypeList` of the returned JSON object and add new property to `Article` node.
 
 ## `alert_add_epi.py`
+This is the python program used to add "isEpi" property to all articles in Neo4j by running the Neural Network machine learning model.
+
+This program will take a while to finish. I've tried to use parallel program to speed the process but it seems the model can't be shared by multiple threads. 
+
+The cutoff value used to decided if an article isEpi or not is 0.5. 
 
 ## `neo4j_access` folder
 This is a python project structure folder that can be used to build a standard python package for other project to import directly.
