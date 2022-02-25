@@ -144,6 +144,7 @@ The is the main program to run for laoding PubMed articles for all rare diseases
 `mindate` and `maxdate` control the time period of PubMed articles. The first run of this program has values `1900/01/01` and `2021/08/31`
 
 ## `load-substance.py`
+The `initial_loading.py` code did not load "substance" from the API call. This program - `load-substance.py` loop through all the pubmedIDs in current Neo4j database and call the EBI API to substance information from 
 
 ## `load-pubtype.py`
 
