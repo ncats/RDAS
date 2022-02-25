@@ -1,5 +1,5 @@
 # Introduction
-One of the target of the alert project is to load all PubMed articles related to rare diseases to a knowledge graph database - Neo4j. Here we use `Python` and third party `API` to parse and load all the information on-the-fly to Neo4j database.
+One of the targets of the alert project is to load all PubMed articles related to rare diseases to a knowledge graph database - Neo4j. Here we use `Python` and third-party `API` to parse and load all the information on-the-fly to Neo4j database.
 
 
 # Architecture
@@ -12,11 +12,11 @@ The following data sources are used to build this Neo4j database:
 - EBI
 - OMIM
 
-Rare diseases related information such as GARD_ID and Name are returned by cypher query against GARD data lake Neo4j database. Disease name is used to query NCBI PubMed archieve to get a list of PubMed article IDs. Because of the large number of articles for same diseases, we limit the number of articles for each disease to 1000.
+Rare diseases related information such as GARD_ID and Name are returned by cypher query against GARD data lake Neo4j database. Disease name is used to query NCBI PubMed archive to get a list of PubMed article IDs. Because of the large number of articles for same diseases, we limit the number of articles for each disease to 1000.
 
-EBI, instead of NCBI PubMed archieve and `APIs` are used to get the article informaiton, such as title, keywords, abstract, etc. because of the following reseans:
+EBI, instead of NCBI PubMed archive and `APIs` are used to get the article information, such as title, keywords, abstract, etc. because of the following reasons:
 1. NCBI has limitation on how many `API` calls can make in one second (around 3 per second).
-2. EBI does not have such limit and it also provids an `API` that can query/return as much as 1000 PubMed articles.
+2. EBI does not have such limit and it also provides an `API` that can query/return as much as 1000 PubMed articles.
 
 Pubtator `API` is used to get further annotations such as MESH term and Gene for an article. There is also a limit (3 calls per second) for how often the `API` can be called. The loading program force itself to sleep for a while (0.34 second) between the calls.
 
@@ -31,8 +31,8 @@ The data model or schema show all the nodes and their relationships.
 ![Data Model](./img/pubmed-neo4j-data-model.png)
 
 # Source Codes
-## Python packages required for runnin the PubMed article loading program
-The following packages and their versions from `alert-requirements.txt` file are the required python packages for running the loading program to laod PubMed articles related information to Neo4j:
+## Python packages required for running the PubMed article loading program
+The following packages and their versions from `alert-requirements.txt` file are the required python packages for running the loading program to load PubMed articles related information to Neo4j:
 ```
 certifi==2021.10.8
 charset-normalizer==2.0.7
@@ -47,7 +47,7 @@ six==1.16.0
 urllib3==1.26.7
 ```
 ## Python packages required for running machine learning model
-To run the Neural Network machine learning model to add `isEpi` property for each article node in Neo4j, the following pakcage and their versions are needed as in file `epi-requirements.txt`
+To run the Neural Network machine learning model to add `isEpi` property for each article node in Neo4j, the following packages and their versions are needed as in file `epi-requirements.txt`
 ```
 absl-py==1.0.0
 astunparse==1.6.3
@@ -137,7 +137,7 @@ wrapt==1.13.3
 zipp==3.6.0
 ```
 ## `initial_loading.py`
-The is the main program to run for laoding PubMed articles for all rare diseases. The rare diseases list comes from Neo4j data lake at https://disease.ncats.io
+The is the main program to run for loading PubMed articles for all rare diseases. The rare diseases list comes from Neo4j data lake at https://disease.ncats.io
 
 `from_disease` and `to_disease` control what's the range of disease to handle. For testing, these can be set to a small range. For handle all the rare diseases, set them to `0` and `None`
 
@@ -152,20 +152,20 @@ Again, the `initial_loading.py` code did not load "pubtype" from the API call. T
 ## `alert_add_epi.py`
 This is the python program used to add "isEpi" property to all articles in Neo4j by running the Neural Network machine learning model.
 
-This program will take a while to finish. I've tried to use parallel program to speed the process but it seems the model can't be shared by multiple threads. 
+This program will take a while to finish. I've tried to use parallel program to speed the process, but it seems the model can't be shared by multiple threads. 
 
-The cutoff value used to decided if an article isEpi or not is 0.5. 
+The cutoff value used to decide if an article isEpi or not is 0.5. 
 
 ## `neo4j_access` folder
-This is a python project structure folder that can be used to build a standard python package for other project to import directly.
+This is a python project structure folder that can be used to build a standard python package for other projects to import directly.
 
 We may move some of the code in `api` folder to here to build a python package.
 
 ## `saved_model` folder
-This folder hold the trainned model of Neural Network for classify if an PubMed article is epidimiology related study or not. The `my_model_orphanet_final` is the actual model used in `alert_add_epi.py`
+This folder holds the trained model of Neural Network for classify if an PubMed article is epidemiology related study or not. The `my_model_orphanet_final` is the actual model used in `alert_add_epi.py`
 
 ## `api` folder
-This folder is for backend python code for connecting to multiple Neo4j databases and provide a general, easy, wrapped way to access rare disease related infomation. It will support the following two use cases, for now:
+This folder is for backend python code for connecting to multiple Neo4j databases and provide a general, easy, wrapped way to access rare disease related information. It will support the following two use cases, for now:
 - Alert web application.
 - Rare diseases public APIs for research community.
 
