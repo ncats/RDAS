@@ -152,6 +152,9 @@ Again, the `initial_loading.py` code did not load "pubtype" from the API call. T
 ## `alert_add_epi.py`
 
 ## `neo4j_access` folder
+This is a python project structure folder that can be used to build a standard python package for other project to import directly.
+
+We may move some of the code in `api` folder to here to build a python package.
 
 ## `saved_model` folder
 This folder hold the trainned model of Neural Network for classify if an PubMed article is epidimiology related study or not. The `my_model_orphanet_final` is the actual model used in `alert_add_epi.py`
