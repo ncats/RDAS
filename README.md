@@ -171,5 +171,8 @@ This folder is for backend python code for connecting to multiple Neo4j database
 
 `neo4j_backend.py` is an example python class for access Neo4j with `cypher` query. `test_neo4j_backend.py` is just a test class on how to use `neo4j_backend.py`
 
+## `invoke-esearch` files
+These three python files: `invoke-esearch.py`, `invoke-esearch2.py`, and `invoke-esearch3.py` are historic files, and not used in build the Neo4j database.
+
 # Publication
 [Q. Zhu et al., "Scientific Evidence Based Knowledge Graph in Rare Diseases," 2021 IEEE International Conference on Bioinformatics and Biomedicine (BIBM), 2021, pp. 2614-2617, doi: 10.1109/BIBM52615.2021.9669645.](https://ieeexplore.ieee.org/document/9669645)
