@@ -154,8 +154,14 @@ Again, the `initial_loading.py` code did not load "pubtype" from the API call. T
 ## `neo4j_access` folder
 
 ## `saved_model` folder
+This folder hold the trainned model of Neural Network for classify if an PubMed article is epidimiology related study or not. The `my_model_orphanet_final` is the actual model used in `alert_add_epi.py`
 
 ## `api` folder
+This folder is for backend python code for connecting to multiple Neo4j databases and provide a general, easy, wrapped way to access rare disease related infomation. It will support the following two use cases, for now:
+- Alert web application.
+- Rare diseases public APIs for research community.
+
+`neo4j_backend.py` is an example python class for access Neo4j with `cypher` query. `test_neo4j_backend.py` is just a test class on how to use `neo4j_backend.py`
 
 # Publication
 [Q. Zhu et al., "Scientific Evidence Based Knowledge Graph in Rare Diseases," 2021 IEEE International Conference on Bioinformatics and Biomedicine (BIBM), 2021, pp. 2614-2617, doi: 10.1109/BIBM52615.2021.9669645.](https://ieeexplore.ieee.org/document/9669645)
