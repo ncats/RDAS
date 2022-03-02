@@ -132,10 +132,9 @@ def get_gard_omim_mapping():
       return [record for record in nodes.data()]
 
 #get OMIM json by OMIM number
-#85Y3L-CUSrykAIVQOrCN5Q  - Qian's
-#wr20AKemSkWnoFR8b-vSkA  - old
+
 def find_OMIM_articles(OMIMNumber):
-  params = {'mimNumber': OMIMNumber, 'include':"all", 'format': 'json', 'apiKey':"85Y3L-CUSrykAIVQOrCN5Q"}
+  params = {'mimNumber': OMIMNumber, 'include':"all", 'format': 'json', 'apiKey':"Your OMIM API Key"}
   return requests.post("https://api.omim.org/api/entry?%s", data=params).json()
 
 #Parse OMIM json and return a map: pubmed_id -> OMIM section   
