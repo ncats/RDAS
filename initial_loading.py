@@ -12,7 +12,7 @@ import re
 
 from_disease = 0
 #to_disease = from_disease + 100
-to_disease = None
+to_disease = 2000
 
 def get_gard_list():
   #Returns list of the GARD Diseases
@@ -652,8 +652,8 @@ def save_disease_articles(mindate, maxdate):
   
 def save_initial_articles():
   """Write initial article data for the GARD Diseases"""
-  mindate = '1900/01/01'
-  today = '2021/08/31'
+  mindate = '1972/01/01'
+  today = '2022/06/11'
   #today = date.today().strftime("%Y/%m/%d")
   logging.info(f'Started save_new_artilcles. Mindate: {mindate}  Maxdate: {today}')
   save_disease_articles(mindate, today)
