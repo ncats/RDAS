@@ -136,7 +136,7 @@ Werkzeug==2.0.2
 wrapt==1.13.3
 zipp==3.6.0
 ```
-## `initial_loading.py`
+## `update-neo4j.py`
 The is the main program to run for loading PubMed articles for all rare diseases. The rare diseases list comes from Neo4j data lake at https://disease.ncats.io
 
 `from_disease` and `to_disease` control what's the range of disease to handle. For testing, these can be set to a small range. For handle all the rare diseases, set them to `0` and `None`
