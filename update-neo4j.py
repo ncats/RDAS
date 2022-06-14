@@ -6,7 +6,7 @@ import configparser
 from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 import time
-import logging, logging.config
+import logging
 import itertools
 import requests
 import jmespath
@@ -26,7 +26,7 @@ to_disease = int(config.get("script","to_disease"))
 
 def get_gard_list():
   #Returns list of the GARD Diseases
-  with GraphDatabase.driver("disease_uri") as driver:
+  with GraphDatabase.driver(disease_uri) as driver:
     with driver.session() as session:
       #cypher_query = '''
       #match p = (d:DATA)-[]-(m:S_GARD) where d.gard_id in ['GARD:0001358', 'GARD:0001360', 'GARD:0001362'] return  d, m
@@ -44,7 +44,7 @@ def get_gard_list():
         disease = {}
         disease['gard_id'] = gard_id
         disease['name'] = res['d'].get("name")
-        disease['is_rare'] = res['d'].get("is_rare") if res['d'].get("is_rare") is not None else ''
+        disease['is_rare'] = True if res['d'].get("is_rare") is not None else False
         disease['categories'] = res['d'].get("categories") if res['d'].get("categories") is not None else ''
         disease['all_names'] = res['m'].get("N_Name") if res['m'].get("N_Name") is not None else ''
         disease['synonyms'] = res['d'].get("synonyms") if res['d'].get("synonyms") is not None else ''
@@ -259,6 +259,13 @@ def fetch_pmc_fulltext_json(pubmedId):
   pmcUrl = "https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_json/" + pubmedId + "/unicode" 
   return requests.urlopen(pmcUrl).json()
 
+def get_isEpi(title, abstract, url="https://rdip2.ncats.io:8000/postEpiClassifyText/"):
+  #check if the article is an Epi article using API
+  text = title + " " + abstract
+  response = requests.post(url, json={'text': text}).json()
+  #print(response)
+  return response['IsEpi']
+
 def create_disease(session, gard_id, rd):
   query = '''
   MERGE (d:Disease {gard_id:$gard_id}) 
@@ -306,19 +313,24 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     n.inEPMC = $inEPMC, 
     n.inPMC = $inPMC, 
     n.hasPDF = $hasPDF, 
-    n.source = $source, 
+    n.source = $source,
+    n.isEpi = $isEpi, 
 
     n.''' + search_source + ''' = true
   MERGE (d)-[r:MENTIONED_IN]->(n)
   RETURN id(n)
   '''
+  #these variables are used in get_isEpi() and as a Article node property
+  title = abstractDataRel['title'] if 'title' in abstractDataRel else ''
+  abstract = abstractDataRel['abstractText'] if 'abstractText' in abstractDataRel else ''
+
   params={
     "id":disease_node,
     "pubmed_id":abstractDataRel['pmid'] if 'pmid' in abstractDataRel else '',
     "source":abstractDataRel['source'] if 'source' in abstractDataRel else '',
     "doi":abstractDataRel['doi'] if 'doi' in abstractDataRel else '',
-    "title":abstractDataRel['title'] if 'title' in abstractDataRel else '',
-    "abstractText":abstractDataRel['abstractText'] if 'abstractText' in abstractDataRel else '',
+    "title":title,
+    "abstractText":abstract,
     #"authorString":abstractDataRel['authorString'] if 'authorString' in abstractDataRel else '',
     "affiliation":abstractDataRel['affiliation'] if 'affiliation' in abstractDataRel else '',
     "firstPublicationDate":abstractDataRel['firstPublicationDate'] if 'firstPublicationDate' in abstractDataRel else '',
@@ -326,6 +338,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     "inEPMC": True if 'inEPMC' in abstractDataRel else False,
     "inPMC":True if 'inPMC' in abstractDataRel else False,
     "hasPDF":True if 'hasPDF' in abstractDataRel else False,
+    "isEpi": get_isEpi(title, abstract),
     "citedByCount":int(abstractDataRel['citedByCount']) if 'citedByCount' in abstractDataRel else 0,
     }
   return tx.run(create_article_query,**params ).single().value()
@@ -670,20 +683,21 @@ def save_disease_articles(mindate, maxdate):
 def save_initial_articles():
   """Write initial article data for the GARD Diseases"""
   today = datetime.now()
-
+  print('len(database_last_run)',len(database_last_run))
   if len(database_last_run) == 0:
     mindate = today - relativedelta(years=50)
+    print('relativedelta',relativedelta(years=50))
+    print(today - relativedelta(years=50))
     mindate = mindate.strftime(r"%Y/%m/%d")
   else:
     mindate = database_last_run
-
   today = today.strftime(r"%Y/%m/%d")
   
   #today = date.today().strftime("%Y/%m/%d")
   logging.info(f'Started save_new_artilcles. Mindate: {mindate}  Maxdate: {today}')
-  print(today,mindate)
+  print('Today',today,'minDate',mindate)
   save_disease_articles(mindate, today)
-  save_omim_articles(mindate, today)
+  #save_omim_articles(mindate, today)
 
 def main():
   logging.basicConfig(level=logging.ERROR, format='%(asctime)s %(levelname)s:%(message)s')
