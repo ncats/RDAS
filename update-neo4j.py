@@ -681,7 +681,7 @@ def save_initial_articles():
   logging.info(f'Started save_new_artilcles. Mindate: {mindate}  Maxdate: {today}')
   print(today,mindate)
   save_disease_articles(mindate, today)
-  #save_omim_articles(mindate, today)
+  save_omim_articles(mindate, today)
 
 '''   
 def save_new_articles():
