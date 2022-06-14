@@ -39,16 +39,16 @@ def get_all_abstracts():
     #return [r['pubmed_id'] for r in results]
     return results
     
-def add_epi(tx, article_id):
+def add_epi(tx, isEpi, article_id):
   query = '''
   MATCH (a:Article) WHERE id(a) = $article_id
-  SET a.isEpi = 'Y'
+  SET a.isEpi = $isEpi
   '''
   
   tx.run(query, parameters={
     "article_id":article_id,
+    "isEpi":str(isEpi).lower()
   })
-
 
 
 def setup():
@@ -145,8 +145,8 @@ def getPredictions(model='my_model_orphanet_final'):
                 #    continue
                 prob, isEpi = process_abstract(r['abstract'], new_tokenizer, new_model, nlpSci, nlpSci2, nlp)
                 #print(count, r['pubmed_id'], prob, isEpi)
-                if isEpi:
-                    add_epi(tx, r['id'])
+                add_epi(tx, r['id'])
+                
                 if count % 1000 == 0:
                     print('commit', count)
                     tx.commit()

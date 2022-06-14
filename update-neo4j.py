@@ -3,7 +3,7 @@
 import json
 from neo4j import GraphDatabase, basic_auth
 import configparser
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 import time
 import logging, logging.config
@@ -18,6 +18,7 @@ config.read("config.ini")
 user = config.get("credentials","neo4j_username")
 password = config.get("credentials","neo4j_password")
 neo4j_uri = config.get("credentials","neo4j_uri")
+disease_uri = config.get("credentials","disease_uri")
 omim_api_key = config.get("credentials","omim_api_key")
 database_last_run = config.get("database","database_last_run")
 from_disease = int(config.get("script","from_disease"))
@@ -25,7 +26,7 @@ to_disease = int(config.get("script","to_disease"))
 
 def get_gard_list():
   #Returns list of the GARD Diseases
-  with GraphDatabase.driver("neo4j+s://disease.ncats.io:7687") as driver:
+  with GraphDatabase.driver("disease_uri") as driver:
     with driver.session() as session:
       #cypher_query = '''
       #match p = (d:DATA)-[]-(m:S_GARD) where d.gard_id in ['GARD:0001358', 'GARD:0001360', 'GARD:0001362'] return  d, m
@@ -53,7 +54,7 @@ def get_gard_list():
 
 #Richard: return 4720 records
 def get_gard_omim_mapping():
-  with GraphDatabase.driver("neo4j+s://disease.ncats.io:7687") as driver:
+  with GraphDatabase.driver(disease_uri) as driver:
     with driver.session() as session:
       cypher_query = '''
       MATCH (o:S_ORDO_ORPHANET)-[:R_exactMatch|:R_equivalentClass]-(m:S_MONDO)-[:R_exactMatch|:R_equivalentClass]-(n:S_GARD)<-[:PAYLOAD]-(d:DATA)
@@ -281,7 +282,7 @@ def create_disease(session, gard_id, rd):
     "synonyms":rd['synonyms'], 
     "all_ids":rd['all_ids']
   }
-  
+
   return session.run(query, **params).single().value()
 
 def create_article(tx, abstractDataRel, disease_node, search_source):
@@ -289,7 +290,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
   #logging.info(f'{disease_node}')
   #logging.info(f'{search_source}')
   #Richard: remove: authorString:$authorString,
-  #Richard: move source as an anticle property, instead of a relation and another node
+  #Richard: move source as an article property, instead of a relation and another node
   create_article_query = '''
   MATCH (d:Disease) WHERE id(d)=$id
   MERGE (n:Article {pubmed_id:$pubmed_id})
@@ -306,6 +307,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     n.inPMC = $inPMC, 
     n.hasPDF = $hasPDF, 
     n.source = $source, 
+
     n.''' + search_source + ''' = true
   MERGE (d)-[r:MENTIONED_IN]->(n)
   RETURN id(n)
@@ -320,11 +322,11 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     #"authorString":abstractDataRel['authorString'] if 'authorString' in abstractDataRel else '',
     "affiliation":abstractDataRel['affiliation'] if 'affiliation' in abstractDataRel else '',
     "firstPublicationDate":abstractDataRel['firstPublicationDate'] if 'firstPublicationDate' in abstractDataRel else '',
-    "isOpenAccess":abstractDataRel['isOpenAccess'] if 'isOpenAccess' in abstractDataRel else '',
-    "inEPMC":abstractDataRel['inEPMC'] if 'inEPMC' in abstractDataRel else '',
-    "inPMC":abstractDataRel['inPMC'] if 'inPMC' in abstractDataRel else '',
-    "hasPDF":abstractDataRel['hasPDF'] if 'hasPDF' in abstractDataRel else '',
-    "citedByCount":abstractDataRel['citedByCount'] if 'citedByCount' in abstractDataRel else ''
+    "isOpenAccess": True if 'isOpenAccess' in abstractDataRel else False,
+    "inEPMC": True if 'inEPMC' in abstractDataRel else False,
+    "inPMC":True if 'inPMC' in abstractDataRel else False,
+    "hasPDF":True if 'hasPDF' in abstractDataRel else False,
+    "citedByCount":int(abstractDataRel['citedByCount']) if 'citedByCount' in abstractDataRel else 0,
     }
   return tx.run(create_article_query,**params ).single().value()
 
@@ -682,17 +684,6 @@ def save_initial_articles():
   print(today,mindate)
   save_disease_articles(mindate, today)
   save_omim_articles(mindate, today)
-
-'''   
-def save_new_articles():
-  yesterday = (date.today() - datetime.timedelta(days=1)).strftime("%Y/%m/%d")
-  print(yesterday)
-  today = date.today().strftime("%Y/%m/%d")
-  print(today)
-  logging.info(f'Started save_new_artilcles. Mindate: {yesterday}  Maxdate: {today}')
-
-  save_articles(yesterday, today)
-'''
 
 def main():
   logging.basicConfig(level=logging.ERROR, format='%(asctime)s %(levelname)s:%(message)s')
