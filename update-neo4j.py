@@ -665,8 +665,8 @@ def save_disease_articles(mindate, maxdate):
           """
 
   
-def save_initial_articles():
-  """Write initial article data for the GARD Diseases"""
+def retrieve_articles():
+  """Gets articles from multiple different sources (PubMed,NCATS databases,OMIM) within a 50 year rolling window or since last script execution"""
   today = datetime.now()
 
   if len(database_last_run) == 0:
@@ -677,11 +677,10 @@ def save_initial_articles():
 
   today = today.strftime(r"%Y/%m/%d")
   
-  #today = date.today().strftime("%Y/%m/%d")
   logging.info(f'Started save_new_artilcles. Mindate: {mindate}  Maxdate: {today}')
-  print(today,mindate)
+  
   save_disease_articles(mindate, today)
-  #save_omim_articles(mindate, today)
+  save_omim_articles(mindate, today)
 
 '''   
 def save_new_articles():
@@ -698,7 +697,7 @@ def main():
   logging.basicConfig(level=logging.ERROR, format='%(asctime)s %(levelname)s:%(message)s')
   print('Started')
   #create_indexes()
-  save_initial_articles()
+  retrieve_articles()
   print('Finished')
 
 if __name__ == '__main__':
