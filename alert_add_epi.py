@@ -47,7 +47,7 @@ def add_epi(tx, isEpi, article_id):
   
   tx.run(query, parameters={
     "article_id":article_id,
-    "isEpi":str(isEpi).lower()
+    "isEpi":isEpi,
   })
 
 
@@ -145,7 +145,7 @@ def getPredictions(model='my_model_orphanet_final'):
                 #    continue
                 prob, isEpi = process_abstract(r['abstract'], new_tokenizer, new_model, nlpSci, nlpSci2, nlp)
                 #print(count, r['pubmed_id'], prob, isEpi)
-                add_epi(tx, r['id'])
+                add_epi(tx, isEpi, r['id'])
                 
                 if count % 1000 == 0:
                     print('commit', count)
