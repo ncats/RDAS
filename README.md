@@ -146,10 +146,15 @@ File used to store variables for use in scripts. Contains credentials for databa
 
 `database_last_run` contains the date (format: YYYY/MM/DD) in which the script was last completed
 
-`from_disease` and `to_disease` control what's the range of disease to handle. For testing, these can be set to a small range. For handle all the rare diseases, set them to `0` and `None`
+`from_disease` and `to_disease` control what's the range of disease to handle. For testing, these can be set to a small range. To load all rare diseases, set them to `0` and `None`
+
+## `update_neo4j.py`
+The is the main program to run for loading PubMed articles for all rare diseases. It initially loads the database for the past fifty years and can update the database with new information. The rare diseases list comes from Neo4j data lake at https://disease.ncats.io
 
 ## `initial_loading.py`
 The is the main program to run for loading PubMed and OMIM articles for all rare diseases. The rare diseases list comes from Neo4j data lake at https://disease.ncats.io
+
+`mindate` and `maxdate` control the time period of PubMed articles. Dates are set as variables and run with a sliding 50 year window of articles, updated weekly.
 
 ## `load-substance.py`
 The `initial_loading.py` code did not load "substance" from the API call. This program - `load-substance.py` loop through all the pubmedIDs in current Neo4j database and call the EBI API to get substance information from `chemicalList` of the returned JSON object and add new property to `Article` node.
