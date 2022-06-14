@@ -136,12 +136,20 @@ Werkzeug==2.0.2
 wrapt==1.13.3
 zipp==3.6.0
 ```
-## `initial_loading.py`
-The is the main program to run for loading PubMed articles for all rare diseases. The rare diseases list comes from Neo4j data lake at https://disease.ncats.io
+
+## `config.ini`
+File used to store variables for use in scripts. Contains credentials for databases and API's as well as some special variables for script functionality
+
+`neo4j_username`, `neo4j_password`, and `neo4j_uri` contains your credentials for writing to your own neo4j database
+
+`omim_api_key` contains your OMIM API key for article retrieval
+
+`database_last_run` contains the date (format: YYYY/MM/DD) in which the script was last completed
 
 `from_disease` and `to_disease` control what's the range of disease to handle. For testing, these can be set to a small range. For handle all the rare diseases, set them to `0` and `None`
 
-`mindate` and `maxdate` control the time period of PubMed articles. The first run of this program has values `1900/01/01` and `2021/08/31`
+## `initial_loading.py`
+The is the main program to run for loading PubMed and OMIM articles for all rare diseases. The rare diseases list comes from Neo4j data lake at https://disease.ncats.io
 
 ## `load-substance.py`
 The `initial_loading.py` code did not load "substance" from the API call. This program - `load-substance.py` loop through all the pubmedIDs in current Neo4j database and call the EBI API to get substance information from `chemicalList` of the returned JSON object and add new property to `Article` node.

@@ -12,6 +12,7 @@ import requests
 import jmespath
 import re
 
+# Loads in variables from config.ini file
 config = configparser.ConfigParser()
 config.read("config.ini")
 
@@ -20,8 +21,15 @@ password = config.get("credentials","neo4j_password")
 neo4j_uri = config.get("credentials","neo4j_uri")
 omim_api_key = config.get("credentials","omim_api_key")
 database_last_run = config.get("database","database_last_run")
-from_disease = int(config.get("script","from_disease"))
-to_disease = int(config.get("script","to_disease"))
+
+try:
+  from_disease = int(config.get("script","from_disease"))
+except ValueError as e:
+  from_disease = 0
+try:
+  to_disease = int(config.get("script","to_disease"))
+except ValueError as e:
+  to_disease = None
 
 def get_gard_list():
   #Returns list of the GARD Diseases
@@ -132,6 +140,9 @@ def get_disease_id(gard_id, driver):
   return id
     
 def save_omim_articles(mindate, maxdate):
+  if len(omim_api_key) == 0:
+    return
+
   results = get_gard_omim_mapping()
   results = itertools.islice(results, from_disease, to_disease)
    #results = dict(itertools.islice(results, 0, None))
@@ -622,7 +633,7 @@ def save_disease_articles(mindate, maxdate):
           except Exception as e:
             logging.error(f'Exception when finding articles for disease {gard_id}, error: {e}')
             continue
-          """
+          
           ids = ' OR ext_id:'.join(pubmedIDs['esearchresult']['idlist'])
           #logging.info(ids)
           ids = 'ext_id:' +ids
@@ -654,7 +665,7 @@ def save_disease_articles(mindate, maxdate):
                   article_node = alist[0].value()
                   logging.info(f'PubMed evidence article already exists: {pubmedID}, {article_node}')
                   with driver.session() as session:
-                  	save_disease_article_relation(disease_node, article_node, session)
+                    save_disease_article_relation(disease_node, article_node, session)
                 else:
                   with driver.session() as session:
                     save_all(result, disease_node, pubmedID, search_source, session)
@@ -662,7 +673,7 @@ def save_disease_articles(mindate, maxdate):
           except Exception as e:
             logging.error(f'Exception when finding articles for disease {gard_id}, error: {e}')
             continue
-          """
+          
 
   
 def retrieve_articles():
@@ -682,17 +693,6 @@ def retrieve_articles():
   save_disease_articles(mindate, today)
   save_omim_articles(mindate, today)
 
-'''   
-def save_new_articles():
-  yesterday = (date.today() - datetime.timedelta(days=1)).strftime("%Y/%m/%d")
-  print(yesterday)
-  today = date.today().strftime("%Y/%m/%d")
-  print(today)
-  logging.info(f'Started save_new_artilcles. Mindate: {yesterday}  Maxdate: {today}')
-
-  save_articles(yesterday, today)
-'''
-
 def main():
   logging.basicConfig(level=logging.ERROR, format='%(asctime)s %(levelname)s:%(message)s')
   print('Started')
@@ -702,6 +702,7 @@ def main():
 
 if __name__ == '__main__':
   main()
+
   config.set("database","database_last_run",datetime.now().strftime(r"%Y/%m/%d"))
   with open("config.ini","w") as conf:
     config.write(conf)
