@@ -32,20 +32,19 @@ The data model or schema show all the nodes and their relationships.
 
 # Source Codes
 ## Python packages required for running the PubMed article loading program
-The following packages and their versions from `alert-requirements.txt` file are the required python packages for running the loading program to load PubMed articles related information to Neo4j:
+We utilized conda package manager to install the following packages:
 ```
-certifi==2021.10.8
-charset-normalizer==2.0.7
-idna==3.3
-jmespath==0.10.0
-neo4j==1.7.6
-neobolt==1.7.17
-neotime==1.7.4
-pytz==2021.3
-requests==2.26.0
-six==1.16.0
-urllib3==1.26.7
+python=3.10.4
+charset-normalizer
+idna
+jmespath
+neo4j
+pytz
+requests
+six
+urllib3
 ```
+See [here](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-from-an-environment-yml-file) for how to create an environment from the `alert-env.yml` file.
 
 ## `config.ini`
 *Add description here*
@@ -79,8 +78,12 @@ This folder is for backend python code for connecting to multiple Neo4j database
 
 `neo4j_backend.py` is an example python class for access Neo4j with `cypher` query. `test_neo4j_backend.py` is just a test class on how to use `neo4j_backend.py`
 
+# Historic Files
 ## `invoke-esearch` files
 These three python files: `invoke-esearch.py`, `invoke-esearch2.py`, and `invoke-esearch3.py` are historic files, and not used in build the Neo4j database.
+
+## `alert-requirements.txt`
+The following packages and their versions from `alert-requirements.txt` file were the required python packages for running the loading program to load PubMed articles related information to Neo4j, but are now superseded but `alert-env.yaml`.
 
 # Publication
 [Q. Zhu et al., "Scientific Evidence Based Knowledge Graph in Rare Diseases," 2021 IEEE International Conference on Bioinformatics and Biomedicine (BIBM), 2021, pp. 2614-2617, doi: 10.1109/BIBM52615.2021.9669645.](https://ieeexplore.ieee.org/document/9669645)
