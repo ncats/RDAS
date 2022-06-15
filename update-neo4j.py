@@ -420,33 +420,36 @@ def get_epiExtract(text, url="https://rdip2.ncats.io:8000/postEpiExtractText"):
     logging.error(f'Exception during get_isEpi. text: {text}, error: {e}')
     raise e
 
-# This function adds epidemiology data to the article node. If it is an Epi article, it adds a new epidemiology information node
+# This function adds isEpi to the article node. If it is an Epi article, it adds a new EpidemiologyAnnotation node
+# isEpi is null when there is no abstract to review.
 def create_epidemiology(tx, abstractDataRel, article_node):
   text = abstractDataRel['title'] + ' ' + abstractDataRel['abstractText']
   isEpi = get_isEpi(text)
   
   if isEpi:
     epi_info = get_epiExtract(text)
-    try:
-      create_epidemiology_query = '''
-        MATCH (a:Article) WHERE id(a) = $article_id
-        SET a.isEpi = $isEpi
-        MERGE (n:Epidemiology {epidemiology_type:$epidemiology_type, epidemiology_rate:$epidemiology_rate, date:$date, location:$location, sex:$sex, ethnicity:$ethnicity}) 
-        MERGE (n) -[r:EPIDEMIOLOGY_FOR]-> (a)
-        '''
-      tx.run(create_epidemiology_query, parameters={
-        "article_id":article_node,
-        "isEpi": isEpi,
-        "epidemiology_type":epi_info['EPI'] if epi_info['EPI'] else [], 
-        "epidemiology_rate":epi_info['STAT'] if epi_info['STAT'] else [], 
-        "date":epi_info['DATE'] if epi_info['DATE'] else [], 
-        "location":epi_info['LOC'] if epi_info['LOC'] else [], 
-        "sex":epi_info['SEX'] if epi_info['SEX'] else [], 
-        "ethnicity":epi_info['ETHN'] if epi_info['ETHN'] else [],
-      })
-    except Exception as e:
-      logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is True.')
-      raise e
+    #This checks if each of the values in the epi_info dictionary is empty. If they all are empty, then the node is not added.
+    if sum([1 for x in epi_info.values() if x]) > 0:
+      try:
+        create_epidemiology_query = '''
+          MATCH (a:Article) WHERE id(a) = $article_id
+          SET a.isEpi = $isEpi
+          MERGE (n:EpidemiologyAnnotation {isEpi:$isEpi, epidemiology_type:$epidemiology_type, epidemiology_rate:$epidemiology_rate, date:$date, location:$location, sex:$sex, ethnicity:$ethnicity}) 
+          MERGE (n) -[r:EPIDEMIOLOGY_ANNOTATION_FOR]-> (a)
+          '''
+        tx.run(create_epidemiology_query, parameters={
+          "article_id":article_node,
+          "isEpi": isEpi,
+          "epidemiology_type":epi_info['EPI'] if epi_info['EPI'] else [], 
+          "epidemiology_rate":epi_info['STAT'] if epi_info['STAT'] else [], 
+          "date":epi_info['DATE'] if epi_info['DATE'] else [], 
+          "location":epi_info['LOC'] if epi_info['LOC'] else [], 
+          "sex":epi_info['SEX'] if epi_info['SEX'] else [], 
+          "ethnicity":epi_info['ETHN'] if epi_info['ETHN'] else [],
+        })
+      except Exception as e:
+        logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is True.')
+        raise e
   else:
     create_epidemiology_query = '''
         MATCH (a:Article) WHERE id(a) = $article_id
@@ -592,10 +595,8 @@ def save_all(abstract, disease_node, pubmedID, search_source, session):
       logging.info(f'Invoking create_keywords')
       create_keywords(tx, abstract['keywordList']['keyword'], article_node)
     
-    #Currently this is running w/o filter. It should be run only if article.isEpi = true
-    #If article is Epi, then create article-epidemiology_node relation
-    # Cypher query for those nodes:
-    # MATCH (a:Article) WHERE id(a) = $article_id AND a.isEpi = true
+    # This function adds isEpi (bool) to the article node and if True, adds EpidemiologyAnnotation node with relation Epidemiology_Annotation_For to Article node.
+    # isEpi is null when there is no abstract to review.
     logging.info(f'Invoking create_epidemiology')
     if ('abstractText' in abstract and 'title' in abstract):
       create_epidemiology(tx, abstract, article_node)
@@ -622,7 +623,6 @@ def save_all(abstract, disease_node, pubmedID, search_source, session):
     '''
     
     #begin another transaction save article annotations
-
     tx = session.begin_transaction()
     logging.info(f'Invoking create annotations')
     annos = ''
