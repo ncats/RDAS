@@ -3,10 +3,10 @@
 import json
 from neo4j import GraphDatabase, basic_auth
 import configparser
-from datetime import datetime, date
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import time
-import logging
+import logging, logging.config
 import itertools
 import requests
 import jmespath
@@ -19,7 +19,6 @@ config.read("config.ini")
 user = config.get("credentials","neo4j_username")
 password = config.get("credentials","neo4j_password")
 neo4j_uri = config.get("credentials","neo4j_uri")
-disease_uri = config.get("credentials","disease_uri")
 omim_api_key = config.get("credentials","omim_api_key")
 database_last_run = config.get("database","database_last_run")
 
@@ -34,7 +33,7 @@ except ValueError as e:
 
 def get_gard_list():
   #Returns list of the GARD Diseases
-  with GraphDatabase.driver(disease_uri) as driver:
+  with GraphDatabase.driver("neo4j+s://disease.ncats.io:7687") as driver:
     with driver.session() as session:
       #cypher_query = '''
       #match p = (d:DATA)-[]-(m:S_GARD) where d.gard_id in ['GARD:0001358', 'GARD:0001360', 'GARD:0001362'] return  d, m
@@ -52,17 +51,17 @@ def get_gard_list():
         disease = {}
         disease['gard_id'] = gard_id
         disease['name'] = res['d'].get("name")
-        disease['is_rare'] = True if res['d'].get("is_rare") is not None else False
+        disease['is_rare'] = res['d'].get("is_rare") if res['d'].get("is_rare") is not None else ''
         disease['categories'] = res['d'].get("categories") if res['d'].get("categories") is not None else ''
         disease['all_names'] = res['m'].get("N_Name") if res['m'].get("N_Name") is not None else ''
         disease['synonyms'] = res['d'].get("synonyms") if res['d'].get("synonyms") is not None else ''
         disease['all_ids'] = res['m'].get("I_CODE") if res['m'].get("I_CODE") is not None else ''
         myData[gard_id] = disease
-  return myData
+    return myData
 
 #Richard: return 4720 records
 def get_gard_omim_mapping():
-  with GraphDatabase.driver(disease_uri) as driver:
+  with GraphDatabase.driver("neo4j+s://disease.ncats.io:7687") as driver:
     with driver.session() as session:
       cypher_query = '''
       MATCH (o:S_ORDO_ORPHANET)-[:R_exactMatch|:R_equivalentClass]-(m:S_MONDO)-[:R_exactMatch|:R_equivalentClass]-(n:S_GARD)<-[:PAYLOAD]-(d:DATA)
@@ -76,6 +75,7 @@ def get_gard_omim_mapping():
       return [record for record in nodes.data()]
 
 #get OMIM json by OMIM number
+
 def find_OMIM_articles(OMIMNumber):
   params = {'mimNumber': OMIMNumber, 'include':"all", 'format': 'json', 'apiKey': omim_api_key}
   return requests.post("https://api.omim.org/api/entry?%s", data=params).json()
@@ -152,12 +152,12 @@ def save_omim_articles(mindate, maxdate):
     for no, rd in enumerate(results):  
       gard_id = rd["gard_id"]
       omim_id = rd["omim_id"]
-      #logging.info(omim_id)
+      logging.info(omim_id)
       omim_json = None
       try:
         omim_json = find_OMIM_articles(omim_id.split(":")[1])
       except Exception as e:
-        logging.error(f' Exception when search omim_id {omim_id}: error {e}')
+        logging.error(f'Exception when search omim: {e}')
         continue        
       sections = get_article_in_section(omim_json)
       logging.info(f'sections: {sections}')
@@ -222,8 +222,8 @@ def create_indexes():
       cypher_query = [
       "CREATE INDEX IF NOT EXISTS FOR (n:Disease) ON (n.gard_id)",
       "CREATE INDEX IF NOT EXISTS FOR (n:Article) ON (n.pubmed_id)",
-      "CREATE INDEX IF NOT EXISTS FOR (n:MeshTerm) ON (n.isMajorTopic, n.descriptorName)",
-      "CREATE INDEX IF NOT EXISTS FOR (n:MeshQualifier) ON (n.abbreviation, n.qualifierName, n.isMajorTopic)",
+      "CREATE INDEX IF NOT EXISTS FOR (n:MeshTerm) ON (n.majorTopic_YN, n.descriptorName)",
+      "CREATE INDEX IF NOT EXISTS FOR (n:MeshQualifier) ON (n.abbreviation, n.qualifierName, n.majorTopic_YN)",
       "CREATE INDEX IF NOT EXISTS FOR (n:Journal) ON (n.title, n.medlineAbbreviation, n.essn, n.issn, n.nlmid)",
       "CREATE INDEX IF NOT EXISTS FOR (n:JournalVolume) ON (n.issue, n.volume, n.journalIssueId, n.dateOfPublication, n.monthOfPublication, n.yearOfPublication,n.printPublicationDate)",
       "CREATE INDEX IF NOT EXISTS FOR (n:Keyword) ON (n.keyword)",
@@ -253,7 +253,7 @@ def fetch_pubtator_annotations(pubmedId):
     pubtatorUrl = "https://www.ncbi.nlm.nih.gov/research/pubtator-api/publications/export/biocjson?pmids=" + pubmedId
     r = requests.get(pubtatorUrl)
     if (not r or r is None or r ==''):
-      logging.error(f'Can not find PubTator for: {pubmedId}')
+      logging.error(f'Can not find pubtator for: {pubmedId}')
       return None
     else:
       return r.json()
@@ -267,7 +267,6 @@ def fetch_pmc_fulltext_json(pubmedId):
   #fetch full text json from pmc
   #pmcUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id=" + pmcId
   pmcUrl = "https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_json/" + pubmedId + "/unicode" 
-  #This may be a urllib command, not sure
   return requests.urlopen(pmcUrl).json()
 
 def create_disease(session, gard_id, rd):
@@ -293,7 +292,7 @@ def create_disease(session, gard_id, rd):
     "synonyms":rd['synonyms'], 
     "all_ids":rd['all_ids']
   }
-
+  
   return session.run(query, **params).single().value()
 
 def create_article(tx, abstractDataRel, disease_node, search_source):
@@ -301,7 +300,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
   #logging.info(f'{disease_node}')
   #logging.info(f'{search_source}')
   #Richard: remove: authorString:$authorString,
-  #Richard: move source as an article property, instead of a relation and another node
+  #Richard: move source as an anticle property, instead of a relation and another node
   create_article_query = '''
   MATCH (d:Disease) WHERE id(d)=$id
   MERGE (n:Article {pubmed_id:$pubmed_id})
@@ -318,15 +317,10 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     n.inPMC = $inPMC, 
     n.hasPDF = $hasPDF, 
     n.source = $source, 
-
     n.''' + search_source + ''' = true
   MERGE (d)-[r:MENTIONED_IN]->(n)
   RETURN id(n)
   '''
-  #these variables are used in get_isEpi() and as a Article node property
-  #title = abstractDataRel['title'] if 'title' in abstractDataRel else ''
-  #abstract = abstractDataRel['abstractText'] if 'abstractText' in abstractDataRel else ''
-
   params={
     "id":disease_node,
     "pubmed_id":abstractDataRel['pmid'] if 'pmid' in abstractDataRel else '',
@@ -337,14 +331,13 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     #"authorString":abstractDataRel['authorString'] if 'authorString' in abstractDataRel else '',
     "affiliation":abstractDataRel['affiliation'] if 'affiliation' in abstractDataRel else '',
     "firstPublicationDate":abstractDataRel['firstPublicationDate'] if 'firstPublicationDate' in abstractDataRel else '',
-    "isOpenAccess": True if 'isOpenAccess' in abstractDataRel else False,
-    "inEPMC": True if 'inEPMC' in abstractDataRel else False,
-    "inPMC":True if 'inPMC' in abstractDataRel else False,
-    "hasPDF":True if 'hasPDF' in abstractDataRel else False,
-    #"isEpi": get_isEpi(title, abstract),
-    "citedByCount":int(abstractDataRel['citedByCount']) if 'citedByCount' in abstractDataRel else 0,
+    "isOpenAccess":abstractDataRel['isOpenAccess'] if 'isOpenAccess' in abstractDataRel else '',
+    "inEPMC":abstractDataRel['inEPMC'] if 'inEPMC' in abstractDataRel else '',
+    "inPMC":abstractDataRel['inPMC'] if 'inPMC' in abstractDataRel else '',
+    "hasPDF":abstractDataRel['hasPDF'] if 'hasPDF' in abstractDataRel else '',
+    "citedByCount":abstractDataRel['citedByCount'] if 'citedByCount' in abstractDataRel else ''
     }
-  return tx.run(create_article_query, **params).single().value()
+  return tx.run(create_article_query,**params ).single().value()
 
 #Richard: change node from "Person" to "Author"
 #Richard: remove affiliation because most items don't have it
@@ -405,72 +398,7 @@ def create_keywords(tx, abstractDataRel, article_node):
         "keyword": keyword
       })
 
-#This classifies if an article is epidemiological or not.
-def get_isEpi(text, url="https://rdip2.ncats.io:8000/postEpiClassifyText/"):
-  #check if the article is an Epi article using API
-  try:
-    response = requests.post(url, json={'text': text}).json()
-    return response['IsEpi']
-  except Exception as e:
-    logging.error(f'Exception during get_isEpi. text: {text}, error: {e}')
-    raise e
-  
-
-def get_epiExtract(text, url="https://rdip2.ncats.io:8000/postEpiExtractText"):
-  #Returns a dictionary of the form 
-  '''
-  {DATE:['1989'],
-  LOC:['Uruguay', 'Brazil'],
-  STAT:['1 in 10000',1/83423]
-  ...}
-  '''
-  try:
-    epi_info = dict(requests.post("https://rdip2.ncats.io:8000/postEpiExtractText", json={'text': text,'extract_diseases':False}).json())
-    return epi_info
-  except Exception as e:
-    logging.error(f'Exception during get_isEpi. text: {text}, error: {e}')
-    raise e
-
-# This function adds isEpi to the article node. If it is an Epi article, it adds a new EpidemiologyAnnotation node
-# isEpi is null when there is no abstract to review.
-def create_epidemiology(tx, abstractDataRel, article_node):
-  text = abstractDataRel['title'] + ' ' + abstractDataRel['abstractText']
-  isEpi = get_isEpi(text)
-  
-  if isEpi:
-    epi_info = get_epiExtract(text)
-    #This checks if each of the values in the epi_info dictionary is empty. If they all are empty, then the node is not added.
-    if sum([1 for x in epi_info.values() if x]) > 0:
-      try:
-        create_epidemiology_query = '''
-          MATCH (a:Article) WHERE id(a) = $article_id
-          SET a.isEpi = $isEpi
-          MERGE (n:EpidemiologyAnnotation {isEpi:$isEpi, epidemiology_type:$epidemiology_type, epidemiology_rate:$epidemiology_rate, date:$date, location:$location, sex:$sex, ethnicity:$ethnicity}) 
-          MERGE (n) -[r:EPIDEMIOLOGY_ANNOTATION_FOR]-> (a)
-          '''
-        tx.run(create_epidemiology_query, parameters={
-          "article_id":article_node,
-          "isEpi": isEpi,
-          "epidemiology_type":epi_info['EPI'] if epi_info['EPI'] else [], 
-          "epidemiology_rate":epi_info['STAT'] if epi_info['STAT'] else [], 
-          "date":epi_info['DATE'] if epi_info['DATE'] else [], 
-          "location":epi_info['LOC'] if epi_info['LOC'] else [], 
-          "sex":epi_info['SEX'] if epi_info['SEX'] else [], 
-          "ethnicity":epi_info['ETHN'] if epi_info['ETHN'] else [],
-        })
-      except Exception as e:
-        logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is True.')
-        raise e
-  else:
-    create_epidemiology_query = '''
-        MATCH (a:Article) WHERE id(a) = $article_id
-        SET a.isEpi = $isEpi'''
-    try:
-      tx.run(create_epidemiology_query, parameters={"article_id":article_node, 'isEpi': isEpi,})
-    except Exception as e:
-      logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is False.')
-      raise e
-
+#Richard: change node fullTextUrl to FullTextUrl
 def create_fullTextUrls(tx, abstractDataRel, article_node):
   create_fullTextUrls_query = '''
   MATCH (a:Article) WHERE id(a) = $article_id
@@ -490,22 +418,19 @@ def create_fullTextUrls(tx, abstractDataRel, article_node):
 def create_meshHeadings(tx, abstractDataRel, article_node):
   create_meshHeadings_query = '''
   MATCH (a:Article) WHERE id(a) = $article_id
-  MERGE (m:MeshTerm {isMajorTopic:$isMajorTopic, descriptorName:$descriptorName}) 
+  MERGE (m:MeshTerm {majorTopic_YN:$majorTopic_YN, descriptorName:$descriptorName}) 
   MERGE (m) - [r:MESH_TERM_FOR] -> (a)
   RETURN id(m)
   '''
   create_meshQualifiers_query = '''
   MATCH (m:MeshTerm) WHERE id(m) = $meshHeading_id
-  MERGE (mq:MeshQualifier {abbreviation:$abbreviation, qualifierName:$qualifierName, isMajorTopic:$isMajorTopic}) 
+  MERGE (mq:MeshQualifier {abbreviation:$abbreviation, qualifierName:$qualifierName,majorTopic_YN:$majorTopic_YN}) 
   MERGE (mq) - [r:MESH_QUALIFIER_FOR] -> (m)
   '''
   for meshHeading in abstractDataRel:
-    if 'majorTopic_YN' in meshHeading:
-      #This converts the MeSH majorTopic_YN property to a boolean isMajorTopic
-      isMajorTopic = True if meshHeading['majorTopic_YN'] == 'Y' else False # The other option is 'N
     parameters={
       "article_id":article_node,
-      "isMajorTopic": isMajorTopic,
+      "majorTopic_YN": meshHeading['majorTopic_YN'] if 'majorTopic_YN' in meshHeading else '',
       "descriptorName": meshHeading['descriptorName'] if 'descriptorName' in meshHeading else ''
     }
     txout = tx.run(create_meshHeadings_query,**parameters).single()
@@ -513,14 +438,11 @@ def create_meshHeadings(tx, abstractDataRel, article_node):
       meshHeadingId = txout.value()
       if ('meshQualifierList' in meshHeading and 'meshQualifier' in meshHeading['meshQualifierList']):
         for meshQualifier in meshHeading['meshQualifierList']['meshQualifier']:
-          #This converts the MeSH majorTopic_YN property to a boolean isMajorTopic
-          if 'majorTopic_YN' in meshQualifier:
-            isMajorTopic = True if meshQualifier['majorTopic_YN'] == 'Y' else False # The other option is 'N
           tx.run(create_meshQualifiers_query, parameters={
           "meshHeading_id":meshHeadingId,
           "abbreviation": meshQualifier['abbreviation'] if 'abbreviation' in meshQualifier else '',
           "qualifierName": meshQualifier['qualifierName'] if 'qualifierName' in meshQualifier else '',
-          "isMajorTopic": isMajorTopic,
+          "majorTopic_YN": meshQualifier['majorTopic_YN'] if 'majorTopic_YN' in meshQualifier else '',
           })
 
 #Richard: change node name from Chemical to Substance
@@ -580,13 +502,14 @@ def save_disease_article_relation(disease_node, article_node, session):
   logging.info(f'Create Disease - Article relation')
   create_disease_article_relation(tx, disease_node, article_node)
   tx.commit()
+  
       
 def save_all(abstract, disease_node, pubmedID, search_source, session):
     tx = session.begin_transaction()
-    #print(f'abstract: {abstract}')
 
     logging.info(f'Invoking create_article')
     article_node = create_article(tx, abstract, disease_node, search_source)
+    
     if ('meshHeadingList' in abstract and 
     'meshHeading' in abstract['meshHeadingList']):
       logging.info(f'Invoking create_meshHeading')
@@ -605,12 +528,6 @@ def save_all(abstract, disease_node, pubmedID, search_source, session):
     'keyword' in abstract['keywordList']):
       logging.info(f'Invoking create_keywords')
       create_keywords(tx, abstract['keywordList']['keyword'], article_node)
-    
-    # This function adds isEpi (bool) to the article node and if True, adds EpidemiologyAnnotation node with relation Epidemiology_Annotation_For to Article node.
-    # isEpi is null when there is no abstract to review.
-    logging.info(f'Invoking create_epidemiology')
-    if ('abstractText' in abstract and 'title' in abstract):
-      create_epidemiology(tx, abstract, article_node)
     
     if ('fullTextUrlList' in abstract and 
     'fullTextUrl' in abstract['fullTextUrlList']):
@@ -634,6 +551,7 @@ def save_all(abstract, disease_node, pubmedID, search_source, session):
     '''
     
     #begin another transaction save article annotations
+
     tx = session.begin_transaction()
     logging.info(f'Invoking create annotations')
     annos = ''
@@ -648,43 +566,34 @@ def save_all(abstract, disease_node, pubmedID, search_source, session):
 def save_articles(disease_node, pubmed_ids, search_source, driver):
   ids = ' OR ext_id:'.join(pubmed_ids)
   ids = 'ext_id:' +ids
-  #logging.info(ids)
+  logging.info(ids)
 
   #logging.warning(f'Fetch pubmed abstracts for ({ids})')
   abstracts = fetch_abstracts(ids)
   #logging.info(abstracts)
   if ('resultList' in abstracts and 'result' in abstracts['resultList'] and len(abstracts['resultList']['result']) > 0):
-    try: 
-      for result in abstracts['resultList']['result']:
-        pubmedID = result['id'] if 'id' in result else None
-        logging.info(f'pubmedID: {pubmedID}')
-        if pubmedID is None:
-          print('N', end='', flush=True)
-          print(f'\n{result}\n')
-          continue
+    for result in abstracts['resultList']['result']:
+      pubmedID = result['id'] if 'id' in result else None
+      logging.info(f'pubmedID: {pubmedID}')
+      if pubmedID is None:
+        print('N', end='', flush=True)
+        print(f'\n{result}\n')
+        continue
+      else:
+        print('.', end='', flush=True)
+      with driver.session() as session:
+        res = session.run("match(a:Article{pubmed_id:$pmid}) return id(a) as id", pmid = pubmedID)
+        record = res.single()
+        if (record):
+          article_node = record["id"]
+          logging.info(f'PubMed evidence article already exists: {pubmedID}, {article_node}')
+          with driver.session() as session:
+            save_disease_article_relation(disease_node, article_node, session)
         else:
-          print('.', end='', flush=True)
-        with driver.session() as session:
-          res = session.run("match(a:Article{pubmed_id:$pmid}) return id(a) as id", pmid = pubmedID)
-          record = res.single()
-          if (record):
-            article_node = record["id"]
-            logging.info(f'PubMed evidence article already exists: {pubmedID}, {article_node}')
-            with driver.session() as session:
-              try:
-                save_disease_article_relation(disease_node, article_node, session)
-              except Exception as e:
-                logging.error(f" Exception when calling save_disease_article_relation, error: {e}")
-          else:
-            with driver.session() as session:
-              try:
-                save_all(result, disease_node, pubmedID, search_source, session)
-              except Exception as e:
-                logging.error(f" Exception when calling save_all, error: {e}")
-    except Exception as e:
-      #print('disease_node',disease_node, 'pubmed_ids',pubmed_ids, 'search_source',search_source,sep='\n')
-      logging.error(f" Exception when iterating abstracts['resultList']['result'], result: {result}, error: {e}")  
-
+          with driver.session() as session:
+            save_all(result, disease_node, pubmedID, search_source, session)
+    print()
+     
 def save_disease_articles(mindate, maxdate):
   #Find and save article data for GARD diseases between from mindate to maxdate
   with GraphDatabase.driver(neo4j_uri, auth=(user,password)) as driver:
@@ -699,7 +608,7 @@ def save_disease_articles(mindate, maxdate):
           #time.sleep(0.02)
           no = 0
           rd = results[gard_id]
-          #logging.info(rd["name"])
+          logging.info(rd["name"])
           logging.warning(f'{idx}: Invoking find_articles({rd["name"]},{mindate},{maxdate})')
           try:
             pubmedIDs = find_articles(rd["name"],mindate,maxdate)
@@ -722,7 +631,6 @@ def save_disease_articles(mindate, maxdate):
           try:
             save_articles(disease_node, pubmed_ids, search_source, driver)
           except Exception as e:
-            #print('disease_node',disease_node, 'pubmed_ids',pubmed_ids, 'search_source',search_source,sep='\n')
             logging.error(f'Exception when finding articles for disease {gard_id}, error: {e}')
             continue
           
@@ -767,15 +675,17 @@ def save_disease_articles(mindate, maxdate):
             continue
           
 
-
+  
 def retrieve_articles():
   """Gets articles from multiple different sources (PubMed,NCATS databases,OMIM) within a 50 year rolling window or since last script execution"""
   today = datetime.now()
+
   if len(database_last_run) == 0:
     mindate = today - relativedelta(years=50)
     mindate = mindate.strftime(r"%Y/%m/%d")
   else:
     mindate = database_last_run
+
   today = today.strftime(r"%Y/%m/%d")
   
   logging.info(f'Started save_new_artilcles. Mindate: {mindate}  Maxdate: {today}')
@@ -784,7 +694,7 @@ def retrieve_articles():
   save_omim_articles(mindate, today)
 
 def main():
-  logging.basicConfig(filename='update_neo4j.log', filemode='w', level=logging.ERROR, format='%(asctime)s %(levelname)s:%(message)s')
+  logging.basicConfig(level=logging.ERROR, format='%(asctime)s %(levelname)s:%(message)s')
   print('Started')
   #create_indexes()
   retrieve_articles()

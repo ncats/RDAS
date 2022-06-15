@@ -12,8 +12,7 @@ import re
 
 from_disease = 0
 #to_disease = from_disease + 100
-#Set to none when you don't want to limit the number of diseases
-to_disease = None
+to_disease = 2000
 
 def get_gard_list():
   #Returns list of the GARD Diseases
