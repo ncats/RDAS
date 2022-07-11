@@ -11,10 +11,9 @@ import itertools
 import requests
 import jmespath
 import re
-
-# Loads in variables from config.ini file
 from annotations import AnnotationManager, AnnotationData
 
+# Loads in variables from config.ini file
 config = configparser.ConfigParser()
 config.read("config.ini")
 
