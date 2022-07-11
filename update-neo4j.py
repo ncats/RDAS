@@ -11,6 +11,7 @@ import itertools
 import requests
 import jmespath
 import re
+from annotations import AnnotationManager, AnnotationData
 
 # Loads in variables from config.ini file
 config = configparser.ConfigParser()
@@ -536,33 +537,20 @@ def create_chemicals(tx, abstractDataRel, article_node):
       "registryNumber": chemical['registryNumber'] if 'registryNumber' in chemical else '',
     })
 
-#Richard: title and abstract already include in Article, so no need to be in PubtatorPassage again, do remove "text"
-#Richard: combine (PubtatorPassage) to (PubtatorAnnotations) because it has only one property: type
-#Richard: remove locations_offset, locations_length
-#Richard: change PubtatorAnnotations to PubtatorAnnotation
-def create_annotations(tx, pubtatorData, article_node):
-  create_annotations_query = '''
-  MATCH(a:Article) WHERE id(a) = $article_id
-  MERGE (pa:PubtatorAnnotation {
-    type:$type,
-    infons_identifier:$infons_identifier, 
-    infons_type:$infons_type, 
-    text:$text
-  })
-  MERGE (pa)- [r:ANNOTATION_FOR] -> (a)
-  '''
 
-  for passage in pubtatorData['passages']:
-    type = passage['infons']['type'] if 'type' in passage['infons'] else ''
-    for annotation in passage['annotations']:
-      parameters={
-        "article_id":article_node,
-        "type":type,
-        "infons_identifier": annotation['infons']['identifier'] if ('identifier' in annotation['infons'] and annotation['infons']['identifier'])  else '',
-        "infons_type": annotation['infons']['type'] if ('type' in annotation['infons'] and annotation['infons']['type']) else '',
-        "text": annotation['text'] if 'text' in annotation else '',
-      }
-      txout = tx.run(create_annotations_query, **parameters)
+def create_annotations(session, pubtatorData, article_id):
+    am = AnnotationManager(session)
+    for passage in pubtatorData['passages']:
+        type = passage['infons']['type'] if 'type' in passage['infons'] else ''
+        for annotation in passage['annotations']:
+            ad = AnnotationData(
+                annotation['infons']['identifier'] if ('identifier' in annotation['infons'] and annotation['infons']['identifier'])  else '',
+                annotation['infons']['type'] if ('type' in annotation['infons'] and annotation['infons']['type']) else '',
+                [annotation['text'] if 'text' in annotation else ''],
+                type)
+            node = am.create_or_merge(ad)
+            am.connect_annotation(node.id, article_id)
+
 
 def create_disease_article_relation(tx, disease_node, article_node):
   query = '''
@@ -639,7 +627,7 @@ def save_all(abstract, disease_node, pubmedID, search_source, session):
     annos = ''
     try:
       annos = fetch_pubtator_annotations(pubmedID)
-      create_annotations(tx, annos, article_node)
+      create_annotations(session, annos, article_node)
     except Exception as e:
       logging.warning(f'\nException creating annotations for article {pubmedID}:  {e}')
     finally:
