@@ -295,6 +295,43 @@ def create_disease(session, gard_id, rd):
   
   return session.run(query, **params).single().value()
 
+
+def search_source_to_properties(search_source: str) -> str:
+  """
+  Given a search_source, return a string containing Cypher to set the correct
+  properties on the Article node. For example, if search_source is
+  "pubmed_evidence", the returned string will be:
+  '''
+  n.pubmed_evidence = true,
+  n.omim_evidence = false,
+  n.refInOMIM = false
+  '''
+
+  refInOMIM will only be `true` if search_source = "omim_evidence".
+  This function expects search_source to be one of pubmed_evidence and
+  omim_evidence, but will gracefully handle unexpected cases by setting all of
+  pubmed_evidence, omim_evidence, and refInOMIM to `false`, and the property
+  specified by search_source to `true`.
+  """
+
+  properties = []
+  if search_source == "omim_evidence":
+    properties.extend(["n.omim_evidence = true", "n.refInOMIM = true"])
+  else:
+    properties.extend(["n.omim_evidence = false", "n.refInOMIM = false"])
+
+  if search_source == "pubmed_evidence":
+    properties.append("n.pubmed_evidence = true")
+  else:
+    properties.append("n.pubmed_evidence = false")
+
+  if search_source not in ["omim_evidence", "pubmed_evidence"]:
+    properties.append(f"n.{search_source} = true")
+
+  # Pad either side of the query with newlines
+  return "\n" + ", \n".join(properties) + "\n"
+
+
 def create_article(tx, abstractDataRel, disease_node, search_source):
   #logging.info(f'{abstractDataRel}')
   #logging.info(f'{disease_node}')
@@ -316,8 +353,10 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     n.inEPMC = $inEPMC, 
     n.inPMC = $inPMC, 
     n.hasPDF = $hasPDF, 
-    n.source = $source, 
-    n.''' + search_source + ''' = true
+    n.source = $source,
+  ''' \
+    + search_source_to_properties(search_source) + \
+  '''
   MERGE (d)-[r:MENTIONED_IN]->(n)
   RETURN id(n)
   '''
