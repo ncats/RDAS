@@ -84,9 +84,8 @@ while True:
         PM_update = datetime.datetime.strptime(PM_update,"%m/%d/%y")
     else:
         PM_update = datetime.datetime.strptime(PM_update,"%m/%d/%y")
-
-# Starts a database update every interval of days
-while True:
+        
+    # Starts a database update every interval of days
     current_time = datetime.date.today()
     current_time = current_time.strftime("%m/%d/%y")
     current_time = datetime.datetime.strptime(current_time,"%m/%d/%y")
