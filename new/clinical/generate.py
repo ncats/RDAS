@@ -10,14 +10,10 @@ def check (empty=False, date=datetime.date.today()):
 
     if empty == True:
         create()
-        configuration.set('DATABASE', 'clinical_update', date.strftime("%m/%d/%y"))
-        with open(init, "w") as f:
-            configuration.write(f)
+        configuration.set('DATABASE', 'database_last_run', date.strftime("%m/%d/%y"))
     elif empty == False:
         update()
-        configuration.set('DATABASE', 'clinical_update', date.strftime("%m/%d/%y"))
-        with open(init, "w") as f:
-            configuration.write(f)
+        configuration.set('DATABASE', 'database_last_run', date.strftime("%m/%d/%y"))
     else:
         print("[ERROR] generate.py \"empty\" parameter not boolean")
 

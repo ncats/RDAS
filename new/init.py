@@ -8,12 +8,13 @@ from time import sleep
 import sys
 import os
 
-print("[RARE DISEASE ALERT SYSTEM]\n---------------------------")
+print("[RARE DISEASE ALERT SYSTEM]")
 
 # Load configuration information
 workspace = os.path.dirname(os.path.abspath(__file__))
 init = os.path.join(workspace, 'config.ini')
 configuration = configparser.ConfigParser()
+configuration.read(init)
 
 # Setup individual database communication objects. AlertCypher object is used to send cypher queries to a specific database in the server
 CTcypher = AlertCypher("clinical")
@@ -55,71 +56,27 @@ GNTcypher.close()
 PMcypher.close()
 
 # Gets last database update from configuration file
+last_run = configuration.get("DATABASE","database_last_run")
+if last_run == "":
+    start_time = datetime.date.today()
+    start_time = start_time.strftime("%m/%d/%y")
+    start_time = datetime.datetime.strptime(start_time,"%m/%d/%y")
+else:
+    start_time = last_run.strftime("%m/%d/%y")
+    start_time = datetime.datetime.strptime(start_time,"%m/%d/%y")
+
+# Starts a database update every interval of days
 while True:
-    # Reload configuration information
-    configuration.read(init)
-
-    CT_update = configuration.get("DATABASE","clinical_update")
-    if CT_update == "":
-        CT_update = datetime.date.today()
-        CT_update = CT_update.strftime("%m/%d/%y")
-        CT_update = datetime.datetime.strptime(CT_update,"%m/%d/%y")
-    else:
-        CT_update = datetime.datetime.strptime(CT_update,"%m/%d/%y")
-
-    GNT_update = configuration.get("DATABASE","grant_update")
-    if GNT_update == "":
-        GNT_update = datetime.date.today()
-        GNT_update = GNT_update.strftime("%m/%d/%y")
-        GNT_update = datetime.datetime.strptime(GNT_update,"%m/%d/%y")
-    else:
-        GNT_update = datetime.datetime.strptime(GNT_update,"%m/%d/%y")
-
-    PM_update = configuration.get("DATABASE","pubmed_update")
-    if PM_update == "":
-        PM_update = datetime.date.today()
-        PM_update = PM_update.strftime("%m/%d/%y")
-        PM_update = datetime.datetime.strptime(PM_update,"%m/%d/%y")
-    else:
-        PM_update = datetime.datetime.strptime(PM_update,"%m/%d/%y")
-
-    # Starts a database update every interval of days
     current_time = datetime.date.today()
     current_time = current_time.strftime("%m/%d/%y")
     current_time = datetime.datetime.strptime(current_time,"%m/%d/%y")
     
-    CT_delta = current_time - CT_update
-    GNT_delta = current_time - GNT_update
-    PM_delta = current_time - PM_update
+    delta = current_time - start_time
+    if delta.days == 30:
+        clinical.generate.check()
+        grant.generate.check()
+        pubmed.generate.check()
 
-    if CT_delta.days > 5:
-        CT_thread = threading.Thread(target=clinical.generate.check, daemon=True)
-        CT_thread.start()
-        CT_thread.join()
-
-    if GNT_delta.days > 5:
-        GNT_thread = threading.Thread(target=grant.generate.check, daemon=True)
-        GNT_thread.start()
-        GNT_thread.join()
-
-    if PM_delta.days > 5:
-        PM_thread = threading.Thread(target=pubmed.generate.check, daemon=True)
-        PM_thread.start()
-        PM_thread.join()
-
-    print("Days Since Last Update:\n[CLINICAL] {CT_day} Days ({CT_update})\n[GRANT] {GNT_day} Days ({GNT_update})\n[PUBMED] {PM_day} Days ({PM_update})\n"
-        .format(CT_day=str(CT_delta.days), 
-        GNT_day=str(GNT_delta.days), 
-        PM_day=str(PM_delta.days), 
-        CT_update=str(CT_update),
-        GNT_update=str(GNT_update),
-        PM_update=str(PM_update)))
-    
-    # Time in seconds to check for an update
-    sleep(5)
-    
-
-    
-
-    
+    print("Days Since Last Update:\n{day} Days\n".format(day=str(delta.days)))
+    sleep(3600)
     
