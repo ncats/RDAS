@@ -9,6 +9,7 @@ class AlertCypher ():
         configuration = configparser.ConfigParser()
         configuration.read(init)
 
+        # Connects to neo4j database
         server_uri = configuration.get("CREDENTIALS", "neo4j_uri")
         user = configuration.get("CREDENTIALS", "neo4j_username")
         password = configuration.get("CREDENTIALS", "neo4j_password")
@@ -17,8 +18,10 @@ class AlertCypher ():
         self.session = connection.session(database=db)
 
     def run(self, query):
+        # Runs and returns cypher query
         response = self.session.run(query)
         return response
     
     def close(self):
+        # Closes connection to database
         self.session.close()
