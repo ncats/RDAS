@@ -8,8 +8,8 @@ class AlertCypher ():
         init = os.path.join(workspace, 'config.ini')
         configuration = configparser.ConfigParser()
         configuration.read(init)
-
-        # Connects to neo4j database
+        
+        # Connects to neo4j databasej
         server_uri = configuration.get("CREDENTIALS", "neo4j_uri")
         user = configuration.get("CREDENTIALS", "neo4j_username")
         password = configuration.get("CREDENTIALS", "neo4j_password")

@@ -18,6 +18,7 @@ def check (empty=False, date=datetime.date.today()):
         configuration.set('DATABASE', 'grant_update', date.strftime("%m/%d/%y"))
         with open(init, "w") as f:
             configuration.write(f)
+
     else:
         print("[ERROR] generate.py \"empty\" parameter not boolean")
 

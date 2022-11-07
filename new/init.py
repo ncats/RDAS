@@ -14,6 +14,7 @@ print("[RARE DISEASE ALERT SYSTEM]\n---------------------------")
 workspace = os.path.dirname(os.path.abspath(__file__))
 init = os.path.join(workspace, 'config.ini')
 configuration = configparser.ConfigParser()
+configuration.read(init)
 
 # Setup individual database communication objects. AlertCypher object is used to send cypher queries to a specific database in the server
 CTcypher = AlertCypher("clinical")
@@ -84,7 +85,8 @@ while True:
     else:
         PM_update = datetime.datetime.strptime(PM_update,"%m/%d/%y")
 
-    # Starts a database update every interval of days
+# Starts a database update every interval of days
+while True:
     current_time = datetime.date.today()
     current_time = current_time.strftime("%m/%d/%y")
     current_time = datetime.datetime.strptime(current_time,"%m/%d/%y")
@@ -118,9 +120,3 @@ while True:
     
     # Time in seconds to check for an update
     sleep(3600)
-    
-
-    
-
-    
-    
