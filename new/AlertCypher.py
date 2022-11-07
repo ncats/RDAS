@@ -19,3 +19,6 @@ class AlertCypher ():
     def run(self, query):
         response = self.session.run(query)
         return response
+    
+    def close(self):
+        self.session.close()

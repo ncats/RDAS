@@ -51,6 +51,10 @@ try:
 except:
     print("[PUBMED] Error finding Neo4j database. Check to see if database exists and rerun script")
 
+CTcypher.close()
+GNTcypher.close()
+PMcypher.close()
+
 # Gets last database update from configuration file
 last_run = configuration.get("DATABASE","database_last_run")
 if last_run == "":
