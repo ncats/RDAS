@@ -1,0 +1,4 @@
+gard_id,gard_name,disease_name,found_by,all_synonyms,
+GARD:0012765,Transient myeloproliferative syndrome,transient myeloproliferative syndrome,exact_match,"[Transient abnormal myelopoiesis,TMD,Transient myeloproliferative disease]",
+GARD:0012768,Reversible cerebral vasoconstriction syndrome,reversible cerebral vasoconstriction syndrome,exact_match,[RCVS],
+GARD:0012784,Livedoid vasculopathy,livedoid vasculopathy,exact_match,"[Segmental hyalinizing vasculopathy,Livedo vasculitis,Livedoid vasculitis,Livedo reticularis with summer ulcerations,Livedo reticularis with winter ulcerations]"
