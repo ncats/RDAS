@@ -1,3 +1,5 @@
+# NEW STRUCTURE IS IN 'NEW' FOLDER, IGNORE 'OLD'
+
 # Init.py
 This script is responsible for initiating the creation and updates of each of the databases
 This script will constantly run until the user kills the process
