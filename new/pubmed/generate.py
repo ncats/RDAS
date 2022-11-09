@@ -1,30 +1,35 @@
 import configparser
 import datetime
 import os
+from AlertCypher import AlertCypher
 
-def check (empty=False, date=datetime.date.today()):
+def check (empty=False, db=AlertCypher("pubmed"), date=datetime.date.today()):
     workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     init = os.path.join(workspace, 'config.ini')
     configuration = configparser.ConfigParser()
     configuration.read(init)
     
     if empty == True:
-        create()
+        create(db)
         configuration.set('DATABASE', 'pubmed_update', date.strftime("%m/%d/%y"))
         with open(init, "w") as f:
             configuration.write(f)
     elif empty == False:
-        update()
+        update(db)
         configuration.set('DATABASE', 'pubmed_update', date.strftime("%m/%d/%y"))
         with open(init, "w") as f:
             configuration.write(f)
     else:
         print("[ERROR] generate.py \"empty\" parameter not boolean")
 
-def update ():
+def update (db):
     # Updates database from last update date
+    # connect to imported update script
     pass
 
-def create ():
+def create (db):
     # Creates database from scratch
-    pass
+    # connect to imported create script
+    print('Creating PubMed Database...')
+    print('Finishing up PubMed Database Creation...')
+    print('PUBMED DATABASE CREATED\n')

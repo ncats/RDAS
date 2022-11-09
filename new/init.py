@@ -1,12 +1,15 @@
-from neo4j import GraphDatabase
+import sys
+import os
+workspace = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(workspace)
 import clinical.generate, grant.generate, pubmed.generate
+from neo4j import GraphDatabase
 from AlertCypher import AlertCypher
 import threading
 import configparser
 import datetime
 from time import sleep
-import sys
-import os
+
 
 print("[RARE DISEASE ALERT SYSTEM]\n---------------------------")
 
@@ -25,7 +28,8 @@ PMcypher = AlertCypher("pubmed")
 try:
     response = CTcypher.run("MATCH (x) RETURN x LIMIT 1").single()
     if response == None:
-        CT_thread = threading.Thread(target=clinical.generate.check, args=(True,), daemon=True)
+        print('Clinical Trial Database Empty')
+        CT_thread = threading.Thread(target=clinical.generate.check, args=(True, CTcypher,), daemon=True)
         CT_thread.start()
         CT_thread.join()
 except:
@@ -35,7 +39,8 @@ except:
 try:
     response = GNTcypher.run("MATCH (x) RETURN x LIMIT 1").single()
     if response == None:
-        GNT_thread = threading.Thread(target=grant.generate.check, args=(True,), daemon=True)
+        print('NIH Grant Database Empty')
+        GNT_thread = threading.Thread(target=grant.generate.check, args=(True, GNTcypher,), daemon=True)
         GNT_thread.start()
         GNT_thread.join()
 except:
@@ -45,21 +50,18 @@ except:
 try:
     response = PMcypher.run("MATCH (x) RETURN x LIMIT 1").single()
     if response == None:
-        PM_thread = threading.Thread(target=pubmed.generate.check, args=(True,), daemon=True)
+        print('PubMed Database Empty')
+        PM_thread = threading.Thread(target=pubmed.generate.check, args=(True, PMcypher,), daemon=True)
         PM_thread.start()
         PM_thread.join()
 except:
     print("[PUBMED] Error finding Neo4j database. Check to see if database exists and rerun script")
 
-CTcypher.close()
-GNTcypher.close()
-PMcypher.close()
-
 # Gets last database update from configuration file
 while True:
     # Reload configuration information
     configuration.read(init)
-    interval = configuration.get("DATABASE","update_interval")
+    interval = int(configuration.get("DATABASE","update_interval"))
 
     CT_update = configuration.get("DATABASE","clinical_update")
     if CT_update == "":
@@ -95,17 +97,17 @@ while True:
     PM_delta = current_time - PM_update
 
     if CT_delta.days > interval:
-        CT_thread = threading.Thread(target=clinical.generate.check, daemon=True)
+        CT_thread = threading.Thread(target=clinical.generate.check, args=(False, CTcypher,), daemon=True)
         CT_thread.start()
         CT_thread.join()
 
     if GNT_delta.days > interval:
-        GNT_thread = threading.Thread(target=grant.generate.check, daemon=True)
+        GNT_thread = threading.Thread(target=grant.generate.check, args=(False, GNTcypher,), daemon=True)
         GNT_thread.start()
         GNT_thread.join()
 
     if PM_delta.days > interval:
-        PM_thread = threading.Thread(target=pubmed.generate.check, daemon=True)
+        PM_thread = threading.Thread(target=pubmed.generate.check, args=(False, PMcypher,), daemon=True)
         PM_thread.start()
         PM_thread.join()
 
