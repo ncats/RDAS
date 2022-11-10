@@ -8,13 +8,14 @@ from http import client
 from neo4j import GraphDatabase
 from csv import DictReader
 import configparser
+import threading
 
-# obtain full data for each trial
-# create a dictionary with NCTID as key and field data as value one field at a time for each trial (ex. first find all interventions for all trials, go to next field and repeat)
-# 
+lock = threading.Lock()
 
 def main(db):
+    lock.acquire()
     print('Creating Clinical Trial Database...')
+    lock.release()
 
     # iterate through list of diseases/conditions
     cnd = os.path.join(workspace, 'conditions_matched_short.csv')
@@ -99,7 +100,9 @@ def main(db):
                     except:
                         pass
     
+    lock.acquire()
     print('Finishing up Clinical Trial Database Creation...')
+    lock.release()
 
     for idx in range(len(data_model.additional_class_fields)):     
         apoc_cypher = 'MATCH (x:{tag}) WITH '.format(tag=data_model.additional_class_names[idx])
@@ -122,5 +125,7 @@ def main(db):
     now = "\"{now}\"".format(now=now)
     apoc_cypher = 'MATCH (x:ClinicalTrial) SET x.DateCreated = {now} RETURN x'.format(now=now)
     db.run(apoc_cypher)
-        
-    print('CLINICAL TRIAL DATABASE CREATED\n')
+
+    lock.acquire() 
+    print('CLINICAL TRIAL DATABASE CREATED')
+    lock.release()

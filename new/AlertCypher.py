@@ -16,6 +16,7 @@ class AlertCypher ():
 
         connection = GraphDatabase.driver(uri=server_uri, auth=(user, password))
         self.session = connection.session(database=db)
+        self.type = db
 
     def run(self, query):
         # Runs and returns cypher query
@@ -25,3 +26,6 @@ class AlertCypher ():
     def close(self):
         # Closes connection to database
         self.session.close()
+
+    def DBtype(self):
+        return self.type

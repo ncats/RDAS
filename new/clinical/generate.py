@@ -6,6 +6,8 @@ import configparser
 import load_neo4j
 import datetime
 from AlertCypher import AlertCypher
+import threading
+lock = threading.Lock()
 
 
 def check (empty=False, db=AlertCypher("clinical"), date=datetime.date.today()):
@@ -13,22 +15,24 @@ def check (empty=False, db=AlertCypher("clinical"), date=datetime.date.today()):
     init = os.path.join(workspace, 'config.ini')
     configuration = configparser.ConfigParser()
     configuration.read(init)
+    #conf = open(init, "w")
 
     if empty == True:
         create(db)
-        configuration.set('DATABASE', 'clinical_update', date.strftime("%m/%d/%y"))
-        with open(init, "w") as f:
-            configuration.write(f)
+        #configuration.set('DATABASE', 'clinical_update', date.strftime("%m/%d/%y"))
+        #configuration.write(conf)
+
     elif empty == False:
         update(db)
-        configuration.set('DATABASE', 'clinical_update', date.strftime("%m/%d/%y"))
-        with open(init, "w") as f:
-            configuration.write(f)
+        #configuration.set('DATABASE', 'clinical_update', date.strftime("%m/%d/%y"))
+        #configuration.write(conf)
+
     else:
         print("[ERROR] generate.py \"empty\" parameter not boolean")
 
-def update ():
+def update (db):
     # Updates database from last update date
+    print('CLINICAL TRIAL DB UPDATING...')
     pass
 
 def create (db):
