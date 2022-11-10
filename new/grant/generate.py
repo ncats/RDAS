@@ -14,14 +14,10 @@ def check (empty=False, db=AlertCypher("grant"), date=datetime.date.today()):
     
     if empty == True:
         create(db)
-        #configuration.set('DATABASE', 'grant_update', date.strftime("%m/%d/%y"))
-        #configuration.write(conf)
-
+   
     elif empty == False:
         update(db)
-        #configuration.set('DATABASE', 'grant_update', date.strftime("%m/%d/%y"))
-        #configuration.write(conf)
-
+      
     else:
         print("[ERROR] generate.py \"empty\" parameter not boolean")
 

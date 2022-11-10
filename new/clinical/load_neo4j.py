@@ -9,7 +9,6 @@ from neo4j import GraphDatabase
 from csv import DictReader
 import configparser
 import threading
-
 lock = threading.Lock()
 
 def main(db):
@@ -125,7 +124,7 @@ def main(db):
     now = "\"{now}\"".format(now=now)
     apoc_cypher = 'MATCH (x:ClinicalTrial) SET x.DateCreated = {now} RETURN x'.format(now=now)
     db.run(apoc_cypher)
-
+    
     lock.acquire() 
     print('CLINICAL TRIAL DATABASE CREATED')
     lock.release()

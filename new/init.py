@@ -81,6 +81,7 @@ GNTcypher = AlertCypher("grant")
 PMcypher = AlertCypher("pubmed")
 
 # Checks if clinical trial database is empty. If it is, it creates it from scratch on a seperate thread
+
 threads = list()
 threads.append(populate(CTcypher))
 threads.append(populate(GNTcypher))
