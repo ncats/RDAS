@@ -10,6 +10,62 @@ import configparser
 import datetime
 from time import sleep
 
+def populate(db):
+    unpack = {"clinical":clinical, "grant":grant, "pubmed":pubmed}
+    cur_module = unpack[db.DBtype()]
+    try:
+        response = db.run("MATCH (x) RETURN x LIMIT 1").single()
+        if response == None:
+            print('{dbtype} Database Empty'.format(dbtype=db.DBtype().upper()))
+            thread = threading.Thread(target=cur_module.generate.check, args=(True, db,), daemon=True)
+            return thread
+        
+    except:
+        print("[{dbtype}] Error finding Neo4j database. Check to see if database exists and rerun script".format(dbtype=db.DBtype().upper()))
+
+def updateCheck(db):
+    unpack = {"clinical":["clinical_update","clinical_interval"], 
+        "grant":["grant_update","grant_interval"], 
+        "pubmed":["pubmed_update","pubmed_interval"]}
+
+    updateInfo = unpack[db.DBtype()]
+    # Reload configuration information
+    configuration.read(init)
+    
+    update = configuration.get("DATABASE", updateInfo[0])
+    if update == "":
+        update = datetime.date.today()
+        update = update.strftime("%m/%d/%y")
+        update = datetime.datetime.strptime(update,"%m/%d/%y")
+    else:
+        update = datetime.datetime.strptime(update,"%m/%d/%y")
+
+    current_time = datetime.date.today()
+    current_time = current_time.strftime("%m/%d/%y")
+    current_time = datetime.datetime.strptime(current_time,"%m/%d/%y")
+
+    delta = current_time - update
+
+    interval = int(configuration.get("DATABASE", updateInfo[1]))
+    if delta.days > interval:
+        thread = threading.Thread(target=clinical.generate.check, args=(False, db,), daemon=True)
+        return {db.DBtype():[thread, delta, update]}
+    else:
+        return {db.DBtype():[None, delta, update]}
+
+def updateDate(threads):
+    date = datetime.date.today()
+    conf = open(init, "w")
+    for i in range(len(threads)):
+        if threads[i]:
+            if i == 0:
+                configuration.set('DATABASE', 'clinical_update', date.strftime("%m/%d/%y"))
+            elif i == 1:
+                configuration.set('DATABASE', 'grant_update', date.strftime("%m/%d/%y"))
+            elif i == 2:
+                configuration.set('DATABASE', 'pubmed_update', date.strftime("%m/%d/%y"))
+    configuration.write(conf)
+    conf.close()
 
 print("[RARE DISEASE ALERT SYSTEM]\n---------------------------")
 
@@ -25,99 +81,54 @@ GNTcypher = AlertCypher("grant")
 PMcypher = AlertCypher("pubmed")
 
 # Checks if clinical trial database is empty. If it is, it creates it from scratch on a seperate thread
-try:
-    response = CTcypher.run("MATCH (x) RETURN x LIMIT 1").single()
-    if response == None:
-        print('Clinical Trial Database Empty')
-        CT_thread = threading.Thread(target=clinical.generate.check, args=(True, CTcypher,), daemon=True)
-        CT_thread.start()
-        CT_thread.join()
-except:
-    print("[CLINICAL TRIAL] Error finding Neo4j database. Check to see if database exists and rerun script")
 
-# Checks if NIH grant database is empty. If it is, it creates it from scratch on a seperate thread
-try:
-    response = GNTcypher.run("MATCH (x) RETURN x LIMIT 1").single()
-    if response == None:
-        print('NIH Grant Database Empty')
-        GNT_thread = threading.Thread(target=grant.generate.check, args=(True, GNTcypher,), daemon=True)
-        GNT_thread.start()
-        GNT_thread.join()
-except:
-    print("[GRANT] Error finding Neo4j database. Check to see if database exists and rerun script")
+threads = list()
+threads.append(populate(CTcypher))
+threads.append(populate(GNTcypher))
+threads.append(populate(PMcypher))
 
-# Checks if PubMed database is empty. If it is, it creates it from scratch on a seperate thread
-try:
-    response = PMcypher.run("MATCH (x) RETURN x LIMIT 1").single()
-    if response == None:
-        print('PubMed Database Empty')
-        PM_thread = threading.Thread(target=pubmed.generate.check, args=(True, PMcypher,), daemon=True)
-        PM_thread.start()
-        PM_thread.join()
-except:
-    print("[PUBMED] Error finding Neo4j database. Check to see if database exists and rerun script")
+for thread in threads:
+    if thread:
+        thread.start()
+
+for thread in threads:
+    if thread:
+        thread.join()
+
+updateDate(threads)
 
 # Gets last database update from configuration file
 while True:
-    # Reload configuration information
-    configuration.read(init)
-    interval = int(configuration.get("DATABASE","update_interval"))
+    threads = list()
+    CT_info = updateCheck(CTcypher)["clinical"]
+    GNT_info = updateCheck(GNTcypher)["grant"]
+    PM_info = updateCheck(PMcypher)["pubmed"]
 
-    CT_update = configuration.get("DATABASE","clinical_update")
-    if CT_update == "":
-        CT_update = datetime.date.today()
-        CT_update = CT_update.strftime("%m/%d/%y")
-        CT_update = datetime.datetime.strptime(CT_update,"%m/%d/%y")
-    else:
-        CT_update = datetime.datetime.strptime(CT_update,"%m/%d/%y")
-
-    GNT_update = configuration.get("DATABASE","grant_update")
-    if GNT_update == "":
-        GNT_update = datetime.date.today()
-        GNT_update = GNT_update.strftime("%m/%d/%y")
-        GNT_update = datetime.datetime.strptime(GNT_update,"%m/%d/%y")
-    else:
-        GNT_update = datetime.datetime.strptime(GNT_update,"%m/%d/%y")
-
-    PM_update = configuration.get("DATABASE","pubmed_update")
-    if PM_update == "":
-        PM_update = datetime.date.today()
-        PM_update = PM_update.strftime("%m/%d/%y")
-        PM_update = datetime.datetime.strptime(PM_update,"%m/%d/%y")
-    else:
-        PM_update = datetime.datetime.strptime(PM_update,"%m/%d/%y")
-        
-    # Starts a database update every interval of days
-    current_time = datetime.date.today()
-    current_time = current_time.strftime("%m/%d/%y")
-    current_time = datetime.datetime.strptime(current_time,"%m/%d/%y")
+    if CT_info[0]:
+        threads.append(CT_info[0])
+    if GNT_info[0]:
+        threads.append(GNT_info[0])
+    if PM_info[0]:
+        threads.append(PM_info[0])
     
-    CT_delta = current_time - CT_update
-    GNT_delta = current_time - GNT_update
-    PM_delta = current_time - PM_update
+    print("\n-----------------------\nDays Since Last Update:\n[CLINICAL] {CT_day} Days ({CT_update})\n[GRANT] {GNT_day} Days ({GNT_update})\n[PUBMED] {PM_day} Days ({PM_update})\n"
+            .format(CT_day=str(CT_info[1].days), 
+            GNT_day=str(GNT_info[1].days), 
+            PM_day=str(PM_info[1].days), 
+            CT_update=str(CT_info[2]),
+            GNT_update=str(GNT_info[2]),
+            PM_update=str(PM_info[2])))
 
-    if CT_delta.days > interval:
-        CT_thread = threading.Thread(target=clinical.generate.check, args=(False, CTcypher,), daemon=True)
-        CT_thread.start()
-        CT_thread.join()
+    for thread in threads:
+        if thread:
+            thread.start()
 
-    if GNT_delta.days > interval:
-        GNT_thread = threading.Thread(target=grant.generate.check, args=(False, GNTcypher,), daemon=True)
-        GNT_thread.start()
-        GNT_thread.join()
+    for thread in threads:
+        if thread:
+            thread.join()
 
-    if PM_delta.days > interval:
-        PM_thread = threading.Thread(target=pubmed.generate.check, args=(False, PMcypher,), daemon=True)
-        PM_thread.start()
-        PM_thread.join()
-
-    print("Days Since Last Update:\n[CLINICAL] {CT_day} Days ({CT_update})\n[GRANT] {GNT_day} Days ({GNT_update})\n[PUBMED] {PM_day} Days ({PM_update})\n"
-        .format(CT_day=str(CT_delta.days), 
-        GNT_day=str(GNT_delta.days), 
-        PM_day=str(PM_delta.days), 
-        CT_update=str(CT_update),
-        GNT_update=str(GNT_update),
-        PM_update=str(PM_update)))
+    updateDate(threads)
     
     # Time in seconds to check for an update
-    sleep(3600)
+    sleep(5)
+

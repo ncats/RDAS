@@ -16,3 +16,4 @@ This class allows you to instantiate an object for each individual database on t
 # Clinical/generate.py, Grant/generate.py, Pubmed/generate.py
 These scripts divert the programs path to either create the individual database from scratch or update it from the last update date
 Scripts for creating and updated will be imported directly into this file to decrease clutter (See Clinical/generate.py create function)
+
