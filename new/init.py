@@ -128,7 +128,7 @@ while True:
             thread.join()
 
     updateDate(threads)
-    
+
     # Time in seconds to check for an update
     sleep(5)
 
