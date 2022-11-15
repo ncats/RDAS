@@ -122,7 +122,7 @@ while True:
     for thread in threads:
         if thread:
             thread.start()
-
+            
     for thread in threads:
         if thread:
             thread.join()
@@ -131,4 +131,3 @@ while True:
 
     # Time in seconds to check for an update
     sleep(5)
-
