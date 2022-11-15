@@ -4,6 +4,7 @@ workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
 import configparser
 import load_neo4j
+import update_neo4j
 import datetime
 from AlertCypher import AlertCypher
 
@@ -27,10 +28,8 @@ def check (empty=False, db=AlertCypher("clinical"), date=datetime.date.today()):
 
 def update (db):
     # Updates database from last update date
-    print('CLINICAL TRIAL DB UPDATING...')
-    pass
-
+    update_neo4j.main(db)
+    
 def create (db):
     # Creates database from scratch
     load_neo4j.main(db)
-    #pass
