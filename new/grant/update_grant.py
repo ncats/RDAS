@@ -93,7 +93,9 @@ def update_configdata(configdata: dict[str, Any], fta: FilesToAdd) -> None:
 	files we visited on this run and when this run occurred, so next time we can
 	check back to figure out which files have changed.
 	"""
-	new_visited = set(configdata["internal"]["visited"]).union(fta.values())
+	new_visited = set(configdata["internal"]["visited"])
+	for lst in fta.values():
+		new_visited |= set(lst)
 	configdata["internal"]["visited"] = list(new_visited)
 	configdata["internal"]["last_run"] = time.time()
 
@@ -123,7 +125,6 @@ def main():
 
 		# Get all the new/modified files to add
 		fta = get_files_to_add(configdata)
-		print(fta)
 
 		print("Connecting to database")
 		# Establish a connection to the database
@@ -134,13 +135,13 @@ def main():
 			with driver.session() as session:
 
 				# run all the steps
-				for step in steps[13:]:
+				for step in steps[7:]:
 					print("\n\n" + step["description"] + "...")
 					step_to_fn(**step)(session, fta)
 
 				print("\nWriting grant.conf")
 				# Write the new configdata out to the file
-				update_configdata(configdata)
+				update_configdata(configdata, fta)
 				configfile.seek(0)
 				json.dump(configdata, configfile)
 				configfile.truncate()

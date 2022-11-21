@@ -305,12 +305,13 @@ steps: list[dict[str, str]] = [
 	# Zipping the two lists up and getting back a list of [ID, name pairs] is done
 	# with a list comprehension, the result of which we immediately unwind into
 	# separate nodes.
-	# TODO
-	# CREATE INDEX pi_name_index IF NOT EXISTS FOR (p:PrincipalInvestigator) ON (p.pi_name)
-	# and pi_id_index as well
 	{
 		"description": "Adding PrincipalInvestigator nodes and INVESTIGATED relationships",
 		"data_folder": "projects",
+		"constraint":
+			"""
+			CREATE INDEX pi_id_index IF NOT EXISTS FOR (p:PrincipalInvestigator) ON (p.pi_id)
+			""",
 		"query":
 			"""
 			WITH split(data.PI_IDS, ';') as ids,
@@ -351,6 +352,10 @@ steps: list[dict[str, str]] = [
 	{
 		"description": "Adding Annotation nodes and ANNOTATED relationships",
 		"data_folder": "annotation_umls",
+		"constraint":
+			"""
+			CREATE INDEX anno_cui_index IF NOT EXISTS FOR (a:Annotation) ON (a.umls_cui)
+			""",
 		"query":
 			"""
 			WITH [x in split(substring(data.SEMANTIC_TYPES, 1, size(data.SEMANTIC_TYPES) - 2), \"'\")
