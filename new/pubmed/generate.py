@@ -1,18 +1,16 @@
+import sys
+import os
+workspace = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(workspace)
+import update_pubmed
 import configparser
 import datetime
-import os
 from AlertCypher import AlertCypher
 import threading
 lock = threading.Lock()
 
 
-def check (empty=False, db=AlertCypher("pubmed"), date=datetime.date.today()):
-    workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    init = os.path.join(workspace, 'config.ini')
-    configuration = configparser.ConfigParser()
-    configuration.read(init)
-    #conf = open(init, "w")
-
+def check (empty=False, db=AlertCypher("pubmed")):
     if empty == True:
         create(db)
 
@@ -26,12 +24,13 @@ def update (db):
     # Updates database from last update date
     # connect to imported update script
     print('PUBMED DB UPDATING...')
-    pass
+    update_pubmed.main(db, update=True)
 
 def create (db):
     # Creates database from scratch
     # connect to imported create script
     # use threading lock functions to prevent same line prints
+    update_pubmed.main(db, update=False)
     lock.acquire()
     print('Creating PubMed Database...')
     lock.release()
