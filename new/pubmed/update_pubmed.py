@@ -12,39 +12,21 @@ import requests
 import jmespath
 import re
 
-# Loads in variables from config.ini file
+today = datetime.now()
+today = today.strftime("%Y/%m/%d")
 config = configparser.ConfigParser()
 config.read("config.ini")
 
-user = config.get("credentials","neo4j_username")
-password = config.get("credentials","neo4j_password")
-neo4j_uri = config.get("credentials","neo4j_uri")
-disease_uri = config.get("credentials","disease_uri")
-omim_api_key = config.get("credentials","omim_api_key")
-database_last_run = config.get("database","database_last_run")
-
-try:
-  from_disease = int(config.get("script","from_disease"))
-except ValueError as e:
-  from_disease = 0
-try:
-  to_disease = int(config.get("script","to_disease"))
-except ValueError as e:
-  to_disease = None
-
-def get_gard_list():
+def get_gard_list(db):
   #Returns list of the GARD Diseases
-  with GraphDatabase.driver(disease_uri) as driver:
+  with GraphDatabase.driver(db.getConf('CREDENTIALS','disease_uri')) as driver:
     with driver.session() as session:
-      #cypher_query = '''
-      #match p = (d:DATA)-[]-(m:S_GARD) where d.gard_id in ['GARD:0001358', 'GARD:0001360', 'GARD:0001362'] return  d, m
-      #'''
       cypher_query = '''
       match p = (d:DATA)-[]-(m:S_GARD) return  d, m
       '''
-      nodes = session.run(cypher_query, parameters={})
+      nodes = session.run(cypher_query)
       results = nodes.data()
-      #results = [record for record in nodes.data()]
+
       # Access the Node using the key 'd' and 'm' (defined in the return statement):
       myData = {}
       for res in results:
@@ -61,23 +43,29 @@ def get_gard_list():
   return myData
 
 #Richard: return 4720 records
-def get_gard_omim_mapping():
-  with GraphDatabase.driver(disease_uri) as driver:
+def get_gard_omim_mapping(db):
+  results = get_gard_list(db)
+  gardlist = list()
+  for res in results:
+    gardlist.append(results[res]['gard_id'])
+
+  with GraphDatabase.driver(db.getConf('CREDENTIALS','disease_uri')) as driver:
     with driver.session() as session:
       cypher_query = '''
       MATCH (o:S_ORDO_ORPHANET)-[:R_exactMatch|:R_equivalentClass]-(m:S_MONDO)-[:R_exactMatch|:R_equivalentClass]-(n:S_GARD)<-[:PAYLOAD]-(d:DATA)
-      WHERE d.is_rare=true and d.gard_id in ['GARD:0001358', 'GARD:0001360', 'GARD:0001362']
+      WHERE d.is_rare=true and d.gard_id in $glist
       WITH o,n,m,d
       MATCH (o)-[e:R_exactMatch|R_closeMatch]-(k:S_OMIM)<-[:PAYLOAD]-(h)
       RETURN DISTINCT d.gard_id as gard_id,d.name as name, e.name as match_type,h.notation as omim_id,h.label as omim_name
       ORDER BY gard_id
       '''
-      nodes = session.run(cypher_query, parameters={})
-      return [record for record in nodes.data()]
+      nodes = session.run(cypher_query, parameters={'glist':gardlist})
+      omim = [record for record in nodes.data()]
+      return omim
 
 #get OMIM json by OMIM number
-def find_OMIM_articles(OMIMNumber):
-  params = {'mimNumber': OMIMNumber, 'include':"all", 'format': 'json', 'apiKey': omim_api_key}
+def find_OMIM_articles(db, OMIMNumber):
+  params = {'mimNumber': OMIMNumber, 'include':"all", 'format': 'json', 'apiKey': db.getConf('CREDENTIALS', 'omim_key')}
   return requests.post("https://api.omim.org/api/entry?%s", data=params).json()
 
 #Parse OMIM json and return a map: pubmed_id -> OMIM section   
@@ -119,69 +107,66 @@ def get_article_in_section(omim_reference):
 
 def get_article_id(pubmed_id, driver):
   article_id = None
-  with driver.session() as session:
-    #pubmed_id = '11977179'
-    result = session.run("MATCH(a:Article {pubmed_id:$pmid}) return id(a) as id", pmid = pubmed_id)
-    #logging.info(f'result: {result}')
-    record = result.single()
-    #logging.info(f'record: {record}')
-    if record:
-      article_id = record["id"]
+  #pubmed_id = '11977179'
+  result = driver.run("MATCH(a:Article {pubmed_id:$pmid}) return id(a) as id", args = {'pmid':pubmed_id})
+  #logging.info(f'result: {result}')
+  record = result.single()
+  #logging.info(f'record: {record}')
+  if record:
+    article_id = record["id"]
   return article_id
 
 def get_disease_id(gard_id, driver):
   id = None
-  with driver.session() as session:
-    result = session.run("MATCH(a:Disease {gard_id:$gard_id}) return id(a) as id", gard_id = gard_id)
-    record = result.single()
-    #logging.info(f'record: {record}')
-    if record:
-      id = record["id"]
+  result = driver.run("MATCH(a:Disease {gard_id:$gard_id}) return id(a) as id", args = {'gard_id':gard_id})
+  record = result.single()
+  #logging.info(f'record: {record}')
+  if record:
+    id = record["id"]
   return id
     
-def save_omim_articles(mindate, maxdate):
+def save_omim_articles(db, mindate, maxdate):
+  omim_api_key = db.getConf('CREDENTIALS','omim_key')
   if len(omim_api_key) == 0:
     return
 
-  results = get_gard_omim_mapping()
-  results = itertools.islice(results, from_disease, to_disease)
-   #results = dict(itertools.islice(results, 0, None))
+  results = get_gard_omim_mapping(db)
+
   search_source = 'omim_evidence'
-  with GraphDatabase.driver(neo4j_uri, auth=(user,password)) as driver:
-    #with driver.session() as session:
-    for no, rd in enumerate(results):  
-      gard_id = rd["gard_id"]
-      omim_id = rd["omim_id"]
-      #logging.info(omim_id)
-      omim_json = None
-      try:
-        omim_json = find_OMIM_articles(omim_id.split(":")[1])
-      except Exception as e:
-        logging.error(f' Exception when search omim_id {omim_id}: error {e}')
-        continue        
-      sections = get_article_in_section(omim_json)
-      logging.info(f'sections: {sections}')
-      #For each pubmed_id, we need to first find (pubmed_id) exist:
-      #if exist, add property key "refInOMIM" (need add value true?) for the article, 
-      #    then, create OMIM node with property: omimId, omimName, omimSections,
-      #    then, create relationship (Article) - [:HAS_OMIM_REF] -> (OMIM)
-      #if not exist, need to save this article by call:
-      #    save_all(result, disease_node, pubmedID, search_source, session)
-      new_sections = dict(sections)
-      for pubmed_id in sections:
-        #print(f'{no}\t{gard_id}\t{omim_id}\t{pubmed_id}\t{sections[pubmed_id]}\t{rd["name"]}\t{rd["omim_name"]}')
-        article_id = get_article_id(pubmed_id, driver)
-        #logging.info(f'article_id: {article_id}')
-        if (article_id):
-          logging.info(f'PubMed evidence article already exists: {pubmed_id}, {article_id}')
-          #need add this function
-          save_omim_article_relation(article_id, omim_id, rd["omim_name"], sections[pubmed_id], driver)
-          new_sections.pop(pubmed_id)
-        else:
-          logging.info(f'PubMed evidence article NOT exists: {pubmed_id}, {article_id}')    
-      logging.info(f'sections after loop: {new_sections}' )   
-      #now add all pubmed articles in new_sections
-      save_omim_remaining_articles(gard_id, rd, new_sections, search_source, driver)      
+  for no, rd in enumerate(results):  
+    gard_id = rd["gard_id"]
+    print('UPDATING OMIM: ' + gard_id)
+    omim_id = rd["omim_id"]
+    #logging.info(omim_id)
+    omim_json = None
+    try:
+      omim_json = find_OMIM_articles(db, omim_id.split(":")[1])
+    except Exception as e:
+      logging.error(f' Exception when search omim_id {omim_id}: error {e}')
+      continue        
+    sections = get_article_in_section(omim_json)
+    logging.info(f'sections: {sections}')
+    #For each pubmed_id, we need to first find (pubmed_id) exist:
+    #if exist, add property key "refInOMIM" (need add value true?) for the article, 
+    #    then, create OMIM node with property: omimId, omimName, omimSections,
+    #    then, create relationship (Article) - [:HAS_OMIM_REF] -> (OMIM)
+    #if not exist, need to save this article by call:
+    #    save_all(result, disease_node, pubmedID, search_source, session)
+    new_sections = dict(sections)
+    for pubmed_id in sections:
+      #print(f'{no}\t{gard_id}\t{omim_id}\t{pubmed_id}\t{sections[pubmed_id]}\t{rd["name"]}\t{rd["omim_name"]}')
+      article_id = get_article_id(pubmed_id, db)
+      #logging.info(f'article_id: {article_id}')
+      if (article_id):
+        logging.info(f'PubMed evidence article already exists: {pubmed_id}, {article_id}')
+        #need add this function
+        save_omim_article_relation(article_id, omim_id, rd["omim_name"], sections[pubmed_id], db)
+        new_sections.pop(pubmed_id)
+      else:
+        logging.info(f'PubMed evidence article NOT exists: {pubmed_id}, {article_id}')    
+    logging.info(f'sections after loop: {new_sections}' )   
+    #now add all pubmed articles in new_sections
+    save_omim_remaining_articles(gard_id, rd, new_sections, search_source, db)      
           
 def save_omim_article_relation(article_id, omim_id, omim_name, sections, driver):
   query = '''
@@ -190,13 +175,12 @@ def save_omim_article_relation(article_id, omim_id, omim_name, sections, driver)
   MERGE (p:OMIMRef {omimId:$omim_id, omimName:$omim_name, omimSections:$sections})
   MERGE (a) - [r:HAS_OMIM_REF] -> (p)
   '''
-  with driver.session() as session:
-    session.run(query, parameters={
-      "article_id":article_id,
-      "omim_id":omim_id,
-      "omim_name":omim_name,
-      "sections":sections
-    })          
+  driver.run(query, args={
+    "article_id":article_id,
+    "omim_id":omim_id,
+    "omim_name":omim_name,
+    "sections":sections
+  })          
           
 def save_omim_remaining_articles(gard_id, rd, sections, search_source, driver):
   pubmed_ids = list(sections.keys())
@@ -238,14 +222,18 @@ def create_indexes():
 def find_articles(keyword, mindate, maxdate):
   #fetch articles and return a map
   params = {'db': 'pubmed', 'term': keyword, 'mindate':mindate, 'maxdate':maxdate, 'retmode': 'json', 'retmax':"1000"}
-  return requests.post("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?%s", data=params).json()
+  response = requests.post("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?%s", data=params).json()
+  return response
 
 def fetch_abstracts(pubmedIDs): 
   #fetch abstract for an article  
   url = "https://www.ebi.ac.uk/europepmc/webservices/rest/searchPOST"
   params = {'query': pubmedIDs, 'pageSize': '1000', 'resultType': 'core', 'format': 'json'}
   head = {'Content-Type': 'application/x-www-form-urlencoded'}
-  response = requests.post(url, data=params, headers = head).json()
+  try:
+    response = requests.post(url, data=params, headers = head).json()
+  except:
+    response = None
   return response
   
 def fetch_pubtator_annotations(pubmedId):
@@ -285,7 +273,7 @@ def create_disease(session, gard_id, rd):
   '''
   params = {
     "gard_id":gard_id,
-    #"gard_id":rd['gard_id'],
+    "gard_id":rd['gard_id'],
     "name":rd['name'], 
     "is_rare":rd['is_rare'], 
     "categories":rd['categories'], 
@@ -294,7 +282,7 @@ def create_disease(session, gard_id, rd):
     "all_ids":rd['all_ids']
   }
 
-  return session.run(query, **params).single().value()
+  return session.run(query, args=params).single().value()
 
 def create_article(tx, abstractDataRel, disease_node, search_source):
   #logging.info(f'{abstractDataRel}')
@@ -344,7 +332,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     #"isEpi": get_isEpi(title, abstract),
     "citedByCount":int(abstractDataRel['citedByCount']) if 'citedByCount' in abstractDataRel else 0,
     }
-  return tx.run(create_article_query, **params).single().value()
+  return tx.run(create_article_query, args=params).single().value()
 
 #Richard: change node from "Person" to "Author"
 #Richard: remove affiliation because most items don't have it
@@ -356,7 +344,7 @@ def create_authors(tx, abstractDataRel, article_node):
   MERGE (p) - [r:WROTE] -> (a)
   '''
   for author in abstractDataRel['authorList']['author']:
-    tx.run(create_author_query, parameters={
+    tx.run(create_author_query, args={
       "article_id":article_node,
       "fullName": author['fullName'] if 'fullName' in author else '',
       "firstName": author['firstName'] if 'firstName' in author else '',
@@ -374,7 +362,7 @@ def create_journal(tx, abstractDataRel, article_node):
   MERGE (a)-[:APPEARS_IN]->(ji)
   MERGE (ji)-[:CONTENT_OF]->(j)
   '''
-  tx.run(create_journal_query, parameters={
+  tx.run(create_journal_query, args={
     "article_id":article_node,
     "issue": abstractDataRel['issue'] if 'issue' in abstractDataRel else '',
     "volume": abstractDataRel['volume'] if 'volume' in abstractDataRel else '',
@@ -400,7 +388,7 @@ def create_keywords(tx, abstractDataRel, article_node):
   
   for keyword in abstractDataRel:
     if keyword:
-      tx.run(create_keyword_query, parameters={
+      tx.run(create_keyword_query, args={
         "article_id":article_node,      
         "keyword": keyword
       })
@@ -448,7 +436,7 @@ def create_epidemiology(tx, abstractDataRel, article_node):
           MERGE (n:EpidemiologyAnnotation {isEpi:$isEpi, epidemiology_type:$epidemiology_type, epidemiology_rate:$epidemiology_rate, date:$date, location:$location, sex:$sex, ethnicity:$ethnicity}) 
           MERGE (n) -[r:EPIDEMIOLOGY_ANNOTATION_FOR]-> (a)
           '''
-        tx.run(create_epidemiology_query, parameters={
+        tx.run(create_epidemiology_query, args={
           "article_id":article_node,
           "isEpi": isEpi,
           "epidemiology_type":epi_info['EPI'] if epi_info['EPI'] else [], 
@@ -466,7 +454,7 @@ def create_epidemiology(tx, abstractDataRel, article_node):
         MATCH (a:Article) WHERE id(a) = $article_id
         SET a.isEpi = $isEpi'''
     try:
-      tx.run(create_epidemiology_query, parameters={"article_id":article_node, 'isEpi': isEpi,})
+      tx.run(create_epidemiology_query, args={"article_id":article_node, 'isEpi': isEpi,})
     except Exception as e:
       logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is False.')
       raise e
@@ -478,7 +466,7 @@ def create_fullTextUrls(tx, abstractDataRel, article_node):
   MERGE (u) - [r:CONTENT_FOR] -> (a)
   '''
   for fullTextUrl in abstractDataRel:
-    tx.run(create_fullTextUrls_query, parameters={
+    tx.run(create_fullTextUrls_query, args={
       "article_id":article_node,
       "availability": fullTextUrl['availability'] if 'availability' in fullTextUrl else '',
       "availabilityCode": fullTextUrl['availabilityCode'] if 'availabilityCode' in fullTextUrl else '',
@@ -508,7 +496,7 @@ def create_meshHeadings(tx, abstractDataRel, article_node):
       "isMajorTopic": isMajorTopic,
       "descriptorName": meshHeading['descriptorName'] if 'descriptorName' in meshHeading else ''
     }
-    txout = tx.run(create_meshHeadings_query,**parameters).single()
+    txout = tx.run(create_meshHeadings_query, args=parameters).single()
     if (txout):
       meshHeadingId = txout.value()
       if ('meshQualifierList' in meshHeading and 'meshQualifier' in meshHeading['meshQualifierList']):
@@ -516,7 +504,7 @@ def create_meshHeadings(tx, abstractDataRel, article_node):
           #This converts the MeSH majorTopic_YN property to a boolean isMajorTopic
           if 'majorTopic_YN' in meshQualifier:
             isMajorTopic = True if meshQualifier['majorTopic_YN'] == 'Y' else False # The other option is 'N
-          tx.run(create_meshQualifiers_query, parameters={
+          tx.run(create_meshQualifiers_query, args={
           "meshHeading_id":meshHeadingId,
           "abbreviation": meshQualifier['abbreviation'] if 'abbreviation' in meshQualifier else '',
           "qualifierName": meshQualifier['qualifierName'] if 'qualifierName' in meshQualifier else '',
@@ -530,7 +518,7 @@ def create_chemicals(tx, abstractDataRel, article_node):
   MERGE (u:Substance {name:$name, registryNumber:$registryNumber}) - [r:SUBSTANCE_ANNOTATED_BY_PUBMED] -> (a)
   '''
   for chemical in abstractDataRel:
-    tx.run(create_chemicals_query, parameters={
+    tx.run(create_chemicals_query, args={
       "article_id":article_node,
       "name": chemical['name'] if 'name' in chemical else '',
       "registryNumber": chemical['registryNumber'] if 'registryNumber' in chemical else '',
@@ -562,7 +550,7 @@ def create_annotations(tx, pubtatorData, article_node):
         "infons_type": annotation['infons']['type'] if ('type' in annotation['infons'] and annotation['infons']['type']) else '',
         "text": annotation['text'] if 'text' in annotation else '',
       }
-      txout = tx.run(create_annotations_query, **parameters)
+      txout = tx.run(create_annotations_query, args=parameters)
 
 def create_disease_article_relation(tx, disease_node, article_node):
   query = '''
@@ -582,47 +570,49 @@ def save_disease_article_relation(disease_node, article_node, session):
   tx.commit()
       
 def save_all(abstract, disease_node, pubmedID, search_source, session):
-    tx = session.begin_transaction()
+    #tx = session.begin_transaction()
     #print(f'abstract: {abstract}')
 
     logging.info(f'Invoking create_article')
-    article_node = create_article(tx, abstract, disease_node, search_source)
+    article_node = create_article(session, abstract, disease_node, search_source)
     if ('meshHeadingList' in abstract and 
     'meshHeading' in abstract['meshHeadingList']):
       logging.info(f'Invoking create_meshHeading')
-      create_meshHeadings(tx, abstract['meshHeadingList']['meshHeading'], article_node)
+      create_meshHeadings(session, abstract['meshHeadingList']['meshHeading'], article_node)
 
     if ('authorList' in abstract and 
     'author' in abstract['authorList']):
       logging.info(f'Invoking create_authors')
-      create_authors(tx, abstract, article_node)
+      create_authors(session, abstract, article_node)
     
     if ('journalInfo' in abstract):
       logging.info(f'Invoking create_journal')
-      create_journal(tx, abstract['journalInfo'], article_node)
+      create_journal(session, abstract['journalInfo'], article_node)
     
     if ('keywordList' in abstract and 
     'keyword' in abstract['keywordList']):
       logging.info(f'Invoking create_keywords')
-      create_keywords(tx, abstract['keywordList']['keyword'], article_node)
+      create_keywords(session, abstract['keywordList']['keyword'], article_node)
     
     # This function adds isEpi (bool) to the article node and if True, adds EpidemiologyAnnotation node with relation Epidemiology_Annotation_For to Article node.
     # isEpi is null when there is no abstract to review.
     logging.info(f'Invoking create_epidemiology')
+    '''
     if ('abstractText' in abstract and 'title' in abstract):
-      create_epidemiology(tx, abstract, article_node)
-    
+      create_epidemiology(session, abstract, article_node)
+    '''
+
     if ('fullTextUrlList' in abstract and 
     'fullTextUrl' in abstract['fullTextUrlList']):
       logging.info(f'Invoking create_fullTextUrls')
-      create_fullTextUrls(tx, abstract['fullTextUrlList']['fullTextUrl'], article_node)
+      create_fullTextUrls(session, abstract['fullTextUrlList']['fullTextUrl'], article_node)
     
     if ('chemicalList' in abstract and 
     'chemical' in abstract['chemicalList']):
       logging.info(f'Invoking create_chemical')
-      create_chemicals(tx, abstract['chemicalList']['chemical'], article_node)
+      create_chemicals(session, abstract['chemicalList']['chemical'], article_node)
 
-    tx.commit()
+    #tx.commit()
     
     #Richard: add keywork, new way
     #Richard: this method has no effect to performance - it's still slow!
@@ -634,29 +624,30 @@ def save_all(abstract, disease_node, pubmedID, search_source, session):
     '''
     
     #begin another transaction save article annotations
-    tx = session.begin_transaction()
+    #tx = session.begin_transaction()
     logging.info(f'Invoking create annotations')
     annos = ''
     try:
       annos = fetch_pubtator_annotations(pubmedID)
-      create_annotations(tx, annos, article_node)
+      create_annotations(session, annos, article_node)
     except Exception as e:
       logging.warning(f'\nException creating annotations for article {pubmedID}:  {e}')
-    finally:
-      tx.commit()
 
-def save_articles(disease_node, pubmed_ids, search_source, driver):
+def save_articles(disease_node, pubmed_ids, search_source, session):
   ids = ' OR ext_id:'.join(pubmed_ids)
   ids = 'ext_id:' +ids
   #logging.info(ids)
 
   #logging.warning(f'Fetch pubmed abstracts for ({ids})')
   abstracts = fetch_abstracts(ids)
+  if abstracts == None:
+    return
   #logging.info(abstracts)
   if ('resultList' in abstracts and 'result' in abstracts['resultList'] and len(abstracts['resultList']['result']) > 0):
     try: 
       for result in abstracts['resultList']['result']:
         pubmedID = result['id'] if 'id' in result else None
+        #pubmedID = pubmedID.replace("PMC","")
         logging.info(f'pubmedID: {pubmedID}')
         if pubmedID is None:
           print('N', end='', flush=True)
@@ -664,135 +655,119 @@ def save_articles(disease_node, pubmed_ids, search_source, driver):
           continue
         else:
           print('.', end='', flush=True)
-        with driver.session() as session:
-          res = session.run("match(a:Article{pubmed_id:$pmid}) return id(a) as id", pmid = pubmedID)
+          res = session.run("match(a:Article{pubmed_id:$pmid}) return id(a) as id", args = {'pmid':pubmedID})
           record = res.single()
           if (record):
+            pass
+            '''
             article_node = record["id"]
             logging.info(f'PubMed evidence article already exists: {pubmedID}, {article_node}')
-            with driver.session() as session:
-              try:
-                save_disease_article_relation(disease_node, article_node, session)
-              except Exception as e:
-                logging.error(f" Exception when calling save_disease_article_relation, error: {e}")
+            try:
+              save_disease_article_relation(disease_node, article_node, session)
+            except Exception as e:
+              logging.error(f" Exception when calling save_disease_article_relation, error: {e}")
+            '''
           else:
-            with driver.session() as session:
-              try:
-                save_all(result, disease_node, pubmedID, search_source, session)
-              except Exception as e:
-                logging.error(f" Exception when calling save_all, error: {e}")
+            try:
+              save_all(result, disease_node, pubmedID, search_source, session)
+            except Exception as e:
+              logging.error(f" Exception when calling save_all, error: {e}")
     except Exception as e:
       #print('disease_node',disease_node, 'pubmed_ids',pubmed_ids, 'search_source',search_source,sep='\n')
       logging.error(f" Exception when iterating abstracts['resultList']['result'], result: {result}, error: {e}")  
 
-def save_disease_articles(mindate, maxdate):
+def save_disease_articles(db, mindate, maxdate):
   #Find and save article data for GARD diseases between from mindate to maxdate
-  with GraphDatabase.driver(neo4j_uri, auth=(user,password)) as driver:
-      #with driver.session() as session:
-      #Richard: move the session to each query because a single session like this will slow the program - why?
-        results = get_gard_list()
-        results = dict(itertools.islice(results.items(), from_disease, to_disease))
-        search_source = 'pubmed_evidence'
-        for idx, gard_id in enumerate(results):
-          if gard_id == None:
-            continue  
-          #time.sleep(0.02)
+      results = get_gard_list(db)
+      search_source = 'pubmed_evidence'
+      for idx, gard_id in enumerate(results):
+        if gard_id == None:
+          continue  
+
+        no = 0
+        rd = results[gard_id]
+
+        try:
+          pubmedIDs = find_articles(rd["name"],mindate,maxdate)
+          
+        except Exception as e:
+          logging.error(f'Exception when finding articles: {e}')
+          continue
+
+        try:
+          no = pubmedIDs['esearchresult']['count']
+        except:
           no = 0
-          rd = results[gard_id]
-          #logging.info(rd["name"])
-          logging.warning(f'{idx}: Invoking find_articles({rd["name"]},{mindate},{maxdate})')
-          try:
-            pubmedIDs = find_articles(rd["name"],mindate,maxdate)
-            no = pubmedIDs['esearchresult']['count']
-          except Exception as e:
-            logging.error(f'Exception when finding articles: {e}')
-            continue
-            
-          print(idx, gard_id, "Articles:", no, rd["name"])
-          logging.debug('Invoking create_gard_disease')
-          with driver.session() as session:
-            disease_node = create_disease(session, gard_id, rd)
-          if not 'esearchresult' in pubmedIDs:
-            logging.error(f'\nError find article for this disease: {gard_id}, {rd["name"]}')
-            continue
-          # Richard: combine all the IDs to one query string
 
-          #logging.info(pubmedIDs['esearchresult']['idlist'])
+        print(idx, gard_id, "Articles:", no, rd["name"])
+        disease_node = create_disease(db, gard_id, rd)
+        if not 'esearchresult' in pubmedIDs:
+          continue
+
+        try:
           pubmed_ids = pubmedIDs['esearchresult']['idlist']
-          try:
-            save_articles(disease_node, pubmed_ids, search_source, driver)
-          except Exception as e:
-            #print('disease_node',disease_node, 'pubmed_ids',pubmed_ids, 'search_source',search_source,sep='\n')
-            logging.error(f'Exception when finding articles for disease {gard_id}, error: {e}')
+          save_articles(disease_node, pubmed_ids, search_source, db)
+        except Exception as e:
+          #print('disease_node',disease_node, 'pubmed_ids',pubmed_ids, 'search_source',search_source,sep='\n')
+          logging.error(f'Exception when finding articles for disease {gard_id}, error1: {e}')
+          continue
+        
+        ids = ' OR ext_id:'.join(pubmedIDs['esearchresult']['idlist'])
+        #logging.info(ids)
+        ids = 'ext_id:' +ids
+        #logging.info(ids)
+        logging.info(f"Total articles find: {pubmedIDs['esearchresult']['count']}")
+
+        try:
+          #logging.warning(f'Fetch pubmed abstracts for ({ids})')
+          #time.sleep(0.5)
+          abstracts = fetch_abstracts(ids)
+          if abstracts == None:
             continue
-          
-          ids = ' OR ext_id:'.join(pubmedIDs['esearchresult']['idlist'])
-          #logging.info(ids)
-          ids = 'ext_id:' +ids
-          #logging.info(ids)
-          logging.info(f"Total articles find: {pubmedIDs['esearchresult']['count']}")
+          #logging.info(abstracts)
+          if ('resultList' in abstracts and 'result' in abstracts['resultList'] and len(abstracts['resultList']['result']) > 0):
+            for result in abstracts['resultList']['result']:
+              #time.sleep(0.02)
+              pubmedID = result['id'] if 'id' in result else None
+              #pubmedID = pubmedID.replace('PMC','')
+              if pubmedID is None:
+                print('N', end='', flush=True)
+                print(f'\n{result}\n')
+                continue
+              else:
+                print('.', end='', flush=True)
 
-          try:
-            #logging.warning(f'Fetch pubmed abstracts for ({ids})')
-            #time.sleep(0.5)
-            abstracts = fetch_abstracts(ids)
-            #logging.info(abstracts)
-            if ('resultList' in abstracts and 'result' in abstracts['resultList'] and len(abstracts['resultList']['result']) > 0):
-              for result in abstracts['resultList']['result']:
-                #time.sleep(0.02)
-                pubmedID = result['id'] if 'id' in result else None
-                if pubmedID is None:
-                  print('N', end='', flush=True)
-                  print(f'\n{result}\n')
-                  continue
-                else:
-                  print('.', end='', flush=True)
-                with driver.session() as session:
-                  res = session.run("match(a:Article{pubmed_id:$pmid}) set a.pubmed_evidence=TRUE return id(a)", parameters={"pmid":pubmedID})
-                logging.info(f'res: {res}')
-                alist = list(res)
-                matching_articles = len(alist)
-                logging.info(f'matching_articles: {matching_articles}')
-                if (matching_articles > 0):
-                  article_node = alist[0].value()
-                  logging.info(f'PubMed evidence article already exists: {pubmedID}, {article_node}')
-                  with driver.session() as session:
-                    save_disease_article_relation(disease_node, article_node, session)
-                else:
-                  with driver.session() as session:
-                    save_all(result, disease_node, pubmedID, search_source, session)
-              print()
-          except Exception as e:
-            logging.error(f'Exception when finding articles for disease {gard_id}, error: {e}')
-            continue
+              res = db.run("match(a:Article{pubmed_id:$pmid}) set a.pubmed_evidence=TRUE return id(a)", args={"pmid":pubmedID})
+              alist = list(res)
+              matching_articles = len(alist)
+
+              if (matching_articles > 0):
+                pass
+                '''
+                article_node = alist[0].value()
+                save_disease_article_relation(disease_node, article_node, db)
+                '''
+              else:
+                save_all(result, disease_node, pubmedID, search_source, db)
+            print()
+        except Exception as e:
+          logging.error(f'Exception when finding articles for disease {gard_id}, error2: {e}')
+          continue
           
 
 
-def retrieve_articles():
+def retrieve_articles(db, last_update):
   """Gets articles from multiple different sources (PubMed,NCATS databases,OMIM) within a 50 year rolling window or since last script execution"""
-  today = datetime.now()
-  if len(database_last_run) == 0:
-    mindate = today - relativedelta(years=50)
-    mindate = mindate.strftime(r"%Y/%m/%d")
+  #today = today.strftime("%m/%d/%y")
+  save_disease_articles(db, last_update, today)
+  save_omim_articles(db, last_update, today)
+
+def main(db, update=False):
+  if update == True:
+    last_update = db.getConf('DATABASE','pubmed_update')
+    last_update = datetime.strptime(last_update, "%m/%d/%y")
   else:
-    mindate = database_last_run
-  today = today.strftime(r"%Y/%m/%d")
-  
-  logging.info(f'Started save_new_artilcles. Mindate: {mindate}  Maxdate: {today}')
-  
-  save_disease_articles(mindate, today)
-  save_omim_articles(mindate, today)
+    last_update = datetime.strptime(today, "%Y/%m/%d") - relativedelta(years=50)
 
-def main():
-  logging.basicConfig(filename='update_neo4j.log', filemode='w', level=logging.ERROR, format='%(asctime)s %(levelname)s:%(message)s')
-  print('Started')
-  #create_indexes()
-  retrieve_articles()
-  print('Finished')
-
-if __name__ == '__main__':
-  main()
-
-  config.set("database","database_last_run",datetime.now().strftime(r"%Y/%m/%d"))
-  with open("config.ini","w") as conf:
-    config.write(conf)
+  last_update = last_update.strftime("%Y/%m/%d")
+  retrieve_articles(db, last_update)

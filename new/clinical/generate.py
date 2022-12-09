@@ -3,20 +3,14 @@ import sys
 workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
 import configparser
-import load_neo4j
-import update_neo4j
+import load_clinical
+import update_clinical
 import datetime
 from AlertCypher import AlertCypher
-
 import threading
 lock = threading.Lock()
 
-def check (empty=False, db=AlertCypher("clinical"), date=datetime.date.today()):
-    workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    init = os.path.join(workspace, 'config.ini')
-    configuration = configparser.ConfigParser()
-    configuration.read(init)
-
+def check (empty=False, db=AlertCypher("clinical")):
     if empty == True:
         create(db)
 
@@ -28,8 +22,8 @@ def check (empty=False, db=AlertCypher("clinical"), date=datetime.date.today()):
 
 def update (db):
     # Updates database from last update date
-    update_neo4j.main(db)
+    update_clinical.main(db)
     
 def create (db):
     # Creates database from scratch
-    load_neo4j.main(db)
+    load_clinical.main(db)

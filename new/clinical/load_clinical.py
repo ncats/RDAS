@@ -9,6 +9,7 @@ from neo4j import GraphDatabase
 from csv import DictReader
 import configparser
 import threading
+import pandas as pd
 lock = threading.Lock()
 
 def main(db):
@@ -20,6 +21,7 @@ def main(db):
     cnd = os.path.join(workspace, 'conditions_matched_short.csv')
     with open(cnd, 'r') as read_obj:
         gard_matches = DictReader(read_obj)
+
         for gard_mapping in gard_matches:
             try:
                 # extract data from mapping
@@ -98,33 +100,33 @@ def main(db):
 
                     except:
                         pass
-    
-    lock.acquire()
-    print('Finishing up Clinical Trial Database Creation...')
-    lock.release()
+        
+        lock.acquire()
+        print('Finishing up Clinical Trial Database Creation...')
+        lock.release()
 
-    for idx in range(len(data_model.additional_class_fields)):     
-        apoc_cypher = 'MATCH (x:{tag}) WITH '.format(tag=data_model.additional_class_names[idx])
-        for idy in range(len(data_model.additional_class_fields[idx])):
-            apoc_cypher += 'toLower(x.{name}) AS label{name}, '.format(name=data_model.additional_class_fields[idx][idy])
+        for idx in range(len(data_model.additional_class_fields)):     
+            apoc_cypher = 'MATCH (x:{tag}) WITH '.format(tag=data_model.additional_class_names[idx])
+            for idy in range(len(data_model.additional_class_fields[idx])):
+                apoc_cypher += 'toLower(x.{name}) AS label{name}, '.format(name=data_model.additional_class_fields[idx][idy])
+            apoc_cypher += 'COLLECT(x) AS nodes CALL apoc.refactor.mergeNodes(nodes, {properties:"overwrite",mergeRels:true}) YIELD node RETURN *'
+            db.run(apoc_cypher)
+        
+        apoc_cypher = 'MATCH (x:GARD)'
+        apoc_cypher += ' WITH COLLECT(x) AS nodes CALL apoc.refactor.rename.nodeProperty("GardName", "GARDName", nodes) YIELD total RETURN true'
+        db.run(apoc_cypher)
+        
+        apoc_cypher = 'MATCH (x:ClinicalTrial) WITH '
+        apoc_cypher += 'toLower(x.NCTId) AS nct, '
         apoc_cypher += 'COLLECT(x) AS nodes CALL apoc.refactor.mergeNodes(nodes, {properties:"overwrite",mergeRels:true}) YIELD node RETURN *'
         db.run(apoc_cypher)
-    
-    apoc_cypher = 'MATCH (x:GARD)'
-    apoc_cypher += ' WITH COLLECT(x) AS nodes CALL apoc.refactor.rename.nodeProperty("GardName", "GARDName", nodes) YIELD total RETURN true'
-    db.run(apoc_cypher)
-    
-    apoc_cypher = 'MATCH (x:ClinicalTrial) WITH '
-    apoc_cypher += 'toLower(x.NCTId) AS nct, '
-    apoc_cypher += 'COLLECT(x) AS nodes CALL apoc.refactor.mergeNodes(nodes, {properties:"overwrite",mergeRels:true}) YIELD node RETURN *'
-    db.run(apoc_cypher)
 
-    now = date.today()
-    now = now.strftime("%m/%d/%y")
-    now = "\"{now}\"".format(now=now)
-    apoc_cypher = 'MATCH (x:ClinicalTrial) SET x.DateCreated = {now} RETURN x'.format(now=now)
-    db.run(apoc_cypher)
-    
-    lock.acquire() 
-    print('CLINICAL TRIAL DATABASE CREATED')
-    lock.release()
+        now = date.today()
+        now = now.strftime("%m/%d/%y")
+        now = "\"{now}\"".format(now=now)
+        apoc_cypher = 'MATCH (x:ClinicalTrial) SET x.DateCreated = {now} RETURN x'.format(now=now)
+        db.run(apoc_cypher)
+        
+        lock.acquire() 
+        print('CLINICAL TRIAL DATABASE CREATED')
+        lock.release()

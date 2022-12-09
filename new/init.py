@@ -5,9 +5,10 @@ sys.path.append(workspace)
 import clinical.generate, grant.generate, pubmed.generate
 from neo4j import GraphDatabase
 from AlertCypher import AlertCypher
+from csv import DictReader
 import threading
 import configparser
-import datetime
+from datetime import datetime, date
 from time import sleep
 
 def populate(db):
@@ -24,48 +25,55 @@ def populate(db):
         print("[{dbtype}] Error finding Neo4j database. Check to see if database exists and rerun script".format(dbtype=db.DBtype().upper()))
 
 def updateCheck(db):
-    unpack = {"clinical":["clinical_update","clinical_interval"], 
-        "grant":["grant_update","grant_interval"], 
-        "pubmed":["pubmed_update","pubmed_interval"]}
+    unpack = {"clinical":["clinical_update","clinical_interval", clinical], 
+        "grant":["grant_update","grant_interval", grant], 
+        "pubmed":["pubmed_update","pubmed_interval", pubmed]}
 
     updateInfo = unpack[db.DBtype()]
     # Reload configuration information
-    configuration.read(init)
-    
-    update = configuration.get("DATABASE", updateInfo[0])
+
+    update = db.getConf("DATABASE", updateInfo[0])
     if update == "":
         update = datetime.date.today()
         update = update.strftime("%m/%d/%y")
-        update = datetime.datetime.strptime(update,"%m/%d/%y")
+        update = datetime.strptime(update,"%m/%d/%y")
     else:
-        update = datetime.datetime.strptime(update,"%m/%d/%y")
+        update = datetime.strptime(update,"%m/%d/%y")
 
-    current_time = datetime.date.today()
+    current_time = datetime.now()
     current_time = current_time.strftime("%m/%d/%y")
-    current_time = datetime.datetime.strptime(current_time,"%m/%d/%y")
+    current_time = datetime.strptime(current_time,"%m/%d/%y")
 
     delta = current_time - update
 
-    interval = int(configuration.get("DATABASE", updateInfo[1]))
+    interval = int(db.getConf("DATABASE", updateInfo[1]))
     if delta.days > interval:
-        thread = threading.Thread(target=clinical.generate.check, args=(False, db,), daemon=True)
-        return {db.DBtype():[thread, delta, update]}
+        thread = threading.Thread(target=updateInfo[2].generate.check, args=(False, db,), daemon=True)
+        return {db.DBtype():[thread, delta, update, db, db.DBtype()]}
     else:
-        return {db.DBtype():[None, delta, update]}
+        return {db.DBtype():[None, delta, update, db, db.DBtype()]}
 
-def updateDate(threads):
-    date = datetime.date.today()
-    conf = open(init, "w")
-    for i in range(len(threads)):
-        if threads[i]:
-            if i == 0:
-                configuration.set('DATABASE', 'clinical_update', date.strftime("%m/%d/%y"))
-            elif i == 1:
-                configuration.set('DATABASE', 'grant_update', date.strftime("%m/%d/%y"))
-            elif i == 2:
-                configuration.set('DATABASE', 'pubmed_update', date.strftime("%m/%d/%y"))
-    configuration.write(conf)
-    conf.close()
+def updateDate(info):
+    date = datetime.now().strftime("%m/%d/%y")
+    try:
+        if info["clinical"][0]:
+            info["clinical"][3].setConf("DATABASE", "clinical_update", date)
+    except TypeError:
+        pass
+    try:
+        if info["grant"][0]:
+            info["grant"][3].setConf("DATABASE", "grant_update", date)
+    except TypeError:
+        pass
+    try:
+        if info["pubmed"][0]:
+            info["pubmed"][3].setConf("DATABASE", "pubmed_update", date)
+    except TypeError:
+        pass
+    
+
+def updateGard():
+    pass
 
 print("[RARE DISEASE ALERT SYSTEM]\n---------------------------")
 
@@ -99,25 +107,31 @@ updateDate(threads)
 
 # Gets last database update from configuration file
 while True:
-    threads = list()
-    CT_info = updateCheck(CTcypher)["clinical"]
-    GNT_info = updateCheck(GNTcypher)["grant"]
-    PM_info = updateCheck(PMcypher)["pubmed"]
+    updateGard()
 
-    if CT_info[0]:
-        threads.append(CT_info[0])
-    if GNT_info[0]:
-        threads.append(GNT_info[0])
-    if PM_info[0]:
-        threads.append(PM_info[0])
+    threads = list()
+    info = dict()
+    CT_info = updateCheck(CTcypher)["clinical"]
+    info["clinical"] = CT_info
+    GNT_info = updateCheck(GNTcypher)["grant"]
+    info["grant"] = GNT_info
+    PM_info = updateCheck(PMcypher)["pubmed"]
+    info["pubmed"] = PM_info
+
+    if info["clinical"][0]:
+        threads.append(info["clinical"][0])
+    if info["grant"][0]:
+        threads.append(info["grant"][0])
+    if info["pubmed"][0]:
+        threads.append(info["pubmed"][0])
     
     print("\n-----------------------\nDays Since Last Update:\n[CLINICAL] {CT_day} Days ({CT_update})\n[GRANT] {GNT_day} Days ({GNT_update})\n[PUBMED] {PM_day} Days ({PM_update})\n"
-            .format(CT_day=str(CT_info[1].days), 
-            GNT_day=str(GNT_info[1].days), 
-            PM_day=str(PM_info[1].days), 
-            CT_update=str(CT_info[2]),
-            GNT_update=str(GNT_info[2]),
-            PM_update=str(PM_info[2])))
+            .format(CT_day=str(info["clinical"][1].days), 
+            GNT_day=str(info["grant"][1].days), 
+            PM_day=str(info["pubmed"][1].days), 
+            CT_update=str(info["clinical"][2]),
+            GNT_update=str(info["grant"][2]),
+            PM_update=str(info["pubmed"][2])))
 
     for thread in threads:
         if thread:
@@ -127,7 +141,7 @@ while True:
         if thread:
             thread.join()
 
-    updateDate(threads)
+    updateDate(info)
 
     # Time in seconds to check for an update
     sleep(5)
