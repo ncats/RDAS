@@ -2,7 +2,7 @@ import sys
 import os
 workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
-import clinical.generate, grant.generate, pubmed.generate
+import clinical.generate, grant.generate, pubmed.generate, gard.generate
 from neo4j import GraphDatabase
 from AlertCypher import AlertCypher
 from csv import DictReader
@@ -12,7 +12,7 @@ from datetime import datetime, date
 from time import sleep
 
 def populate(db):
-    unpack = {"clinical":clinical, "grant":grant, "pubmed":pubmed}
+    unpack = {"clinical":clinical, "grant":grant, "pubmed":pubmed, "gard":gard}
     cur_module = unpack[db.DBtype()]
     try:
         response = db.run("MATCH (x) RETURN x LIMIT 1").single()
@@ -26,15 +26,16 @@ def populate(db):
 
 def updateCheck(db):
     unpack = {"clinical":["clinical_update","clinical_interval", clinical], 
-        "grant":["grant_update","grant_interval", grant], 
-        "pubmed":["pubmed_update","pubmed_interval", pubmed]}
+        "grant":["grant_update","grant_interval", grant],
+        "pubmed":["pubmed_update","pubmed_interval", pubmed],
+        "gard":["gard_update","gard_interval", gard]}
 
     updateInfo = unpack[db.DBtype()]
     # Reload configuration information
 
     update = db.getConf("DATABASE", updateInfo[0])
     if update == "":
-        update = datetime.date.today()
+        update = datetime.now()
         update = update.strftime("%m/%d/%y")
         update = datetime.strptime(update,"%m/%d/%y")
     else:
@@ -70,8 +71,13 @@ def updateDate(info):
             info["pubmed"][3].setConf("DATABASE", "pubmed_update", date)
     except TypeError:
         pass
-    
 
+    try:
+        if info["gard"][0]:
+            info["gard"][3].setConf("DATABASE", "gard_update", date)
+    except TypeError:
+        pass
+        
 def updateGard():
     pass
 
@@ -87,6 +93,7 @@ configuration.read(init)
 CTcypher = AlertCypher("clinical")
 GNTcypher = AlertCypher("grant")
 PMcypher = AlertCypher("pubmed")
+GARDcypher = AlertCypher("gard")
 
 # Checks if clinical trial database is empty. If it is, it creates it from scratch on a seperate thread
 
@@ -94,6 +101,7 @@ threads = list()
 threads.append(populate(CTcypher))
 threads.append(populate(GNTcypher))
 threads.append(populate(PMcypher))
+threads.append(populate(GARDcypher))
 
 for thread in threads:
     if thread:
@@ -118,20 +126,27 @@ while True:
     PM_info = updateCheck(PMcypher)["pubmed"]
     info["pubmed"] = PM_info
 
+    GARD_info = updateCheck(GARDcypher)["gard"]
+    info["gard"] = GARD_info
+
     if info["clinical"][0]:
         threads.append(info["clinical"][0])
     if info["grant"][0]:
         threads.append(info["grant"][0])
     if info["pubmed"][0]:
         threads.append(info["pubmed"][0])
+    if info["gard"][0]:
+        threads.append(info["gard"][0])
     
-    print("\n-----------------------\nDays Since Last Update:\n[CLINICAL] {CT_day} Days ({CT_update})\n[GRANT] {GNT_day} Days ({GNT_update})\n[PUBMED] {PM_day} Days ({PM_update})\n"
+    print("\n-----------------------\nDays Since Last Update:\n[CLINICAL] {CT_day} Days ({CT_update})\n[GRANT] {GNT_day} Days ({GNT_update})\n[PUBMED] {PM_day} Days ({PM_update})\n[GARD] {GARD_day} Days ({GARD_update})\n"
             .format(CT_day=str(info["clinical"][1].days), 
             GNT_day=str(info["grant"][1].days), 
-            PM_day=str(info["pubmed"][1].days), 
+            PM_day=str(info["pubmed"][1].days),
+            GARD_day=str(info["gard"][1].days), 
             CT_update=str(info["clinical"][2]),
             GNT_update=str(info["grant"][2]),
-            PM_update=str(info["pubmed"][2])))
+            PM_update=str(info["pubmed"][2]),
+            GARD_update=str(info["gard"][2])))
 
     for thread in threads:
         if thread:
