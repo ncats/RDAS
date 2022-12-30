@@ -26,7 +26,7 @@ def populate(db):
 
 def updateCheck(db):
     unpack = {"clinical":["clinical_update","clinical_interval", clinical], 
-        "grant":["grant_update","grant_interval", grant], 
+        "grant":["grant_update","grant_interval", grant],
         "pubmed":["pubmed_update","pubmed_interval", pubmed],
         "gard":["gard_update","gard_interval", gard]}
 
@@ -71,13 +71,13 @@ def updateDate(info):
             info["pubmed"][3].setConf("DATABASE", "pubmed_update", date)
     except TypeError:
         pass
+
     try:
         if info["gard"][0]:
             info["gard"][3].setConf("DATABASE", "gard_update", date)
     except TypeError:
         pass
-    
-
+        
 def updateGard():
     pass
 
@@ -125,6 +125,7 @@ while True:
     info["grant"] = GNT_info
     PM_info = updateCheck(PMcypher)["pubmed"]
     info["pubmed"] = PM_info
+
     GARD_info = updateCheck(GARDcypher)["gard"]
     info["gard"] = GARD_info
 

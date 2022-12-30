@@ -135,7 +135,7 @@ def main():
 			with driver.session() as session:
 
 				# run all the steps
-				for step in steps[7:]:
+				for step in steps:
 					print("\n\n" + step["description"] + "...")
 					step_to_fn(**step)(session, fta)
 

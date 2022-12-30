@@ -208,20 +208,22 @@ steps: list[dict[str, str]] = [
 			""",
 		"query":
 			"""
+			WITH [x in split(data.PROJECT_TERMS, ';') WHERE x <> "" | x]
+				AS terms, data
 			MERGE (p:Project {
 				application_id: toInteger(data.APPLICATION_ID),
 				funding_year: toInteger(data.FY)
 				})
 				ON CREATE SET
 					p.phr = data.PHR,
-					p.terms = split(data.PROJECT_TERMS, ';'),
+					p.terms = terms,
 					p.total_cost = toInteger(data.TOTAL_COST),
 					p.title = data.PROJECT_TITLE,
 					p.application_type = toInteger(data.APPLICATION_TYPE),
 					p.subproject_id = toInteger(data.SUBPROJECT_ID)
 				ON MATCH SET
 					p.phr = coalesce(data.PHR, p.phr),
-					p.terms = coalesce(split(data.PROJECT_TERMS, ';'), p.terms),
+					p.terms = coalesce(terms, p.terms),
 					p.total_cost = coalesce(toInteger(data.TOTAL_COST), p.total_cost),
 					p.title = coalesce(data.PROJECT_TITLE),
 					p.application_type =
@@ -274,19 +276,22 @@ steps: list[dict[str, str]] = [
 
 	# Add Disease nodes and connect to associated DiseaseCategory nodes as well as
 	# back to the Project node.
+	# See Annotation nodes comment for what the WITH statement is doing
 	{
 		"description": "Adding Disease nodes and IN_CLASS, RESEARCHED_BY relationships",
 		"data_folder": "disease",
 		"query":
 			"""
+			WITH [x in split(substring(data.SYNONYMS, 2, size(data.SYNONYMS) - 4), "', '")
+				WHERE size(x) > 0 | x] as snns, data
 			MERGE (d:Disease {
 				name: data.NAME,
 				gard_id: data.GARD_ID,
 				is_rare: data.IS_RARE = 'TRUE'})
 				ON CREATE SET
-					d.synonyms = data.SYNONYMS
+					d.synonyms = snns
 				ON MATCH SET
-					d.synonyms = data.SYNONYMS
+					d.synonyms = snns
 			WITH d, data
 			UNWIND split(data.CATEGORIES, ';') AS x
 			MATCH (c:DiseaseCategory {name: x})
@@ -321,13 +326,9 @@ steps: list[dict[str, str]] = [
 			] as pi_data
 			MERGE (p:PrincipalInvestigator {
 				pi_id: pi_data[0],
-				pi_name: pi_data[1]})
-				ON CREATE SET
-					p.org_state = data.ORG_STATE,
-					p.org_name = data.ORG_NAME
-				ON MATCH SET
-					p.org_state = coalesce(data.ORG_STATE, p.org_state),
-					p.org_name = coalesce(data.ORG_NAME, p.org_name)
+				pi_name: pi_data[1],
+				org_state: coalesce(data.ORG_STATE, ""),
+				org_name: coalesce(data.ORG_NAME, "")})
 			WITH p, data
 			MATCH (r:Project {application_id: toInteger(data.APPLICATION_ID)})
 			MERGE (r)<-[:INVESTIGATED]-(p)

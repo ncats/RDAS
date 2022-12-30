@@ -23,7 +23,6 @@ def check (empty=False, db=AlertCypher("clinical")):
 def update (db):
     # Updates database from last update date
     update_clinical.main(db)
-    #update_clinical.main(db)
     
 def create (db):
     # Creates database from scratch

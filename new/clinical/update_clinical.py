@@ -22,6 +22,7 @@ def main(db):
     all_new_trials = list()
     
     cnd = os.path.join(workspace, 'conditions_matched.csv')
+
     with open(cnd, 'r') as read_obj:
         gard_matches = DictReader(read_obj)
 
@@ -58,7 +59,9 @@ def main(db):
                                 
                                 # create clinical trial node
                                 clinical_trial_data_string = load_neo4j_functions.data_string(full_trial, data_model.ClinicalTrial, CT=True)
+
                                 running = True
+
                                 if not len(clinical_trial_data_string) > 0:
                                     continue
                                 cypher_add_trial = cypher_add_trial_base + 'CREATE (gard)-[:gard_in]->(trial:ClinicalTrial{' 

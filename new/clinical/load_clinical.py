@@ -19,6 +19,7 @@ def main(db):
     
     # iterate through list of diseases/conditions
     cnd = os.path.join(workspace, 'conditions_matched.csv')
+
     with open(cnd, 'r') as read_obj:
         gard_matches = DictReader(read_obj)
 
@@ -39,8 +40,6 @@ def main(db):
                 continue
         
             for trial in trials:
-                #running = True
-                #while running:
                 try:
                     # generate neo4j query to attach disease to clinical trial
                     cypher_add_trial_base = 'MATCH (gard:GARD) WHERE gard.GardName = \'' + GARD_name + '\''
