@@ -90,7 +90,6 @@ def add_trial(db, trials, GARDId):
 
 def main(db, update=False):
     print('CLINICAL TRIAL DB UPDATING...')
-
     num_new_trials = 0
     cnd = os.path.join(workspace, 'conditions_matched.csv')
 
