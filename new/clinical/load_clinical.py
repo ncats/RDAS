@@ -62,6 +62,7 @@ def main(db):
                         now = now.strftime("%m/%d/%y")
 
                         cypher_add_trial = cypher_add_trial_base + 'CREATE (gard)-[:gard_in]->(trial:ClinicalTrial{x.DateCreated = \'{now}\','.format(now=now)
+
                         cypher_add_trial += clinical_trial_data_string[0]
                         cypher_add_trial += '})'
 
@@ -90,15 +91,13 @@ def main(db):
                         for b in range(1,len(cypher_batch),4):
                             b = cypher + ' '.join(cypher_batch[b:b+4])
                             db.run(b)
-                            
-                        
+                    
                     # if node exists
                     else:
                         # attach to gard node
                         cypher_add_trial = cypher_add_trial_base + 'MATCH (trial:ClinicalTrial) WHERE trial.NCTId = \'' + trial + '\''
                         cypher_add_trial += 'MERGE (gard)-[:gard_in]->(trial)'
                         db.run(cypher_add_trial)
-
                 except:
                     pass
         
