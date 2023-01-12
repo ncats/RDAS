@@ -1,0 +1,4 @@
+Hi {{ first_name }},
+
+Your case report, {{drugs}}{{tail}} has been rejected by a curator.
+

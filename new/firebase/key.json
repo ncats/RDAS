@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "ncats-summer-interns",
+  "private_key_id": "606db0711ba1d6c96a33195d9da9acaba0667da2",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDNu4Cm3CCqmbeZ\nPdCa9Hiiy2kk3xxw4DbbFULKVTRwg0H2ev7RZvjw7wcToYF0E4R6rZynekN7wDvj\nwxfUWKmor/NxdD6Q3FhnJy5T90YBgtzX5BO/Eabw1ID57Tv43fNn6y/340y9yqlu\n+xYGuXXooIUjcc7w2AbMPaGwdNz8hEQB120+nIff3q0VKYrf4cibt7Tbl6b+yvw3\nLfj21JJ3mkExInat4l1cWAe3HDMH4Qu1MiOTm6FxGcyMjlfz93Yb+S5KHF7xo332\ne0aWqmhqWuSawGkYji0iVIwUhsvNVaY8i3FbwwJmxoW3QFTTs1QHT3sKFSJfuI//\n0Z2Pv+TdAgMBAAECggEAL1UiRkGC6n0vNnx4UA5K6vltmWQTgQy00jbUBQURaYlp\nVbH6imbsg1IbCLMxu2j6I9dpoUaJ3CDgJoiuJNa5QewpUEL0WhO36xOinwLXAmX/\nNVRuDpmbFPFvMxEXqSw3YgNEJ/4Nm+TSkowGB0oIDJtRxlPazqKE/dx4JMbeSOIj\nwbJel2U4gYNY3CO0IpDVI+HRuxQ3NXszQVZFCZsZ6Ed5p1t36wd8qGx2ysDPRG52\nqWEgAdEOMBj3dFn1rT2ajZ5wqMeMTTE6WKDl3D07lEM+Ba2lT7vBTRfmIu79jbDi\nIlVVjT3MOIa54yJTPnJetWr5dGYLVHa5pEK+vb1hqQKBgQDlm36QNrmMzFhi+NiK\nwiq+Pmspe45XOcv6tm7cq3s7yxlNAudhjKOkzFxc9dxZ3u3sYIZZoXQTIh1H3kgD\n3NPs2lrOiZXAjl+wN8CRvK0fWDW5HBmGbVMAJauiok/pJpqkGC7IJU3Bpo3rFQG8\nsREZdF8uLXBo3Jq8PH3AjWZDxwKBgQDlYXSIhDSdTye2rdhzBWtjy17ajAuU8c/l\nNTNn87z52LnVIUYy3haw9Se45OkoBTtUcRiy1t6Dy9wY4S+TtHkCQehLDTsL63B/\npZ05Q3l35+OYNWmttPVpNjrns0GkMXhsEQQAeMlfeeofeZg70+UAi6Sym2MXQhag\nZ1UI6DOKOwKBgG2ezFEb34CKOxSdi/zLcM69TDpU5ANe87TyDoHKWR6V+7FZ1pAr\nLiHK87nqI9bAaUU2XE5El/9ehS4/wJAfiQqGwV3kMBvrnWGrbIPn2ZuiaJvE/6a/\nYSYr1gLijVZZ+PCpHwStUq9GznDS6a5lty048ww/43AdCr8d/kfE+nMXAoGBAJI8\n3YSjdL/N1S3cC6DZFawb3i9LFZ8xwy8ICev+Mr6+80rz2cNYX/MVeOuh1RvUqgyd\nxfdOkbJI59tcxW5Pos5TonsmxjxFMAXRWjlF0U0mo61IcEV0lvkqv8c0O2couvN6\nrah3WTrriN3kMbAC2X7NiITuF/CeC7rb5hS1pRY9AoGBAIeyTGj3PjW0bArcKweI\nVmVJ5JOk25qc/g/WxuRvw6qHrbQEZ32xxvVkqFGbtEoGsCD9N4CCDE6S7GGYDTO2\nNA1vDHVpsRKUVZBfo4GCvqoWoIQz1OPtBpMQfDLOQqKAQwbZc3xQ1+2QyySrnpRl\nM0zQTDZcteFBuEW69+AyJVh4\n-----END PRIVATE KEY-----\n",
+  "client_email": "rdas-serviceaccount@ncats-summer-interns.iam.gserviceaccount.com",
+  "client_id": "111291399523186011285",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/rdas-serviceaccount%40ncats-summer-interns.iam.gserviceaccount.com"
+}

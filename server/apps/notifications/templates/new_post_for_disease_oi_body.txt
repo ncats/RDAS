@@ -1,0 +1,4 @@
+Hi {{ first_name }},
+
+A new {{type}} has started on {{disease}}, a disease you are interested in!
+You can find it here: https://{{front_end_sub_domain}}{{front_end_domain}}{{end_of_url}}

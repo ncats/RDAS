@@ -119,6 +119,8 @@ while True:
 
     threads = list()
     info = dict()
+    GARD_info = updateCheck(GARDcypher)["gard"]
+    info["gard"] = GARD_info
     CT_info = updateCheck(CTcypher)["clinical"]
     info["clinical"] = CT_info
     GNT_info = updateCheck(GNTcypher)["grant"]
@@ -126,17 +128,15 @@ while True:
     PM_info = updateCheck(PMcypher)["pubmed"]
     info["pubmed"] = PM_info
 
-    GARD_info = updateCheck(GARDcypher)["gard"]
-    info["gard"] = GARD_info
-
+    if info["gard"][0]:
+        threads.append(info["gard"][0])
     if info["clinical"][0]:
         threads.append(info["clinical"][0])
     if info["grant"][0]:
         threads.append(info["grant"][0])
     if info["pubmed"][0]:
         threads.append(info["pubmed"][0])
-    if info["gard"][0]:
-        threads.append(info["gard"][0])
+    
     
     print("\n-----------------------\nDays Since Last Update:\n[CLINICAL] {CT_day} Days ({CT_update})\n[GRANT] {GNT_day} Days ({GNT_update})\n[PUBMED] {PM_day} Days ({PM_update})\n[GARD] {GARD_day} Days ({GARD_update})\n"
             .format(CT_day=str(info["clinical"][1].days), 

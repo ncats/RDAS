@@ -31,7 +31,7 @@ def main(db):
                 CT_name = gard_mapping['disease_name']
                 
                 # create gard condition node
-                cypher_create_gard = 'MERGE (gard:GARD{GardName: \"' + GARD_name + '\", GARDId: \"' + GARDId + '\"})'
+                cypher_create_gard = 'MERGE (gard:GARD{GARDName: \"' + GARD_name + '\", GARDId: \"' + GARDId + '\"})'
                 response_trial_exists = db.run(cypher_create_gard)
                 
                 # add each clinical trial to neo4j
@@ -58,7 +58,10 @@ def main(db):
                         clinical_trial_data_string = load_neo4j_functions.data_string(full_trial, data_model.ClinicalTrial, CT=True)
                         if not len(clinical_trial_data_string) > 0:
                             continue
-                        cypher_add_trial = cypher_add_trial_base + 'CREATE (gard)-[:gard_in]->(trial:ClinicalTrial{' 
+                        now = date.today()
+                        now = now.strftime("%m/%d/%y")
+
+                        cypher_add_trial = cypher_add_trial_base + 'CREATE (gard)-[:gard_in]->(trial:ClinicalTrial{x.DateCreated = \'{now}\','.format(now=now)
                         cypher_add_trial += clinical_trial_data_string[0]
                         cypher_add_trial += '})'
 
@@ -87,7 +90,7 @@ def main(db):
                         for b in range(1,len(cypher_batch),4):
                             b = cypher + ' '.join(cypher_batch[b:b+4])
                             db.run(b)
-                            #running = False
+                            
                         
                     # if node exists
                     else:
@@ -95,7 +98,6 @@ def main(db):
                         cypher_add_trial = cypher_add_trial_base + 'MATCH (trial:ClinicalTrial) WHERE trial.NCTId = \'' + trial + '\''
                         cypher_add_trial += 'MERGE (gard)-[:gard_in]->(trial)'
                         db.run(cypher_add_trial)
-                        running = False
 
                 except:
                     pass
@@ -111,19 +113,9 @@ def main(db):
         apoc_cypher += 'COLLECT(x) AS nodes CALL apoc.refactor.mergeNodes(nodes, {properties:"overwrite",mergeRels:true}) YIELD node RETURN *'
         db.run(apoc_cypher)
     
-    apoc_cypher = 'MATCH (x:GARD)'
-    apoc_cypher += ' WITH COLLECT(x) AS nodes CALL apoc.refactor.rename.nodeProperty("GardName", "GARDName", nodes) YIELD total RETURN true'
-    db.run(apoc_cypher)
-    
     apoc_cypher = 'MATCH (x:ClinicalTrial) WITH '
     apoc_cypher += 'toLower(x.NCTId) AS nct, '
     apoc_cypher += 'COLLECT(x) AS nodes CALL apoc.refactor.mergeNodes(nodes, {properties:"overwrite",mergeRels:true}) YIELD node RETURN *'
-    db.run(apoc_cypher)
-
-    now = date.today()
-    now = now.strftime("%m/%d/%y")
-    now = "\"{now}\"".format(now=now)
-    apoc_cypher = 'MATCH (x:ClinicalTrial) SET x.DateCreated = {now} RETURN x'.format(now=now)
     db.run(apoc_cypher)
     
     lock.acquire() 

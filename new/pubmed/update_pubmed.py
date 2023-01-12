@@ -11,6 +11,7 @@ import itertools
 import requests
 import jmespath
 import re
+#from new.firebase.email.ses_firebase import trigger_email
 
 today = datetime.now()
 today = today.strftime("%Y/%m/%d")
@@ -763,6 +764,7 @@ def retrieve_articles(db, last_update):
   save_omim_articles(db, last_update, today)
 
 def main(db, update=False):
+  return
   if update == True:
     last_update = db.getConf('DATABASE','pubmed_update')
     last_update = datetime.strptime(last_update, "%m/%d/%y")
@@ -771,3 +773,4 @@ def main(db, update=False):
 
   last_update = last_update.strftime("%Y/%m/%d")
   retrieve_articles(db, last_update)
+  #trigger_email("pubmed")

@@ -1,0 +1,1380 @@
+{
+    "disease":{
+        "name": "disease",
+        "title": "Disease",
+        "description": "What disease did you have that you received treatment for and are reporting today (e.g., monkeypox, Long COVID, RASopathies)?",
+        "isRequired": true,
+        "showPage": true,
+        "formControls": [
+            {
+                "key": "report__disease",
+                "placeholder": "Enter disease",
+                "controlType": "autocomplete",
+                "note": "Note: Users may add a term that is not currently in the list by typing the term and pressing enter.",
+                "required": true,
+                "multiselect": false,
+                "allowCustom": false,
+                "asyncUrl": "/diseases?typeahead=",
+                "fieldText": "name"
+            }
+        ]
+    },
+    "diagnosis":{
+        "name": "diagnosis",
+        "title": "Diagnosis Determination",
+        "description": "How was the diagnosis made?",
+        "isRequired": true,
+        "showPage": true,
+        "formControls": [
+            {
+                "key": "report__how_diagnosis",
+                "label": "Select all that apply",
+                "controlType": "checkbox",
+                "required": true,
+                "allowCustom": true,
+                "options": [
+                    { "value": "Clinical assessment", "label": "My doctor examined me" },
+                    { "value": "Imaging", "label": "I had an X-Ray, MRI or some other image" },
+                    { "value": "Pathology", "label": "I had a biopsy" },
+                    { "value": "Serology", "label": "I had a blood test" },
+                    { "value": "PCR or other nucleic acid test", "label": "I had a PCR test" },
+                    { "value": "Antigen test", "label": "I had a rapid antigen test" },
+                    { "value": "Antibody test", "label": "I had an antibody test" },
+                    { "value": "Sputum test", "label": "I had a sputum test" },
+                    { "value": "Urine test", "label": "I had a urine test" },
+                    { "value": "Stool examination", "label": "I had a stool examination" },
+                    { "value": "Unknown", "label": "I don't know" }
+                ]
+            }
+        ]
+    },
+    "treatment-challenges":{
+        "name": "treatment-challenges",
+        "title": "Treatment Challenge",
+        "description": "What made your patient's infection difficult to treat?",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [
+            {
+                "key": "report__why_new_way",
+                "label": "Select all that apply",
+                "controlType": "checkbox",
+                "required": true,
+                "allowCustom": true,
+                "options": [
+                    { "value": "There is no standard/approved therapy for this disease" },
+                    { "value": "Patient failed previous therapy" },
+                    { "value": "Standard therapy was contraindicated in this patient" },
+                    { "value": "Patient experienced drug toxicity or adverse events on prior therapy" },
+                    { "value": "Organism was resistant" },
+                    { "value": "Standard therapy was not available or accessible" },
+                    { "value": "There is no standard/approved therapy in this patient population" },
+                    { "value": "Diagnosis unknown or empiric therapy" },
+                    { "value": "Unusual disease presentation" },
+                    { "value": "Co-Infection or Complex Co-morbidities" },
+                    { "value": "Therapeutic options were inadequate" },
+                    { "value": "I don't know" }
+                ]
+            }
+        ]
+    },
+    "drugs":{
+        "name": "drugs",
+        "title": "Drug(s)",
+        "description": "What medicine(s) did you take for your condition?",
+        "tips":"Enter the generic name of the drug you took (e.g., tecovirimat if you took TPOXX, which is the brand name of the drug",
+        "isRequired": true,
+        "showPage": true,
+        "formControls": [
+            {
+                "key": "report__drugs",
+                "placeholder": "Enter drug(s)",
+                "controlType": "autocomplete",
+                "note": "Note: Users may add a term that is not currently in the dropdown list by typing the term and pressing enter.",
+                "multiselect": true,
+                "required": true,
+                "allowCustom": false,
+                "asyncUrl": "/drugs?typeahead=",
+                "fieldText": "name"
+            }
+        ]
+    },
+    "treatment-outcome":{
+        "name": "treatment-outcome",
+        "title": "Treatment Outcome",
+        "description": "What was the outcome of your treatment?",
+        "isRequired": true,
+        "showPage": true,
+        "formControls": [
+            {
+                "key": "report__outcome",
+                "controlType": "radio",
+                "required": true,
+                "options": [
+                    { "value": "Patient was cured/recovered", "label": "My symptoms disappeared" },
+                    { "value": "Patient improved", "label": "My symptoms improved, but didn't disappear" },
+                    { "value": "Patient's condition was unchanged", "label": "My symptoms did not change" },
+                    { "value": "Patient deteriorated", "label": "My symptoms got worse" },
+                    { "value": "Treatment was terminated due to adverse events", "label": "I had to stop treatment because of side effects" },
+                    { "value": "Outcome is unknown/not yet determined", "label": "I don't know yet" }
+                ]
+            }
+        ]
+    },
+    "adverse-events":{
+        "name": "adverse-events",
+        "title": "Adverse Events",
+        "description": "Did you have any side effects from the medicine?",
+        "isRequired": true,
+        "showPage": true,
+        "formControls": [
+            {
+                "key": "report__have_adverse_events",
+                "controlType": "toggle",
+                "label": "Experience any adverse events?",
+                "ifOnShow": "report__adverse_events"
+            },
+            {
+                "key": "report__adverse_events",
+                "placeholder": "(e.g. side effects, unexpected safety or concerns, tolerability issues, etc.)",
+                "label": "What side effects did you have?",
+                "controlType": "textarea",
+                "visibility": false
+            }
+        ]
+    },
+    "pregnancy":{
+        "name": "pregnancy",
+        "title": "Pregnancy",
+        "description": "Were you pregnant during the treatment of your condition?",
+        "isRequired": true,
+        "showPage": true,
+        "formControls": [{
+            "key": "report__patient__pregnant",
+            "controlType": "toggle",
+            "label": "Yes",
+            "ifOnShow": "adverse_events"
+        }]
+    },
+    "reminder":{
+        "name": "reminder",
+        "title": "Reminder",
+        "description": "Would you like a reminder to update this form (e.g., if you are still on treatment)?",
+        "isRequired": true,
+        "showPage": true,
+        "formControls": [
+            {
+                "key": "when_reminder",
+                "label": "",
+                "controlType": "radio",
+                "visibility": true,
+                "required": true,
+                "options": [
+                    { "value": "No reminder"},
+                    { "value": "1 week"},
+                    { "value": "2 weeks"},
+                    { "value": "3 weeks"},
+                    { "value": "1 month"},
+                    { "value": "3 months"},
+                    { "value": "6 months"},
+                    { "value": "1 year"}
+                ]
+            }
+        ]
+    },
+    "initial-overview":{
+        "title": "Initial Overview",
+        "isRequired": false,
+        "showPage": true,
+        "name": "initial-overview",
+        "formControls": [{
+                "controlType": "overview",
+                "key": "key_overview",
+                "label": "Initial Overview",
+                "width": 100,
+                "value": {
+                    "Disease": "${report.disease.name}",
+                    "Diagnosis": "report.how_diagnosis.map( => value)}",
+                    "Drug(s)": "${report.drugs.join(,)}",
+                    "Outcome": "${report.outcome}",
+                    "Adverse Events": "${report.adverse_events}",
+                    "Pregnant": "${report.patient.pregnant}",
+                    "Reminder": "${reminder}"
+                }
+            },
+            {
+                "controlType": "label",
+                "key": "buttons_title",
+                "label": "Continue to finish the full case report",
+                "classes": "label-title",
+                "width": 100
+            },
+            {
+                "controlType": "button",
+                "key": "button_back",
+                "label": "Back",
+                "classes": "clear-button max-140",
+                "width": 50
+            },
+            {
+                "controlType": "button",
+                "key": "button_continue",
+                "label": "Continue",
+                "classes": "action-button max-140",
+                "width": 50
+            }
+        ]
+    },
+    "demographics":{
+        "name": "demographics",
+        "title": "Patient Demographics",
+        "description": "Tell us about yourself:",
+        "isRequired": false,
+        "showPage": true,
+        "formControls": [
+            {
+                "key": "report__patient__age_group",
+                "placeholder": "Age",
+                "controlType": "dropdown",
+                "options": [
+                    { "value": "16-20 years" },
+                    { "value": "21-30 years" },
+                    { "value": "31-40 years" },
+                    { "value": "41-50 years" },
+                    { "value": "51-60 years" },
+                    { "value": "61-70 years" },
+                    { "value": "71-80 years" },
+                    { "value": "81-89 years" },
+                    { "value": "90+ years" }
+                ]
+            },
+            {
+                "key": "report__patient__sex",
+                "placeholder": "Sex assigned at birth",
+                "controlType": "dropdown",
+                "options": [
+                    { "value": "Male" },
+                    { "value": "Female" },
+                    { "value": "Intersex" },
+                    { "value": "Other" },
+                    { "value": "I prefer not to answer" }
+                ]
+            },
+            {
+                "key": "report__patient__ethnicity",
+                "label": "Ethnicity",
+                "controlType": "radio",
+                "options": [
+                    { "value": "Hispanic/Latino" },
+                    { "value": "Not Hispanic/Latino" },
+                    { "value": "I prefer not to answer" }
+                ]
+            },
+            {
+                "key": "report__patient__races",
+                "label": "Race(s) (Check all that apply)",
+                "controlType": "checkbox",
+                "allowCustom": true,
+                "options": [
+                    { "value": "American Indian or Alaskan Native" },
+                    { "value": "Asian" },
+                    { "value": "Black or African American" },
+                    { "value": "Native Hawaiian or Other Pacific Islander" },
+                    { "value": "White" },
+                    { "value": "Unknown" ,"label": "I prefer not to answer" }
+                ]
+            }
+        ]
+    },
+    "mp-demographics":{
+        "name": "demographics",
+        "title": "Patient Demographics",
+        "description": "Tell us about yourself:",
+        "isRequired": false,
+        "showPage": true,
+        "formControls": [
+            {
+                "key": "report__patient__age_group",
+                "placeholder": "Age",
+                "controlType": "dropdown",
+                "options": [
+                    { "value": "18-20 years" },
+                    { "value": "21-30 years" },
+                    { "value": "31-40 years" },
+                    { "value": "41-50 years" },
+                    { "value": "51-60 years" },
+                    { "value": "61-70 years" },
+                    { "value": "71-80 years" },
+                    { "value": "81-89 years" },
+                    { "value": "90+ years" }
+                ]
+            },
+            {
+                "key": "report__patient__sex",
+                "placeholder": "Sex assigned at birth",
+                "controlType": "dropdown",
+                "options": [
+                    { "value": "Male" },
+                    { "value": "Female" },
+                    { "value": "Intersex" },
+                    { "value": "Other" },
+                    { "value": "I prefer not to answer" }
+                ]
+            },
+            {
+                "key": "report__patient__ethnicity",
+                "label": "Ethnicity",
+                "controlType": "radio",
+                "options": [
+                    { "value": "Hispanic/Latino" },
+                    { "value": "Not Hispanic/Latino" },
+                    { "value": "I prefer not to answer" }
+                ]
+            },
+            {
+                "key": "report__patient__races",
+                "label": "Race (Check all that apply)",
+                "controlType": "checkbox",
+                "allowCustom": true,
+                "options": [
+                    { "value": "American Indian or Alaskan Native" },
+                    { "value": "Asian" },
+                    { "value": "Black or African American" },
+                    { "value": "Native Hawaiian or Other Pacific Islander" },
+                    { "value": "White" },
+                    { "value": "Unknown" ,"label": "I prefer not to answer" }
+                ]
+            }
+        ]
+    },
+    "country":{
+        "name": "country",
+        "title": "Country",
+        "description": "Country in which you were infected or treated",
+        "isRequired": false,
+        "showPage": true,
+        "formControls": [
+			{
+				"label": "",
+				"key": "report__country_contracted",
+				"placeholder": "Which country were you in when you got sick?",
+				"controlType": "autocomplete",
+				"multiselect": false,
+				"allowCustom": false,
+				"asyncUrl": "/countries?typeahead=",
+				"fieldText": "name",
+				"asString": true
+			}, {
+				"label": "",
+				"key": "report__country_treated",
+				"placeholder": "Which country were you in when you got the treatment?",
+				"controlType": "autocomplete",
+				"multiselect": false,
+				"allowCustom": false,
+				"asyncUrl": "/countries?typeahead=",
+				"fieldText": "name",
+				"asString": true
+			}
+        ]
+    },
+    "year":{
+        "name": "year",
+        "title": "Year",
+        "description": "When did you start taking the medicine for this infection?",
+        "isRequired": false,
+        "showPage": true,
+        "formControls": [
+            {
+				"label": "",
+				"key": "report__began_treatment_year",
+				"placeholder": "Select year",
+				"controlType": "dropdown",
+				"fillFromUrl": "/years"
+			}
+
+        ]
+    },
+    "other-conditions":{
+        "name": "other-conditions",
+                "title": "Other Conditions",
+                "description": "Do you have any of these conditions?",
+                "isRequired": false,
+                "showPage": true,
+                "formControls": [
+                    {
+                        "controlType" : "checkbox",
+                        "key": "report__patient__comorbidities",
+                        "options": [ 
+                            { "label": "HIV", "value": "HIV" },
+                            { "label": "Hepatitis B", "value": "Hepatitis B" },
+                            { "label": "Hepatitis C", "value": "Hepatitis C" },
+                            { "label": "Asthma", "value": "Asthma" },
+                            { "label": "COPD", "value": "COPD" },
+                            { "label": "Other Chronic Lung Disease", "value": "Other Chronic Lung Disease" },
+                            { "label": "Diabetes Mellitus", "value": "Diabetes Mellitus" },
+                            { "label": "Hypertension", "value": "Hypertension" },
+                            { "label": "Cardiovascular Disease", "value": "Cardiovascular Disease" },
+                            { "label": "Chronic Renal Disease", "value": "Chronic Renal Disease" },
+                            { "label": "Chronic Liver Disease", "value": "Chronic Liver Disease" },
+                            { "label": "Immunocompromised Condition", "value": "Immunocompromised Condition" },
+                            { "label": "Immunosuppresant Drugs", "value": "Immunosuppresant Drugs" },
+                            { "label": "Cancer", "value": "Cancer" },
+                            { "label": "Neurologic/Neurodevelopmental/Intellectual Disability", "value": "Neurologic/Neurodevelopmental/Intellectual Disability " },
+                            { "label": "Smoker", "value": "Smoker" }
+                        ],
+                        "allowCustom": true,
+                        "placeholder" : "Other relevant Co-morbidities/Co-infections"
+                    }
+                ]
+    },
+    "clinical-presentation":{
+        "name": "clinical-presentation",
+        "title": "Clinical Presentation",
+        "description": "Description of your infection:",
+        "isRequired": false,
+        "showPage": true,
+        "formControls": [{
+            "key": "report__site_of_disease",
+            "placeholder": "Where on your body were your rash/skin lesions?",
+            "controlType": "textbox"
+        }, {
+            "key": "report__clinical_syndrome",
+            "placeholder": "Clinical syndrome(s)",
+            "controlType": "textbox",
+            "visibility": false
+        }]
+    },
+    "tb-clinical-presentation":{
+            "name": "tb-clinical-presentation",
+            "title": "Clinical Presentation",
+            "description": "Describe the clinical presentation: ",
+            "isRequired": false,
+            "showPage": false,
+            "formControls": [{
+              "key": "report__site_of_tuberculosis_infection",
+              "placeholder": "Site(s) of infection",
+              "controlType": "multiselect",
+              "ifValueShow": ["Extrapulmonary"],
+              "toggleFieldName": "report__extrapulmonary_site",
+              "options": [
+                { "value": "Pulmonary" },
+                { "value": "Extrapulmonary" }
+              ]
+            }, {
+              "key": "report__extrapulmonary_site",
+              "placeholder": "Specific extrapulmonary site",
+              "controlType": "multiselect",
+              "visibility": false,
+              "options": [
+                { "value": "Pleural" },
+                { "value": "TB Meningitis" },
+                { "value": "Pericardial" },
+                { "value": "Musculoskeletal" },
+                { "value": "Urorgenital" },
+                { "value": "Abdominal" },
+                { "value": "Brain" }
+              ]
+            }, {
+              "key": "report__clinical_syndrome",
+              "placeholder": "Clinical syndrome(s)",
+              "controlType": "textbox"
+            }]
+    },
+    "mp-clinical-presentation":{
+        "name": "mp-clinical-presentation",
+        "title": "Site of lesions",
+        "description": "Description of your infection:",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [{
+            "key": "report__extra_fields__monkeypox_site_of_infection",
+            "controlType": "checkbox",
+            "label": "Where on your body were your rash/skin lesions?",
+            "options": [{
+              "value": "Anogenital area",
+              "label": "Genitals or Anus"
+            }, {
+              "value": "Trunk"
+            }, {
+              "value": "Limbs",
+              "label": "Limbs (arms, legs)"
+            }, {
+              "value": "Face"
+            }, {
+              "value": "Palms",
+              "label": "Palms of your hands"
+            }, {
+              "value": "Soles",
+              "label": "Soles of your feet"
+            }],
+            "alternative_options": [{
+              "value": "Patient didn't have rash/skin lesions",
+              "label": "I didn't have a rash or skin lesions"
+            }]
+    }]
+    },
+    "unusual":{
+        "name": "unusual",
+        "title": "Unusual",
+        "description": "Was there anything else about your infection that you would like to share?",
+        "isRequired": false,
+        "showPage": true,
+        "formControls": [
+            {
+                "key": "report__unusual",
+                "placeholder": "(e.g. unusual clinical manifestations, abnormal findings, etc.)",
+                "controlType": "textarea"
+            }
+        ]
+    },
+    "organism":{
+        "name": "organism",
+        "title": "Organism",
+        "description": "What is the organism(s) causing the disease, if known/applicable?",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [
+            {
+                "key": "report__organisms",
+                "placeholder": "Enter organism(s)",
+                "controlType": "autocomplete",
+                "multiselect": true,
+                "allowCustom": true,
+                "note": "Note: Users may add a term that is not currently in the dropdown list by typing the term and pressing enter.",
+                "asyncUrl": "/organisms?typeahead=",
+                "fieldText": "name"
+            }
+        ]
+    },
+    "resistance":{
+        "name": "resistance",
+        "title": "Resistance",
+        "description": "To which drugs, if any, was the organism resistant?",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [
+            {
+                "key": "report__resistant_drugs",
+                "placeholder": "Enter drug(s)",
+                "controlType": "autocomplete",
+                "note": "Note: Users may add a term that is not currently in the dropdown list by typing the term and pressing enter.",
+                "multiselect": true,
+                "allowCustom": true,
+                "asyncUrl": "/drugs?typeahead=",
+                "fieldText": "name"
+            }
+        ]
+    },
+    "tb-resistance":{
+        "name": "tb-resistance",
+        "title": "Resistance",
+        "description": "To which drugs, if any, was the organism resistant?",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [{
+            "key": "report__resistant_drugs",
+            "placeholder": "Enter drug(s)",
+            "controlType": "multiselect",
+            "asString": false,
+            "fillFromUrl": "/tuberculosis-resistant-drugs"
+          }]
+    },
+
+    "sample": {
+        "name": "sample",
+        "title": "Sample",
+        "description": "What is the sample from which the organism was isolated?",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [
+            {
+                "key": "report__sample",
+                "controlType": "checkbox",
+                "required": true,
+                "allowCustom": true,
+                "options": [
+                    { "value": "Blood" },
+                    { "value": "Urine" },
+                    { "value": "Sputum" },
+                    { "value": "Peritoneal fluid" },
+                    { "value": "Pleural fluid" },
+                    { "value": "Bronchoalveolar lavage (BAL)" },
+                    { "value": "Conjunctiva" },
+                    { "value": "Vagina" },
+                    { "value": "Urethra" },
+                    { "value": "Rectum" },
+                    { "value": "Cerebral spinal fluid (CSF)" },
+                    { "value": "Blood" },
+                    { "value": "Cord blood" },
+                    { "value": "Placenta" },
+                    { "value": "Tissue (from biopsy)" }
+                ]
+            }
+        ]
+
+    },
+
+    "dosing-regimen":{
+        "name": "dosing-regimen",
+        "title": "Dosing regimen ${num}",
+        "description": "How did you take the medicine ${drug_name}?",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [
+            {
+                "label": "Dose",
+                "key": "report__regimens__dose",
+                "placeholder": "Dose (e.g. 500mg)",
+                "controlType": "textbox"
+            },
+            {
+                "key": "report__regimens__frequency",
+                "label": "Number of times per day",
+                "placeholder": "Select frequency",
+                "controlType": "dropdown",
+                "options": [
+                    { "value": "Daily/Once per day (QD)" },
+                    { "value": "2 times a day (BID)" },
+                    { "value": "3 times a day (TID)" },
+                    { "value": "4 times a day (QID)" },
+                    { "value": "5 times a day" },
+                    { "value": "Every 3 Hours (q3h)" },
+                    { "value": "Every 4 Hours (q4h)" },
+                    { "value": "Every 6 Hours (q6h)" },
+                    { "value": "Every 8 Hours (q8h)" },
+                    { "value": "Every 12 Hours (q12h)" },
+                    { "value": "Every 24 Hours (q24h)" },
+                    { "value": "Every Week/Weekly (qwk)" },
+                    { "value": "Twice a Week" },
+                    { "value": "Every 14 Days/Every Two Weeks" },
+                    { "value": "Every Month/Monthly" },
+                    { "value": "Every other day" },
+                    { "value": "Every two days" },
+                    { "value": "Every three days" }
+                ]
+            },
+            {
+                "key": "report__regimens__route",
+                "label": "Route of Administration",
+                "placeholder": "Select option",
+                "controlType": "dropdown",
+                "options": [
+                    { "value": "Oral (by mouth)" },
+                    { "value": "Intravenous injection or IV (injected in your vein)" },
+                    { "value": "Intramuscular injection of IM (injected in your muscle)" },
+                    { "value": "Sublingual (placed under your tongue)" },
+                    { "value": "Rectal (inserted in your rectum)" },
+                    { "value": "Vaginal (inserted in your vagina)" },
+                    { "value": "Ocular (placed in your eye)" },
+                    { "value": "Otic (placed in your ear)" },
+                    { "value": "Nasal (sprayed in your nose)" },
+                    { "value": "Inhaled (breathed into your lungs through your mouth)" },
+                    { "value": "Nebulized (breathed into your lungs through your mouth and nose)" },
+                    { "value": "Topical or Transdermal (applied to your skin)" }
+                ]
+            },
+            {
+                "label": "Length of treatment",
+                "key": "report__regimens__duration",
+                "placeholder": "Number of days",
+                "controlType": "textbox"
+            }
+        ]
+    },
+    "additional-details":{
+        "name": "additional-details",
+        "title": "Additional details ${num}",
+        "description": "How was ${drug} used in a new way?",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [
+            {
+                "key": "report__regimens__use_drug",
+                "controlType": "checkbox",
+                "label": "Select all that apply",
+                "allowCustom": true,
+                "options": [
+                    { "value": "To treat a disease other than the one for which the drug is approved" },
+                    { "value": "In a new dose, for a novel duration, or by a new route of administration" },
+                    { "value": "In a novel combination with another drug" },
+                    { "value": "In a novel population (e.g. pediatrics/neonates, pregnant patient, immunosuppressed, etc.)" }
+                ],
+                "alternative_options" : [
+                    { "value": "It was not used in a new way" }
+                ]
+            }
+        ]
+    },
+    "treatment-setting":{
+        "name": "treatment-setting",
+        "title": "Treatment Setting ${num}",
+        "description": "What was the treatment setting in which ${drug_name} was introduced?",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [
+            {
+                "key": "report__regimens__severity",
+                "placeholder": "Where were you treated for your infection with this drug (e.g., at a clinic, admitted to the hospital)?",
+                "controlType": "dropdown",
+                "options": [
+                    { "value": "Outpatient", "label": "At home" },
+                    { "value": "Inpatient", "label": "In the hospital" },
+                    { "value": "ICU/Critical Care", "label": "In the ICU" }
+                ]
+            },
+            {
+                "key": "report__regimens__severity_detail",
+                "placeholder": "Additional details of severity",
+                "controlType": "textbox"
+            }
+        ]
+    },
+    "monkeypox_hiv" : {
+        "name": "monkeypox_hiv",
+        "title": "HIV treatment",
+        "showPage": false,
+        "isRequired": false,
+        "description": "HIV treatment",
+        "formControls": [
+            {
+                "key": "report__extra_fields__monkeypox_hiv_art",
+                "label": "Are you on treatment (ART) for HIV?",
+                "controlType": "radio",
+                "options": [
+                    { "value": "Yes" },
+                    { "value": "No" },
+                    { "value": "I don't know" }
+                ]
+            },
+            {
+                "key": "report__extra_fields__monkeypox_cd4_count",
+                "label": "Most recent CD4 count",
+                "controlType": "radio",
+                "options": [
+                    { "value": "<200" },
+                    { "value": ">=200" },
+                    { "value": "I don't know" }
+                ]
+            },
+            {
+                "key": "report__extra_fields__monkeypox_viral_load",
+                "label": "Most recent viral load",
+                "controlType": "radio",
+                "options": [
+                    { "value": "Detectable" },
+                    { "value": "Undetectable" },
+                    { "value": "I don't know" }
+                ]
+            }
+        ]
+    },
+    "monkeypox_symptoms" : {
+        "name": "monkeypox_symptoms",
+        "title": "Symptoms",
+        "showPage": false,
+        "isRequired": false,
+        "description": "Did you have any of the following symptoms with your monkeypox infection?",
+        "formControls": [
+            {
+                "controlType": "checkbox",
+                "key": "report__extra_fields__monkeypox_symptoms",
+                "label": "Select all that apply",
+                "allowCustom": true,
+                "options": [
+                    { "value": "Genital ulcers", "label": "Genital ulcers or blisters" },
+                    { "value": "Anal ulcers", "label": "Anal ulcers or blisters" },
+                    { "value": "Rectal pain (tenesmus) or proctitis", "label": "Rectal pain" },
+                    { "value": "Oral lesions", "label": "Mouth ulcers " },
+                    { "value": "Skin lesions, vesicles, pustules, or scabs on the limbs or trunk", "label": "Blistering or lesions on your arms, legs, or trunk" }
+                ]
+            }
+        ]
+    },
+    "monkeypox_treatment_administration" : {
+        "name": "monkeypox_treatment_administration",
+        "title": "Treatment Administration",
+        "showPage": false,
+        "isRequired": false,
+        "description": "Treatment administration",
+        "formControls": [{
+                "key": "report__extra_fields__monkeypox_time_to_treatment_start",
+                "label": "How long after the appearance of the blisters or rash did you start the medicine? (days)",
+                "placeholder": "Select",
+                "controlType": "dropdown",
+                "options": [{
+                    "value": "1 day"
+                }, {
+                    "value": "2 days"
+                }, {
+                    "value": "3 days"
+                }, {
+                    "value": "4 days"
+                }, {
+                    "value": "5 days"
+                }, {
+                    "value": "6 days"
+                }, {
+                    "value": "7 days"
+                }, {
+                    "value": "8 days"
+                }, {
+                    "value": "9 days"
+                }, {
+                    "value": "10 days"
+                }, {
+                    "value": "11 days"
+                }, {
+                    "value": "12 days"
+                }, {
+                    "value": "13 days"
+                }, {
+                    "value": "14 days"
+                }, {
+                    "value": "15 days"
+                }]
+            }
+        ]
+    },
+    "monkeypox_skin_vesicle" : {
+        "name": "monkeypox_skin_vesicle",
+        "title": "Skin lesions and Vesicle Symptoms",
+        "showPage": false,
+        "isRequired": false,
+        "description": "Skin lesions and Vesicle Symptoms",
+        "formControls": [
+            {
+                "key": "report__extra_fields__monkeypox_time_complete_resolution_symptoms",
+                "label": "How many days after treatment administration was a complete resolution of symptoms of skin lesions or vesicles seen?",
+                "placeholder": "Select",
+                "controlType": "dropdown",
+                "options": [{
+                    "value": "1 day"
+                }, {
+                    "value": "2 days"
+                }, {
+                    "value": "3 days"
+                }, {
+                    "value": "4 days"
+                }, {
+                    "value": "5 days"
+                }, {
+                    "value": "6 days"
+                }, {
+                    "value": "7 days"
+                }, {
+                    "value": "8 days"
+                }, {
+                    "value": "9 days"
+                }, {
+                    "value": "10 days"
+                }, {
+                    "value": "11 days"
+                }, {
+                    "value": "12 days"
+                }, {
+                    "value": "13 days"
+                }, {
+                    "value": "14 days"
+                }, {
+                    "value": "15 days"
+                }]
+            }
+        ]
+    },
+    "monkeypox_hospitalization" : {
+        "name": "monkeypox_hospitalization",
+        "title": "Hospitalization",
+        "showPage": false,
+        "isRequired": false,
+        "description": "Hospitalization",
+        "formControls": [
+            {
+                "key": "report__extra_fields__monkeypox_hospitalization",
+                "label": "Were you hospitalized for monkeypox?",
+                "controlType": "radio",
+                "options": [
+                    { "value": "Yes" },
+                    { "value": "No" },
+                    {"value": "Unknown", "label": "I prefer not to answer"}
+                ],
+                "ifValueShow": ["Yes"],
+                "toggleFieldName": ["report__extra_fields__monkeypox_days_of_hospitalization", "report__extra_fields__monkeypox_reason_for_hospitalization"]
+            },
+            {
+                "key": "report__extra_fields__monkeypox_days_of_hospitalization",
+                "label": "For how many days were you hospitalized for monkeypox?",
+                "placeholder": "Select",
+                "controlType": "dropdown",
+                "options": [
+                    { "value": "1 day" },
+                    { "value": "2 days" },
+                    { "value": "3 days" },
+                    { "value": "4 days" },
+                    { "value": "5 days" },
+                    { "value": "6 days" },
+                    { "value": "7 days" },
+                    { "value": "8 days" },
+                    { "value": "9 days" },
+                    { "value": "10 days" },
+                    { "value": "11 days" },
+                    { "value": "12 days" },
+                    { "value": "13 days" },
+                    { "value": "14 days" },
+                    { "value": "15 days" }
+                ],
+                "visibility" : false
+            },
+            {
+                "key": "report__extra_fields__monkeypox_reason_for_hospitalization",
+                "label": "Why were you admitted to the hospital?",
+                "controlType": "textbox",
+                "visibility" : false
+            }
+        ]
+    },
+    "monkeypox_contact" : {
+        "name": "monkeypox_contact",
+        "title": "Sexual Behavior and Intimate Contact",
+        "showPage": false,
+        "isRequired": false,
+        "description": "Intimate Contact",
+        "formControls": [
+            {
+				"key": "report__extra_fields__monkeypox_sexual_behavior",
+				"label": "Do you have sex with:",
+				"controlType": "radio",
+				"options": [{
+					"value": "Men"
+				}, {
+					"value": "Women"
+				}, {
+					"value": "Both men and women"
+				}, {
+					"value": "Unknown",
+					"label": "I prefer not to answer"
+				}]
+            },
+            {
+                "key": "report__extra_fields__monkeypox_intimate_contact",
+                "label": "Have you had other forms of intimate contact in the past 6 weeks (besides sex)? ",
+                "controlType": "radio",
+                "options": [
+                    { "value": "Yes" },
+                    { "value": "No" },
+                    { "value": "Unknown", "label": "I prefer not to answer" }
+                ]
+            }
+        ]
+    },
+    "monkeypox_vaccine_status" : {
+        "name": "monkeypox_vaccine_status",
+        "title": "Vaccine Status",
+        "showPage": false,
+        "isRequired": false,
+        "description": "Vaccine Status",
+        "formControls": [
+            {
+                "key": "report__extra_fields__monkeypox_smallpox_vaccine_status",
+                "label": "Have you been vaccinated against smallpox?",
+                "controlType": "radio",
+                "options": [
+                    { "value": "Vaccinated" },
+                    { "value": "Unvaccinated" },
+                    { "value": "Unknown", "label": "I don't know" }
+                ]
+            }
+        ]
+    },
+
+    "adverse-events-outcome":{
+        "name": "adverse-events-outcome",
+        "title": "Adverse Event Outcome",
+        "description": "",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [
+            {
+                "label": "You stated that you experienced a side effect from the medication. What was the outcome attributed to this adverse event/side effect?",
+                "key": "report__adverse_events_outcome",
+                "controlType": "radio",
+                "options": [
+                    { "value": "Life-threatening" },
+                    { "value": "Hospitalization" },
+                    { "value": "Disability or Permanent Damage" },
+                    { "value": "Congenital Anomaly/Birth Defects" },
+                    { "value": "Other Serious or Important Medical Events" },
+                    { "value": "Required Intervention to Prevent Permanent Impairment/Damage" },
+                    { "value": "Non-Serious Medical Event" }
+                ]
+            }
+        ]
+    },
+    "surgery":{
+        "name": "surgery",
+        "title": "Surgery",
+        "description": "Did you patient have surgery as part of the control of your infection?",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [
+            {
+                "key": "report__surgery",
+                "controlType": "radio",
+                "options": [
+                    { "value": "Yes" },
+                    { "value": "No" },
+                    { "value": "Unknown" }
+                ]
+            }
+        ]
+    },
+    "previous-treatment":{
+        "name": "previous-treatment",
+        "title": "Previous Treatment",
+        "description": "What medicine, if any, did you take previously to treat your infection?",
+        "isRequired": false,
+        "showPage": true,
+        "formControls": [
+            {
+                "key": "report__previous_drugs",
+                "placeholder": "Enter drug(s)",
+                "controlType": "autocomplete",
+                "multiselect": true,
+                "asyncUrl": "/drugs?typeahead=",
+                "fieldText": "name",
+                "allowCustom": false
+            }
+        ]
+    },
+    "outcome-determination":{
+        "name": "outcome-determination",
+        "title": "Outcome Determination",
+        "description": "How was your treatment outcome determined?",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [
+            {
+                "key": "report__how_outcome",
+                "controlType": "checkbox",
+                "label": "Select all that apply",
+                "width": 100,
+                "allowCustom": true,
+                "options": [
+                    { "value": "Clinical assessment" },
+                    { "value": "Imaging" },
+                    { "value": "Pathology" },
+                    { "value": "Culture" },
+                    { "value": "Serology" },
+                    { "value": "PCR" },
+                    { "value": "Smear" },
+                    { "value": "Unknown", "label": "I don’t know" }
+                ]
+            }
+        ]
+    },    
+    "outcome-timing":{
+        "name": "outcome-timing",
+        "title": "Outcome Timing",
+        "description": "When was your treatment outcome assessed?",
+        "isRequired": false,
+        "showPage": false,
+        "formControls": [
+            {
+                "key": "report__when_outcome",
+                "controlType": "dropdown",
+                "placeholder": "Select",
+                "width": 100,
+                "options": [
+                    { "value": "While you were still on treatment" },
+                    { "value": "When you had just completed treatment" },
+                    { "value": "After a period of follow-up", "label": "After you had completed treatment and follow-up" }
+                ],
+                "ifValueShow": ["After a period of follow-up"],
+                "toggleFieldName": "report__outcome_followup"
+            },
+            {
+				"key": "report__outcome_followup",
+				"controlType": "textbox",
+				"width": 100,
+				"label": "",
+				"placeholder": "How long was the follow-up?",
+				"inputType": "text",
+				"visibility": false
+			}
+        ]
+    },
+    "gestational-age":{
+        "name": "gestational-age",
+        "title": "Pregnancy",
+        "description": "",
+        "isRequired": false,
+        "showPage": true,
+        "formControls": [{
+            "key": "report__patient__pregnancy__treatment_gestational_age",
+            "placeholder": "select",
+            "controlType": "dropdown",
+            "label": "How many weeks pregnant were you when you began treatment (round to the nearly week)?",
+            "options": [
+                        { "value": "Unknown" },
+                        { "value": "42 weeks" },
+                        { "value": "41 weeks" },
+                        { "value": "40 weeks" },
+                        { "value": "39 weeks" },
+                        { "value": "38 weeks" },
+                        { "value": "37 weeks" },
+                        { "value": "36 weeks" },
+                        { "value": "35 weeks" },
+                        { "value": "34 weeks" },
+                        { "value": "33 weeks" },
+                        { "value": "32 weeks" },
+                        { "value": "31 weeks" },
+                        { "value": "30 weeks" },
+                        { "value": "29 weeks" },
+                        { "value": "28 weeks" },
+                        { "value": "27 weeks" },
+                        { "value": "26 weeks" },
+                        { "value": "25 weeks" },
+                        { "value": "24 weeks" },
+                        { "value": "23 weeks" },
+                        { "value": "22 weeks" },
+                        { "value": "21 weeks" },
+                        { "value": "20 weeks" },
+                        { "value": "19 weeks" },
+                        { "value": "18 weeks" },
+                        { "value": "17 weeks" },
+                        { "value": "16 weeks" },
+                        { "value": "15 weeks" },
+                        { "value": "14 weeks" },
+                        { "value": "13 weeks" },
+                        { "value": "12 weeks" },
+                        { "value": "11 weeks" },
+                        { "value": "10 weeks" },
+                        { "value": "9 weeks" },
+                        { "value": "8 weeks" },
+                        { "value": "7 weeks" },
+                        { "value": "6 weeks" },
+                        { "value": "5 weeks" },
+                        { "value": "4 weeks" },
+                        { "value": "3 weeks" },
+                        { "value": "2 weeks" },
+                        { "value": "1 week"}
+                      ]
+          }]
+    },
+    "neonates":{
+        "name": "neonates",
+        "title": "Neonates",
+        "description": "",
+        "isRequired": false,
+        "showPage": true,
+        "formControls": [{
+            "controlType": "group",
+            "key": "report__patient__pregnancy__neonates",
+            "label": "Neonates",
+            "groupTitle": "Neonate",
+            "width": 100,
+            "visibility": true,
+            "required": false,
+            "note": "Please describe the following neonatal details<br>* Data for all neonates will not be saved until after clicking either 'continue' or 'save'",
+            "initialFormOpen": true,
+            "addNote": "If this is a multiple pregnancy, click 'Add Neonate' to add information about additional neonates",
+            "isArray": true,
+            "allowAddDelete": true,
+            "controls": [{
+                "key": "diagnosed_with_disease",
+                "controlType": "radio",
+                "label": "Was your baby diagnosed with the same infection as you (e.g., congenital transmission)? ",
+                "options": [
+                    { "value": "Yes" },
+                    { "value": "No" },
+                    { "value": "Not tested" }
+                ]
+            }, {
+                "key": "abnormalities_or_defects",
+                "label": "Please describe any disabilities or congenital anomalies your baby experienced",
+                "placeholder": "Enter free text",
+                "controlType": "textarea"
+            }, {
+                "key": "other_outcome_details",
+                "label": "Is there any additional information you would like to add concerning this neonatal/fetal outcome? (e.g., reason for termination of pregnancy)",
+                "placeholder": "Enter free text",
+                "controlType": "textarea"
+            }]
+        }]
+    },
+    "relapse":{
+        "name": "relapse",
+        "title": "Relapse",
+        "description": "Did your infection come back after you finished your medicine?",
+        "isRequired": false,
+        "showPage": true,
+        "formControls": [
+            {
+                "key": "report__relapse",
+                "controlType": "radio",
+                "options": [
+                    { "value": "Yes" },
+                    { "value": "No" },
+                    { "value": "Unknown" }
+                ]
+            }
+        ]
+    },
+    "other":{
+        "name": "other",
+        "title": "Other",
+        "description": "Is there any other important information you would like to add?",
+        "isRequired": false,
+        "showPage": true,
+        "formControls": [
+            {
+                "key": "report__additional_info",
+                "placeholder": "Enter free text",
+                "controlType": "textarea"
+            },
+            {
+                "controlType": "file",
+                "key": "report__attached_images",
+                "label": "Upload images (x-rays, lab reports, etc.) that support this report. Images will be pending approval to ensure they follow the community guidelines.",
+                "note": "Changes won't be saved, until you 'continue' or hit the 'save' button",
+                "multiselect": true,
+                "showInfo": false,
+                "allowCaption": true,
+                "required": false
+            }
+        ]
+    },
+    "final-review":{
+        "title": "Final Review",
+        "isRequired": false,
+        "showPage": true,
+        "name": "final-review",
+        "finalOverView": true,
+            "formControls": [{
+                "controlType": "overview",
+                "key": "key_review",
+                "label": "Final Review",
+                "width": 100,
+                "value": {
+                    "Disease": "report.disease.name}",
+                    "Diagnosis": "report.how_diagnosis.map( => value)}",
+                    "Drug(s)": "report.drugs",
+                    "Outcome": "report.outcome",
+                    "Adverse Events": "report.adverse_events",
+                    "Pregnant": "report.patient.pregnant",
+                    "Reminder": "when_reminder"
+                }
+              }, {
+                "controlType": "accordion",
+                "key": "final_overview",
+                "label": "",
+                "width": 100,
+                "groups": [{
+                    "key": "patient_demographics",
+                    "label": "Patient Demographics",
+                    "expanded": true,
+                    "controls": [{
+                        "controlType": "json",
+                        "key": "patient",
+                        "value": {
+                            "Age": "report.patient.age_group",
+                            "Sex": "report.patient.sex",
+                            "Ethnicity": "report.patient.ethnicity",
+                            "Race(s)": "report.patient.race",
+                            "Country Contracted": "report.country_contracted",
+                            "Country Treated": "report.country_treated",
+                            "Treatment Began": "report.began_treatment_year"
+                        }
+                    }]
+                }, {
+                  "key": "comorbidities",
+                  "label": "Co-Morbidities",
+                  "expanded": true,
+                  "controls": [{
+                        "controlType": "json",
+                        "key": "comorbidities",
+                        "value": { 
+                            "Co-Morbidities": "report.patient.comorbidity"
+                        }
+                    }]
+                }, {
+                  "key": "presentation",
+                  "label": "Presentation",
+                  "expanded": true,
+                  "controls": [{
+                        "controlType": "json",
+                        "key": "presentation",
+                        "value": {
+                            "Site of Disease": "report.site_of_disease",
+                            "Site of Infection": "report.site_of_tuberculosis_infection",
+                            "What makes the case unusual": "report.unusual"
+                        }
+                  }]
+                }, {
+                  "key": "diagnosis",
+                  "label": "Diagnosis",
+                  "expanded": true,
+                  "controls": [{
+                        "controlType": "json",
+                        "key": "diagnosis",
+                        "value": {
+                            "Previous Treatment": "report.previous_drugs"
+                        }
+                  }]
+                }, {
+                  "key": "treatment-details",
+                  "label": "Treatment Details",
+                  "expanded": true,
+                  "controls": [
+                    {
+                        "controlType": "json",
+                        "key": "diagnosis",
+                        "value": {
+                           
+                        }
+                    }
+                ]
+                }, {
+                  "key": "outcome",
+                  "label": "Outcome",
+                  "expanded": true,
+                  "controls": [{
+                        "controlType": "json",
+                        "key": "outsome",
+                        "value": {
+                            "Patient Outcome": "report.outcome",
+                            "Outcome Determination": "report.how_outcome",
+                            "Outcome Assessed": "report.when_outcome",
+                            "Surgery": "report.surgery",
+                            "Relapse": "report.relapse",
+                            "Adverse Events": "report.adverse_events_outcome",
+                            "FollowUp": "report.outcome_followup"
+                        }
+                    }]
+                }, {
+                  "key": "pregnancy",
+                  "label": "Pregnancy",
+                  "expanded": true,
+                  "controls": [{
+                        "controlType": "json",
+                        "key": "pregnancy",
+                        "value": {
+                            "Gestational age at the time when treatment began": "report.patient.pregnancy.treatment_gestational_age",
+                            "Pregnancy Outcome": "report.patient.pregnancy.outcome",
+                            "Gestational age at the timeof delivery": "report.patient.pregnancy.delivery_gestational_age"
+                        }
+                  }]
+                }, {
+                  "key": "additional",
+                  "label": "Additional Info",
+                  "expanded": true,
+                  "controls": [{
+                        "controlType": "json",
+                        "key": "additional",
+                        "value":{}
+                    }]
+                } ]
+              }
+            ]
+
+    }
+}

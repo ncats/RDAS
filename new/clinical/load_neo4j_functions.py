@@ -2,6 +2,7 @@ from dataclasses import field
 import requests
 import html
 import data_model
+from datetime import date
 
 def extract_all_fields(nctid):
     '''
@@ -108,6 +109,11 @@ def data_string(full_data, node_fields, special_types = data_model.special_types
             nodes_data = ', '.join(node_data)
         node_group.append(nodes_data)
         if CT:
+            temp = node_group[0]
+            now = date.today()
+            now = now.strftime("%m/%d/%y")
+            temp = temp + ', DateCreated: \"{now}\"'.format(now=now)
+            node_group[0] = temp
             return (list(set(node_group)))
 
     # return list of strings for each individual node

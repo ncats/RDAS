@@ -1,0 +1,3 @@
+gard_id,gard_name,disease_name,found_by,all_synonyms,
+GARD:0000005,Abetalipoproteinemia,abetalipoproteinemia,exact_match,"[Bassen Kornzweig syndrome,Microsomal triglyceride transfer protein deficiency disease,Microsomal triglyceride transfer protein deficiency,ABL,Abetalipoproteinemia neuropathy,Apolipoprotein B deficiency,Betalipoprotein deficiency disease,Congenital betalipoprotein deficiency syndrome,MTP deficiency,Bassen-Kornzweig disease,Homozygous familial hypobetalipoproteinemia]",
+GARD:0000008,Agnosia,agnosia,exact_match,"[Primary visual agnosia,Monomodal visual amnesia,Visual amnesia]",

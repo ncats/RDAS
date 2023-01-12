@@ -1,4 +1,5 @@
 # NEW STRUCTURE IS IN 'NEW' FOLDER, IGNORE 'OLD'
+# ALSO IGNORE 'SERVER' and 'NEW_MERGE' FOR NOW
 
 # Init.py
 This script is responsible for initiating the creation and updates of each of the databases

@@ -1,0 +1,111 @@
+Hi {{ first_name }},
+
+The following is a list of all the activity on CURE ID in the past 24 hours. Follow the links to see the full details and join the conversations.
+
+{% if data.reports %}
+  Case Reports:
+{% for disease, values in data.reports.items %}
+{% if values.1 %}
+  User-Submitted Case Reports on {{ disease }}:
+{% for report in values.1 %}
+    Case ID #{{ report.report_id }}, Drug(s): {{ report.drugs }}, Outcome: {{ report.outcome }}
+      {{ report.url }}
+
+{% endfor %}
+{% endif %}
+{% if values.2 %}
+  Published Case Reports on {{ disease }}:
+{% for report in values.2 %}
+    Case ID #{{ report.report_id }}, Drug(s): {{ report.drugs }}, Outcome: {{ report.outcome }}
+      {{ report.url }}
+
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if data.clinical_trials %}
+ ----------------------------------------------------------------------------
+
+  Clinical Trials:
+{% for disease, values in data.clinical_trials.items %}
+  Clinical Trials on {{ disease }}:
+{% for ct in values.1 %}
+    {{ ct.gov_id }}, Drug(s): {{ ct.drugs }}, {{ ct.phase }}
+      {{ ct.url }}
+
+{% endfor %}
+{% endfor %}
+{% endif %}
+{% if data.discussions %}
+ ----------------------------------------------------------------------------
+
+  Discussions:
+{% for disease, values in data.discussions.items %}
+{% if values.1 %}
+  New Discussion Posts on {{ disease }}:
+{% for discussion in values.1 %}
+    {{ discussion.title }}, {{ discussion.comments_no }}
+       {{ discussion.url }}
+
+{% endfor %}
+{% endif %}
+{% if values.2 %}
+  New Comments on Case Reports on {{ disease }}:
+{% for discussion in values.2 %}
+    {{ discussion.report_id }}, Drug(s): {{ discussion.drugs }}, Outcome: {{ discussion.outcome }}, {{ discussion.comments_no }}
+      {{ discussion.report_url }}
+
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if data.jarticles %}
+ ----------------------------------------------------------------------------
+
+  Journal Articles:
+{% for article in data.jarticles %}
+  {{ article.url }}
+  {{ article.title }}
+  {{ article.journal_name }}
+  {{ article.abstract }}
+
+{% endfor %}
+{% endif %}
+{% if data.narticles %}
+ ----------------------------------------------------------------------------
+
+  News Articles:
+{% for article in data.narticles %}
+  {{ article.url }}
+  {{ article.title }}
+  {{ article.publication_name }}
+  {{ article.abstract }}
+
+{% endfor %}
+{% endif %}
+{% if data.events %}
+ ----------------------------------------------------------------------------
+
+  Events:
+{% for event in data.events %}
+  {{ event.url }}
+  {{ event.title }}
+  {{ event.location }}
+  {{ event.description }}
+
+{% endfor %}
+{% endif %}
+
+{% if data.comments %}
+ ----------------------------------------------------------------------------
+  Comments:
+{% for comment in data.comments %}
+  {{ comment.parent_link }}
+  {{ comment.parent }}
+
+{% endfor %}
+{% endif %}
+This email was sent to {{ email_address }}.
+
+
+- CURE ID

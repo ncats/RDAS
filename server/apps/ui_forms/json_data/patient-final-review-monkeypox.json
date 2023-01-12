@@ -1,0 +1,233 @@
+{
+        "title": "Final Review",
+        "isRequired": false,
+        "showPage": true,
+        "name": "final-review",
+        "finalOverView": true,
+            "formControls": [{
+                "controlType": "overview",
+                "key": "key_review",
+                "label": "Final Review",
+                "width": 100,
+                "value": {
+                    "Disease": "report.disease.name}",
+                    "Diagnosis": "report.how_diagnosis.map( => value)}",
+                    "Drug(s)": "report.drugs",
+                    "Outcome": "report.outcome",
+                    "Adverse Events": "report.adverse_events",
+                    "Pregnant": "report.patient.pregnant",
+                    "Reminder": "when_reminder"
+                }
+              }, {
+                "controlType": "accordion",
+                "key": "final_overview",
+                "label": "",
+                "width": 100,
+                "groups": [{
+                    "key": "patient_demographics",
+                    "label": "Patient Demographics",
+                    "expanded": true,
+                    "controls": [{
+                        "controlType": "json",
+                        "key": "patient",
+                        "value": {
+                            "Age": "report.patient.age_group",
+                            "Sex": "report.patient.sex",
+                            "Ethnicity": "report.patient.ethnicity",
+                            "Race(s)": "report.patient.race",
+                            "Country Contracted": "report.country_contracted",
+                            "Country Treated": "report.country_treated",
+                            "Treatment Began": "report.began_treatment_year"
+                        }
+                    }]
+                }, {
+                  "key": "comorbidities",
+                  "label": "Co-Morbidities",
+                  "expanded": true,
+                  "controls": [{
+                        "controlType": "json",
+                        "key": "comorbidities",
+                        "value": { 
+                            "Co-Morbidities": "report.patient.comorbidity"
+                        }
+                    }]
+                }, {
+                  "key": "presentation",
+                  "label": "Presentation",
+                  "expanded": true,
+                  "controls": [{
+                        "controlType": "json",
+                        "key": "presentation",
+                        "value": {
+                            "Site(s) of skin lesions": "report.site_of_disease",
+                            "What makes the case unusual": "report.unusual"
+                        }
+                  }]
+                }, {
+                  "key": "diagnosis",
+                  "label": "Diagnosis",
+                  "expanded": true,
+                  "controls": [{
+                        "controlType": "json",
+                        "key": "diagnosis",
+                        "value": {
+                            "Previous Treatment": "report.previous_drugs", 
+                            "Samples": "report.samples"
+                        }
+                  }]
+                }, 
+                
+                {
+                    "key": "monkeypox_hiv",
+                    "label": "HIV treatment",
+                    "expanded": true,
+                    "controls": [{
+                      "controlType": "json",
+                      "key": "monkeypox_hiv",
+                      "value": {
+                        "Are you on treatment (ART) for HIV? ": "monkeypox_hiv_art",
+                        "Most recent CD4 count": "monkeypox_cd4_count",
+                        "Most recent viral load": "monkeypox_viral_load"
+                      }
+                    }]
+                }, 
+                {
+                    "key": "monkeypox_symptoms",
+                    "label": "Symptoms",
+                    "expanded": true,
+                    "controls": [{
+                      "controlType": "json",
+                      "key": "monkeypox_symptoms",
+                      "value": {
+                        "Did you have any of the following symptoms with your monkeypox infection?": "monkeypox_symptoms"
+                      }
+                    }]
+                }, 
+                {
+                    "key": "monkeypox_treatment_administration",
+                    "label": "Treatment Administration",
+                    "expanded": true,
+                    "controls": [{
+                      "controlType": "json",
+                      "key": "monkeypox_treatment_administration",
+                      "value": {
+                        "How long after the appearance of the blisters or rash did you start the medicine? (days)": "monkeypox_time_to_treatment_start",
+                        "How long did it take for all of your blisters or rash to go away after you started taking the medicine?": "monkeypox_time_complete_resolution_symptoms"
+                      }
+                    }]
+                }, 
+                {
+                    "key": "monkeypox_skin_vesicle",
+                    "label": "Skin lesions and Vesicle Symptoms",
+                    "expanded": true,
+                    "controls": [{
+                      "controlType": "json",
+                      "key": "monkeypox_skin_vesicle",
+                      "value": {
+                        "How painful were your blisters or rash from 0-10 (0=no pain, 10=worst pain ever experienced)?": "monkeypox_lesion_pain",
+                        "How long did it take for the pain from your blisters or rash to get better?": "monkeypox_lesion_pain_time_to_improvement",
+                        "How long did it take for your blisters or rash to go away?": "monkeypox_lesion_time_to_resolve"
+                      }
+                    }]
+                }, 
+                {
+                    "key": "monkeypox_hospitalization",
+                    "label": "Hospitalization",
+                    "expanded": true,
+                    "controls": [{
+                      "controlType": "json",
+                      "key": "monkeypox_hospitalization",
+                      "value": {
+                        "Were you hospitalized for monkeypox?": "monkeypox_hospitalization",
+                        "For how many days were you hospitalized for monkeypox?": "monkeypox_days_of_hospitalization",
+                        "Why were you admitted to the hospital?": "monkeypox_reason_for_hospitalization"
+                      }
+                    }]
+                }, 
+                {
+                    "key": "monkeypox_contact",
+                    "label": "Sexual Behavior and Intimate Contact",
+                    "expanded": true,
+                    "controls": [{
+                      "controlType": "json",
+                      "key": "monkeypox_contact",
+                      "value": {
+                        "Do you have sex with:": "monkeypox_sexual_behavior",
+                        "Have you had other forms of intimate contact in the past 6 weeks (besides sex)?": "monkeypox_intimate_contact"
+                      }
+                    }]
+                }, 
+                {
+                    "key": "monkeypox_vaccine_status",
+                    "label": "Vaccine Status",
+                    "expanded": true,
+                    "controls": [{
+                      "controlType": "json",
+                      "key": "monkeypox_vaccine_status",
+                      "value": {
+                        "Have you been vaccinated against smallpox?": "monkeypox_smallpox_vaccine_status"
+                      }
+                    }]
+                }, 
+                
+                {
+                  "key": "treatment-details",
+                  "label": "Treatment Details",
+                  "expanded": true,
+                  "controls": [
+                    {
+                        "controlType": "json",
+                        "key": "diagnosis",
+                        "value": {
+                          
+                        }
+                    }
+                ]
+                }, {
+                  "key": "outcome",
+                  "label": "Outcome",
+                  "expanded": true,
+                  "controls": [{
+                        "controlType": "json",
+                        "key": "outsome",
+                        "value": {
+                            "Patient Outcome": "report.outcome",
+                            "Outcome Determination": "report.how_outcome",
+                            "Outcome Assessed": "report.when_outcome",
+                            "Surgery": "report.surgery",
+                            "Relapse": "report.relapse",
+                            "Adverse Events": "report.adverse_events_outcome",
+                            "FollowUp": "report.outcome_followup"
+                        }
+                    }]
+                }, {
+                  "key": "pregnancy",
+                  "label": "Pregnancy",
+                  "expanded": true,
+                  "controls": [{
+                        "controlType": "json",
+                        "key": "pregnancy",
+                        "value": {
+                            "Gestational age at the time when treatment began": "report.patient.pregnancy.treatment_gestational_age",
+                            "Pregnancy Outcome": "report.patient.pregnancy.outcome",
+                            "Gestational age at the timeof delivery": "report.patient.pregnancy.delivery_gestational_age"
+                        }
+                  }]
+                }, {
+                  "key": "additional",
+                  "label": "Additional Info",
+                  "expanded": true,
+                  "controls": [{
+                        "controlType": "json",
+                        "key": "additional",
+                        "value": {
+                            "Other": "report.additional_info"
+                        },
+                        "images": "report.attached_images"
+                    }]
+                } ]
+              }
+            ]
+            
+
+    }
