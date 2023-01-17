@@ -1,0 +1,1 @@
+CURE ID Daily Digest, {{ digest_date }}.

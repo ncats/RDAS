@@ -1,0 +1,540 @@
+<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+   <head>
+      <!-- NAME: 1 COLUMN -->
+      <!--[if gte mso 15]>
+      <xml>
+         <o:OfficeDocumentSettings>
+            <o:AllowPNG/>
+            <o:PixelsPerInch>96</o:PixelsPerInch>
+         </o:OfficeDocumentSettings>
+      </xml>
+      <![endif]-->
+      <meta charset="UTF-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+   </head>
+   <body>
+      <center>
+         <table align="center" border="0" cellpadding="0" cellspacing="0" height="100%" width="100%" id="bodyTable">
+            <tr>
+               <td align="center" valign="top" id="bodyCell">
+                           <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                              <tr>
+                                 <td valign="top" id="templatePreheader">
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%"></table>
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width:100%;">
+                                       <tbody>
+                                          <tr>
+                                             <td valign="top" style="padding-top:9px;">
+                                                <!--[if mso]>
+                                                <table align="left" border="0" cellspacing="0" cellpadding="0" width="100%" style="width:100%;">
+                                                   <tr>
+                                                      <![endif]-->
+                                                      <!--[if mso]>
+                                                      <td valign="top" width="600" style="width:600px;">
+                                                         <![endif]-->
+                                                         <table align="left" border="0" cellpadding="0" cellspacing="0" style="max-width:100%; min-width:100%;" width="100%">
+                                                            <tbody style="font-size:11pt;font-family:Calibri,sans-serif;">
+                                                               <tr>
+                                                                  <td valign="top"  style="padding-top:0; padding-right:18px; padding-bottom:9px; padding-left:18px;">
+                                                                    <p>Hi {{ first_name }},<br>
+                                                                        <br>
+                                                                        The following is a list of all the activity on CURE ID in the past {{ data.period }}. Follow the links to see the full details and join the conversations.
+                                                                     </p>
+                                                                  </td>
+                                                               </tr>
+                                                            </tbody>
+                                                         </table>
+                                                         <!--[if mso]>
+                                                      </td>
+                                                      <![endif]-->
+                                                      <!--[if mso]>
+                                                   </tr>
+                                                </table>
+                                                <![endif]-->
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td valign="top" id="templateHeader"></td>
+                              </tr>
+                              <tr>
+                                 <td valign="top" id="templateBody">
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                       <tbody style="font-size:11pt;font-family:Calibri,sans-serif;">
+                                         {% if data.reports %} <!-- rep -->
+                                          <tr>
+                                             <td valign="top">
+                                                <div style="border: 1px solid #ccc; padding-bottom: 10px">
+
+                                                   <div style="margin:0;text-align: center; background: #455a64;padding-top: 10px; padding-bottom: 10px;"><span style="color:#FFFFFF" padding>Case Reports</span></div>
+                                                   <div style="padding: 10px 10px">
+                                                      <!-- Aggregation Should Start From Here-->
+                                                      {% for disease, values in data.reports.items %} <!-- rep 1 -->
+                                                      <table style="width:100%;padding: 10px 10px;">
+                                                         <tbody>
+                                                           {% if values.1 %} <!-- rep 2 -->
+                                                            <tr>
+                                                               <th colspan="3" style="text-align: left;">
+                                                                  <strong style="margin: 10px 0px; display: block">User-Submitted Case Report on <a href="{{ values.0 }}">{{ disease }}</a></strong>
+                                                               </th>
+                                                            </tr>
+                                                            {% endif %} <!-- rep 2 -->
+                                                            {% for report in values.1 %} <!-- rep 3 -->
+                                                            <tr style="border: 1px solid #ccc; padding: 10px;">
+                                                               <td style="width: 20%; border-right: none;padding: 10px; text-align: left;"><a href="{{ report.url }}">Case ID #{{ report.report_id }}</a></td>
+                                                               <td style="width: 60%; border-right: none;padding: 10px; text-align: left;"><strong>Drug(s):</strong> {{ report.drugs }}</td>
+                                                               <td style="width: 20%; border-right: none;padding: 10px; text-align: right;"><strong>{{ report.outcome }}</strong></td>
+                                                            </tr>
+                                                            {% endfor %} <!-- rep 3 -->
+                                                            {% if values.2 %} <!-- rep 4 -->
+                                                            <tr>
+                                                               <th colspan="3" style="text-align: left;">
+                                                                  <strong style="margin: 15px 0px; display: block">Published Case Reports on <a href="{{ values.0 }}">{{ disease }}</a></strong>
+                                                               </th>
+                                                            </tr>
+                                                            {% endif %} <!-- rep 4 -->
+                                                            {% for report in values.2 %} <!-- rep 5 -->
+                                                            <tr style="border: 1px solid #ccc; padding: 10px;">
+                                                               <td style="width: 20%; border-right: none;padding: 10px; text-align: left;"><a href="{{ report.url }}">Case ID #{{ report.report_id }}</a></td>
+                                                               <td style="width: 60%; border-right: none;padding: 10px; text-align: left;"><strong>Drug(s):</strong> {{ report.drugs }}</td>
+                                                               <td style="width: 20%; border-right: none;padding: 10px; text-align: right;"><strong>{{ report.outcome }}</strong></td>
+                                                            </tr>
+                                                            {% endfor %} <!-- rep 5 -->
+                                                         </tbody>
+                                                      </table>
+                                                      {% endfor %} <!-- rep 1 -->
+                                                      <!-- Aggregation Should End Here-->
+                                                   </div>
+                                                </div>
+                                             </td>
+                                          </tr>
+                                          {% endif %} <!-- rep -->
+                                       </tbody>
+                                    </table>
+
+                                    {% if data.clinical_trials %} <!-- ct -->
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width:100%;">
+                                       <tbody style="font-size:11pt;font-family:Calibri,sans-serif;">
+                                          <tr>
+                                             <td style="min-width: 100%; padding: 10px 10px;">
+                                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width: 100%;border-top: 2px none #EAEAEA;">
+                                                   <tbody>
+                                                      <tr>
+                                                         <td>
+                                                            <span></span>
+                                                         </td>
+                                                      </tr>
+                                                   </tbody>
+                                                </table>
+
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                       <tbody style="font-size:11pt;font-family:Calibri,sans-serif;">
+                                          <tr>
+                                             <td valign="top">
+                                                <div style="border: 1px solid #ccc; padding-bottom: 10px">
+                                                  <div style="font-size:11pt;font-family:Calibri,sans-serif;margin:0;text-align: center;background: #455a64;padding: 10px 0px;"><span style="color:#FFFFFF">Clinical Trials</span></div>
+                                                  <div style="padding: 10px 10px">
+                                                      <!-- Aggregation Should Start From Here-->
+                                                      <table style="width:100%;padding: 10px 10px;">
+                                                         <tbody>
+                                                           {% for disease, values in data.clinical_trials.items %} <!-- ct 1 -->
+                                                           <tr>
+                                                              <th colspan="3" style="text-align: left;">
+                                                                 <strong style="margin: 15px 0px; display: block">Clinical Trials on <a href="{{ values.0 }}">{{ disease }}</a></strong>
+                                                              </th>
+                                                           </tr>
+                                                           {% for item in values.1 %} <!-- ct 2 -->
+                                                            <tr style="border: 1px solid #ccc; padding: 10px;">
+                                                               <td style="width: 20%; border-right: none;padding: 10px; text-align: left;"><a href="{{ item.url }}">{{ item.gov_id }}</a></td>
+                                                               <td style="width: 60%; border-right: none;padding: 10px; text-align: left;"><strong>Drug(s):</strong> {{ item.drugs }}</td>
+                                                              <td style="width: 20%; border-right: none;padding: 10px; text-align: right;"><strong>{{ item.phase }}</strong></td>
+                                                            </tr>
+                                                            {% endfor %} <!-- ct 2 -->
+                                                            {% endfor %} <!-- ct 1 -->
+                                                         </tbody>
+                                                      </table>
+                                                      <!-- Aggregation Should End Here-->
+                                                   </div>
+                                                </div>
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                    {% endif %} <!-- ct -->
+
+                                    {% if data.discussions %} <!-- disc -->
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width:100%;">
+                                       <tbody>
+                                          <tr>
+                                             <td style="min-width: 100%; padding: 10px 10px;">
+                                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width: 100%;border-top: 2px none #EAEAEA;">
+                                                   <tbody>
+                                                      <tr>
+                                                         <td>
+                                                            <span></span>
+                                                         </td>
+                                                      </tr>
+                                                   </tbody>
+                                                </table>
+                                                <!--
+                                                   <td class="mcnDividerBlockInner" style="padding: 18px;">
+                                                   <hr class="mcnDividerContent" style="border-bottom-color:none; border-left-color:none; border-right-color:none; border-bottom-width:0; border-left-width:0; border-right-width:0; margin-top:0; margin-right:0; margin-bottom:0; margin-left:0;" />
+                                                   -->
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                       <tbody style="font-size:11pt;font-family:Calibri,sans-serif;">
+                                          <tr>
+                                             <td valign="top">
+                                                <div style="border: 1px solid #ccc; padding-bottom: 10px">
+                                                    <div style="font-size:11pt;font-family:Calibri,sans-serif;margin:0;text-align: center;background: #455a64;padding: 10px 0px;"><span style="color:#FFFFFF">Discussions</span></div>
+                                                    <div style="padding: 10px 10px">
+                                                        <!-- Aggregation Should Start From Here-->
+                                                        {% for disease, values in data.discussions.items %} <!-- disc 1 -->
+                                                        {% if values.1 %} <!-- disc 2 -->
+                                                        <table style="width:100%;padding: 10px 10px;">
+                                                         <tbody>
+                                                           <tr>
+                                                              <th colspan="2" style="text-align: left;">
+                                                                 <strong style="margin: 15px 0px; display: block">New Discussions Posts on <a href="{{ values.0 }}">{{ disease }}</a></strong>
+                                                              </th>
+                                                           </tr>
+                                                           {% for item in values.1 %} <!-- disc 3 -->
+                                                            <tr style="border: 1px solid #ccc; padding: 10px;">
+                                                                <td style="width: 80%; border-right: none;padding: 10px; text-align: left;"><a href="{{ item.url }}">{{ item.title }}</a></td>
+                                                                <td style="width: 20%; border-right: none;padding: 10px; text-align: right;">
+                                                                  {% if item.comments_no != '0' and item.comments_no != 0 %} <!-- disc 4 -->
+                                                                  <a style="display: inline;" href="{{ item.url }}">
+                                                                     <div style="display: inline;">{{ item.comments_no }}</div>
+                                                                  </a>
+                                                                  {% endif %} <!-- disc 4 -->
+                                                               </td>
+                                                            </tr>
+                                                            {% endfor %} <!-- disc 3 -->
+                                                         </tbody>
+                                                      </table>
+                                                      <br>
+                                                      {% endif %} <!-- disc 2 -->
+
+                                                      {% if values.2 %} <!-- disc 5 -->
+                                                      <table style="width:100%;padding: 10px 10px;">
+                                                         <tbody>
+                                                           <tr>
+                                                              <th colspan="4" style="text-align: left;">
+                                                                <strong style="display: block">New Comments on Case Report of <a href="{{ values.0 }}">{{ disease }}</a></strong>
+                                                              </th>
+                                                           </tr>
+                                                            {% for item in values.2 %} <!-- disc 6 -->
+                                                            <tr style="border: 1px solid #ccc; padding: 10px;">
+                                                                <td style="width: 20%; border-right: none;padding: 10px; text-align: left;"><a href="{{ item.report_url}}">Case ID #{{ item.report_id }} </a></td>
+                                                                <td style="width: 40%; border-right: none;padding: 10px; text-align: left;"><strong>Drugs:</strong> {{ item.drugs }}</td>
+                                                                <td style="width: 20%; border-right: none;padding: 10px; text-align: left;">{{ item.outcome }}</td>
+                                                                <td style="width: 20%; border-right: none;padding: 10px; text-align: right;">
+                                                                  <a style="display: inline;" href="{{ item.report_url }}">
+                                                                     <div style="display: inline;">{{ item.comments_no }}</div>
+                                                                  </a>
+                                                               </td>
+                                                            </tr>
+                                                            {% endfor %} <!-- disc 6 -->
+                                                       </tbody>
+                                                      </table>
+                                                      {% endif %} <!-- disc 5 -->
+                                                      {% endfor %} <!-- disc 1 -->
+                                                   </div>
+                                                </div>
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                    {% endif %} <!-- disc -->
+
+                                    {% if data.jarticles %} <!-- ja -->
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                       <tbody>
+                                          <tr>
+                                             <td style="min-width: 100%; padding: 10px 18px;">
+                                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width: 100%;border-top: 2px none #EAEAEA;">
+                                                   <tbody>
+                                                      <tr>
+                                                         <td>
+                                                            <span></span>
+                                                         </td>
+                                                      </tr>
+                                                   </tbody>
+                                                </table>
+                                                <!--
+                                                   <td class="mcnDividerBlockInner" style="padding: 18px;">
+                                                   <hr class="mcnDividerContent" style="border-bottom-color:none; border-left-color:none; border-right-color:none; border-bottom-width:0; border-left-width:0; border-right-width:0; margin-top:0; margin-right:0; margin-bottom:0; margin-left:0;" />
+                                                   -->
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                       <tbody style="font-size:11pt;font-family:Calibri,sans-serif;">
+                                          <tr>
+                                             <td valign="top">
+                                               <div style="border: 1px solid #ccc; padding-bottom: 15px">
+                                                   <div style="font-size:11pt;font-family:Calibri,sans-serif;margin:0;text-align: center;background: #455a64;padding: 10px 0px;"><span style="color:#FFFFFF">Journal Articles</span></div>
+                                                   <div style="padding: 10px 10px">
+                                                     <!-- Aggregation Should Start From Here-->
+                                                     <table style="width:100%;padding: 10px 10px;">
+                                                         <tbody>
+                                                           {% for article in data.jarticles %} <!-- ja 1 -->
+                                                            <tr style="border: 1px solid #ccc; padding: 10px;">
+                                                               <td style="width: 100%; border-right: none;padding: 10px; padding-bottom: 20px; text-align: left;">
+                                                                  <a href="{{ article.url }}">{{ article.title }}</a><br><br>
+                                                                  <span><strong>{{ article.journal_name }}</strong></span><br><br>
+                                                                  <span>{{ article.abstract }}</span>
+                                                               </td>
+                                                            </tr>
+                                                            {% endfor %} <!-- ja 1 -->
+                                                         </tbody>
+                                                      </table>
+                                                   </div>
+                                                </div>
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                    {% endif %} <!-- ja -->
+
+                                    {% if data.narticles %} <!-- na -->
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                       <tbody>
+                                          <tr>
+                                             <td style="min-width: 100%; padding: 10px 18px;">
+                                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width: 100%;border-top: 2px none #EAEAEA;">
+                                                   <tbody>
+                                                      <tr>
+                                                         <td>
+                                                            <span></span>
+                                                         </td>
+                                                      </tr>
+                                                   </tbody>
+                                                </table>
+                                                <!--
+                                                   <td class="mcnDividerBlockInner" style="padding: 18px;">
+                                                   <hr class="mcnDividerContent" style="border-bottom-color:none; border-left-color:none; border-right-color:none; border-bottom-width:0; border-left-width:0; border-right-width:0; margin-top:0; margin-right:0; margin-bottom:0; margin-left:0;" />
+                                                   -->
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                       <tbody style="font-size:11pt;font-family:Calibri,sans-serif;">
+                                          <tr>
+                                            <td valign="top">
+                                              <div style="border: 1px solid #ccc; padding-bottom: 15px">
+                                                  <div style="font-size:11pt;font-family:Calibri,sans-serif;margin:0;text-align: center;background: #455a64;padding: 10px 0px;"><span style="color:#FFFFFF">News Articles</span></div>
+                                                  <div style="padding: 10px 10px">
+                                                    <!-- Aggregation Should Start From Here-->
+                                                    <table style="width:100%;padding: 10px 10px;">
+                                                         <tbody>
+                                                           {% for article in data.narticles %} <!-- na 1 -->
+                                                            <tr style="border: 1px solid #ccc; padding: 10px;">
+                                                               <td style="width: 100%; border-right: none;padding: 10px; padding-bottom: 20px; text-align: left;">
+                                                                  <a href="{{ article.url }}">{{ article.title }}</a> <br><br>
+                                                                  <span><strong>{{ article.publication_name }}</strong></span><br><br>
+                                                                  <span>{{ article.abstract }}</span>
+                                                               </td>
+                                                            </tr>
+                                                            {% endfor %} <!-- na 1 -->
+                                                         </tbody>
+                                                      </table>
+                                                   </div>
+                                                </div>
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                    {% endif %} <!-- na -->
+
+                                    {% if data.events %} <!-- ev -->
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                       <tbody>
+                                          <tr>
+                                             <td style="min-width: 100%; padding: 10px 18px;">
+                                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width: 100%;border-top: 2px none #EAEAEA;">
+                                                   <tbody>
+                                                      <tr>
+                                                         <td>
+                                                            <span></span>
+                                                         </td>
+                                                      </tr>
+                                                   </tbody>
+                                                </table>
+                                                <!--
+                                                   <td class="mcnDividerBlockInner" style="padding: 18px;">
+                                                   <hr class="mcnDividerContent" style="border-bottom-color:none; border-left-color:none; border-right-color:none; border-bottom-width:0; border-left-width:0; border-right-width:0; margin-top:0; margin-right:0; margin-bottom:0; margin-left:0;" />
+                                                   -->
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                       <tbody style="font-size:11pt;font-family:Calibri,sans-serif;">
+                                          <tr>
+                                             <td valign="top">
+                                               <div style="border: 1px solid #ccc; padding-bottom: 15px">
+                                                   <div style="font-size:11pt;font-family:Calibri,sans-serif;margin:0;text-align: center;background: #455a64;padding: 10px 0px;"><span style="color:#FFFFFF">Events</span></div>
+                                                   <div style="padding: 10px 10px">
+                                                     <!-- Aggregation Should Start From Here-->
+                                                     <table style="width:100%;padding: 10px 10px;">
+                                                          <tbody>
+                                                            {% for event in data.events %} <!-- ev 1 -->
+                                                            <tr>
+                                                               <td style="width: 100%; border-right: none;padding: 10px; padding-bottom: 20px; text-align: left;">
+                                                                  <a href="{{ event.url }}">{{ event.title }}</a><br><br>
+                                                                  <span><strong>{{ event.location }}</strong></span> <br><br>
+                                                                  <span>{{ event.description }}</span>
+                                                               </td>
+                                                            </tr>
+                                                            {% endfor %} <!-- ev 1 -->
+                                                         </tbody>
+                                                      </table>
+                                                   </div>
+                                                </div>
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                    {% endif %} <!-- ev -->
+
+                                    {% if data.comments %} <!-- ev -->
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                       <tbody>
+                                          <tr>
+                                             <td style="min-width: 100%; padding: 10px 18px;">
+                                                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width: 100%;border-top: 2px none #EAEAEA;">
+                                                   <tbody>
+                                                      <tr>
+                                                         <td>
+                                                            <span></span>
+                                                         </td>
+                                                      </tr>
+                                                   </tbody>
+                                                </table>
+                                                <!--
+                                                   <td class="mcnDividerBlockInner" style="padding: 18px;">
+                                                   <hr class="mcnDividerContent" style="border-bottom-color:none; border-left-color:none; border-right-color:none; border-bottom-width:0; border-left-width:0; border-right-width:0; margin-top:0; margin-right:0; margin-bottom:0; margin-left:0;" />
+                                                   -->
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                       <tbody style="font-size:11pt;font-family:Calibri,sans-serif;">
+                                          <tr>
+                                             <td valign="top">
+                                               <div style="border: 1px solid #ccc; padding-bottom: 15px">
+                                                   <div style="font-size:11pt;font-family:Calibri,sans-serif;margin:0;text-align: center;background: #455a64;padding: 10px 0px;"><span style="color:#FFFFFF">New Comments on:</span></div>
+                                                   <div style="padding: 10px 10px">
+                                                     <!-- Aggregation Should Start From Here-->
+                                                     <table style="width:100%;padding: 10px 10px;">
+                                                          <tbody>
+                                                            {% for comment in data.comments %} <!-- ev 1 -->
+                                                            <tr>
+                                                               <td style="width: 100%; border-right: none;padding: 10px; padding-bottom: 20px; text-align: left;">
+                                                                  <a href="{{ comment.parent_link }}">{{ comment.parent }}</a><br><br>
+                                                                  <!-- <span>{{ comment.body }}</span>                                                                   -->
+                                                               </td>
+                                                            </tr>
+                                                            {% endfor %} <!-- ev 1 -->
+                                                         </tbody>
+                                                      </table>
+                                                   </div>
+                                                </div>
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                    {% endif %} <!-- ev -->
+                                 </td>
+                              </tr>
+                              <tr>
+                                 <td valign="top" id="templateFooter">
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%" class="mcnDividerBlock" style="min-width:100%;">
+                                       <tbody class="mcnDividerBlockOuter">
+                                          <tr>
+                                             <td class="mcnDividerBlockInner" style="min-width: 100%; padding: 10px 18px 25px;">
+                                                <table class="mcnDividerContent" border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width: 100%;border-top: 2px none #EEEEEE;">
+                                                   <tbody>
+                                                      <tr>
+                                                         <td>
+                                                            <span></span>
+                                                         </td>
+                                                      </tr>
+                                                   </tbody>
+                                                </table>
+                                                <!--
+                                                   <td class="mcnDividerBlockInner" style="padding: 18px;">
+                                                   <hr class="mcnDividerContent" style="border-bottom-color:none; border-left-color:none; border-right-color:none; border-bottom-width:0; border-left-width:0; border-right-width:0; margin-top:0; margin-right:0; margin-bottom:0; margin-left:0;" />
+                                                   -->
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width:100%;">
+                                       <tbody style="font-size:11pt;font-family:Calibri,sans-serif;">
+                                          <tr>
+                                             <td valign="top"  style="padding-top:9px;">
+                                                <!--[if mso]>
+                                                <table align="left" border="0" cellspacing="0" cellpadding="0" width="100%" style="width:100%;">
+                                                   <tr>
+                                                      <![endif]-->
+                                                      <!--[if mso]>
+                                                      <td valign="top" width="600" style="width:600px;">
+                                                         <![endif]-->
+                                                         <table align="left" border="0" cellpadding="0" cellspacing="0" style="max-width:100%; min-width:100%;" width="100%">
+                                                            <tbody>
+                                                               <tr>
+                                                                  <td valign="top" style="padding-top:0; padding-right:18px; padding-bottom:9px; padding-left:18px;">
+                                                                     <p>This email was sent to <a href="mailto:{{ email_address }}" target="_blank">{{ email_address }}</a><br>
+                                                                        &nbsp;
+                                                                     </p>
+                                                                     <p>If you wish to stop receiving these daily digest emails click <a href="{{ unsubscribe }}" target="_blank">unsubscribe</a></p>
+                                                                     <p><a href="https://cure.ncats.io" target="_blank">©2022 CURE ID</a></p>
+                                                                  </td>
+                                                               </tr>
+                                                            </tbody>
+                                                         </table>
+                                                         <!--[if mso]>
+                                                      </td>
+                                                      <![endif]-->
+                                                      <!--[if mso]>
+                                                   </tr>
+                                                </table>
+                                                <![endif]-->
+                                             </td>
+                                          </tr>
+                                       </tbody>
+                                    </table>
+                                 </td>
+                              </tr>
+                           </table>
+                           <!--[if (gte mso 9)|(IE)]>
+                        </td>
+                     </tr>
+                  </table>
+                  <![endif]-->
+                  <!-- // END TEMPLATE -->
+               </td>
+            </tr>
+         </table>
+      </center>
+   </body>
+</html>

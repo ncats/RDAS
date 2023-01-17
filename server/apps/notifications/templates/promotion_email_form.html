@@ -1,0 +1,15 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+  {% load static %}
+  <link rel="stylesheet" type="text/css" href="{% static 'notifications/style.css' %}">
+
+  <form action="/admin/promotion-email" method="post">
+      {% csrf_token %}
+      <div id="promotion-email-form">
+        {{ form.as_p }}
+        <input type="submit" value="Submit" id="promotion-email-form-submit-button">
+      </div>
+  </form>
+{% endblock %}

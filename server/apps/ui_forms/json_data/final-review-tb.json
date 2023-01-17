@@ -1,0 +1,152 @@
+{
+    "title": "Final Review",
+    "isRequired": false,
+    "showPage": true,
+    "name": "final-review",
+    "finalOverView": true,
+        "formControls": [{
+            "controlType": "overview",
+            "key": "key_review",
+            "label": "Final Review",
+            "width": 100,
+            "value": {
+              "Disease": "report.disease.name}",
+              "Diagnosis": "report.how_diagnosis.map( => value)}",
+              "Challenge": "report.why_new_way.map( => value)}",
+              "Drug(s)": "report.drugs",
+              "Outcome": "report.outcome",
+              "Adverse Events": "report.adverse_events",
+              "Pregnant": "report.patient.pregnant",
+              "Reminder": "when_reminder"
+            }
+          }, {
+            "controlType": "accordion",
+            "key": "final_overview",
+            "label": "",
+            "width": 100,
+            "groups": [{
+              "key": "patient_demographics",
+              "label": "Patient Demographics",
+              "expanded": true,
+              "controls": [{
+                "controlType": "json",
+                "key": "patient",
+                "value": {
+                  "Age": "report.patient.age_group",
+                  "Sex": "report.patient.sex",
+                  "Ethnicity": "report.patient.ethnicity",
+                  "Race(s)": "report.patient.race",
+                  "Country Contracted": "report.country_contracted",
+                  "Country Treated": "report.country_treated",
+                  "Treatment Began": "report.began_treatment_year"
+                }
+              }]
+            }, {
+              "key": "comorbidities",
+              "label": "Co-Morbidities",
+              "expanded": true,
+              "controls": [{
+                "controlType": "json",
+                "key": "comorbidities",
+                "value": {
+                  "Co-Morbidities": "report.patient.comorbidity"
+                }
+              }]
+            }, {
+              "key": "presentation",
+              "label": "Presentation",
+              "expanded": true,
+              "controls": [{
+                "controlType": "json",
+                "key": "presentation",
+                "value": {
+                  "Site of Disease": "report.site_of_disease",
+                  "Site of Infection": "report.site_of_tuberculosis_infection",
+                  "Clinical Syndrome": "report.clinical_syndrome",
+                  "What makes the case unusual": "report.unusual"
+                }
+              }]
+            }, {
+              "key": "diagnosis",
+              "label": "Diagnosis",
+              "expanded": true,
+              "controls": [{
+                "controlType": "json",
+                "key": "diagnosis",
+                "value": {
+                  "Organism": "report.organisms",
+                  "Previous Treatment": "report.previous_drugs",
+                  "Resistance": "report.resistant_drugs",
+                  "Samples": "report.sample"
+                }
+              }]
+            }, {
+              "key": "treatment-details",
+              "label": "Treatment Details",
+              "expanded": true,
+              "controls": [
+               {
+                "controlType": "json",
+                "key": "diagnosis",
+                "value": {
+                 
+                }
+              }
+            ]
+            }, {
+              "key": "outcome",
+              "label": "Outcome",
+              "expanded": true,
+              "controls": [{
+                "controlType": "json",
+                "key": "outsome",
+                "value": {
+                  "Patient Outcome": "report.outcome",
+                  "Outcome Determination": "report.how_outcome",
+                  "Outcome Assessed": "report.when_outcome",
+                  "Surgery": "report.surgery",
+                  "Relapse": "report.relapse",
+                  "Adverse Events": "report.adverse_events_outcome",
+                  "FollowUp": "report.outcome_followup"
+                }
+              }]
+            }, {
+              "key": "pregnancy",
+              "label": "Pregnancy",
+              "expanded": true,
+              "controls": [{
+                "controlType": "json",
+                "key": "pregnancy",
+                "value": {
+                  "Gestational age at the time when treatment began": "report.patient.pregnancy.treatment_gestational_age",
+                  "Pregnancy Outcome": "report.patient.pregnancy.outcome",
+                  "Gestational age at the timeof delivery": "report.patient.pregnancy.delivery_gestational_age"
+                }
+              }]
+            }, {
+              "key": "additional",
+              "label": "Additional Info",
+              "expanded": true,
+              "controls": [{
+                "controlType": "json",
+                "key": "additional",
+                "value": {
+                  "Other": "report.additional_info"
+                },
+                "images": "report.attached_images"
+              }]
+            } ]
+          }, {
+            "controlType": "checkbox",
+            "key": "anonymous",
+            "label": "",
+            "options": [{
+              "label": "I do not want to appear publicity as the author of this case",
+              "value": "report.anonymous"
+            }],
+            "classes": "margin-top-20",
+            "width": 100
+          }]
+        
+
+}

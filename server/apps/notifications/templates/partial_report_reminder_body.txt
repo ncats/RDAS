@@ -1,0 +1,5 @@
+Hi {{ first_name }},
+
+Thanks for using CURE ID! We wanted to remind you that you have a partially completed case report form - {{report_title}}.
+
+You can find it on https://{{front_end_sub_domain}}{{front_end_domain}}{{end_of_url}} in your account tab under My Case Reports menu.

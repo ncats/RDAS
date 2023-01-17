@@ -1,0 +1,66 @@
+{% extends "admin/login.html" %}
+{% load i18n static %}
+
+{% block content %}
+
+<link rel="stylesheet" type="text/css" href="{% static '/api/css/cureid_auth.css' %}"/>
+
+<div class="cureid-admin-message">
+  Please use <a href="https://cure.ncats.io" target="_blank">CUREID</a> app to create an account, reset the password or link accounts.
+</div>
+<br />&nbsp;<hr><br />&nbsp;
+<div class="cureid-admin-firebase-providers">
+  <a href="/v2/login-through?t=facebook"><div class="cureid-facebook">&nbsp;</div></a>
+  <a href="/v2/login-through?t=gmail"><div class="cureid-gmail">&nbsp;</div></a>
+  <a href="/v2/login-through?t=twitter"><div class="cureid-twitter">&nbsp;</div></a>
+</div>
+<br />&nbsp;<hr><br />&nbsp;
+
+{% if form.errors and not form.non_field_errors %}
+<p class="errornote">
+{% if form.errors.items|length == 1 %}
+  {% translate "Please correct the error below." %}
+{% else %}
+  {% translate "Please correct the errors below." %}
+{% endif %}
+</p>
+{% endif %}
+
+{% if form.non_field_errors %}
+{% for error in form.non_field_errors %}
+<p class="errornote">
+    {{ error }}
+</p>
+{% endfor %}
+{% endif %}
+
+<div id="content-main">
+
+{% if user.is_authenticated %}
+<p class="errornote">
+{% blocktranslate trimmed %}
+    You are authenticated as {{ username }}, but are not authorized to
+    access this page. Would you like to login to a different account?
+{% endblocktranslate %}
+</p>
+{% endif %}
+
+
+
+<form action="{{ app_path }}" method="post" id="login-form">{% csrf_token %}
+  <div class="form-row">
+    {{ form.username.errors }}
+    {{ form.username.label_tag }} {{ form.username }}
+  </div>
+  <div class="form-row">
+    {{ form.password.errors }}
+    {{ form.password.label_tag }} {{ form.password }}
+    <input type="hidden" name="next" value="{{ next }}">
+  </div>
+  <div class="submit-row">
+    <input type="submit" value="{% translate 'Log in' %}">
+  </div>
+</form>
+
+</div>
+{% endblock %}

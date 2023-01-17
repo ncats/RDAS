@@ -1,0 +1,4 @@
+Hi {{ first_name }},
+
+Your case report, {{drugs}}{{tail}} has a new comment!
+You can find it here: https://{{front_end_sub_domain}}{{front_end_domain}}{{end_of_url}}

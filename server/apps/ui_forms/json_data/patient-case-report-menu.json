@@ -1,0 +1,204 @@
+{
+	"menu": [{
+		"name": "disease",
+		"title": "Disease",
+		"description": "What disease did you have that you received treatment for and are reporting today (e.g., monkeypox, Long COVID, RASopathies)?",
+		"isRequired": true,
+		"showPage": true
+	}, {
+		"name": "diagnosis",
+		"title": "Diagnosis Determination",
+		"description": "How was the diagnosis made?",
+		"isRequired": true,
+		"showPage": true
+	}, {
+		"name": "treatment-challenges",
+		"title": "Treatment Challenge",
+		"description": "What made your patient's infection difficult to treat?",
+		"isRequired": false,
+		"showPage": false
+	}, {
+		"name": "drugs",
+		"title": "Drug(s)",
+		"description": "What medicine(s) did you take for your condition? ",
+		"isRequired": true,
+		"showPage": true
+	}, {
+		"name": "treatment-outcome",
+		"title": "Treatment Outcome",
+		"description": "What was the outcome of your treatment? ",
+		"isRequired": true,
+		"showPage": true
+	}, {
+		"name": "adverse-events",
+		"title": "Adverse Events",
+		"description": "Did you have any side effects from the medicine? ",
+		"isRequired": true,
+		"showPage": true
+	}, {
+		"name": "pregnancy",
+		"title": "Pregnancy",
+		"description": "Were you pregnant during the treatment of your condition? ",
+		"isRequired": true,
+		"showPage": true
+	}, {
+		"name": "reminder",
+		"title": "Reminder",
+		"description": "Would you like a reminder to update this form (e.g., if you are still on treatment)?",
+		"isRequired": true,
+		"showPage": true
+	}, {
+		"title": "Initial Overview",
+		"isRequired": false,
+		"showPage": true,
+		"name": "initial-overview"
+	}, {
+		"name": "demographics",
+		"title": "Patient Demographics",
+		"description": "Tell us about yourself:",
+		"isRequired": false,
+		"showPage": true
+	}, {
+		"name": "country",
+		"title": "Country",
+		"description": "Country in which you were infected or treated",
+		"isRequired": false,
+		"showPage": true
+	}, {
+		"name": "year",
+		"title": "Year",
+		"description": "When did you start taking the medicine for this infection?",
+		"isRequired": false,
+		"showPage": true
+	}, {
+		"name": "other-conditions",
+		"title": "Other Conditions",
+		"description": "Do you have any of these conditions?",
+		"isRequired": false,
+		"showPage": true
+	}, {
+		"name": "gestational-age",
+		"title": "Pregnancy",
+		"description": "How many weeks pregnant were you when you began treatment (round to the nearly week)?",
+		"isRequired": false,
+		"showPage": false
+	}, {
+		"name": "neonates",
+		"title": "Neonates",
+		"isRequired": false,
+		"showPage": false
+	},{
+		"name": "clinical-presentation",
+		"title": "Clinical Presentation",
+		"description": "Where on your body were your rash/skin lesions?",
+		"isRequired": false,
+		"showPage": true
+	}, {
+		"name": "tb-clinical-presentation",
+		"title": "Clinical Presentation",
+		"description": "Describe the clinical presentation: ",
+		"isRequired": false,
+		"showPage": false
+	},{
+        "name": "mp-clinical-presentation",
+        "title": "Site of Lesions",
+        "description": "Describe the clinical presentation: ",
+        "isRequired": false,
+        "showPage": false
+    },{
+		"name": "unusual",
+		"title": "Unusual",
+		"description": "Was there anything else about your infection that you would like to share?",
+		"isRequired": false,
+		"showPage": true
+	}, {
+		"name": "organism",
+		"title": "Organism",
+		"description": "What is the organism(s) causing the disease, if known/applicable?",
+		"isRequired": false,
+		"showPage": false
+	}, {
+		"name": "resistance",
+		"title": "Resistance",
+		"description": "To which drugs, if any, was the organism resistant?",
+		"isRequired": false,
+		"showPage": false
+	}, {
+		"name": "tb-resistance",
+		"title": "Resistance",
+		"description": "To which drugs, if any, was the organism resistant?",
+		"isRequired": false,
+		"showPage": false
+	}, {
+		"name": "sample",
+		"title": "Sample",
+		"description": "",
+		"isRequired": false,
+		"showPage": false
+	}, {
+		"name": "dosing-regimen",
+		"title": "Dosing regimen ",
+		"description": "What dosing regimen did you use for ${drug}?",
+		"isRequired": false,
+		"showPage": false
+	}, {
+		"name": "additional-details",
+		"title": "Additional details ",
+		"description": "How was ${drug} used in a new way?",
+		"isRequired": false,
+		"showPage": false
+	}, {
+		"name": "treatment-setting",
+		"title": "Treatment Setting ",
+		"description": "Where were you treated for your infection (e.g., at a clinic, admitted to the hospital)?",
+		"isRequired": false,
+		"showPage": false
+	},{
+		"name": "adverse-events-outcome",
+		"title": "Adverse Event Outcome",
+		"description": "You stated that you experienced a side effect from the medication. What was the outcome attributed to this adverse event/side effect? ",
+		"showPage": false
+	}, {
+		"name": "previous-treatment",
+		"title": "Previous Treatment",
+		"description": "What medicine, if any, did you take previously to treat your infection?",
+		"isRequired": false,
+		"showPage": true
+	}, {
+		"name": "surgery",
+		"title": "Surgery",
+		"description": "Did the patient have surgery as part of the control of their infection?",
+		"isRequired": false,
+		"showPage": false
+	}, {
+		"name": "outcome-determination",
+		"title": "Outcome Determination",
+		"description": "How did you determine the outcome?",
+		"isRequired": false,
+		"showPage": false
+	}, {
+		"name": "outcome-timing",
+		"title": "Outcome Timing",
+		"description": "When did you assess the outcome?",
+		"isRequired": false,
+		"showPage": false
+	}, {
+		"name": "relapse",
+		"title": "Relapse",
+		"description": "Did your infection come back after you finished your medicine?",
+		"isRequired": false,
+		"showPage": false
+	}, {
+		"name": "other",
+		"title": "Other",
+		"description": "Is there any other important information you would like to add?",
+		"isRequired": false,
+		"showPage": true
+	}, {
+		"title": "Final Review",
+		"isRequired": false,
+		"showPage": true,
+		"name": "final-review",
+		"finalOverView": true
+	}]
+}
