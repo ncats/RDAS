@@ -1,3 +1,16 @@
+"""
+This module defines a series of stages for preprocessing raw CSV grant
+data downloaded from ExPORTER, and defines a function prep_data
+for running those stages sequentially.
+
+To greatly optimize the speed of this process, we use pygit2 to track
+which files have changed and only annotate those files.
+
+update_grant.py calls prep_data() from this module to figure out
+which files need to be added to the database.
+"""
+
+
 import os
 import re
 import ast
@@ -490,7 +503,21 @@ def to_abs_path(path: str):
 	return os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
 
 
-def prep_data(data_raw_path: str, data_neo4j_path: str):
+def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
+	"""
+	The most important function of this module. Given the path to raw ExPORTER data,
+	runs the preprocessing stages on the data (situationally skipping some slower
+	stages on files that have not changed) and determines which output files are
+	new/modified and thus contain data that would need to be inserted into the
+	database.
+
+	@param data_raw_path: the path, relative or absolute, to the folder containing
+	                      raw CSV data from ExPORTER
+	@param data_neo4j_path: the path, relative or absolute, to the folder containing
+	                        (or that will contain) processed and annotated CSV data.
+	"""
+
+	# Initializing some variables
 	global raw_path, neo4j_path, years_to_annotate
 	raw_path = to_abs_path(data_raw_path)
 	neo4j_path = to_abs_path(data_neo4j_path)
@@ -510,7 +537,8 @@ def prep_data(data_raw_path: str, data_neo4j_path: str):
 			"publications"
 	]
 
-	# clear out old files, or initialize new repo for them if not exists
+	# Clear out old files, or initialize new repo for them if the given data_neo4j path does
+	# not already exist.
 	repo = None
 	try:
 		files = os.listdir(neo4j_path)
@@ -518,6 +546,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str):
 		print("Found existing git repo at neo4j_path, clearing out old files")
 		repo = pygit2.Repository(data_neo4j(".git"))
 		for f in files:
+			# skip annotation-related files because we may not want to reannotate some files
 			if f in ["annotation_files", "annotation_source", "annotation_umls", "grants_umls"]:
 				folders_to_create.remove(f)
 				continue
@@ -526,6 +555,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str):
 	except (NotADirectoryError, FileNotFoundError, ValueError):
 		print("Not existing repo at given data_neo4j path, initializing")
 		repo = pygit2.init_repository(neo4j_path)
+		is_new_repo = True
 
 	print("Creating empty output directories")
 
@@ -534,6 +564,9 @@ def prep_data(data_raw_path: str, data_neo4j_path: str):
 	for folder in folders_to_create:
 		add_folder(folder)
 
+	##############################################
+	# Run preprocessing stages one after another.#
+	##############################################
 	print("Running get_RD_project_ids")
 	get_RD_project_ids()
 	print("Running merge_project_funding")
@@ -554,11 +587,13 @@ def prep_data(data_raw_path: str, data_neo4j_path: str):
 	select_RD_publications()
 	print("Running cleanup_pub_country")
 	cleanup_pub_country()
-
 	print("Running select_RD_abstracts")
 	select_RD_abstracts()
+
+	# The below stages are extremely slow, so we will only run them for
+	# years that have changed data.
 	years_to_annotate = {k[-8:-4] for k,v in repo.status().items()
-											 if k.startswith("abstracts/")
+											 if (k.startswith("abstracts/") or k.startswith("projects/"))
 											 and v in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_WT_NEW]}
 	print("Running annotation_preprocess_grant")
 	annotation_preprocess_grant()
@@ -574,6 +609,10 @@ def prep_data(data_raw_path: str, data_neo4j_path: str):
 	print("Running fix_escaped_endings")
 	fix_escaped_endings()
 
+	################################################
+
+	# Finished running stages, now we figure out which files have changed
+	# (and store them in a FilesToAdd object to be returned) and commit the changes
 	print("Getting current repo status")
 	status = repo.status().items()
 	fta = {}
@@ -583,8 +622,12 @@ def prep_data(data_raw_path: str, data_neo4j_path: str):
 									 and v in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_WT_NEW]]
 
 	print("adding all changes to commit")
-	ref = repo.head.name
-	parents = [repo.head.target]
+	if is_new_repo:
+		ref = "HEAD"
+		parents = []
+	else:
+		ref = repo.head.name
+		parents = [repo.head.target]
 	index = repo.index
 	index.add_all()
 	index.write()
@@ -597,5 +640,8 @@ def prep_data(data_raw_path: str, data_neo4j_path: str):
 
 	return fta
 
+
+# For testing purposes; this file is typically not run directly, but instead called
+# by update_grant.py with an appropriate raw and output path
 if __name__ == "__main__":
 	prep_data("~/testneo4jprep/data_raw", "~/testneo4jprep/data_neo4j")
