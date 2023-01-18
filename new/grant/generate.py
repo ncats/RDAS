@@ -22,14 +22,14 @@ def check (empty=False, db=AlertCypher("grant")):
 def update (db):
     # Updates database from last update date
     # connect to imported update script
-    update_grant.main()
+    update_grant.main(db)
     print('NIH GRANT DB UPDATING...')
 
 def create (db):
     # Creates database from scratch
     # connect to imported create script
     # use threading lock functions to prevent same line prints
-    update_grant.main()
+    update_grant.main(db)
     lock.acquire()
     print('Creating NIH Grant Database...')
     lock.release()
