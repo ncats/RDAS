@@ -4,7 +4,7 @@ from neo4j import GraphDatabase, Session, Record
 from typing import TypedDict, Any, Callable, Optional
 from AlertCypher import AlertCypher
 from steps import steps
-from prep_neo4j_data import prep_data
+from prep_neo4j_data import FilesToAdd, prep_data
 
 
 def write(session: Session, query: str, params: dict[str, Any]) -> list[Record]:
