@@ -439,7 +439,7 @@ def create_epidemiology(tx, abstractDataRel, article_node):
           MERGE (n:EpidemiologyAnnotation {isEpi:$isEpi, epidemiology_type:$epidemiology_type, epidemiology_rate:$epidemiology_rate, date:$date, location:$location, sex:$sex, ethnicity:$ethnicity}) 
           MERGE (n) -[r:EPIDEMIOLOGY_ANNOTATION_FOR]-> (a)
           '''
-        tx.run(create_epidemiology_query, args={
+        tx.run(create_epidemiology_query, **{
           "article_id":article_node,
           "isEpi": isEpi,
           "epidemiology_type":epi_info['EPI'] if epi_info['EPI'] else [], 
@@ -457,7 +457,7 @@ def create_epidemiology(tx, abstractDataRel, article_node):
         MATCH (a:Article) WHERE id(a) = $article_id
         SET a.isEpi = $isEpi'''
     try:
-      tx.run(create_epidemiology_query, args={"article_id":article_node, 'isEpi': isEpi,})
+      tx.run(create_epidemiology_query, **{"article_id":article_node, 'isEpi': isEpi,})
     except Exception as e:
       logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is False.')
       raise e
