@@ -16,6 +16,8 @@ import re
 today = datetime.now()
 today = today.strftime("%Y/%m/%d")
 config = configparser.ConfigParser()
+# Used to be "https://rdip2.ncats.io:8000"
+epiapi_url = "http://127.0.0.1:8000"
 config.read("config.ini")
 
 def get_gard_list(db):
@@ -395,7 +397,7 @@ def create_keywords(tx, abstractDataRel, article_node):
       })
 
 #This classifies if an article is epidemiological or not.
-def get_isEpi(text, url="https://rdip2.ncats.io:8000/postEpiClassifyText/"):
+def get_isEpi(text, url=f"{epiapi_url}/postEpiClassifyText/"):
   #check if the article is an Epi article using API
   try:
     response = requests.post(url, json={'text': text}).json()
@@ -405,7 +407,7 @@ def get_isEpi(text, url="https://rdip2.ncats.io:8000/postEpiClassifyText/"):
     raise e
   
 
-def get_epiExtract(text, url="https://rdip2.ncats.io:8000/postEpiExtractText"):
+def get_epiExtract(text, url=f"{epiapi_url}/postEpiExtractText"):
   #Returns a dictionary of the form 
   '''
   {DATE:['1989'],
@@ -414,7 +416,7 @@ def get_epiExtract(text, url="https://rdip2.ncats.io:8000/postEpiExtractText"):
   ...}
   '''
   try:
-    epi_info = dict(requests.post("https://rdip2.ncats.io:8000/postEpiExtractText", json={'text': text,'extract_diseases':False}).json())
+    epi_info = dict(requests.post(f"{epiapi_url}/postEpiExtractText", json={'text': text,'extract_diseases':False}).json())
     return epi_info
   except Exception as e:
     logging.error(f'Exception during get_isEpi. text: {text}, error: {e}')
@@ -598,10 +600,8 @@ def save_all(abstract, disease_node, pubmedID, search_source, session):
     # This function adds isEpi (bool) to the article node and if True, adds EpidemiologyAnnotation node with relation Epidemiology_Annotation_For to Article node.
     # isEpi is null when there is no abstract to review.
     logging.info(f'Invoking create_epidemiology')
-    '''
     if ('abstractText' in abstract and 'title' in abstract):
       create_epidemiology(session, abstract, article_node)
-    '''
 
     if ('fullTextUrlList' in abstract and 
     'fullTextUrl' in abstract['fullTextUrlList']):
