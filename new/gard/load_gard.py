@@ -16,7 +16,7 @@ def create_relationship_query(db, current, node, has_parent=False):
     if has_parent:
         query = '''
         MATCH (x:GARD {GardId: $parent}), (y:GARD {GardId: $current})
-        MERGE (x)-[i:subClassOf]->(y)
+        MERGE (x)<-[i:subClassOf]-(y)
         RETURN y
         '''
         params = {
@@ -26,7 +26,7 @@ def create_relationship_query(db, current, node, has_parent=False):
     else:
         query = '''
         MATCH (x:GARD {GardId: $current}), (y:GARD {GardId: $child})
-        MERGE (x)-[i:subClassOf]->(y)
+        MERGE (x)<-[i:subClassOf]-(y)
         RETURN y
         '''
         params = {
@@ -37,9 +37,9 @@ def create_relationship_query(db, current, node, has_parent=False):
     return db.run(query, args=params).single().value()    
 
 def create_relationship(db, data):
-    if data['RootTerm'] == 'GARD to be classified':
+    '''if data['RootTerm'] == 'GARD to be classified':
        return
-
+    '''
     current = data['GardID']
     parent = data['Parent']
     child = data['Child']

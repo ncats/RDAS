@@ -11,7 +11,8 @@ import itertools
 import requests
 import jmespath
 import re
-#from new.firebase.email.ses_firebase import trigger_email
+import ast
+from firestore.ses_firebase import trigger_email
 
 today = datetime.now()
 today = today.strftime("%Y/%m/%d")
@@ -553,6 +554,13 @@ def create_annotations(tx, pubtatorData, article_node):
         "infons_type": annotation['infons']['type'] if ('type' in annotation['infons'] and annotation['infons']['type']) else '',
         "text": annotation['text'] if 'text' in annotation else '',
       }
+      temp = parameters['text']
+      if len(temp) > 0:
+        try:
+          temp = temp.split(",")
+        except:
+          pass
+      parameters['text'] = temp
       txout = tx.run(create_annotations_query, args=parameters)
 
 def create_disease_article_relation(tx, disease_node, article_node):
@@ -764,7 +772,6 @@ def retrieve_articles(db, last_update):
   save_omim_articles(db, last_update, today)
 
 def main(db, update=False):
-  return
   if update == True:
     last_update = db.getConf('DATABASE','pubmed_update')
     last_update = datetime.strptime(last_update, "%m/%d/%y")
@@ -773,4 +780,4 @@ def main(db, update=False):
 
   last_update = last_update.strftime("%Y/%m/%d")
   retrieve_articles(db, last_update)
-  #trigger_email("pubmed")
+  trigger_email("pubmed")

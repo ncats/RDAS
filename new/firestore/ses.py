@@ -2,7 +2,7 @@ import django
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 import os
-os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+os.environ['DJANGO_SETTINGS_MODULE'] = 'firestore.settings'
 django.setup()
 
 def clinical_msg (data): # dict

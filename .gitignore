@@ -2,3 +2,8 @@ venv/
 .idea
 *.pyc
 
+new/firebase/email/key.json
+new/config.ini
+new/firestore/key.json
+new/config.ini
+new/config.ini
