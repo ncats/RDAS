@@ -38,7 +38,7 @@ def step_to_fn(
 	return fn
 
 def main(db: AlertCypher):
-
+	#return
 	# TODO: specify which folders store the raw and processed data on the server
 	fta = prep_data("raw data folder here", "output data folder here")
 

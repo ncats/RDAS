@@ -11,7 +11,7 @@ import configparser
 import threading
 import pandas as pd
 lock = threading.Lock()
-#from firebase.email.ses_firebase import trigger_email
+from firestore.ses_firebase import trigger_email
 
 def remove_dupes(db):
     for idx in range(len(data_model.additional_class_fields)):     
@@ -102,10 +102,12 @@ def main(db, update=False):
             CT_name = gard_mapping['disease_name']
             retrieved_trials = load_neo4j_functions.nctid_list(CT_name)
 
+
             if update == False:
                 cypher_create_gard = 'MERGE (gard:GARD{GARDName: \"' + GARD_name + '\", GARDId: \"' + GARDId + '\"})'
                 response_trial_exists = db.run(cypher_create_gard)
-                add_trial(db, retrieved_trials, GARDId)
+                if int([elm[0] for elm in response_trial_exists][0]) == 0:
+                    add_trial(db, retrieved_trials, GARDId)
             
             elif update == True:
                 cypher = 'MATCH (x:ClinicalTrial)--(y:GARD) WHERE y.GARDId = \'{GID}\' RETURN COLLECT(x.NCTId) AS result'.format(GID=GARDId)
@@ -125,6 +127,6 @@ def main(db, update=False):
 
         elif num_new_trials > 0:
             remove_dupes(db)   
-            #trigger_email("clinical")
+            trigger_email(db, "clinical")
 
         print('Clinical Trial Database Update Finished')

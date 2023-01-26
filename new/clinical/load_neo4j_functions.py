@@ -95,8 +95,6 @@ def data_string(full_data, node_fields, special_types = data_model.special_types
                         val = full_data[field_name]
                         
                         field_value = [elem for elem in val]
-                        #field_value = field_value.replace('\\','\\\\').replace('\'','\\\'').replace('\"','\\"')
-                        #field_value = ['\"' + field_value + '\"']
                         node_data.append(field_name + ': ' + str(field_value))
                         continue
                     else:
