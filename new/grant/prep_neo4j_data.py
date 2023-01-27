@@ -145,7 +145,7 @@ def cleanup_project_IC_NAME_totalcost():
 									'PROJECT_TERMS', 'PROJECT_TITLE', 'SUBPROJECT_ID', 'TOTAL_COST', 'TOTAL_COST_SUB_PROJECT']
 
 	# Build Agent names lookup dictionary
-	agents = pd.read_csv('agent_names.csv')
+	agents = pd.read_csv('new/grant/agent_names.csv')
 	agent_lkup = dict(zip(agents['IC_NAME_OLD'], agents['IC_NAME_NEW']))
 
 	# Clean all files
@@ -326,7 +326,7 @@ def cleanup_pub_country():
 	files = glob.glob(input_path + '*.csv')
 
 	# Build country lookup dictionary
-	countries = pd.read_csv('countries.csv')
+	countries = pd.read_csv('new/grant/countries.csv')
 	country_lkup = dict(zip(countries['COUNTRY_OLD'], countries['COUNTRY_NEW']))
 
 	# Clean all files

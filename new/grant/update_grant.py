@@ -15,8 +15,11 @@ def write(session: Session, query: str, params: dict[str, Any]) -> list[Record]:
 	:param params: The parameters to substitute in the query
 	:return: The returned records from the query
 	"""
-	return session.write_transaction(
-		lambda tx: [record for record in tx.run(query, **params)])
+	if len(params) == 0:
+		params = None
+  
+	response = session.run(query, args=params)
+	return response
 
 
 def step_to_fn(
@@ -40,9 +43,9 @@ def step_to_fn(
 def main(db: AlertCypher):
 	#return
 	# TODO: specify which folders store the raw and processed data on the server
-	fta = prep_data("raw data folder here", "output data folder here")
+	fta = prep_data("new/grant/raw", "new/grant/processed")
 
 	# run database upgrade steps on only new/modified files
 	for step in steps:
 		print("\n\n" + step["description"] + "...")
-		step_to_fn(**step)(db.session, fta)
+		step_to_fn(**step)(db, fta)
