@@ -19,9 +19,9 @@ import pygit2
 import glob
 from typing import TypedDict
 import pandas as pd
-from prepare_annotation_text import prepare_phr_aim
-from annotate_text import *
-from remove_general_umls_concepts import clean_annotation_output
+#from prepare_annotation_text import prepare_phr_aim
+#from annotate_text import *
+#from remove_general_umls_concepts import clean_annotation_output
 
 ENCODING = "latin1"
 raw_path = ""
@@ -545,6 +545,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 		files.remove(".git")
 		print("Found existing git repo at neo4j_path, clearing out old files")
 		repo = pygit2.Repository(data_neo4j(".git"))
+		is_new_repo = False
 		for f in files:
 			# skip annotation-related files because we may not want to reannotate some files
 			if f in ["annotation_files", "annotation_source", "annotation_umls", "grants_umls"]:
@@ -595,17 +596,17 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	years_to_annotate = {k[-8:-4] for k,v in repo.status().items()
 											 if (k.startswith("abstracts/") or k.startswith("projects/"))
 											 and v in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_WT_NEW]}
-	print("Running annotation_preprocess_grant")
-	annotation_preprocess_grant()
-	print("Running annotate_grant_abstracts")
-	annotate_grant_abstracts()
-	print("Running clean_umls_concepts")
-	clean_umls_concepts()
-	print("Running clean_annotation_source")
-	clean_annotation_source()
-	print("Running map_semantic_types")
-	map_semantic_types()
-
+#	print("Running annotation_preprocess_grant")
+#	annotation_preprocess_grant()
+#	print("Running annotate_grant_abstracts")
+#	annotate_grant_abstracts()
+#	print("Running clean_umls_concepts")
+#	clean_umls_concepts()
+#	print("Running clean_annotation_source")
+#	clean_annotation_source()
+#	print("Running map_semantic_types")
+#	map_semantic_types()
+#
 	print("Running fix_escaped_endings")
 	fix_escaped_endings()
 
