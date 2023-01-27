@@ -540,6 +540,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	# Clear out old files, or initialize new repo for them if the given data_neo4j path does
 	# not already exist.
 	repo = None
+	is_new_repo = False
 	try:
 		files = os.listdir(neo4j_path)
 		files.remove(".git")
