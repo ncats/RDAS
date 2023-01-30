@@ -19,9 +19,9 @@ import pygit2
 import glob
 from typing import TypedDict
 import pandas as pd
-#from prepare_annotation_text import prepare_phr_aim
-#from annotate_text import *
-#from remove_general_umls_concepts import clean_annotation_output
+from prepare_annotation_text import prepare_phr_aim
+from annotate_text import *
+from remove_general_umls_concepts import clean_annotation_output
 
 ENCODING = "latin1"
 raw_path = ""
@@ -34,15 +34,14 @@ class FilesToAdd(TypedDict):
 	names of subdirectories of CSV files) and values that are of type list[str].
 	Each element of that list[str] is a path (i.e. "subdir/file.csv")
 	"""
-	abstracts: list[str]
-	annotation_source: list[str]
-	annotation_umls: list[str]
-	clinical_studies: list[str]
-	disease: list[str]
-	patents: list[str]
-	projects: list[str]
-	publications: list[str]
-	link_tables: list[str]
+	abstracts: list
+	annotation_source: list
+	annotation_umls: list
+	clinical_studies: list
+	disease: list
+	patents: list
+	projects: list
+	link_tables: list
 
 
 def data_raw(subpath: str):
@@ -597,17 +596,17 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	years_to_annotate = {k[-8:-4] for k,v in repo.status().items()
 											 if (k.startswith("abstracts/") or k.startswith("projects/"))
 											 and v in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_WT_NEW]}
-#	print("Running annotation_preprocess_grant")
-#	annotation_preprocess_grant()
-#	print("Running annotate_grant_abstracts")
-#	annotate_grant_abstracts()
-#	print("Running clean_umls_concepts")
-#	clean_umls_concepts()
-#	print("Running clean_annotation_source")
-#	clean_annotation_source()
-#	print("Running map_semantic_types")
-#	map_semantic_types()
-#
+	print("Running annotation_preprocess_grant")
+	annotation_preprocess_grant()
+	print("Running annotate_grant_abstracts")
+	annotate_grant_abstracts()
+	print("Running clean_umls_concepts")
+	clean_umls_concepts()
+	print("Running clean_annotation_source")
+	clean_annotation_source()
+	print("Running map_semantic_types")
+	map_semantic_types()
+
 	print("Running fix_escaped_endings")
 	fix_escaped_endings()
 

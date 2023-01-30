@@ -3,6 +3,8 @@ import numpy as np
 import unicodedata
 import re
 import spacy
+import spacy.cli
+spacy.cli.download("en_core_web_lg")
 from scispacy.abbreviation import AbbreviationDetector
 from nltk.tokenize import sent_tokenize
 from nltk.corpus import words
