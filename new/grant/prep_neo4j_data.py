@@ -401,8 +401,7 @@ def annotation_preprocess_grant():
 	for projects_file, abstracts_file in zip(projects_files, abstracts_files):
 		annotate_text = prepare_phr_aim(projects_file, abstracts_file)
 
-		yr_idx = len(projects_path) + 13
-		year = projects_file[yr_idx:yr_idx+4]
+		year = projects_file[-8:-4]
 
 		output_file = data_neo4j("annotation_files/annotation_text_" + year + ".csv")
 		annotate_text.to_csv(output_file, index=False, encoding=ENCODING)
@@ -427,8 +426,7 @@ def annotate_grant_abstracts():
 		print(f'*** Annotate with {model} model ***')
 
 		for file in input_files:
-			yr_idx = len(input_file_path) + 17
-			year = file[yr_idx : yr_idx+4]
+			year = file[-8:-4]
 
 			nlp = load_model(model)
 			text = pd.read_csv(file, encoding=ENCODING, dtype={'APPLICATION_ID':int, 'ABSTRACT_TEXT':str})
