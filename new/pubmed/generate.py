@@ -30,10 +30,10 @@ def create (db):
     # Creates database from scratch
     # connect to imported create script
     # use threading lock functions to prevent same line prints
-    update_pubmed.main(db, update=False)
     lock.acquire()
     print('Creating PubMed Database...')
     lock.release()
+    update_pubmed.main(db, update=False)
     lock.acquire()
     print('Finishing up PubMed Database Creation...')
     lock.release()

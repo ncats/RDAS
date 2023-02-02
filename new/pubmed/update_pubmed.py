@@ -309,8 +309,8 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     n.inEPMC = $inEPMC, 
     n.inPMC = $inPMC, 
     n.hasPDF = $hasPDF, 
-    n.source = $source, 
-
+    n.source = $source,
+    n.DateCreatedRDAS = $now
     n.''' + search_source + ''' = true
   MERGE (d)-[r:MENTIONED_IN]->(n)
   RETURN id(n)
@@ -333,6 +333,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     "inEPMC": True if 'inEPMC' in abstractDataRel else False,
     "inPMC":True if 'inPMC' in abstractDataRel else False,
     "hasPDF":True if 'hasPDF' in abstractDataRel else False,
+    "now": date.today().strftime("%m/%d/%y"),
     #"isEpi": get_isEpi(title, abstract),
     "citedByCount":int(abstractDataRel['citedByCount']) if 'citedByCount' in abstractDataRel else 0,
     }
