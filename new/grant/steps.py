@@ -221,7 +221,7 @@ steps: list = [
 					p.title = data.PROJECT_TITLE,
 					p.application_type = toInteger(data.APPLICATION_TYPE),
 					p.subproject_id = toInteger(data.SUBPROJECT_ID),
-                    p.DateCreatedRDAS = {date.today().strftime("%m/%d/%y")}
+                    p.DateCreatedRDAS = "{date.today().strftime("%m/%d/%y")}"
 				ON MATCH SET
 					p.phr = coalesce(data.PHR, p.phr),
 					p.terms = coalesce(terms, p.terms),
@@ -231,7 +231,7 @@ steps: list = [
 						coalesce(toInteger(data.APPLICATION_TYPE), p.application_type),
 					p.subproject_id =
 						coalesce(toInteger(data.SUBPROJECT_ID), p.subproject_id),
-                    p.DateCreatedRDAS = {date.today().strftime("%m/%d/%y")}
+                    p.DateCreatedRDAS = "{date.today().strftime("%m/%d/%y")}"
 			WITH p, data
 			MATCH (c:CoreProject {core_project_num: data.CORE_PROJECT_NUM})
 			MERGE (p)-[:UNDER_CORE]->(c)
