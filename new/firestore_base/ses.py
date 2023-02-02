@@ -2,7 +2,7 @@ import django
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 import os
-os.environ['DJANGO_SETTINGS_MODULE'] = 'firestore.settings'
+os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
 django.setup()
 
 def clinical_msg (data): # dict
@@ -40,3 +40,13 @@ def grant_msg (data): # dict
         ['shanmardev@hotmail.com'],
         html_message=msg_html
     )
+    
+'''
+#TEST SEND EMAIL
+send_mail(
+    'Test Email',
+    'this is a test email',
+    'ncatsrdas@mail.nih.gov <notif@nih.gov>',
+    ['carlin.biyoo@nih.gov']
+)
+'''

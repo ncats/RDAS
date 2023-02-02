@@ -11,7 +11,7 @@ import configparser
 import threading
 import pandas as pd
 lock = threading.Lock()
-from firestore.ses_firebase import trigger_email
+from firestore_base.ses_firebase import trigger_email
 
 def remove_dupes(db):
     for idx in range(len(data_model.additional_class_fields)):     
@@ -90,6 +90,7 @@ def add_trial(db, trials, GARDId):
 
 def main(db, update=False):
     print('CLINICAL TRIAL DB UPDATING...')
+
     num_new_trials = 0
     cnd = os.path.join(workspace, 'conditions_matched.csv')
 
@@ -128,5 +129,6 @@ def main(db, update=False):
         elif num_new_trials > 0:
             remove_dupes(db)   
             trigger_email(db, "clinical")
-
+    
         print('Clinical Trial Database Update Finished')
+        

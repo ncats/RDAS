@@ -26,6 +26,7 @@ def get_stats(db, type, gards):
     return_data = dict()
     now = date.today()
     now = now.strftime("%m/%d/%y")
+    #now = "12/27/22"
     convert = {'clinical':['ClinicalTrial','GARD','GARDId'], 'pubmed':['Article','Disease','gard_id'], 'grant':['Project','Disease','gard_id']}
 
     response = db.run('MATCH (x:{node})--(y:{gardnode}) WHERE x.DateCreated = \"{now}\" AND y.{property} IN {list} RETURN COUNT(x)'

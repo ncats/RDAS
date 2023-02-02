@@ -12,7 +12,7 @@ import requests
 import jmespath
 import re
 import ast
-from firestore.ses_firebase import trigger_email
+from firestore_base.ses_firebase import trigger_email
 
 today = datetime.now()
 today = today.strftime("%Y/%m/%d")

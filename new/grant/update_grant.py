@@ -7,7 +7,7 @@ from steps import steps
 from prep_neo4j_data import FilesToAdd, prep_data
 
 
-def write(session: Session, query: str, params: dict[str, Any]) -> list[Record]:
+def write(session: Session, query: str, params: dict) -> list:
 	"""
 	A small convenience function for running write transactions against the
 	database.

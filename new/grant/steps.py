@@ -22,7 +22,7 @@
 #   CSV data via the `data` cypher variable.
 
 
-steps: list[dict[str, str]] = [
+steps: list = [
 
 	# First, we add new CoreProject nodes for all CORE_PROJECT_NUM (column in
 	# CSV files found in "projects" directory) that are not already associated
