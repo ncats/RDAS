@@ -5,6 +5,7 @@ sys.path.append(workspace)
 import clinical.generate, grant.generate, pubmed.generate, gard.generate
 from neo4j import GraphDatabase
 from AlertCypher import AlertCypher
+from gard import update_gard
 from csv import DictReader
 import threading
 import configparser
@@ -27,8 +28,7 @@ def populate(db):
 def updateCheck(db):
     unpack = {"clinical":["clinical_update","clinical_interval", clinical], 
         "grant":["grant_update","grant_interval", grant],
-        "pubmed":["pubmed_update","pubmed_interval", pubmed],
-        "gard":["gard_update","gard_interval", gard]}
+        "pubmed":["pubmed_update","pubmed_interval", pubmed]}
 
     updateInfo = unpack[db.DBtype()]
     # Reload configuration information
@@ -72,15 +72,6 @@ def updateDate(info):
     except TypeError:
         pass
 
-    try:
-        if info["gard"][0]:
-            info["gard"][3].setConf("DATABASE", "gard_update", date)
-    except TypeError:
-        pass
-        
-def updateGard():
-    pass
-
 print("[RARE DISEASE ALERT SYSTEM]\n---------------------------")
 
 # Load configuration information
@@ -103,6 +94,9 @@ threads.append(populate(GNTcypher))
 threads.append(populate(PMcypher))
 threads.append(populate(GARDcypher))
 
+if threads:
+    update_gard.main(GARDcypher, update=True)
+
 for thread in threads:
     if thread:
         thread.start()
@@ -115,12 +109,9 @@ updateDate(threads)
 
 # Gets last database update from configuration file
 while True:
-    updateGard()
-
     threads = list()
     info = dict()
-    GARD_info = updateCheck(GARDcypher)["gard"]
-    info["gard"] = GARD_info
+
     CT_info = updateCheck(CTcypher)["clinical"]
     info["clinical"] = CT_info
     GNT_info = updateCheck(GNTcypher)["grant"]
@@ -128,28 +119,24 @@ while True:
     PM_info = updateCheck(PMcypher)["pubmed"]
     info["pubmed"] = PM_info
 
-
-    if info["gard"][0]:
-        threads.append(info["gard"][0])
-
     if info["clinical"][0]:
         threads.append(info["clinical"][0])
     if info["grant"][0]:
         threads.append(info["grant"][0])
     if info["pubmed"][0]:
         threads.append(info["pubmed"][0])
-    if info["gard"][0]:
-        threads.append(info["gard"][0])
+    
         
-    print("\n-----------------------\nDays Since Last Update:\n[CLINICAL] {CT_day} Days ({CT_update})\n[GRANT] {GNT_day} Days ({GNT_update})\n[PUBMED] {PM_day} Days ({PM_update})\n[GARD] {GARD_day} Days ({GARD_update})\n"
+    print("\n-----------------------\nDays Since Last Update:\n[CLINICAL] {CT_day} Days ({CT_update})\n[GRANT] {GNT_day} Days ({GNT_update})\n[PUBMED] {PM_day} Days ({PM_update})\n"
             .format(CT_day=str(info["clinical"][1].days), 
             GNT_day=str(info["grant"][1].days), 
             PM_day=str(info["pubmed"][1].days),
-            GARD_day=str(info["gard"][1].days), 
             CT_update=str(info["clinical"][2]),
             GNT_update=str(info["grant"][2]),
-            PM_update=str(info["pubmed"][2]),
-            GARD_update=str(info["gard"][2])))
+            PM_update=str(info["pubmed"][2])))
+
+    if threads:
+        update_gard.main(GARDcypher, update=True)
 
     for thread in threads:
         if thread:

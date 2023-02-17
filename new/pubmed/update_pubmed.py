@@ -1,9 +1,13 @@
 #Richard: change how to use MERGE - only include key in MERGE and left other properties to ON CREATE SET
-
+import os
+import sys
+workspace = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(workspace)
 import json
 from neo4j import GraphDatabase, basic_auth
 import configparser
 from datetime import datetime, date
+from AlertCypher import AlertCypher
 from dateutil.relativedelta import relativedelta
 import time
 import logging
@@ -12,38 +16,34 @@ import requests
 import jmespath
 import re
 import ast
-from firestore_base.ses_firebase import trigger_email
+#from firestore_base import trigger_email
 
 today = datetime.now()
 today = today.strftime("%Y/%m/%d")
 config = configparser.ConfigParser()
 # Used to be "https://rdip2.ncats.io:8000"
-epiapi_url = "http://127.0.0.1:8000"
+epiapi_url = "https://rdip2.ncats.io"
+#epiapi_url = "http://127.0.0.1:8000"
 config.read("config.ini")
 
 def get_gard_list(db):
   #Returns list of the GARD Diseases
-  with GraphDatabase.driver(db.getConf('CREDENTIALS','disease_uri')) as driver:
-    with driver.session() as session:
-      cypher_query = '''
-      match p = (d:DATA)-[]-(m:S_GARD) return  d, m
-      '''
-      nodes = session.run(cypher_query)
-      results = nodes.data()
+  GARDdb = AlertCypher("gard")
+  cypher_query = 'match (m:GARD) return m'
+  nodes = GARDdb.run(cypher_query)
+  results = nodes.data()
 
-      # Access the Node using the key 'd' and 'm' (defined in the return statement):
-      myData = {}
-      for res in results:
-        gard_id = res['d'].get("gard_id")
-        disease = {}
-        disease['gard_id'] = gard_id
-        disease['name'] = res['d'].get("name")
-        disease['is_rare'] = True if res['d'].get("is_rare") is not None else False
-        disease['categories'] = res['d'].get("categories") if res['d'].get("categories") is not None else ''
-        disease['all_names'] = res['m'].get("N_Name") if res['m'].get("N_Name") is not None else ''
-        disease['synonyms'] = res['d'].get("synonyms") if res['d'].get("synonyms") is not None else ''
-        disease['all_ids'] = res['m'].get("I_CODE") if res['m'].get("I_CODE") is not None else ''
-        myData[gard_id] = disease
+  # Access the Node using the key 'd' and 'm' (defined in the return statement):
+  myData = {}
+  for res in results:
+    gard_id = res['m']["GardId"]
+    disease = {}
+    disease['gard_id'] = gard_id
+    disease['name'] = res['m']["GardName"]
+    disease['type'] = res['m']["DisorderType"]
+    disease['classification'] = res['m']["ClassificationLevel"] if res['m']["ClassificationLevel"] is not None else ''
+    disease['synonyms'] = res['m']["Synonyms"] if res['m']["Synonyms"] is not None else ''
+    myData[gard_id] = disease
   return myData
 
 #Richard: return 4720 records
@@ -242,14 +242,21 @@ def fetch_abstracts(pubmedIDs):
   
 def fetch_pubtator_annotations(pubmedId):
   #fetch annotations from pubtator
-    pubtatorUrl = "https://www.ncbi.nlm.nih.gov/research/pubtator-api/publications/export/biocjson?pmids=" + pubmedId
-    r = requests.get(pubtatorUrl)
-    if (not r or r is None or r ==''):
-      logging.error(f'Can not find PubTator for: {pubmedId}')
+    try:
+      pubtatorUrl = "https://www.ncbi.nlm.nih.gov/research/pubtator-api/publications/export/biocjson?pmids=" + pubmedId
+    
+      r = requests.get(pubtatorUrl)
+      if (not r or r is None or r ==''):
+        logging.error(f'Can not find PubTator for: {pubmedId}')
+        return None
+      else:
+        return r.json()
+    except TimeoutError as e:
+      time.sleep(1)
+      fetch_pubtator_annotations(pubmedId)
+    except ValueError as e:
+      print('No Pubtator Annotation')
       return None
-    else:
-      return r.json()
-
 def fetch_pmc_fulltext_xml(pmcId):
   #fetch full text xml from pmc
   pmcUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id=" + pmcId
@@ -267,23 +274,20 @@ def create_disease(session, gard_id, rd):
   MERGE (d:Disease {gard_id:$gard_id}) 
   ON CREATE SET
     d.gard_id = $gard_id,
-    d.name = $name, 
-    d.is_rare = $is_rare, 
-    d.categories = $categories, 
-    d.all_names = $all_names, 
-    d.synonyms = $synonyms, 
-    d.all_ids = $all_ids
+    d.name = $name,
+    d.classification = $classification, 
+    d.synonyms = $synonyms,
+    d.type = $type
   RETURN id(d)
   '''
   params = {
     "gard_id":gard_id,
     "gard_id":rd['gard_id'],
     "name":rd['name'], 
-    "is_rare":rd['is_rare'], 
-    "categories":rd['categories'], 
-    "all_names":rd['all_names'], 
-    "synonyms":rd['synonyms'], 
-    "all_ids":rd['all_ids']
+    "type":rd['type'],
+    "classification":rd['classification'], 
+    "classification":rd["classification"],
+    "synonyms":rd['synonyms']
   }
 
   return session.run(query, args=params).single().value()
@@ -310,7 +314,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     n.inPMC = $inPMC, 
     n.hasPDF = $hasPDF, 
     n.source = $source,
-    n.DateCreatedRDAS = $now
+    n.DateCreatedRDAS = $now,
     n.''' + search_source + ''' = true
   MERGE (d)-[r:MENTIONED_IN]->(n)
   RETURN id(n)
@@ -337,6 +341,9 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     #"isEpi": get_isEpi(title, abstract),
     "citedByCount":int(abstractDataRel['citedByCount']) if 'citedByCount' in abstractDataRel else 0,
     }
+  
+  response = tx.run(create_article_query, args=params).single().value()
+  print(response)
   return tx.run(create_article_query, args=params).single().value()
 
 #Richard: change node from "Person" to "Author"
@@ -399,17 +406,18 @@ def create_keywords(tx, abstractDataRel, article_node):
       })
 
 #This classifies if an article is epidemiological or not.
-def get_isEpi(text, url=f"{epiapi_url}/postEpiClassifyText/"):
+def get_isEpi(text, url=f"{epiapi_url}/api/postEpiClassifyText/"):
   #check if the article is an Epi article using API
   try:
-    response = requests.post(url, json={'text': text}).json()
+    response = requests.post(url, json={'text': text})
+    response = response.json()
     return response['IsEpi']
   except Exception as e:
     logging.error(f'Exception during get_isEpi. text: {text}, error: {e}')
     raise e
   
 
-def get_epiExtract(text, url=f"{epiapi_url}/postEpiExtractText"):
+def get_epiExtract(text, url=f"{epiapi_url}/api/postEpiExtractText"):
   #Returns a dictionary of the form 
   '''
   {DATE:['1989'],
@@ -418,7 +426,7 @@ def get_epiExtract(text, url=f"{epiapi_url}/postEpiExtractText"):
   ...}
   '''
   try:
-    epi_info = dict(requests.post(f"{epiapi_url}/postEpiExtractText", json={'text': text,'extract_diseases':False}).json())
+    epi_info = dict(requests.post(url, json={'text': text,'extract_diseases':False}).json())
     return epi_info
   except Exception as e:
     logging.error(f'Exception during get_isEpi. text: {text}, error: {e}')
@@ -441,7 +449,7 @@ def create_epidemiology(tx, abstractDataRel, article_node):
           MERGE (n:EpidemiologyAnnotation {isEpi:$isEpi, epidemiology_type:$epidemiology_type, epidemiology_rate:$epidemiology_rate, date:$date, location:$location, sex:$sex, ethnicity:$ethnicity}) 
           MERGE (n) -[r:EPIDEMIOLOGY_ANNOTATION_FOR]-> (a)
           '''
-        tx.run(create_epidemiology_query, **{
+        tx.run(create_epidemiology_query, args={
           "article_id":article_node,
           "isEpi": isEpi,
           "epidemiology_type":epi_info['EPI'] if epi_info['EPI'] else [], 
@@ -454,15 +462,15 @@ def create_epidemiology(tx, abstractDataRel, article_node):
       except Exception as e:
         logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is True.')
         raise e
-  else:
-    create_epidemiology_query = '''
-        MATCH (a:Article) WHERE id(a) = $article_id
-        SET a.isEpi = $isEpi'''
-    try:
-      tx.run(create_epidemiology_query, **{"article_id":article_node, 'isEpi': isEpi,})
-    except Exception as e:
-      logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is False.')
-      raise e
+
+  create_epidemiology_query = '''
+      MATCH (a:Article) WHERE id(a) = $article_id
+      SET a.isEpi = $isEpi'''
+  try:
+    tx.run(create_epidemiology_query, args={"article_id":article_node, 'isEpi': isEpi})
+  except Exception as e:
+    logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is False.')
+    raise e
 
 def create_fullTextUrls(tx, abstractDataRel, article_node):
   create_fullTextUrls_query = '''
@@ -534,35 +542,36 @@ def create_chemicals(tx, abstractDataRel, article_node):
 #Richard: remove locations_offset, locations_length
 #Richard: change PubtatorAnnotations to PubtatorAnnotation
 def create_annotations(tx, pubtatorData, article_node):
-  create_annotations_query = '''
-  MATCH(a:Article) WHERE id(a) = $article_id
-  MERGE (pa:PubtatorAnnotation {
-    type:$type,
-    infons_identifier:$infons_identifier, 
-    infons_type:$infons_type, 
-    text:$text
-  })
-  MERGE (pa)- [r:ANNOTATION_FOR] -> (a)
-  '''
+  if pubtatorData:
+    create_annotations_query = '''
+    MATCH(a:Article) WHERE id(a) = $article_id
+    MERGE (pa:PubtatorAnnotation {
+      type:$type,
+      infons_identifier:$infons_identifier, 
+      infons_type:$infons_type, 
+      text:$text
+    })
+    MERGE (pa)- [r:ANNOTATION_FOR] -> (a)
+    '''
 
-  for passage in pubtatorData['passages']:
-    type = passage['infons']['type'] if 'type' in passage['infons'] else ''
-    for annotation in passage['annotations']:
-      parameters={
-        "article_id":article_node,
-        "type":type,
-        "infons_identifier": annotation['infons']['identifier'] if ('identifier' in annotation['infons'] and annotation['infons']['identifier'])  else '',
-        "infons_type": annotation['infons']['type'] if ('type' in annotation['infons'] and annotation['infons']['type']) else '',
-        "text": annotation['text'] if 'text' in annotation else '',
-      }
-      temp = parameters['text']
-      if len(temp) > 0:
-        try:
-          temp = temp.split(",")
-        except:
-          pass
-      parameters['text'] = temp
-      txout = tx.run(create_annotations_query, args=parameters)
+    for passage in pubtatorData['passages']:
+      type = passage['infons']['type'] if 'type' in passage['infons'] else ''
+      for annotation in passage['annotations']:
+        parameters={
+          "article_id":article_node,
+          "type":type,
+          "infons_identifier": annotation['infons']['identifier'] if ('identifier' in annotation['infons'] and annotation['infons']['identifier'])  else '',
+          "infons_type": annotation['infons']['type'] if ('type' in annotation['infons'] and annotation['infons']['type']) else '',
+          "text": annotation['text'] if 'text' in annotation else '',
+        }
+        temp = parameters['text']
+        if len(temp) > 0:
+          try:
+            temp = temp.split(",")
+          except:
+            pass
+        parameters['text'] = temp
+        txout = tx.run(create_annotations_query, args=parameters)
 
 def create_disease_article_relation(tx, disease_node, article_node):
   query = '''
@@ -639,7 +648,8 @@ def save_all(abstract, disease_node, pubmedID, search_source, session):
     annos = ''
     try:
       annos = fetch_pubtator_annotations(pubmedID)
-      create_annotations(session, annos, article_node)
+      if annos:
+        create_annotations(session, annos, article_node)
     except Exception as e:
       logging.warning(f'\nException creating annotations for article {pubmedID}:  {e}')
 
@@ -668,15 +678,8 @@ def save_articles(disease_node, pubmed_ids, search_source, session):
           res = session.run("match(a:Article{pubmed_id:$pmid}) return id(a) as id", args = {'pmid':pubmedID})
           record = res.single()
           if (record):
-            pass
-            '''
-            article_node = record["id"]
-            logging.info(f'PubMed evidence article already exists: {pubmedID}, {article_node}')
-            try:
-              save_disease_article_relation(disease_node, article_node, session)
-            except Exception as e:
-              logging.error(f" Exception when calling save_disease_article_relation, error: {e}")
-            '''
+            continue
+       
           else:
             try:
               save_all(result, disease_node, pubmedID, search_source, session)
@@ -716,7 +719,11 @@ def save_disease_articles(db, mindate, maxdate):
 
         try:
           pubmed_ids = pubmedIDs['esearchresult']['idlist']
-          save_articles(disease_node, pubmed_ids, search_source, db)
+          if pubmed_ids:
+            save_articles(disease_node, pubmed_ids, search_source, db)
+          else:
+            continue
+          
         except Exception as e:
           #print('disease_node',disease_node, 'pubmed_ids',pubmed_ids, 'search_source',search_source,sep='\n')
           logging.error(f'Exception when finding articles for disease {gard_id}, error1: {e}')
@@ -781,4 +788,4 @@ def main(db, update=False):
 
   last_update = last_update.strftime("%Y/%m/%d")
   retrieve_articles(db, last_update)
-  trigger_email("pubmed")
+  #trigger_email("pubmed")

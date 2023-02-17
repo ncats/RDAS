@@ -29,10 +29,10 @@ def create (db):
     # Creates database from scratch
     # connect to imported create script
     # use threading lock functions to prevent same line prints
-    update_grant.main(db)
     lock.acquire()
     print('Creating NIH Grant Database...')
     lock.release()
+    update_grant.main(db)
     lock.acquire()
     print('Finishing up NIH Grant Database Creation...')
     lock.release()

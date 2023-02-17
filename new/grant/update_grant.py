@@ -41,8 +41,6 @@ def step_to_fn(
 	return fn
 
 def main(db: AlertCypher):
-	#return
-	# TODO: specify which folders store the raw and processed data on the server
 	fta = prep_data("new/grant/raw", "new/grant/processed")
 
 	# run database upgrade steps on only new/modified files

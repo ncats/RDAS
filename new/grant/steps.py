@@ -210,10 +210,8 @@ steps: list = [
 			f"""
 			WITH [x in split(data.PROJECT_TERMS, ';') WHERE x <> "" | x]
 				AS terms, data
-			MERGE (p:Project {
-				application_id: toInteger(data.APPLICATION_ID),
-				funding_year: toInteger(data.FY)
-				})
+			MERGE (p:Project {{application_id: toInteger(data.APPLICATION_ID),
+				funding_year: toInteger(data.FY)}})
 				ON CREATE SET
 					p.phr = data.PHR,
 					p.terms = terms,
@@ -233,7 +231,7 @@ steps: list = [
 						coalesce(toInteger(data.SUBPROJECT_ID), p.subproject_id),
                     p.DateCreatedRDAS = "{date.today().strftime("%m/%d/%y")}"
 			WITH p, data
-			MATCH (c:CoreProject {core_project_num: data.CORE_PROJECT_NUM})
+			MATCH (c:CoreProject {{core_project_num: data.CORE_PROJECT_NUM}})
 			MERGE (p)-[:UNDER_CORE]->(c)
 				ON CREATE SET c.rd_total_cost = coalesce(c.rd_total_cost, 0) + p.total_cost
 			"""

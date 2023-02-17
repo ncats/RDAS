@@ -66,7 +66,7 @@ def list_type(text_raw):
         clean_list = [elm.replace('\"','\\"') for elm in text_list]
     return str(clean_list)          # '|' represents new element
 
-def data_string(full_data, node_fields, special_types = data_model.special_types, CT = False):
+def data_string(full_data, node_fields, update, CT = False):
     '''
     generates string containing all data to create a neo4j node
     arguments:
@@ -76,6 +76,13 @@ def data_string(full_data, node_fields, special_types = data_model.special_types
     returns:
         (string): data_string
     '''
+    if update:
+        setType = '= '
+        varType = 'trial.'
+    else:
+        setType = ': '
+        varType = ''
+        
     node_data = list()
     nodes_data = list()
     node_group = list()
@@ -95,7 +102,7 @@ def data_string(full_data, node_fields, special_types = data_model.special_types
                         val = full_data[field_name]
                         
                         field_value = [elem for elem in val]
-                        node_data.append(field_name + ': ' + str(field_value))
+                        node_data.append(varType + field_name + setType + str(field_value))
                         continue
                     else:
                         val = full_data[field_name][i]
@@ -103,21 +110,25 @@ def data_string(full_data, node_fields, special_types = data_model.special_types
                     continue
                 field_value = val.replace('\\','\\\\').replace('\'','\\\'').replace('\"','\\"')
                 field_value = '\"' + field_value + '\"'
-                node_data.append(field_name + ': ' + field_value)
+                node_data.append(varType + field_name + setType + field_value)
             nodes_data = ', '.join(node_data)
         node_group.append(nodes_data)
         if CT:
             temp = node_group[0]
             now = date.today()
             now = now.strftime("%m/%d/%y")
-            temp = temp + ', DateCreated: \"{now}\"'.format(now=now)
+            
+            if update == False:
+                temp = temp + ', ' + varType + 'DateCreatedRDAS' + setType + '\"{now}\"'.format(now=now)
+                
+            temp = temp + ', ' + varType + 'LastUpdatedRDAS' + setType + '\"{now}\"'.format(now=now)
             node_group[0] = temp
             return (list(set(node_group)))
 
     # return list of strings for each individual node
     return (list(set(node_group)))
 
-def nctid_list(condition_name):
+def nctid_list(name_list):
     '''
     generates list of all clinical trials (nctid) for a given condition
     arguments:
@@ -126,30 +137,34 @@ def nctid_list(condition_name):
         (string list): clinical trials (nctid list)
     '''
     # check total number of trials
-    initial_query = 'https://clinicaltrials.gov/api/query/study_fields?expr=%22'
-    initial_query += condition_name.replace(' ', '+') + '%22&fields=NCTId&min_rnk=1&max_rnk=1000&fmt=csv'
-    initial_response = requests.get(initial_query).text.splitlines()
-    total_trials = int(initial_response[4][16:-1])
-    
-    # add trials to list
-    trials = list()
-    for trial in initial_response[11:]:
-        trials.append(trial.split(',')[1][1:-1])
-
-    # break into extra queries of 1000 trials if necessary
-    for rank in range(1, total_trials//1000 + 1): 
-        
-        # get next 1000 trials
-        extra_query = 'https://clinicaltrials.gov/api/query/study_fields?expr=%22' + condition_name.replace(' ', '+')
-        extra_query += '%22&fields=NCTId&min_rnk=' + str(rank*1000+1) + '&max_rnk=' + str((rank+1)*1000) + '&fmt=csv'
-        extra_response = requests.get(extra_query).text.splitlines()
+    all_trials = list()
+    for name in name_list:
+        initial_query = 'https://clinicaltrials.gov/api/query/study_fields?expr=%22'
+        initial_query += name.replace(' ', '+') + '%22&fields=NCTId&min_rnk=1&max_rnk=1000&fmt=csv'
+        initial_response = requests.get(initial_query).text.splitlines()
+        total_trials = int(initial_response[4][16:-1])
         
         # add trials to list
-        for trial in extra_response[11:]:
+        trials = list()
+        for trial in initial_response[11:]:
             trials.append(trial.split(',')[1][1:-1])
+
+        # break into extra queries of 1000 trials if necessary
+        for rank in range(1, total_trials//1000 + 1): 
+            
+            # get next 1000 trials
+            extra_query = 'https://clinicaltrials.gov/api/query/study_fields?expr=%22' + name.replace(' ', '+')
+            extra_query += '%22&fields=NCTId&min_rnk=' + str(rank*1000+1) + '&max_rnk=' + str((rank+1)*1000) + '&fmt=csv'
+            extra_response = requests.get(extra_query).text.splitlines()
+            
+            # add trials to list
+            for trial in extra_response[11:]:
+                trials.append(trial.split(',')[1][1:-1])
+                
+        all_trials += trials
         
     # return list of trials
-    return trials
+    return all_trials
 
 
 
