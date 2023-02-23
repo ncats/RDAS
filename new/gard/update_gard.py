@@ -14,6 +14,9 @@ from ast import literal_eval
 lock = threading.Lock()
 
 def create_relationship_query(db, current, node, has_parent=False):
+    '''
+    Creates GARD disease relationships with a specific direction
+    '''
     if has_parent:
         query = '''
         MATCH (x:GARD {GardId: $parent}), (y:GARD {GardId: $current})
@@ -38,8 +41,8 @@ def create_relationship_query(db, current, node, has_parent=False):
     return db.run(query, args=params).single().value()    
 
 def create_relationship(db, data):
-    '''if data['RootTerm'] == 'GARD to be classified':
-       return
+    '''
+    Creates the relationships connecting to each GARD disease using the classification list
     '''
     current = data['GardID']
     parent = data['Parent']
@@ -57,61 +60,70 @@ def create_relationship(db, data):
         pass
 
 def create_disease_node(db, data):
+    '''
+    Creates GARD Disease node in the Neo4j
+    '''
     query = '''
     MERGE (d:GARD {GardId:$gard_id}) 
     ON CREATE SET
     d.GardName = $name,
     d.GardId = $gard_id,
+    d.DataSource = $mapping_type,
+    d.DataSourceId = $mapping_id,
     d.ClassificationLevel = $classlvl, 
     d.DisorderType = $disordertype, 
     d.Synonyms = $syns
     RETURN d
     '''
 
-    if type(data[4]) == float:
-        data[4] = []
+    if type(data[6]) == float:
+        data[6] = []
 
+    # Turn synonyms into a python list
     else:
-        data[4] = data[4].replace('\'','\\\'')
-        data[4] = data[4].replace(',','\',\'')
-        data[4] = data[4].replace('[','[\'')
-        data[4] = data[4].replace(']','\']')
-        data[4] = literal_eval(data[4])
-        data[4] = [ele.strip() for ele in data[4]]
+        data[6] = data[6].replace('\'','\\\'')
+        data[6] = data[6].replace(',','\',\'')
+        data[6] = data[6].replace('[','[\'')
+        data[6] = data[6].replace(']','\']')
+        data[6] = literal_eval(data[6])
+        data[6] = [ele.strip() for ele in data[6]]
 
-    data[2] = data[2].replace('[','')
-    data[2] = data[2].replace(']','')
+    # Remove brackets from DisorderType
+    data[4] = data[4].replace('[','')
+    data[4] = data[4].replace(']','')
 
     params = {
-    "name":data[3],
+    "name":data[5],
     "gard_id":data[0],
-    "classlvl":data[1], 
-    "disordertype":data[2], 
-    "syns":data[4]
+    "mapping_type":data[1],
+    "mapping_id":data[2],
+    "classlvl":data[3], 
+    "disordertype":data[4], 
+    "syns":data[6]
     }
 
     return db.run(query, args=params).single().value()
 
-def retrieve_gard_data(db, compare=None):
+def retrieve_gard_data(db):
+    '''
+    Retrieves GARD disease files from Palantir workspace
+    '''
     print("Retrieving GARD data from Palantir")
     command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o new/gard/GARD.csv https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.ec51a84a-3b60-44d8-9625-3fc2a2b1d481/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=db.getConf("CREDENTIALS","palantir"))
     os.system(command)
     command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o new/gard/GARD_classification.csv https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.363c2a9e-3213-4e66-a5db-052af2309f02/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=db.getConf("CREDENTIALS","palantir"))
     os.system(command)
     
-    #MAY HAVE TO FULLY REBUILD NEO4J ANYTIME THERE IS A CHANGE BETWEEN THE 2 FILES
-    if compare:
-        gard_new = pd.read_csv(os.path.dirname(workspace) + '\\gard\\GARD.csv', index_col=False)
-        classification_new = pd.read_csv(os.path.dirname(workspace) + '\\gard\\GARD_classification.csv', index_col=False)
-        gard_old = compare['gard']
-        classification_old = compare['classification']
-        gard_diff = pd.concat([gard_new, gard_old]).drop_duplicates(keep=False)
-        classification_diff = pd.concat([classification_new, classification_old]).drop_duplicates(keep=False)
-        
-        return {'gard':gard_diff, 'classification':classification_diff}
-    
 def generate(db, data):
+    '''
+    Loops through all GARD diseases and creates all the nodes and relationships
+    '''
     print("Building new GARD connections")
+    
+    # Erase database so it can be recreated
+    db.run('MATCH ()-[r]-() DELETE r')
+    db.run('MATCH (n) DELETE n')
+    
     gard = data['gard']
     classification = data['classification']
     r,c = gard.shape
@@ -132,16 +144,13 @@ def main(db, update=False):
             print('GARD DB already up to date')
             return
         
-    if update:
-        gard = pd.read_csv(os.path.dirname(workspace) + '\\gard\\GARD.csv', index_col=False)
-        classification = pd.read_csv(os.path.dirname(workspace) + '\\gard\\GARD_classification.csv', index_col=False)
-        data = retrieve_gard_data(db, compare={'gard':gard, 'classification':classification})
-        generate(db, data)
-    else:
-        retrieve_gard_data(db)
-        gard = pd.read_csv(os.path.dirname(workspace) + '\\gard\\GARD.csv', index_col=False)
-        classification = pd.read_csv(os.path.dirname(workspace) + '\\gard\\GARD_classification.csv', index_col=False)
-        data = {'gard':gard, 'classification':classification}
-        generate(db, data)
+    retrieve_gard_data(db)
+    gard = pd.read_csv(os.path.dirname(workspace) + '\\gard\\GARD.csv', index_col=False)
+    classification = pd.read_csv(os.path.dirname(workspace) + '\\gard\\GARD_classification.csv', index_col=False)
+    data = {'gard':gard, 'classification':classification}
+    generate(db, data)
+    
+    if not update:
+        db.setConf('DATABASE', 'gard_finished', 'True')
         
     db.setConf('DATABASE','gard_update', now)

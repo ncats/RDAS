@@ -13,26 +13,37 @@ from datetime import datetime, date
 from time import sleep
 
 def populate(db):
-    unpack = {"clinical":clinical, "grant":grant, "pubmed":pubmed, "gard":gard}
+    '''
+    Checks if Neo4j database is empty. If the database is either empty or the [database name]_finished value in config.ini is False, it creates a thread that creates the database
+    from scratch or from the logged progress point
+    '''
+    unpack = {"clinical":[clinical, 'clinical_finished'], "grant":[grant, 'grant_finished'], "pubmed":[pubmed, 'pubmed_finished'], "gard":[gard, 'gard_finished']}
     cur_module = unpack[db.DBtype()]
     try:
         response = db.run("MATCH (x) RETURN x LIMIT 1").single()
+        
+        if db.getConf('DATABASE', cur_module[1]) == 'False':
+            response = None
+            
         if response == None:
-            print('{dbtype} Database Empty'.format(dbtype=db.DBtype().upper()))
-            thread = threading.Thread(target=cur_module.generate.check, args=(True, db,), daemon=True)
+            print('Creating {dbtype} database'.format(dbtype=db.DBtype().upper()))
+            db.setConf('DATABASE', cur_module[1], 'False')
+            thread = threading.Thread(target=cur_module[0].generate.check, args=(True, db,), daemon=True)
             return thread
         
     except:
         print("[{dbtype}] Error finding Neo4j database. Check to see if database exists and rerun script".format(dbtype=db.DBtype().upper()))
 
 def updateCheck(db):
+    '''
+    Creates a thread that updates a database if a set interval of time has passed since the last update
+    '''
     unpack = {"clinical":["clinical_update","clinical_interval", clinical], 
         "grant":["grant_update","grant_interval", grant],
         "pubmed":["pubmed_update","pubmed_interval", pubmed]}
 
     updateInfo = unpack[db.DBtype()]
     # Reload configuration information
-
     update = db.getConf("DATABASE", updateInfo[0])
     if update == "":
         update = datetime.now()
@@ -55,6 +66,9 @@ def updateCheck(db):
         return {db.DBtype():[None, delta, update, db, db.DBtype()]}
 
 def updateDate(info):
+    '''
+    Writes the current date in the config.ini file when an update on a database has finished
+    '''
     date = datetime.now().strftime("%m/%d/%y")
     try:
         if info["clinical"][0]:
@@ -87,13 +101,13 @@ PMcypher = AlertCypher("pubmed")
 GARDcypher = AlertCypher("gard")
 
 # Checks if clinical trial database is empty. If it is, it creates it from scratch on a seperate thread
-
 threads = list()
 threads.append(populate(CTcypher))
 threads.append(populate(GNTcypher))
 threads.append(populate(PMcypher))
 threads.append(populate(GARDcypher))
 
+# Recreates the GARD disease database when an update for any other database is triggered
 if threads:
     update_gard.main(GARDcypher, update=True)
 
@@ -107,7 +121,7 @@ for thread in threads:
 
 updateDate(threads)
 
-# Gets last database update from configuration file
+# Runs until program is exited: Checks to see if any databases needed updated occasionally. 
 while True:
     threads = list()
     info = dict()
@@ -149,4 +163,4 @@ while True:
     updateDate(info)
 
     # Time in seconds to check for an update
-    sleep(5)
+    sleep(3600)

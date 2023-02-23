@@ -15,6 +15,9 @@ lock = threading.Lock()
 from firestore_base.ses_firebase import trigger_email
 
 def remove_dupes(db):
+    '''
+    Removes duplicate nodes by merging copied nodes and relationships together
+    '''
     for idx in range(len(data_model.additional_class_fields)):     
         apoc_cypher = 'MATCH (x:{tag}) WITH '.format(tag=data_model.additional_class_names[idx])
         for idy in range(len(data_model.additional_class_fields[idx])):
@@ -28,6 +31,9 @@ def remove_dupes(db):
     db.run(apoc_cypher)
 
 def add_trial(db, trials, GARDId):
+    '''
+    Retrieves clinical trial data and adds nodes and relationships to other data nodes
+    '''
     cypher_add_trial_base = 'MATCH (gard:GARD) WHERE gard.GARDId = \'' + GARDId + '\''
     for trial in trials:
         # DB data pull
@@ -97,9 +103,18 @@ def main(db, update=False):
     print('CLINICAL TRIAL DB UPDATING...')
     GARDdb = AlertCypher("gard")
     gard_matches = GARDdb.run('MATCH (x:GARD) RETURN x')
-    for gard_mapping in gard_matches.data():
-        gard_mapping = gard_mapping['x']
+    progress = db.getConf('DATABASE', 'clinical_progress')
+    
+    if progress == "":
+        progress == 0
+    else:
+        progress = int(progress)
+    
+    for idx, gard_mapping in enumerate(gard_matches.data()):
+        if idx < progress:
+          continue
         
+        gard_mapping = gard_mapping['x']
         GARDId = gard_mapping['GardId']
         GARD_name = gard_mapping['GardName'].replace('\\','\\\\').replace('\'','\\\'').replace('\"','\\"')
         GARD_synonyms = gard_mapping['Synonyms']
@@ -109,6 +124,8 @@ def main(db, update=False):
         
         if len(retrieved_trials) > 0:
             add_trial(db, retrieved_trials, GARDId)
+            
+        db.setConf('DATABASE', 'clinical_progress', str(idx))
 
     lock.acquire()
     print('Finishing up Clinical Trial Database Update...')
@@ -116,8 +133,11 @@ def main(db, update=False):
     
     remove_dupes(db) 
     
-    if update == True:
+    if update:
         trigger_email(db, "clinical")
+    else:
+        db.setConf('DATABASE', 'pubmed_finished', 'True')
+        db.setConf('DATABASE', 'pubmed_progress', '')
     
     print('Clinical Trial Database Update Finished')
         

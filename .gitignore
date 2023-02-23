@@ -10,3 +10,4 @@ new/config.ini
 new/grant/raw
 new/grant/processed
 new/firestore_base/key.json
+new/firestore_base/settings.py
