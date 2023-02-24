@@ -52,7 +52,7 @@ def get_gard_omim_mapping(db):
   for res in results:
     gardlist.append(results[res]['gard_id'])
 
-  with GraphDatabase.driver(db.getConf('CREDENTIALS','disease_uri')) as driver:
+  with GraphDatabase.driver(os.environ['DISEASE_URI']) as driver:
     with driver.session() as session:
       cypher_query = '''
       MATCH (o:S_ORDO_ORPHANET)-[:R_exactMatch|:R_equivalentClass]-(m:S_MONDO)-[:R_exactMatch|:R_equivalentClass]-(n:S_GARD)<-[:PAYLOAD]-(d:DATA)
@@ -68,7 +68,7 @@ def get_gard_omim_mapping(db):
 
 #get OMIM json by OMIM number
 def find_OMIM_articles(db, OMIMNumber):
-  params = {'mimNumber': OMIMNumber, 'include':"all", 'format': 'json', 'apiKey': db.getConf('CREDENTIALS', 'omim_key')}
+  params = {'mimNumber': OMIMNumber, 'include':"all", 'format': 'json', 'apiKey': os.environ['OMIM_KEY']}
   return requests.post("https://api.omim.org/api/entry?%s", data=params).json()
 
 #Parse OMIM json and return a map: pubmed_id -> OMIM section   
@@ -124,7 +124,7 @@ def get_disease_id(gard_id, driver):
   return id
     
 def save_omim_articles(db, mindate, maxdate):
-  omim_api_key = db.getConf('CREDENTIALS','omim_key')
+  omim_api_key = os.environ['OMIM_KEY']
   if len(omim_api_key) == 0:
     return
 
@@ -185,7 +185,7 @@ def save_omim_remaining_articles(gard_id, rd, sections, search_source, driver):
     else:
       logging.error(f'Something wrong with adding omim article relation: {pubmed_id}, {article_id}')            
  
-'''         
+'         
 def create_indexes(): 
   with GraphDatabase.driver(neo4j_uri, auth=(user,password)) as driver:
     with driver.session() as session:
@@ -204,7 +204,7 @@ def create_indexes():
       ]
       for c in cypher_query:
         session.run(c, parameters={})
-'''
+'
 
 def find_articles(keyword, mindate, maxdate):
   #fetch articles and return a map
