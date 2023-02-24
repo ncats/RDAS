@@ -109,9 +109,9 @@ def retrieve_gard_data(db):
     Retrieves GARD disease files from Palantir workspace
     '''
     print("Retrieving GARD data from Palantir")
-    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o new/gard/GARD.csv https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.ec51a84a-3b60-44d8-9625-3fc2a2b1d481/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=db.getConf("CREDENTIALS","palantir"))
+    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o new/gard/GARD.csv https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.ec51a84a-3b60-44d8-9625-3fc2a2b1d481/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'])
     os.system(command)
-    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o new/gard/GARD_classification.csv https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.363c2a9e-3213-4e66-a5db-052af2309f02/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=db.getConf("CREDENTIALS","palantir"))
+    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o new/gard/GARD_classification.csv https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.363c2a9e-3213-4e66-a5db-052af2309f02/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'])
     os.system(command)
     
 def generate(db, data):

@@ -12,9 +12,9 @@ class AlertCypher ():
         self.configuration.read(self.init)
         
         # Connects to neo4j databasej
-        server_uri = self.configuration.get("CREDENTIALS", "neo4j_uri")
-        user = self.configuration.get("CREDENTIALS", "neo4j_username")
-        password = self.configuration.get("CREDENTIALS", "neo4j_password")
+        server_uri = os.environ['NEO4J_URI']
+        user = os.environ['NEO4J_USERNAME']
+        password = os.environ['NEO4J_PASSWORD']
 
         connection = GraphDatabase.driver(uri=server_uri, auth=(user, password))
         self.session = connection.session(database=db)
