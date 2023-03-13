@@ -31,7 +31,8 @@ def populate(db):
             thread = threading.Thread(target=cur_module[0].generate.check, args=(True, db,), daemon=True)
             return thread
         
-    except:
+    except Exception as e:
+        print(e)
         print("[{dbtype}] Error finding Neo4j database. Check to see if database exists and rerun script".format(dbtype=db.DBtype().upper()))
 
 def updateCheck(db):
@@ -96,14 +97,14 @@ configuration.read(init)
 
 # Setup individual database communication objects. AlertCypher object is used to send cypher queries to a specific database in the server
 CTcypher = AlertCypher("clinical")
-GNTcypher = AlertCypher("grant")
+#GNTcypher = AlertCypher("grant")
 PMcypher = AlertCypher("pubmed")
 GARDcypher = AlertCypher("gard")
 
 # Checks if clinical trial database is empty. If it is, it creates it from scratch on a seperate thread
 threads = list()
 threads.append(populate(CTcypher))
-threads.append(populate(GNTcypher))
+#threads.append(populate(GNTcypher))
 threads.append(populate(PMcypher))
 threads.append(populate(GARDcypher))
 

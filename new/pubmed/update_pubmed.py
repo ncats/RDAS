@@ -43,6 +43,7 @@ def get_gard_list(db):
     disease['type'] = res['m']["DisorderType"]
     disease['classification'] = res['m']["ClassificationLevel"] if res['m']["ClassificationLevel"] is not None else ''
     disease['synonyms'] = res['m']["Synonyms"] if res['m']["Synonyms"] is not None else ''
+    disease['OMIM'] = res['m']['OMIM'] if 'OMIM' in res['m'] else None
     myData[gard_id] = disease
   return OrderedDict(sorted(myData.items()))
 
@@ -73,6 +74,7 @@ def find_OMIM_articles(db, OMIMNumber):
 
 #Parse OMIM json and return a map: pubmed_id -> OMIM section   
 def get_article_in_section(omim_reference):
+  # if no pmid in reference, dont run pubtator but still include it, else run pubtator on pmid
   textSections = jmespath.search("omim.entryList[0].entry.textSectionList[*].textSection",omim_reference)
   references = {}
   for t in textSections:
@@ -98,7 +100,7 @@ def get_article_in_section(omim_reference):
         tsections.append(sectionName)
         
     if tsections:
-      articleString[str(pmid)] = tsections  #Richard: pmid is int, covert to string for consistance
+      articleString[str(pmid)] = tsections
     else:
       articleString[str(pmid)] = ['See Also']
       
@@ -128,50 +130,63 @@ def save_omim_articles(db, mindate, maxdate):
   if len(omim_api_key) == 0:
     return
 
-  results = get_gard_omim_mapping(db)
+  results = get_gard_list(db)
 
   search_source = 'omim_evidence'
-  for no, rd in enumerate(results):  
-    gard_id = rd["gard_id"]
+  for no, gard_id in enumerate(results):
     print('UPDATING OMIM: ' + gard_id)
-    omim_id = rd["omim_id"]
-    omim_json = None
     try:
-      omim_json = find_OMIM_articles(db, omim_id.split(":")[1])
+      omim_ids = results[gard_id]["OMIM"]
     except Exception as e:
-      logging.error(f' Exception when search omim_id {omim_id}: error {e}')
-      continue        
-    sections = get_article_in_section(omim_json)
-    logging.info(f'sections: {sections}')
-    new_sections = dict(sections)
+      print(e)
+      continue
     
-    for pubmed_id in sections:
-      article_id = get_article_id(pubmed_id, db)
-      if (article_id):
-        logging.info(f'PubMed evidence article already exists: {pubmed_id}, {article_id}')
-        save_omim_article_relation(article_id, omim_id, rd["omim_name"], sections[pubmed_id], db)
-        new_sections.pop(pubmed_id)
-      else:
-        logging.info(f'PubMed evidence article NOT exists: {pubmed_id}, {article_id}')  
-          
+    if not omim_ids:
+      continue
+    for omim in omim_ids:    
+      omim_json = None
+
+      try:
+        omim_json = find_OMIM_articles(db, omim)
+      except Exception as e:
+        logging.error(f' Exception when search omim_id {omim}: error {e}')
+        continue
+        
+      sections = get_article_in_section(omim_json)
+      logging.info(f'sections: {sections}')
+      new_sections = dict(sections)
+    
+      for pubmed_id in sections:
+        article_id = get_article_id(pubmed_id, db)
+        if (article_id):
+          logging.info(f'PubMed evidence article already exists: {pubmed_id}, {article_id}')
+          save_omim_article_relation(article_id, omim, sections[pubmed_id], db)
+          print(pubmed_id)
+          print(omim)
+          print(article_id)
+          new_sections.pop(pubmed_id)
+
+        else:
+          logging.info(f'PubMed evidence article NOT exists: {pubmed_id}, {article_id}')
+
     logging.info(f'sections after loop: {new_sections}' )   
-    save_omim_remaining_articles(gard_id, rd, new_sections, search_source, db)      
-          
-def save_omim_article_relation(article_id, omim_id, omim_name, sections, driver):
+    save_omim_remaining_articles(gard_id, omim, new_sections, search_source, db)      
+    
+      
+def save_omim_article_relation(article_id, omim_id, sections, driver):
   query = '''
   MATCH (a:Article) WHERE id(a) = $article_id
   SET a.refInOMIM = TRUE
-  MERGE (p:OMIMRef {omimId:$omim_id, omimName:$omim_name, omimSections:$sections})
+  MERGE (p:OMIMRef {omimId:$omim_id, omimSections:$sections})
   MERGE (a) - [r:HAS_OMIM_REF] -> (p)
   '''
   driver.run(query, args={
     "article_id":article_id,
     "omim_id":omim_id,
-    "omim_name":omim_name,
     "sections":sections
   })          
           
-def save_omim_remaining_articles(gard_id, rd, sections, search_source, driver):
+def save_omim_remaining_articles(gard_id, omim_id, sections, search_source, driver):
   pubmed_ids = list(sections.keys())
   disease_id = get_disease_id(gard_id, driver)
   logging.info(f'pubmed_ids: {pubmed_ids}')
@@ -181,11 +196,10 @@ def save_omim_remaining_articles(gard_id, rd, sections, search_source, driver):
   for pubmed_id in sections:
     article_id = get_article_id(pubmed_id, driver)
     if (article_id):
-      save_omim_article_relation(article_id, rd["omim_id"], rd["omim_name"], sections[pubmed_id], driver)
+      save_omim_article_relation(article_id, omim_id, sections[pubmed_id], driver)
     else:
       logging.error(f'Something wrong with adding omim article relation: {pubmed_id}, {article_id}')            
- 
-'         
+          
 def create_indexes(): 
   with GraphDatabase.driver(neo4j_uri, auth=(user,password)) as driver:
     with driver.session() as session:
@@ -204,24 +218,35 @@ def create_indexes():
       ]
       for c in cypher_query:
         session.run(c, parameters={})
-'
 
 def find_articles(keyword, mindate, maxdate):
   #fetch articles and return a map
-  params = {'db': 'pubmed', 'term': keyword, 'mindate':mindate, 'maxdate':maxdate, 'retmode': 'json', 'retmax':"1000"}
-  response = requests.post("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?%s", data=params).json()
+  url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=\"{keyword}\"[~1]&mindate={mindate}&maxdate={maxdate}&retmode=json&retmax=10000"
+  response = requests.post(url).json()
   return response
 
 def fetch_abstracts(pubmedIDs): 
-  #fetch abstract for an article  
-  url = "https://www.ebi.ac.uk/europepmc/webservices/rest/searchPOST"
-  params = {'query': pubmedIDs, 'pageSize': '1000', 'resultType': 'core', 'format': 'json'}
-  head = {'Content-Type': 'application/x-www-form-urlencoded'}
-  try:
-    response = requests.post(url, data=params, headers = head).json()
-  except:
-    response = None
-  return response
+  #fetch abstract for an article
+  responses = list()
+  batches = [pubmedIDs[i * 1000:(i + 1) * 1000] for i in range((len(pubmedIDs) + 1000 - 1) // 1000 )]
+  
+  for batch in batches:
+    ids = ' OR ext_id:'.join(batch)
+    ids = 'ext_id:' +ids
+    
+    url = "https://www.ebi.ac.uk/europepmc/webservices/rest/searchPOST"
+    params = {"query": ids, "pageSize": "1000", "resultType": "core", "format": "json"}
+    head = {'Content-type': 'application/x-www-form-urlencoded'}
+    try:
+      response = requests.post(url=url, data=params, headers=head).json()
+      responses.append(response)
+      
+    except Exception as e:
+      print('error in fetch abstracts')
+      print(e)
+      responses = None
+
+  return responses
   
 def fetch_pubtator_annotations(pubmedId):
   #fetch annotations from pubtator
@@ -266,8 +291,7 @@ def create_disease(session, gard_id, rd):
     "gard_id":rd['gard_id'],
     "name":rd['name'], 
     "type":rd['type'],
-    "classification":rd['classification'], 
-    "classification":rd["classification"],
+    "classification":rd['classification'],
     "synonyms":rd['synonyms']
   }
 
@@ -286,7 +310,8 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     n.firstPublicationDate = $firstPublicationDate, 
     n.citedByCount = $citedByCount,
     n.isOpenAccess = $isOpenAccess, 
-    n.inEPMC = $inEPMC, 
+    n.inEPMC = $inEPMC,
+    n.isEpi = $isEpi, 
     n.inPMC = $inPMC, 
     n.hasPDF = $hasPDF, 
     n.source = $source,
@@ -313,7 +338,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     "hasPDF":True if 'hasPDF' in abstractDataRel else False,
     "pubtype":abstractDataRel['pubTypeList']['pubType'] if 'pubTypeList' in abstractDataRel else '',
     "now": date.today().strftime("%m/%d/%y"),
-    #"isEpi": get_isEpi(title, abstract),
+    "isEpi": False, #Defaults to False, changes to True if there is Epi data in article later on
     "citedByCount":int(abstractDataRel['citedByCount']) if 'citedByCount' in abstractDataRel else 0,
     }
   
@@ -603,38 +628,39 @@ def save_all(abstract, disease_node, pubmedID, search_source, session):
       logging.warning(f'\nException creating annotations for article {pubmedID}:  {e}')
 
 def save_articles(disease_node, pubmed_ids, search_source, session):
-  ids = ' OR ext_id:'.join(pubmed_ids)
-  ids = 'ext_id:' +ids
+  all_abstracts = fetch_abstracts(pubmed_ids)
 
-  abstracts = fetch_abstracts(ids)
-  if abstracts == None:
+  if all_abstracts == None:
     return
 
-  if ('resultList' in abstracts and 'result' in abstracts['resultList'] and len(abstracts['resultList']['result']) > 0):
-    try: 
-      for result in abstracts['resultList']['result']:
-        pubmedID = result['id'] if 'id' in result else None
-        logging.info(f'pubmedID: {pubmedID}')
+  for abstracts in all_abstracts:
+    if ('resultList' in abstracts and 'result' in abstracts['resultList'] and len(abstracts['resultList']['result']) > 0):
+      
+      try: 
+        for result in abstracts['resultList']['result']:
+          pubmedID = result['id'] if 'id' in result else None
+          logging.info(f'pubmedID: {pubmedID}')
         
-        if pubmedID is None:
-          print('N', end='', flush=True)
-          print(f'\n{result}\n')
-          continue
-        else:
-          print('.', end='', flush=True)
-          res = session.run("match(a:Article{pubmed_id:$pmid}) return id(a) as id", args = {'pmid':pubmedID})
-          record = res.single()
-          if (record):
+          if pubmedID is None:
+            print('N', end='', flush=True)
+            print(f'\n{result}\n')
             continue
           else:
-            try:
-              save_all(result, disease_node, pubmedID, search_source, session)
-            except Exception as e:
-              logging.error(f" Exception when calling save_all, error: {e}")
+            print('.', end='', flush=True)
+            res = session.run("match(a:Article{pubmed_id:$pmid}) return id(a) as id", args = {'pmid':pubmedID})
+            record = res.single()
+            if (record):
+              continue # place update function for abstractText?
+              # add fetch pubtator function?
+            else:
+              try:
+                save_all(result, disease_node, pubmedID, search_source, session)
+              except Exception as e:
+                logging.error(f" Exception when calling save_all, error: {e}")
               
-    except Exception as e:
-      #print('disease_node',disease_node, 'pubmed_ids',pubmed_ids, 'search_source',search_source,sep='\n')
-      logging.error(f" Exception when iterating abstracts['resultList']['result'], result: {result}, error: {e}")  
+      except Exception as e:
+        #print('disease_node',disease_node, 'pubmed_ids',pubmed_ids, 'search_source',search_source,sep='\n')
+        logging.error(f" Exception when iterating abstracts['resultList']['result'], result: {result}, error: {e}")  
 
 def filter_existing(db, gard_id, pmids):
   query = fr'MATCH (x:Disease)--(y:Article) WHERE x.gard_id = "{gard_id}" AND y.pubmed_id IN {pmids} RETURN y.pubmed_id'
@@ -645,6 +671,13 @@ def filter_existing(db, gard_id, pmids):
     if len(pmids) == 0:
       pmids = None   
   return pmids
+
+def filter_synonyms(syns):
+    filtered = list()
+    for syn in syns:
+        if ' ' in syn:
+            filtered.append(syn)
+    return filtered
 
 def save_disease_articles(db, mindate, maxdate):
   #Find and save article data for GARD diseases between from mindate to maxdate
@@ -661,72 +694,74 @@ def save_disease_articles(db, mindate, maxdate):
         if idx < progress:
           continue
         if gard_id == None:
-          continue  
+          continue
 
         no = 0
-        rd = results[gard_id]
-
-        try:
-          pubmedIDs = find_articles(rd["name"],mindate,maxdate)
-        except Exception as e:
-          logging.error(f'Exception when finding articles: {e}')
-          continue
-
-        try:
-          no = pubmedIDs['esearchresult']['count']
-        except:
-          no = 0
-
-        print(idx, gard_id, "Articles:", no, rd["name"])
-        disease_node = create_disease(db, gard_id, rd)
+        rd = results[gard_id] #'GARD:0007893'
         
-        if not 'esearchresult' in pubmedIDs:
-          continue
-
-        try:
-          pubmed_ids = filter_existing(db, gard_id, pubmedIDs['esearchresult']['idlist'])
-          
-          if pubmed_ids:
-            save_articles(disease_node, pubmed_ids, search_source, db)
-          else:
-            print('All articles already in database')
-            continue
-        except Exception as e:
-          logging.error(f'Exception when finding articles for disease {gard_id}, error1: {e}')
-          continue
+        searchterms = filter_synonyms(rd['synonyms'])
+        searchterms.extend([rd['name']])
         
-        ids = ' OR ext_id:'.join(pubmedIDs['esearchresult']['idlist'])
-        ids = 'ext_id:' +ids
-        logging.info(f"Total articles find: {pubmedIDs['esearchresult']['count']}")
-
-        try:
-          abstracts = fetch_abstracts(ids)
-          if abstracts == None:
+        for searchterm in searchterms:
+          try:
+            pubmedIDs = find_articles(searchterm,mindate,maxdate) #Use names AND synonyms (only include syns with more than 1 word, if more than 1 word then count if they have more than 5 characters???)
+          except Exception as e:
+            logging.error(f'Exception when finding articles: {e}')
             continue
 
-          if ('resultList' in abstracts and 'result' in abstracts['resultList'] and len(abstracts['resultList']['result']) > 0):
-            for result in abstracts['resultList']['result']:
-              pubmedID = result['id'] if 'id' in result else None
-              
-              if pubmedID is None:
-                print('N', end='', flush=True)
-                continue
-              else:
-                print('.', end='', flush=True)
+          try:
+            no = pubmedIDs['esearchresult']['count']
+          except:
+            no = 0
 
-              res = db.run("match(a:Article{pubmed_id:$pmid}) set a.pubmed_evidence=TRUE return id(a)", args={"pmid":pubmedID})
-              alist = list(res)
-              matching_articles = len(alist)
+          print(idx, gard_id, "Articles:", no, rd["name"]+'['+searchterm+']')
+          disease_node = create_disease(db, gard_id, rd)
+        
+          if not 'esearchresult' in pubmedIDs:
+            print('no esearchresult in pubmedIDs')
+            continue
 
-              if (matching_articles > 0):
-                pass
-              else:
-                save_all(result, disease_node, pubmedID, search_source, db)
-            print()
-            db.setConf('DATABASE', 'pubmed_progress', str(idx))
-        except Exception as e:
-          logging.error(f'Exception when finding articles for disease {gard_id}, error2: {e}')
-          continue
+          try:
+            pubmed_ids = filter_existing(db, gard_id, pubmedIDs['esearchresult']['idlist'])
+            # handle existing IDs and update them 
+            if pubmed_ids:
+              save_articles(disease_node, pubmed_ids, search_source, db)
+            else:
+              print('All articles already in database')
+              continue
+          except Exception as e:
+            logging.error(f'Exception when finding articles for disease {gard_id}, error1: {e}')
+            continue
+
+          try:
+            all_abstracts = fetch_abstracts(pubmed_ids)
+            if all_abstracts == None:
+              continue
+            
+            for abstracts in all_abstracts:
+              if ('resultList' in abstracts and 'result' in abstracts['resultList'] and len(abstracts['resultList']['result']) > 0):
+                for result in abstracts['resultList']['result']:
+                  pubmedID = result['id'] if 'id' in result else None
+                
+                  if pubmedID is None:
+                    print('N', end='', flush=True)
+                    continue
+                  else:
+                    print('.', end='', flush=True)
+
+                  res = db.run("match(a:Article{pubmed_id:$pmid}) set a.pubmed_evidence=TRUE return id(a)", args={"pmid":pubmedID})
+                  alist = list(res)
+                  matching_articles = len(alist)
+
+                  if (matching_articles > 0):
+                    pass
+                  else:
+                    save_all(result, disease_node, pubmedID, search_source, db)
+                print()
+                db.setConf('DATABASE', 'pubmed_progress', str(idx))
+          except Exception as e:
+            logging.error(f'Exception when finding articles for disease {gard_id}, error2: {e}')
+            continue
           
 
 

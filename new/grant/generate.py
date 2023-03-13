@@ -2,7 +2,7 @@ import sys
 import os
 workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
-import update_grant
+#import update_grant
 import configparser
 import datetime
 from AlertCypher import AlertCypher
@@ -22,7 +22,7 @@ def check (empty=False, db=AlertCypher("grant")):
 def update (db):
     # Updates database from last update date
     # connect to imported update script
-    update_grant.main(db)
+    #update_grant.main(db)
     print('NIH GRANT DB UPDATING...')
 
 def create (db):
@@ -32,7 +32,7 @@ def create (db):
     lock.acquire()
     print('Creating NIH Grant Database...')
     lock.release()
-    update_grant.main(db)
+    #update_grant.main(db)
     lock.acquire()
     print('Finishing up NIH Grant Database Creation...')
     lock.release()

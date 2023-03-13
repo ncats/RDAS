@@ -46,6 +46,6 @@ def grant_msg (data): # dict
 send_mail(
     'Test Email',
     'this is a test email',
-    'ncatsrdas@mail.nih.gov <notif@nih.gov>',
-    ['shanmardev@hotmail.com']
+    'ncatsrdas@mail.nih.gov',
+    ['sheilstk@nih.gov']
 )

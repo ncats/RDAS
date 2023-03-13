@@ -59,7 +59,7 @@ def create_relationship(db, data):
     except:
         pass
 
-def create_disease_node(db, data):
+def create_disease_node(db, data, xrefs): # Include xrefs into GARD node instead of seperate node
     '''
     Creates GARD Disease node in the Neo4j
     '''
@@ -72,10 +72,22 @@ def create_disease_node(db, data):
     d.DataSourceId = $mapping_id,
     d.ClassificationLevel = $classlvl, 
     d.DisorderType = $disordertype, 
-    d.Synonyms = $syns
+    d.Synonyms = $syns,
+    d.Orphanet = $orpha,
+    d.ICD10 = $icd10,
+    d.UMLS = $umls,
+    d.OMIM = $omim,
+    d.SNOMEDCT = $snomed,
+    d.DiseaseOntology = $diseaseontology,
+    d.MeSH = $mesh,
+    d.MedDRA = $meddra,
+    d.GeneticAlliance = $genetic,
+    d.ICD11 = $icd11,
+    d.GeneticsHomeReference = $ghr,
+    d.ICD10CM = $icd10cm
     RETURN d
     '''
-
+ 
     if type(data[6]) == float:
         data[6] = []
 
@@ -92,6 +104,9 @@ def create_disease_node(db, data):
     data[4] = data[4].replace('[','')
     data[4] = data[4].replace(']','')
 
+    results = xrefs.loc[xrefs['GardID'] == data[0]]
+    results = results.groupby('XrefSource')['SourceID'].apply(list).to_dict()
+
     params = {
     "name":data[5],
     "gard_id":data[0],
@@ -99,19 +114,33 @@ def create_disease_node(db, data):
     "mapping_id":data[2],
     "classlvl":data[3], 
     "disordertype":data[4], 
-    "syns":data[6]
+    "syns":data[6],
+    "orpha":results['Orphanet'] if 'Orphanet' in results else None,
+    "icd10":results['ICD-10'] if 'ICD-10' in results else None,
+    "umls":results['UMLS'] if 'UMLS' in results else None,
+    "omim":results['OMIM'] if 'OMIM' in results else None,
+    "snomed":results['SNOMED-CT'] if 'SNOMED-CT' in results else None,
+    "diseaseontology":results['DiseaseOntology'] if 'DiseaseOntology' in results else None,
+    "mesh":results['MeSH'] if 'MeSH' in results else None,
+    "meddra":results['MedDRA'] if 'MedDRA' in results else None,
+    "genetic":results['GeneticAlliance'] if 'GeneticAlliance' in results else None,
+    "icd11":results['ICD-11'] if 'ICD-11' in results else None,
+    "ghr":results['GeneticsHomeReference'] if 'GeneticsHomeReference' in results else None,
+    "icd10cm":results['ICD-10-CM'] if 'ICD-10-CM' in results else None
     }
 
-    return db.run(query, args=params).single().value()
+    db.run(query, args=params).single().value()
 
 def retrieve_gard_data(db):
     '''
     Retrieves GARD disease files from Palantir workspace
     '''
     print("Retrieving GARD data from Palantir")
-    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o new/gard/GARD.csv https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.ec51a84a-3b60-44d8-9625-3fc2a2b1d481/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'])
+    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.ec51a84a-3b60-44d8-9625-3fc2a2b1d481/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=os.path.join(os.path.dirname(workspace), 'gard', 'GARD.csv'))
     os.system(command)
-    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o new/gard/GARD_classification.csv https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.363c2a9e-3213-4e66-a5db-052af2309f02/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'])
+    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.363c2a9e-3213-4e66-a5db-052af2309f02/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=os.path.join(os.path.dirname(workspace), 'gard', 'GARD_classification.csv'))
+    os.system(command)
+    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.95f22ad1-90fc-48a1-9c40-c4c632f9c310/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=os.path.join(os.path.dirname(workspace), 'gard', 'GARD_xrefs.csv'))
     os.system(command)
     
 def generate(db, data):
@@ -129,14 +158,14 @@ def generate(db, data):
     r,c = gard.shape
     for i in range(r):
         row = gard.iloc[i]
-        data = row.to_list()
-        create_disease_node(db, data)
+        row = row.to_list()
+        create_disease_node(db, row, data['xrefs'])
 
     r,c = classification.shape
     for i in range(r):
         row = classification.iloc[i]
-        data = row.to_dict()
-        create_relationship(db, data)
+        row = row.to_dict()
+        create_relationship(db, row)
     
 def main(db, update=False):
     now = datetime.now().strftime("%m/%d/%y")
@@ -145,9 +174,10 @@ def main(db, update=False):
             return
         
     retrieve_gard_data(db)
-    gard = pd.read_csv(os.path.dirname(workspace) + '\\gard\\GARD.csv', index_col=False)
-    classification = pd.read_csv(os.path.dirname(workspace) + '\\gard\\GARD_classification.csv', index_col=False)
-    data = {'gard':gard, 'classification':classification}
+    gard = pd.read_csv(os.path.join(os.path.dirname(workspace), 'gard', 'GARD.csv'), index_col=False)
+    classification = pd.read_csv(os.path.join(os.path.dirname(workspace), 'gard', 'GARD_classification.csv'), index_col=False)
+    xrefs = pd.read_csv(os.path.join(os.path.dirname(workspace), 'gard', 'GARD_xrefs.csv'), index_col=False)
+    data = {'gard':gard, 'classification':classification, 'xrefs':xrefs}
     generate(db, data)
     
     if not update:
