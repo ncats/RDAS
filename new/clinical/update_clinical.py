@@ -100,17 +100,22 @@ def add_trial(db, trials, GARDId):
 
 
 def main(db, update=False):
-    print('CLINICAL TRIAL DB UPDATING...')
+    if update:
+      print('CLINICAL TRIAL DB UPDATING...')
+    else:
+      print('CREATING CLINICAL TRIAL DB')
+
     GARDdb = AlertCypher("gard")
     gard_matches = GARDdb.run('MATCH (x:GARD) RETURN x')
     progress = db.getConf('DATABASE', 'clinical_progress')
     
-    if progress == "":
-        progress == 0
+    if progress == '':
+        progress = 0
     else:
         progress = int(progress)
     
     for idx, gard_mapping in enumerate(gard_matches.data()):
+        
         if idx < progress:
           continue
         

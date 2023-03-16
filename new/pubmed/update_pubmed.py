@@ -161,9 +161,6 @@ def save_omim_articles(db, mindate, maxdate):
         if (article_id):
           logging.info(f'PubMed evidence article already exists: {pubmed_id}, {article_id}')
           save_omim_article_relation(article_id, omim, sections[pubmed_id], db)
-          print(pubmed_id)
-          print(omim)
-          print(article_id)
           new_sections.pop(pubmed_id)
 
         else:
@@ -184,7 +181,7 @@ def save_omim_article_relation(article_id, omim_id, sections, driver):
     "article_id":article_id,
     "omim_id":omim_id,
     "sections":sections
-  })          
+  })
           
 def save_omim_remaining_articles(gard_id, omim_id, sections, search_source, driver):
   pubmed_ids = list(sections.keys())

@@ -46,7 +46,7 @@ def updateCheck(db):
     updateInfo = unpack[db.DBtype()]
     # Reload configuration information
     update = db.getConf("DATABASE", updateInfo[0])
-    if update == "":
+    if update == '':
         update = datetime.now()
         update = update.strftime("%m/%d/%y")
         update = datetime.strptime(update,"%m/%d/%y")
@@ -97,14 +97,14 @@ configuration.read(init)
 
 # Setup individual database communication objects. AlertCypher object is used to send cypher queries to a specific database in the server
 CTcypher = AlertCypher("clinical")
-#GNTcypher = AlertCypher("grant")
+GNTcypher = AlertCypher("grant")
 PMcypher = AlertCypher("pubmed")
 GARDcypher = AlertCypher("gard")
 
 # Checks if clinical trial database is empty. If it is, it creates it from scratch on a seperate thread
 threads = list()
 threads.append(populate(CTcypher))
-#threads.append(populate(GNTcypher))
+threads.append(populate(GNTcypher))
 threads.append(populate(PMcypher))
 threads.append(populate(GARDcypher))
 
