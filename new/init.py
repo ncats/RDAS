@@ -21,10 +21,12 @@ def populate(db):
     cur_module = unpack[db.DBtype()]
     try:
         response = db.run("MATCH (x) RETURN x LIMIT 1").single()
-        
+        if db.getConf('DATABASE', cur_module[1]) == 'True':
+            return None
+
         if db.getConf('DATABASE', cur_module[1]) == 'False':
             response = None
-            
+	    
         if response == None:
             print('Creating {dbtype} database'.format(dbtype=db.DBtype().upper()))
             db.setConf('DATABASE', cur_module[1], 'False')
@@ -76,11 +78,13 @@ def updateDate(info):
             info["clinical"][3].setConf("DATABASE", "clinical_update", date)
     except TypeError:
         pass
+    
     try:
         if info["grant"][0]:
             info["grant"][3].setConf("DATABASE", "grant_update", date)
     except TypeError:
         pass
+    
     try:
         if info["pubmed"][0]:
             info["pubmed"][3].setConf("DATABASE", "pubmed_update", date)

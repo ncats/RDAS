@@ -36,36 +36,50 @@ def add_trial(db, trials, GARDId):
     '''
     cypher_add_trial_base = 'MATCH (gard:GARD) WHERE gard.GARDId = \'' + GARDId + '\''
     for trial in trials:
+        print(trial, end="")
+        print('.', end="")
         # DB data pull
-        existing_trial_data = db.run('MATCH (x:ClinicalTrial) WHERE x.NCTId = \"{trial}\" RETURN x'.format(trial=trial)).data()
+        existing_trial_data = db.run('MATCH (y:GARD)--(x:ClinicalTrial) WHERE y.GARDId = \"{GARD}\" AND x.NCTId = \"{trial}\" RETURN x'.format(trial=trial, GARD=GARDId)).data()
         # clinicaltrial.gov data pull
         full_trial = load_neo4j_functions.extract_all_fields(trial)
         
         #if trial exists in db
         if len(existing_trial_data) > 0:
             existing_trial_data = existing_trial_data[0]['x']
-            #if trial exists in db and hasnt been updated on clinicaltrial.gov then continue to next
-            if full_trial['LastUpdatePostDate'] == [existing_trial_data['LastUpdatePostDate']]:
-                continue
-            #if trial exists in db and HAS been updated on clinicaltrial.gov
-            else:
-                update = True
-                clinical_trial_data_string = load_neo4j_functions.data_string(full_trial, data_model.ClinicalTrial, update, CT = True)
 
-                if not len(clinical_trial_data_string) > 0:
-                    continue
+            #if trial exists in db and hasnt been updated on clinicaltrial.gov then continue to next
+            try:
+                if full_trial['LastUpdatePostDate'] == [existing_trial_data['LastUpdatePostDate']]:
+                    continue                
+            #if trial exists in db and HAS been updated on clinicaltrial.gov
+                else:
+                    update = True
+                    clinical_trial_data_string = load_neo4j_functions.data_string(full_trial, data_model.ClinicalTrial, update, CT = True)
+
+                    if not len(clinical_trial_data_string) > 0:
+                        continue
         
-                cypher_add_trial = 'MATCH (trial:ClinicalTrial) WHERE trial.NCTId = \"' + trial + '\" SET '
-                cypher_add_trial += clinical_trial_data_string[0]
-            
-                db.run(cypher_add_trial)
-        #if trial does NOT exist
+                    cypher_add_trial = 'MATCH (trial:ClinicalTrial) WHERE trial.NCTId = \"' + trial + '\" SET '
+                    cypher_add_trial += clinical_trial_data_string[0]
+                    db.run(cypher_add_trial)
+
+            except KeyError as e:
+                print(e)
+                continue
+        #if trial does NOT exist under specific disease
         else:
-            # create clinical trial node
+            # create or merge clinical trial node
+            exists_in_db = db.run('MATCH (x:ClinicalTrial)--(y:GARD) WHERE x.NCTId = \"{trial}\" RETURN x'.format(trial=trial)).data()
+            if len(exists_in_db) > 0:
+                db.run('MATCH (y:GARD),(x:ClinicalTrial) WHERE y.GARDId = \"{GARD}\" AND  x.NCTId = \"{trial}\" MERGE (y)-[r:gard_in]->(x)'.format(trial=trial,GARD=GARDId))
+                print('Merged with existing trial in database')
+                continue
+ 
             update = False
             clinical_trial_data_string = load_neo4j_functions.data_string(full_trial, data_model.ClinicalTrial, update, CT = True)
 
             if not len(clinical_trial_data_string) > 0:
+                print('else: no length on clinical_trial_data_string')
                 continue
         
             cypher_add_trial = cypher_add_trial_base + 'CREATE (gard)-[:gard_in]->(trial:ClinicalTrial{'
@@ -94,10 +108,21 @@ def add_trial(db, trials, GARDId):
                             cypher2 += data_model.additional_class_names[j] + '{' + field[i] +'})'
 
             cypher_batch = ['CREATE' + i for i in cypher2.split('CREATE')]
-            for b in range(1,len(cypher_batch),4):
-                b = cypher + ' '.join(cypher_batch[b:b+4])
-                db.run(b)
-
+            
+            # Section sometimes gets a neo4j unknown error, below code will retry if there is an error
+            attempt = True
+            tries = 0
+            while attempt:
+                try:
+                    for b in range(1,len(cypher_batch),4):
+                        b = cypher + ' '.join(cypher_batch[b:b+4])
+                        db.run(b)
+                        attempt = False
+                except Exception as e:
+                    if tries > 10:
+                        break
+                    tries += 1
+                    print(e)
 
 def main(db, update=False):
     if update:
@@ -121,10 +146,13 @@ def main(db, update=False):
         
         gard_mapping = gard_mapping['x']
         GARDId = gard_mapping['GardId']
+        print(str(idx) + ": " + GARDId)
         GARD_name = gard_mapping['GardName'].replace('\\','\\\\').replace('\'','\\\'').replace('\"','\\"')
-        GARD_synonyms = gard_mapping['Synonyms']
+        GARD_synonyms = [x for x in gard_mapping['Synonyms'] if " " in x]
         GARD_list = [GARD_name] + GARD_synonyms
+        print(GARD_list)
         retrieved_trials = load_neo4j_functions.nctid_list(GARD_list)
+        print(f'Retrieved Trials: {len(retrieved_trials)}')
         db.run('MERGE (gard:GARD{GARDName: \"' + GARD_name + '\", GARDId: \"' + GARDId + '\"})')
         
         if len(retrieved_trials) > 0:

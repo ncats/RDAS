@@ -2,26 +2,26 @@
 This module defines a series of stages for preprocessing raw CSV grant
 data downloaded from ExPORTER, and defines a function prep_data
 for running those stages sequentially.
-
 To greatly optimize the speed of this process, we use pygit2 to track
 which files have changed and only annotate those files.
-
 update_grant.py calls prep_data() from this module to figure out
 which files need to be added to the database.
 """
 
-
 import os
+import json
 import re
 import ast
 import shutil
-import pygit2
+#import pygit2
 import glob
 from typing import TypedDict
 import pandas as pd
 from prepare_annotation_text import prepare_phr_aim
 from annotate_text import *
 from remove_general_umls_concepts import clean_annotation_output
+from rdsmproj import Blacklist, AbstractMap
+from AlertCypher import AlertCypher
 
 ENCODING = "latin1"
 raw_path = ""
@@ -39,6 +39,7 @@ class FilesToAdd(TypedDict):
 	annotation_umls: list
 	clinical_studies: list
 	disease: list
+	publications: list
 	patents: list
 	projects: list
 	link_tables: list
@@ -51,18 +52,58 @@ def data_raw(subpath: str):
 
 def data_neo4j(subpath: str):
 	global neo4j_path
+	print(neo4j_path)
+	print(os.path.join(neo4j_path, subpath))
 	return os.path.join(neo4j_path, subpath)
 
 
 def years_to_files(subdir: str):
-	all_files = glob.glob(data_neo4j(subdir) + "*.csv")
-	return [f for f in all_files if f[-8:-4] in years_to_annotate]
+	all_files = glob.glob(data_neo4j(subdir) + "/*.csv")
+	#return [f for f in all_files if f[-8:-4] in years_to_annotate]
+	return [f for f in all_files]
 
+
+def aggregate_disease_data():
+	normmap_df = pd.read_csv(data_raw('normmap_results.csv'),index_col=False,usecols=['ID','GARD_id'])
+	normmap_df = normmap_df.rename(columns={'ID':'APPLICATION_ID', 'GARD_id': 'GARD_ID'})
+
+	disease_df = pd.read_csv(data_raw('ncats_disease_list.csv'),index_col=False)
+	disease_df = disease_df.rename(columns={'GARD id':'GARD_ID', 'Name':'NAME', 'Synonyms':'SYNONYMS'})
+
+	merged_df = pd.merge(normmap_df, disease_df, on=['GARD_ID'])
+	merged_df.to_csv(data_neo4j('disease/disease_to_application.csv'),index=False)
+
+def combine_projects():
+	# iterate through all files in raw/abstracts
+	# read as a dataframe with pandas
+	# read next csv as dataframe and append to last
+	# repeat
+	# export to csv into raw directory
+	combine_df = pd.DataFrame()
+	for filename in os.listdir(data_raw('abstracts')):
+		tmp = pd.read_csv(data_raw('abstracts/{filename}'.format(filename=filename)),index_col=False, encoding = "ISO-8859-1")
+		combine_df = pd.concat([combine_df,tmp], axis=0)
+
+	combine_df.to_csv(raw_path + '/RePORTER_PRJABS_C_FY_ALL.csv')
+
+def run_normmap():
+	print('Running NormMap')
+	combine_projects()
+	bl = Blacklist.Blacklist()
+	absmap = AbstractMap.AbstractMap(bl=bl)
+	absmap._set_input_path(raw_path)
+	absmap._set_output_path(raw_path)
+	print(absmap._get_input_path())
+	print(absmap._get_output_path())
+	# RePORTER_PRJABS_C_FY1985
+	absmap._match('/RePORTER_PRJABS_C_FY_ALL.csv', 'ncats_disease_list.json',IDcol='APPLICATION_ID',TEXTcols=['ABSTRACT_TEXT'])
 
 def get_RD_project_ids():
-	apps = pd.read_csv(data_raw("abstract_matches_2mil_ALL.csv"), usecols=["APPLICATION_ID"])
+	run_normmap()
+	aggregate_disease_data()
+	apps = pd.read_csv(data_raw("normmap_results.csv"), usecols=["ID"])
 	apps = apps.drop_duplicates()
-	apps = apps.sort_values(by=["APPLICATION_ID"])
+	apps = apps.sort_values(by=["ID"])
 
 	apps.to_csv(data_neo4j("NormMap_mapped_app_ids.csv"), index=None)
 
@@ -105,7 +146,6 @@ def select_RD_projects():
 	def find_RD_apps(input_file, rd_ids):
 		'''
 		Extract the applications that are rare disease related
-
 		Parameters:
 		input_file: path and filename of the file
 		rd_ids: a list of rare disease related application IDs
@@ -121,7 +161,7 @@ def select_RD_projects():
 
 	# Read the list of RD Application IDs
 	rd_ids = pd.read_csv(data_neo4j('NormMap_mapped_app_ids.csv'))
-	rd_ids = rd_ids['APPLICATION_ID'].tolist()
+	rd_ids = rd_ids['ID'].tolist()
 
 	# Get CSV files lists from a folder
 	input_path = data_neo4j('projects_with_funds/')
@@ -144,7 +184,7 @@ def cleanup_project_IC_NAME_totalcost():
 									'PROJECT_TERMS', 'PROJECT_TITLE', 'SUBPROJECT_ID', 'TOTAL_COST', 'TOTAL_COST_SUB_PROJECT']
 
 	# Build Agent names lookup dictionary
-	agents = pd.read_csv('new/grant/agent_names.csv')
+	agents = pd.read_csv('alert/new/grant/agent_names.csv')
 	agent_lkup = dict(zip(agents['IC_NAME_OLD'], agents['IC_NAME_NEW']))
 
 	# Clean all files
@@ -168,7 +208,7 @@ def cleanup_project_IC_NAME_totalcost():
 def find_RD_core_projects():
 	apps = pd.read_csv(data_neo4j('NormMap_mapped_app_ids.csv'))
 
-	match_col = 'APPLICATION_ID'
+	match_col = 'ID'
 	new_col = 'CORE_PROJECT_NUM'
 
 	input_path = data_neo4j('projects/')
@@ -177,7 +217,7 @@ def find_RD_core_projects():
 	for file in files:
 		proj = pd.read_csv(file, usecols=['APPLICATION_ID', 'CORE_PROJECT_NUM'], encoding=ENCODING)
 		proj.sort_values('APPLICATION_ID', inplace=True)
-		apps.loc[apps[match_col].isin(proj[match_col]), new_col] = proj.loc[proj[match_col].isin(apps[match_col]), new_col].values
+		apps.loc[apps[match_col].isin(proj['APPLICATION_ID']), new_col] = proj.loc[proj['APPLICATION_ID'].isin(apps[match_col]), new_col].values
 
 		# Export RD related APPLICATION_ID and CORE_PROJECT_NUM pairs
 		apps.to_csv(data_neo4j("RD_appID_coreProjNum.csv"), index=False)
@@ -195,7 +235,6 @@ def select_RD_patents():
 	def find_RD_core_project(input_file, col_name_to_replace, core_proj_nums):
 		'''
 		Extract the applications that are rare disease related
-
 		Parameters:
 		input_file: path and filename of the file
 		core_proj_nums: a list of rare disease related core project numbers
@@ -229,7 +268,6 @@ def select_RD_clinical_studies():
 	def find_RD_core_project(input_file, col_name_to_replace, core_proj_nums):
 		'''
 		Extract the applications that are rare disease related
-
 		Parameters:
 		input_file: path and filename of the file
 		core_proj_nums: a list of rare disease related core project numbers
@@ -262,7 +300,6 @@ def select_RD_link_tables():
 	def find_RD_core_project(input_file, col_name_to_replace, core_proj_nums):
 		'''
 		Extract the applications that are rare disease related
-
 		Parameters:
 		input_file: path and filename of the file
 		core_proj_nums: a list of rare disease related core project numbers
@@ -325,7 +362,7 @@ def cleanup_pub_country():
 	files = glob.glob(input_path + '*.csv')
 
 	# Build country lookup dictionary
-	countries = pd.read_csv('new/grant/countries.csv')
+	countries = pd.read_csv('alert/new/grant/countries.csv')
 	country_lkup = dict(zip(countries['COUNTRY_OLD'], countries['COUNTRY_NEW']))
 
 	# Clean all files
@@ -349,6 +386,7 @@ def fix_escaped_endings():
 
 	files = glob.glob(data_neo4j("*/*.csv"))
 	for file in files:
+		print(file)
 		df = pd.read_csv(file, low_memory=False, dtype=str, encoding=ENCODING)
 		df = df.applymap(tf)
 		df.to_csv(file, index=False, encoding="utf-8")
@@ -359,7 +397,6 @@ def select_RD_abstracts():
 	def find_RD_apps(input_file, rd_ids):
 		'''
 		Extract the applications that are rare disease related
-
 		Parameters:
 		input_file: path and filename of the file
 		rd_ids: a list of rare disease related application IDs
@@ -376,7 +413,7 @@ def select_RD_abstracts():
 
 	# Read the list of RD Application IDs
 	rd_ids = pd.read_csv(data_neo4j('NormMap_mapped_app_ids.csv'))
-	rd_ids = rd_ids['APPLICATION_ID'].tolist()
+	rd_ids = rd_ids['ID'].tolist()
 
 	# Get CSV files lists from a folder
 	input_path = data_raw('abstracts/')
@@ -395,10 +432,15 @@ def select_RD_abstracts():
 
 def annotation_preprocess_grant():
 	# Get CSV files lists from projects and abstracts folders
-	projects_files = sorted(years_to_files("projects/"))
-	abstracts_files = sorted(years_to_files("abstracts/"))
+	projects_files = sorted(years_to_files("projects"))
+	abstracts_files = sorted(years_to_files("abstracts"))
 
 	for projects_file, abstracts_file in zip(projects_files, abstracts_files):
+		print(projects_file)
+		print(abstracts_file)
+		if projects_file == None or abstracts_file == None:
+			continue
+
 		annotate_text = prepare_phr_aim(projects_file, abstracts_file)
 
 		year = projects_file[-8:-4]
@@ -407,9 +449,7 @@ def annotation_preprocess_grant():
 		annotate_text.to_csv(output_file, index=False, encoding=ENCODING)
 
 		print("Finished", output_file)
-
 		print("................. ALL DONE! .................")
-	pass
 
 def annotate_grant_abstracts():
 	MODELS = ['en_ner_craft_md', 'en_ner_jnlpba_md', 'en_ner_bc5cdr_md', 'en_ner_bionlp13cg_md']
@@ -427,8 +467,9 @@ def annotate_grant_abstracts():
 
 		for file in input_files:
 			year = file[-8:-4]
-
+			print('///////')
 			nlp = load_model(model)
+			print('///////')
 			text = pd.read_csv(file, encoding=ENCODING, dtype={'APPLICATION_ID':int, 'ABSTRACT_TEXT':str})
 			umls = get_umls_concepts(nlp, text)
 
@@ -446,15 +487,14 @@ def annotate_grant_abstracts():
 
 def clean_umls_concepts():
 	# Get CSV files lists from a folder
-	files = years_to_files("grants_umls/")
+	files = years_to_files(data_neo4j("grants_umls/"))
 
 	# Clean all files
-	output_path = data_neo4j('grants_umls/')
-
-	keep_semantic_types = pd.read_csv('semantic_type_keep.csv', usecols=['TUI'])
+	output_path = data_neo4j(data_neo4j('grants_umls/'))
+	keep_semantic_types = pd.read_csv('alert/new/grant/semantic_type_keep.csv', usecols=['TUI'])
 	keep_semantic_types = keep_semantic_types['TUI'].to_list()
 
-	remove_umls_concepts = pd.read_csv('umls_concepts_remove.csv', usecols=['UMLS_CUI'])
+	remove_umls_concepts = pd.read_csv('alert/new/grant/umls_concepts_remove.csv', usecols=['UMLS_CUI'])
 	remove_umls_concepts = remove_umls_concepts['UMLS_CUI'].to_list()
 
 	for file in files:
@@ -479,7 +519,7 @@ def clean_annotation_source():
 
 
 def map_semantic_types():
-	names = pd.read_csv("SemanticTypes_2018AB.csv", delimiter='|', header=None)
+	names = pd.read_csv("alert/new/grant/SemanticTypes_2018AB.csv", delimiter='|', header=None)
 	names = {k: v for [k, v] in names.values}
 	input_file_path = data_neo4j("grants_umls/")
 	output_file_path = data_neo4j("annotation_umls/")
@@ -499,6 +539,25 @@ def map_semantic_types():
 def to_abs_path(path: str):
 	return os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
 
+def get_disease_data():
+	db = AlertCypher('gard')
+	query = 'MATCH (x:GARD) RETURN COLLECT(x)'
+
+	response = db.run(query).data()[0]['COLLECT(x)']
+	
+	json_list = list()
+	for res in response:
+		json_dict = dict()
+		json_dict['GARD id'] = res['GardId']
+		json_dict['Name'] = res['GardName']
+		json_dict['Synonyms'] = res['Synonyms']
+		json_list.append(json_dict)
+
+	json_df = pd.DataFrame.from_records(json_list)
+	json_df.to_csv(data_raw('ncats_disease_list.csv'),index=False)
+
+	with open(data_raw('ncats_disease_list.json'), 'w+') as f:
+		json.dump(json_list, f)
 
 def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	"""
@@ -507,7 +566,6 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	stages on files that have not changed) and determines which output files are
 	new/modified and thus contain data that would need to be inserted into the
 	database.
-
 	@param data_raw_path: the path, relative or absolute, to the folder containing
 	                      raw CSV data from ExPORTER
 	@param data_neo4j_path: the path, relative or absolute, to the folder containing
@@ -522,6 +580,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	print("Reading raw data from", raw_path, "and outputting processed data to", neo4j_path)
 	folders_to_create = [
 			"abstracts",
+			"disease",
 			"annotation_files",
 			"annotation_source",
 			"annotation_umls",
@@ -538,6 +597,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	# not already exist.
 	repo = None
 	is_new_repo = False
+	'''
 	try:
 		files = os.listdir(neo4j_path)
 		files.remove(".git")
@@ -557,15 +617,19 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 		is_new_repo = True
 
 	print("Creating empty output directories")
-
+	'''
 	# add empty folders for the generated files
 	add_folder = lambda folder_name: os.mkdir(data_neo4j(folder_name))
 	for folder in folders_to_create:
+		if os.path.exists(data_neo4j(folder)):
+			continue
 		add_folder(folder)
 
 	##############################################
 	# Run preprocessing stages one after another.#
 	##############################################
+	print('Running get_disease_data')
+	get_disease_data()
 	print("Running get_RD_project_ids")
 	get_RD_project_ids()
 	print("Running merge_project_funding")
@@ -591,9 +655,11 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 
 	# The below stages are extremely slow, so we will only run them for
 	# years that have changed data.
+	'''
 	years_to_annotate = {k[-8:-4] for k,v in repo.status().items()
 											 if (k.startswith("abstracts/") or k.startswith("projects/"))
 											 and v in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_WT_NEW]}
+	'''	
 	print("Running annotation_preprocess_grant")
 	annotation_preprocess_grant()
 	print("Running annotate_grant_abstracts")
@@ -604,14 +670,15 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	clean_annotation_source()
 	print("Running map_semantic_types")
 	map_semantic_types()
-
+	
 	print("Running fix_escaped_endings")
-	fix_escaped_endings()
-
+	#fix_escaped_endings()
+	
 	################################################
 
 	# Finished running stages, now we figure out which files have changed
 	# (and store them in a FilesToAdd object to be returned) and commit the changes
+	'''
 	print("Getting current repo status")
 	status = repo.status().items()
 	fta = {}
@@ -636,6 +703,12 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	message = "regular update commit"
 	tree = index.write_tree()
 	repo.create_commit(ref, author, committer, message, tree, parents)
+	'''
+
+	fta = {}
+
+	for subdir in FilesToAdd.__dict__['__annotations__'].keys():
+		fta[subdir] = ['file:///'+data_neo4j(subdir)+'/'+d for d in os.listdir(data_neo4j(subdir))]
 
 	return fta
 

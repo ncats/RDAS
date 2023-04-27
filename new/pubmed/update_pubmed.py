@@ -769,6 +769,40 @@ def retrieve_articles(db, last_update):
   save_disease_articles(db, last_update, today)
   save_omim_articles(db, last_update, today)
 
+def retrieve_specific_article(pmid):
+  url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/epost.fcgi?db=pubmed&id={pmid}&retmode=json&retmax=10000"
+  response = requests.post(url).json()
+  return response
+ 
+
+def update_missing_abstracts(db, today):
+  print('Searching for missing abstracts of articles with missing abstract')
+  today = datetime.strptime(today, "%Y/%m/%d")
+  maxsearchdate = today - relativedelta(years=1)
+  
+  query = 'MATCH (x:Article) WHERE x.abstractText = \"\" RETURN x.pubmed_id, x.firstPublicationDate, x.title, ID(x)'
+  response = db.run(query).data()
+  for res in response:
+    pmid = res['x.pubmed_id']
+    title = res['x.title']
+    pubdate = datetime.strptime(res['x.firstPublicationDate'], "%Y-%m-%d")
+    article_node = res['ID(x)']
+
+    if pubdate < maxsearchdate:
+      continue
+
+    article = fetch_abstracts([pmid])[0]['resultList']['result'][0]
+    if 'abstractText' in article:
+      print(f'New Abstract Found for Article: {pmid}')
+      new_abstract = article['abstractText']
+      query = f"MATCH (x:Article) WHERE ID(x) = {article_node} SET x.abstractText = \"{new_abstract}\" RETURN true"
+      db.run(query)
+
+      abstractDataRel = {'abstractText': new_abstract,'title': title}
+      create_epidemiology(db, abstractDataRel, article_node)
+  
+
+
 def main(db, update=False):
   '''
   Routes script to either create database from scratch or update. Articles are retrieved from 50 years prior to the current date if creating from scratch, or
@@ -777,6 +811,7 @@ def main(db, update=False):
   if update == True:
     last_update = db.getConf('DATABASE','pubmed_update')
     last_update = datetime.strptime(last_update, "%m/%d/%y")
+    update_missing_abstracts(db,today)
   else:
     last_update = datetime.strptime(today, "%Y/%m/%d") - relativedelta(years=50)
 

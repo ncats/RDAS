@@ -61,12 +61,7 @@ steps: list = [
 			ASSERT a.name IS UNIQUE
 			""",
 		"query":
-			"""
-			MERGE (a:Agent {name: data.IC_NAME})
-			WITH a, data
-			MATCH (c:CoreProject {core_project_num: data.CORE_PROJECT_NUM})
-			MERGE (a)<-[:FUNDED_BY]-(c)
-			"""
+			"WITH data WHERE data.IC_NAME IS NOT NULL MERGE (a:Agent {name: data.IC_NAME}) WITH a,data MATCH (c:CoreProject {core_project_num: data.CORE_PROJECT_NUM}) MERGE (a)<-[:FUNDED_BY]-(c)"
 	},
 
 	# Similar thing, but now with ClinicalStudies nodes.
@@ -135,7 +130,6 @@ steps: list = [
 		"query":
 			"""
 			MERGE (n:Publication {
-				country: data.COUNTRY,
 				language: data.LANG,
 				pmid: toInteger(data.PMID),
 				date: data.PUB_DATE})
@@ -253,26 +247,28 @@ steps: list = [
 			"""
 	},
 
+	
 	# Similar to how we handled Journal and Publication nodes, for DiseaseCategory
 	# and Disease nodes, we'll start from the outside and work our way in, first
 	# adding all the DiseaseCategory nodes. As of now the only DiseaseCategory
 	# is TBD, but TODO I'm assuming by the column name "CATEGORIES" that it
 	# can actually be a list of categories on each row, delimited by ; (can of
 	# course be changed).
-	{
-		"description": "Adding DiseaseCategory nodes",
-		"data_folder": "disease",
-		"constraint":
-			"""
-			CREATE CONSTRAINT unique_disease_category IF NOT EXISTS ON (d:DiseaseCategory)
-			ASSERT d.name IS UNIQUE
-			""",
-		"query":
-			"""
-			UNWIND split(data.CATEGORIES, ';') AS c
-			MERGE (:DiseaseCategory {name: c})
-			"""
-	},
+	#{
+	#	"description": "Adding DiseaseCategory nodes",
+	#	"data_folder": "disease",
+	#	"constraint":
+	#		"""
+	#		CREATE CONSTRAINT unique_disease_category IF NOT EXISTS ON (d:DiseaseCategory)
+	#		ASSERT d.name IS UNIQUE
+	#		""",
+	#	"query":
+	#		"""
+	#		UNWIND split(data.CATEGORIES, ';') AS c
+	#		MERGE (:DiseaseCategory {name: c})
+	#		"""
+	#},
+	
 
 	# Add Disease nodes and connect to associated DiseaseCategory nodes as well as
 	# back to the Project node.
@@ -282,21 +278,16 @@ steps: list = [
 		"data_folder": "disease",
 		"query":
 			"""
-			WITH [x in split(substring(data.SYNONYMS, 2, size(data.SYNONYMS) - 4), "', '")
-				WHERE size(x) > 0 | x] as snns, data
 			MERGE (d:Disease {
 				name: data.NAME,
-				gard_id: data.GARD_ID,
-				is_rare: data.IS_RARE = 'TRUE'})
+				gard_id: data.GARD_ID})
 				ON CREATE SET
-					d.synonyms = snns
+					d.synonyms = apoc.text.split(apoc.text.replace(apoc.text.replace(data.SYNONYMS,"[\[\]]+",""),"[']+",""),", ")
 				ON MATCH SET
-					d.synonyms = snns
+					d.synonyms = apoc.text.split(apoc.text.replace(apoc.text.replace(data.SYNONYMS,"[\[\]]+",""),"[']+",""),", ")
 			WITH d, data
-			UNWIND split(data.CATEGORIES, ';') AS x
-			MATCH (c:DiseaseCategory {name: x})
 			MATCH (r:Project {application_id: toInteger(data.APPLICATION_ID)})
-			MERGE (r)<-[:RESEARCHED_BY]-(d)-[:IN_CLASS]->(c)
+			MERGE (r)<-[:RESEARCHED_BY]-(d)
 			"""
 	},
 

@@ -139,11 +139,16 @@ def nctid_list(name_list):
     # check total number of trials
     all_trials = list()
     for name in name_list:
-        initial_query = 'https://clinicaltrials.gov/api/query/study_fields?expr=%22'
-        initial_query += name.replace(' ', '+') + '%22&fields=NCTId&min_rnk=1&max_rnk=1000&fmt=csv'
+        name = name.replace('"','\"')
+        initial_query = 'https://clinicaltrials.gov/api/query/study_fields?expr=AREA[BriefTitle] AREA[BriefSummary] AREA[Condition] AREA[OfficialTitle] AREA[DetailedDescription]\"'
+        initial_query += name + '\"&fields=NCTId&min_rnk=1&max_rnk=1000&fmt=csv'
+        print(initial_query)
         initial_response = requests.get(initial_query).text.splitlines()
-        total_trials = int(initial_response[4][16:-1])
-        
+        try:
+            total_trials = int(initial_response[4][16:-1])
+        except (IndexError,ValueError) as e:
+            print(initial_response)
+            continue
         # add trials to list
         trials = list()
         for trial in initial_response[11:]:

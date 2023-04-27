@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 import sys
 workspace = os.path.dirname(os.path.abspath(__file__))
@@ -93,12 +94,7 @@ def create_disease_node(db, data, xrefs): # Include xrefs into GARD node instead
 
     # Turn synonyms into a python list
     else:
-        data[6] = data[6].replace('\'','\\\'')
-        data[6] = data[6].replace(',','\',\'')
-        data[6] = data[6].replace('[','[\'')
-        data[6] = data[6].replace(']','\']')
-        data[6] = literal_eval(data[6])
-        data[6] = [ele.strip() for ele in data[6]]
+        data[6] = data[6].split('|')
 
     # Remove brackets from DisorderType
     data[4] = data[4].replace('[','')
