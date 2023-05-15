@@ -99,7 +99,7 @@ def run_normmap():
 	absmap._match('/RePORTER_PRJABS_C_FY_ALL.csv', 'ncats_disease_list.json',IDcol='APPLICATION_ID',TEXTcols=['ABSTRACT_TEXT'])
 
 def get_RD_project_ids():
-	run_normmap()
+	#run_normmap()
 	aggregate_disease_data()
 	apps = pd.read_csv(data_raw("normmap_results.csv"), usecols=["ID"])
 	apps = apps.drop_duplicates()
@@ -629,29 +629,29 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	# Run preprocessing stages one after another.#
 	##############################################
 	print('Running get_disease_data')
-	get_disease_data()
+	#get_disease_data()
 	print("Running get_RD_project_ids")
-	get_RD_project_ids()
+	#get_RD_project_ids()
 	print("Running merge_project_funding")
-	merge_project_funding()
+	#merge_project_funding()
 	print("Running select_RD_projects")
-	select_RD_projects()
+	#select_RD_projects()
 	print("Running cleanup_project_IC_NAME_totalcost")
-	cleanup_project_IC_NAME_totalcost()
+	#cleanup_project_IC_NAME_totalcost()
 	print("Running find_RD_core_projects")
-	find_RD_core_projects()
+	#find_RD_core_projects()
 	print("Running select_RD_patents")
-	select_RD_patents()
+	#select_RD_patents()
 	print("Running select_RD_clinical_studies")
-	select_RD_clinical_studies()
+	#select_RD_clinical_studies()
 	print("Running select_RD_link_tables")
-	select_RD_link_tables()
+	#select_RD_link_tables()
 	print("Running select_RD_publications")
-	select_RD_publications()
+	#select_RD_publications()
 	print("Running cleanup_pub_country")
-	cleanup_pub_country()
+	#cleanup_pub_country()
 	print("Running select_RD_abstracts")
-	select_RD_abstracts()
+	#select_RD_abstracts()
 
 	# The below stages are extremely slow, so we will only run them for
 	# years that have changed data.
@@ -661,15 +661,15 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 											 and v in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_WT_NEW]}
 	'''	
 	print("Running annotation_preprocess_grant")
-	annotation_preprocess_grant()
+	#annotation_preprocess_grant()
 	print("Running annotate_grant_abstracts")
-	annotate_grant_abstracts()
+	#annotate_grant_abstracts()
 	print("Running clean_umls_concepts")
-	clean_umls_concepts()
+	#clean_umls_concepts()
 	print("Running clean_annotation_source")
-	clean_annotation_source()
+	#clean_annotation_source()
 	print("Running map_semantic_types")
-	map_semantic_types()
+	#map_semantic_types()
 	
 	print("Running fix_escaped_endings")
 	#fix_escaped_endings()
@@ -709,7 +709,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 
 	for subdir in FilesToAdd.__dict__['__annotations__'].keys():
 		fta[subdir] = ['file:///'+data_neo4j(subdir)+'/'+d for d in os.listdir(data_neo4j(subdir))]
-
+		print(fta)
 	return fta
 
 

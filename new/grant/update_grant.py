@@ -44,6 +44,6 @@ def main(db: AlertCypher):
 	fta = prep_data("alert/new/grant/raw", "alert/new/grant/processed")
 
 	# run database upgrade steps on only new/modified files
-	for step in steps[10:]:
+	for step in steps[9:]:
 		print("\n\n" + step["description"] + "...")
 		step_to_fn(**step)(db, fta)

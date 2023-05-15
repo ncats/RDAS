@@ -1,5 +1,9 @@
 import os
+import re
 import sys
+import spacy
+from spacy.matcher import Matcher
+import requests
 workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
 import load_neo4j_functions, data_model
@@ -13,6 +17,114 @@ import threading
 import pandas as pd
 lock = threading.Lock()
 from firestore_base.ses_firebase import trigger_email
+
+def condition_map(db):
+    remove_words = ['and','or','of','the','and/or']
+
+    nlp = spacy.load('en_core_web_lg')
+    conditions = db.run('MATCH (x:Condition) RETURN x.Condition, ID(x)')
+    diseases = db.run('MATCH (x:GARD) RETURN x.GARDId, x.GARDName')
+    cond_docs = dict()
+    disease_docs = dict()
+    
+    for cond in conditions:
+        cond_id = cond['ID(x)']
+        cond_name = cond['x.Condition']
+        doc = nlp(cond_name)
+        tokens = [i.text.lower() for i in doc if not i.is_punct and i.text.lower() not in remove_words]
+        cond_docs[cond_id] = tokens
+    
+    for disease in diseases:
+        gard_id = disease['x.GARDId']
+        name = disease['x.GARDName']
+        doc = nlp(name)
+        tokens = [i.text.lower() for i in doc if not i.is_punct and i.text.lower() not in remove_words]
+        disease_docs[gard_id] = tokens
+    
+    for k,v in disease_docs.items():
+        for k2,v2 in cond_docs.items():
+            check = all(item in v2 for item in v)
+            if check:
+                db.run('MATCH (x:GARD) WHERE x.GARDId = \"{gard_id}\" MATCH (z:Condition) WHERE ID(z) = {cond_id} MERGE (x)<-[:mapped_to_gard]-(z) RETURN TRUE'.format(cond_id=k2,gard_id=k))
+
+def drug_normalize(drug):
+    print(drug)
+    new_val = drug.encode("ascii", "ignore")
+    updated_str = new_val.decode()
+    updated_str = re.sub('\W+',' ', updated_str)
+    print(updated_str)
+    return updated_str
+
+def create_drug_connection(db,rxdata,drug_id):
+    rxnormid = rxdata['RxNormID']
+    db.run('MATCH (x:Intervention) WHERE ID(x)={drug_id} MERGE (y:Drug {{RxNormID:{rxnormid}}}) MERGE (y)<-[:has_participant]-(x)'.format(rxnormid=rxnormid, drug_id=drug_id))
+
+    for k,v in rxdata.items():
+        key = k.replace(' ','')
+        db.run('MERGE (y:Drug {{RxNormID:{rxnormid}}}) WITH y MATCH (x:Intervention) WHERE ID(x)={drug_id} MERGE (y)<-[:has_participant]-(x) SET y.{key} = {value}'.format(rxnormid=rxdata['RxNormID'], drug_id=drug_id, key=key, value=v))
+
+
+def get_rxnorm_data(drug):
+    rq = 'https://rxnav.nlm.nih.gov/REST/rxcui.json?name={drug}&search=2'.format(drug=drug)
+    response = requests.get(rq)
+    try:
+        rxdata = dict()
+        response = response.json()['idGroup']['rxnormId'][0]
+        rxdata['RxNormID'] = response
+
+        rq2 = 'https://rxnav.nlm.nih.gov/REST/rxcui/{rxnormid}/allProperties.json?prop=codes+attributes+names+sources'.format(rxnormid=response)
+        response = requests.get(rq2)
+        response = response.json()['propConceptGroup']['propConcept']
+
+        for r in response:
+            if r['propName'] in rxdata:
+                rxdata[r['propName']].append(r['propValue'])
+            else:
+                rxdata[r['propName']] = [r['propValue']]
+
+        return rxdata
+
+    except KeyError as e:
+        return
+    except ValueError as e:
+        print('ERROR')
+        print(drug)
+        return
+
+
+def nlp_to_drug(db,doc,matches,drug_name,drug_id):
+    for match_id, start, end in matches:
+        span = doc[start:end].text
+        rxdata = get_rxnorm_data(span.replace(' ','+'))
+            
+        if rxdata:
+            create_drug_connection(db,rxdata,drug_id)
+        else:
+            print('Map to RxNorm failed for intervention name: {drug_name}'.format(drug_name=drug_name))
+
+def rxnorm_map(db):
+    print('Starting RxNorm data mapping to Drug Interventions')
+    nlp = spacy.load('en_ner_bc5cdr_md')
+    pattern = [{'ENT_TYPE':'CHEMICAL'}]
+    matcher = Matcher(nlp.vocab)
+    matcher.add('DRUG',[pattern])
+
+    results = db.run('MATCH (x:Intervention) WHERE x.InterventionType = "Drug" RETURN x.InterventionName, ID(x)')
+
+    for idx,res in enumerate(results.data()):
+        print(idx)
+        drug_id = res['ID(x)']
+        drug = res['x.InterventionName']
+        drug = drug_normalize(drug)
+        drug_url = drug.replace(' ','+')
+        rxdata = get_rxnorm_data(drug_url)
+
+        if rxdata:
+            create_drug_connection(db, rxdata, drug_id)
+        else:
+            doc = nlp(drug)
+            matches = matcher(doc)
+            nlp_to_drug(db,doc,matches,drug,drug_id)
 
 def remove_dupes(db):
     '''
@@ -125,6 +237,8 @@ def add_trial(db, trials, GARDId):
                     print(e)
 
 def main(db, update=False):
+    condition_map(db)
+    exit()
     if update:
       print('CLINICAL TRIAL DB UPDATING...')
     else:
@@ -164,7 +278,9 @@ def main(db, update=False):
     print('Finishing up Clinical Trial Database Update...')
     lock.release()
     
-    remove_dupes(db) 
+    remove_dupes(db)
+    rxnorm_map(db) 
+    condition_map(db)
     
     if update:
         trigger_email(db, "clinical")
