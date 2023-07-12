@@ -13,3 +13,12 @@
 
 # End of https://www.gitignore.io/api/visualstudiocode
 personal-config.ini
+
+clinical/src/full_trial_data/
+clinical/src/chromedriver
+clinical/src/ctgov_nctids.json
+clinical/src/ctgov_webscraped_names.csv
+clinical/src/all_queries/
+pubmed/src/
+gard/src/
+grant/src/
