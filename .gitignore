@@ -22,3 +22,8 @@ clinical/src/all_queries/
 pubmed/src/
 gard/src/
 grant/src/
+__pycache__/
+clinical/__pycache__/
+pubmed/__pycache__/
+gard/__pycache__/
+grant/__pycache__/
