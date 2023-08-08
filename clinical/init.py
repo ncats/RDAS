@@ -16,23 +16,16 @@ cores = multiprocessing.cpu_count()
 now = date.today()
 now = now.strftime("%m/%d/%y")
 
-
 def generate_queries_populate(db, pnum, file_batch):
     for idx,filename in enumerate(file_batch):
         print(f'[{pnum}] ' + str(idx) + f' Disease Query Files Generated [{filename}]')
         with open(f'{sysvars.ct_files_path}full_trial_data/{filename}', 'r') as json_file:
-            #queries = list()
             full_data = json.load(json_file)
             num_trials = len(full_data)
 
             for trial_data in full_data:
                 for node_type in dm.node_names:
                     trial_string = rdas.format_node_data(db, trial_data, node_type)
-                    #queries.extend(trial_string)
-
-            #queries = pd.DataFrame(queries)
-            #filename = filename.replace('.json','')
-            #queries.to_csv(f'{sysvars.ct_files_path}all_queries/{filename}.csv',index=False)
 
 def gather_full_data(pnum, ctgov_nctids):
   total_diseases = len(ctgov_nctids)

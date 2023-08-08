@@ -19,6 +19,9 @@ clinical/src/chromedriver
 clinical/src/ctgov_nctids.json
 clinical/src/ctgov_webscraped_names.csv
 clinical/src/all_queries/
+clinical/src/metamap_cond.txt
+clinical/src/metamap_gard.txt
+clinical/src/metamap_cond_out.json
 pubmed/src/
 gard/src/
 grant/src/

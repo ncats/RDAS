@@ -93,12 +93,12 @@ def create_disease_node(db, data, xrefs): # Include xrefs into GARD node instead
     if type(data[6]) == float:
         data[6] = []
     else:
-        print(data[6])
         data[6] = data[6].split('|')
         data[6] = [term.replace(',',';') for term in data[6]]
-        print(data[6])
 
     if type(data[4]) == float:
+        data[4] = []
+    else:
         data[4] = data[4].split('|')
 
     results = xrefs.loc[xrefs['GardID'] == data[0]]
@@ -129,7 +129,7 @@ def create_disease_node(db, data, xrefs): # Include xrefs into GARD node instead
     db.run(query, args=params).single().value()
 
 
-def retrieve_gard_data(db):
+def retrieve_gard_data():
     '''
     Retrieves GARD disease files from Palantir workspace
     '''
@@ -155,26 +155,30 @@ def add_genes(db, data):
     d.GeneTitle = $gene_title,
     d.GeneType = $gene_type,
     d.Locus = $locus,
-    d.AssociationType = $assoc_type,
-    d.AssociationStatus = $assoc_status,
-    d.AssociationSource = $assoc_source,
     d.OMIM = $omim,
     d.Ensembl = $ensembl,
     d.IUPHAR = $iuphar,
     d.Swissprot = $swissprot,
     d.Reactome = $reactome
-    MERGE (g)-[:associated_with_gene]->(d)
+    MERGE (g)-[r:associated_with_gene]->(d)
+    ON CREATE SET
+    r.AssociationType = $assoc_type,
+    r.AssociationStatus = $assoc_status,
+    r.Reference = $reference
     RETURN TRUE
     '''
-
+    
     try:
-        data['GeneSynonym'] = data['GeneSynonym'].split(';')
+        data['GeneSynonym'] = data['GeneSynonym'].strip('][').split(', ')
     except Exception as e:
+        print(e)
         pass
 
     try:
-        data['AssociationSource'] = data['AssociationSource'].replace('[PMID]','').split('_')
+        data['Reference'] = data['Reference'].strip('][').split(', ')
+    
     except Exception as e:
+        print(e)
         pass
 
     params = {
@@ -187,7 +191,7 @@ def add_genes(db, data):
     "locus":data['Locus'] if not type(data['Locus']) == float else None,
     "assoc_type":data['AssociationType'] if not type(data['AssociationType']) == float else None,
     "assoc_status":data['AssociationStatus'] if not type(data['AssociationStatus']) == float  else None,
-    "assoc_source":data['AssociationSource'] if not type(data['AssociationSource']) == float else None,
+    "reference":data['Reference'] if not type(data['Reference']) == float else None,
     "omim":data['OMIM'] if not type(data['OMIM']) == float else None,
     "ensembl":data['Ensembl'] if not type(data['Ensembl']) == float else None,
     "iuphar":data['IUPHAR'] if not type(data['IUPHAR']) == float else None,
@@ -204,21 +208,23 @@ def add_phenotypes(db, data):
     MERGE (d:Phenotype {HPOId:$HPOId})
     ON CREATE SET
     d.HPOTerm = $hpo_term,
-    d.HPOFrequency = $hpo_freq,
-    d.Evidence = $evidence,
     d.Sex = $sex,
     d.Onset = $onset,
     d.Modifier = $mod,
-    d.Source = $source,
-    d.Online = $online,
-    d.ValidationStatus = $validation_status
-    MERGE (g)-[:has_phenotype]->(d)
+    d.Online = $online
+    MERGE (g)-[r:has_phenotype]->(d)
+    ON CREATE SET
+    r.ValidationStatus = $validation_status,
+    r.HPOFrequency = $hpo_freq,
+    r.Evidence = $evidence,
+    r.Reference = $reference
     RETURN TRUE
     '''
 
     try:
-        data['Reference'] = data['Reference'].split('_')
+        data['Reference'] = data['Reference'].strip('][').split(', ')
     except Exception as e:
+        print(e)
         pass
 
     try:
@@ -267,36 +273,41 @@ def generate(db, data):
     '''
     Loops through all GARD diseases and creates all the nodes and relationships
     '''
-    print("Building new GARD connections")
+    
+    print("Building new GARD nodes")
     # Erase database so it can be recreated
     db.run('MATCH ()-[r]-() DELETE r')
     db.run('MATCH (n) DELETE n')
-
+    
     gard = data['gard']
     classification = data['classification']
+    
     r,c = gard.shape
     for i in range(r):
         row = gard.iloc[i]
         row = row.to_list()
         create_disease_node(db, row, data['xrefs'])
 
+    print('Building GARD relationships')
     r,c = classification.shape
     for i in range(r):
         row = classification.iloc[i]
         row = row.to_dict()
         create_relationship(db, row)
     
+    print('Building Gene data')
     genes = data['genes']
     r,c = genes.shape
     for i in range(r):
         row = genes.iloc[i]
         row = row.to_dict()
         add_genes(db, row)
-
+    
+    print('Building Phenotype data')
     phenotypes = data['phenotypes']
     r,c = phenotypes.shape
     for i in range(r):
         row = phenotypes.iloc[i]
         row = row.to_dict()
         add_phenotypes(db, row)
-
+    

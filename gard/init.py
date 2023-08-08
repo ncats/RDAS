@@ -5,7 +5,7 @@ from AlertCypher import AlertCypher
 
 def main():
     db = AlertCypher('gard')
-    rdas.retrieve_gard_data(db)
+    rdas.retrieve_gard_data()
     gard = pd.read_csv(f'{sysvars.gard_files_path}GARD.csv', index_col=False)
     classification = pd.read_csv(f'{sysvars.gard_files_path}GARD_classification.csv', index_col=False)
     xrefs = pd.read_csv(f'{sysvars.gard_files_path}GARD_xrefs.csv', index_col=False)

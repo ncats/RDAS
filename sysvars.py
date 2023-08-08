@@ -1,5 +1,5 @@
 current_user = 'leadmandj'
-base_directory_name = 'alert_remake'
+base_directory_name = 'github/alert'
 base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 
 ct_files_path = '{base_path}/clinical/src/'.format(base_path=base_path)

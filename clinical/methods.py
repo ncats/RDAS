@@ -1,7 +1,14 @@
+from skr_web_api import Submission, METAMAP_INTERACTIVE_URL
 from src import data_model as dm
+import json
+import os
+import sysvars
+workspace = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(workspace)
 import requests
 import html
 import re
+from unidecode import unidecode
 from datetime import date
 from AlertCypher import AlertCypher
 from selenium import webdriver
@@ -9,7 +16,11 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
 import spacy
+import nltk
+from nltk.stem import PorterStemmer
+nltk.download("punkt")
 from spacy.matcher import Matcher
+from fuzzywuzzy import fuzz
 
 def webscrape_ctgov_diseases():
     url = 'https://clinicaltrials.gov/ct2/search/browse?brwse=ord_alpha_all'
@@ -190,60 +201,113 @@ def format_node_data(db,now,trial,node_type,return_single=None):
             queries.append(query)
     return queries
 
+def is_acronym(word):
+    if len(word.split(' ')) > 1:
+        return False
+    elif bool(re.match(r'\w*[A-Z]\w*', word[:len(word)-1])) and (word[len(word)-1].isupper() or word[len(word)-1].isnumeric()):
+        return True
+    else:
+        return False
+
+def get_unmapped_conditions(db):
+    conditions = db.run('MATCH (x:Condition) where not (x)-[:mapped_to_gard]-(:GARD) RETURN x.Condition, ID(x)').data()
+    return conditions
+
+#GATHER DATA FROM A LIST OF METAMAP MAPPINGS FOR A DISEASE AND FILTER MAPPING TO SINGLE RESULT USING TEXT SIMILARITY ALGORITHMS
+def filter_mappings(mappings,cond_name):
+    map_details = dict()
+    for idx,mapping in enumerate(mappings):
+        meta_score = int(mapping['MappingScore'].replace('-',''))
+        candidates = mapping['MappingCandidates'][0]
+        CUI = candidates['CandidateCUI']
+        candidate_pref = candidates['CandidatePreferred']
+        candidate_match = candidates['CandidateMatched']
+        fuzz_score_cond_pref = fuzz.token_sort_ratio(cond_name, candidate_pref)
+
+        map_details[idx] = {'meta_score':meta_score,'fuzz_score_cond_pref':fuzz_score_cond_pref,'CUI':CUI,'candidate_pref':candidate_pref,'candidate_match':candidate_match}
+
+    map_details = {k:v for (k,v) in map_details.items() if v['meta_score'] > 750}
+    if len(map_details) > 0:
+        max_cond_pref = max(map_details, key= lambda x: map_details[x]['fuzz_score_cond_pref'])
+        return map_details[max_cond_pref]['CUI']
+
+#CONVERT ACCENTED CHARACTERS TO THEIR ENGLISH EQUIVILANTS AND REMOVE TRAILING WHITESPACE
+def normalize(phrase):
+    phrase = unidecode(phrase)
+    phrase = re.sub(r'\W+', ' ', phrase)
+    return phrase
+
 def condition_map(db):
-    remove_words = ['and','or','of','the','and/or','with','to','for','in','this','is','due']
-    pos_remove = ['CCONJ','PUNCT','DET','CONJ','PART','ADP']    
-
+    #SETUP DATABASE OBJECTS
     gard_db = AlertCypher('gard')
-    nlp = spacy.load('en_core_web_lg')
-    conditions = db.run('MATCH (x:Condition) RETURN x.Condition, ID(x)').data()
-    diseases = gard_db.run('MATCH (x:GARD) RETURN x.GardId, x.GardName, x.Synonyms').data()
-    cond_docs = dict()
-    disease_docs = dict()
+    
+    #SETUP METAMAP INSTANCE
+    INSTANCE = Submission(os.environ['METAMAP_EMAIL'],os.environ['METAMAP_KEY'])
+    INSTANCE.init_generic_batch('metamap','-J acab,anab,comd,cgab,dsyn,emod,fndg,inpo,mobd,neop,patf,sosy --JSONn') #--sldiID
+    INSTANCE.form['SingLinePMID'] = True
+    
+    #POPULATE CLINICAL DB WITH GARD DATA WITH UMLS MAPPINGS FROM GARD NEO4J DB
+    gard_res = gard_db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.GardName as GardName, x.Synonyms as Synonyms, x.UMLS as gUMLS')
+    for gres in gard_res.data():
+        gUMLS = gres['gUMLS']
+        name = gres['GardName']
+        gard_id = gres['GardId']
+        syns = gres['Synonyms']
+    
+    if gUMLS:
+        db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns},UMLS:{gUMLS}}})'.format(name=gres['GardName'],gard_id=gres['GardId'],syns=gres['Synonyms'],gUMLS=gres['gUMLS']))
+    else:
+        db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns}}})'.format(name=gres['GardName'],gard_id=gres['GardId'],syns=gres['Synonyms']))
+    
+    #RUN BATCH METAMAP ON ALL CONDITIONS IN CLINICAL DB
+    res = db.run('MATCH (c:Condition) RETURN c.Condition as condition, ID(c) as cond_id')
+    cond_strs = [f"{i['cond_id']}|{normalize(i['condition'])}\n" for i in res]
+    with open(f'{sysvars.ct_files_path}metamap_cond.txt','w') as f:
+        f.writelines(cond_strs)
+    
+    if not os.path.exists(f'{sysvars.ct_files_path}metamap_cond_out.json'):
+        INSTANCE.set_batch_file(f'{sysvars.ct_files_path}metamap_cond.txt') #metamap_cond.txt
+        response = INSTANCE.submit()
+        try:
+            data = response.content.decode().replace("\n"," ")
+            data = re.search(r"({.+})", data).group(0)
+    
+        except Exception as e:
+            print(e)
+            data = None
+    
+        try:
+            data = json.loads(data)
+            with open(f'{sysvars.ct_files_path}metamap_cond_out.json','w') as f:
+                json.dump(data,f)
+                data = data['AllDocuments']
+    
+        except Exception as e:
+            print(e)
+    
+    else:
+        with open(f'{sysvars.ct_files_path}metamap_cond_out.json','r') as f:
+            data = json.load(f)['AllDocuments']
+            print(data)
 
-    for disease in diseases:
-        gard_id = disease['x.GardId']
-        name = disease['x.GardName']
-        syns = disease['x.Synonyms']
-        db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns}}})'.format(gard_id=gard_id,name=name,syns=syns))
+    #PARSE OUT DATA FROM BATCH METAMAP AND FILTER MAPPINGS CANDIDATES TO ONE RESULT
+    for entry in data:
+        utterances = entry['Document']['Utterances'][0]
+        utt_text = utterances['UttText']
+        phrases = utterances['Phrases'][0]
+        mappings = phrases['Mappings']
+        cond_id = utterances['PMID']
+        CUI = filter_mappings(mappings,utt_text)
+        if CUI:
+            db.run('MATCH (x:Condition) WHERE ID(x) = {cond_id} SET x.UMLS = \"{CUI}\"'.format(CUI=CUI,cond_id=cond_id))
 
-    for cond in conditions:
-        cond_id = cond['ID(x)']
-        cond_name = cond['x.Condition']
-        doc = nlp(cond_name)
-        #print(doc)
-        tokens = [i.text.lower() for i in doc if not i.is_punct and i.text not in remove_words] #if not i.is_punct and i.text not in remove_words
-        cond_docs[cond_id] = tokens
-        #print(cond_docs[cond_id])
-
-    for disease in diseases:
-        all_tokens = list()
-        gard_id = disease['x.GardId']
-        name = disease['x.GardName']
-        syns = disease['x.Synonyms']
-        syns.insert(0,name)
-        
-        for phrase in syns:
-            doc = nlp(name)
-            tokens = [i.text.lower() for i in doc if not i.is_punct and i.text not in remove_words] # if not i.is_punct not in remove_words
-            all_tokens.append(tokens)
-
-        disease_docs[gard_id] = all_tokens
-        #print(disease_docs[gard_id])
-        
-
-    for idx, (k,v) in enumerate(disease_docs.items()):
-        for tokens in v:
-            for k2,v2 in cond_docs.items():
-                check = all(item in v2 for item in tokens)
-                if check:
-                    query = 'MATCH (x:GARD) WHERE x.GardId = \"{gard_id}\" MATCH (z:Condition) WHERE ID(z) = {cond_id} MERGE (x)<-[:mapped_to_gard]-(z) RETURN TRUE'.format(cond_id=k2,gard_id=k)
-                    db.run(query)
-                    print(query)
-                    print(tokens)
-                    print(v2)
-                    print(f'{k} mapped to {k2}')
-        print(f'{idx} GARD Processed')
+    #CREATE RELATIONSHIPS BETWEEN CONDITION AND GARD BASED ON UMLS CODES MAPPED
+    res = db.run('MATCH (x:Condition) RETURN x.UMLS AS UMLS,ID(x) as cond_id')
+    cond_dict = {i['UMLS']:i['cond_id'] for i in res}
+    print('APPLYING MAPPINGS TO DATABASE')
+    for idx,(umls,cond_id) in enumerate(cond_dict.items()):
+        print(idx,cond_id,umls)
+        db.run('MATCH (x:GARD) WHERE \"{umls}\" IN x.UMLS MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (y)-[:mapped_to_gard]->(x)'.format(umls=umls,cond_id=cond_id))
 
 def drug_normalize(drug):
     print(drug)
