@@ -405,11 +405,9 @@ def condition_map(db):
 
 
 def drug_normalize(drug):
-    print(drug)
     new_val = drug.encode("ascii", "ignore")
     updated_str = new_val.decode()
     updated_str = re.sub('\W+',' ', updated_str)
-    print(updated_str)
     return updated_str
 
 def create_drug_connection(db,rxdata,drug_id,wspacy=False):
@@ -448,18 +446,15 @@ def get_rxnorm_data(drug):
         return
 
 
-def nlp_to_drug(db,doc,matches,drug_name,drug_id,map_spacy): #TEMP map_spacy
+def nlp_to_drug(db,doc,matches,drug_name,drug_id):
     for match_id, start, end in matches:
         span = doc[start:end].text
         rxdata = get_rxnorm_data(span.replace(' ','+'))
 
         if rxdata:
             create_drug_connection(db,rxdata,drug_id,wspacy=True)
-            map_spacy += 1 #TEMP
-            print('spacy', span) #TEMP
         else:
             print('Map to RxNorm failed for intervention name: {drug_name}'.format(drug_name=drug_name))
-    return map_spacy #TEMP
 
 def rxnorm_map(db):
     print('Starting RxNorm data mapping to Drug Interventions')
@@ -470,17 +465,7 @@ def rxnorm_map(db):
 
     results = db.run('MATCH (x:Intervention) WHERE x.InterventionType = "Drug" RETURN x.InterventionName, ID(x)').data()
 
-    #TEMP
-    map_drugs = len(results)
-    map_spacy = 0
-    map_rxnorm = 0
-    #TEMP
-    print(map_drugs) #TEMP
     for idx,res in enumerate(results):
-        if idx < 73571:
-            continue
-        print()
-        print(idx)
         drug_id = res['ID(x)']
         drug = res['x.InterventionName']
         drug = drug_normalize(drug)
@@ -489,18 +474,9 @@ def rxnorm_map(db):
 
         if rxdata:
             create_drug_connection(db, rxdata, drug_id)
-            map_rxnorm += 1 #TEMP
-            print('rxnorm') #TEMP
             
         else:
             doc = nlp(drug)
             matches = matcher(doc)
-            add_match = nlp_to_drug(db,doc,matches,drug,drug_id,map_spacy)
-            if add_match: #TEMP
-                map_spacy += add_match #TEMP
-    #TEMP
-    print(map_rxnorm)
-    print(map_spacy)
-    print(map_rxnorm + map_spacy)
-    print(map_drugs)
-    
+            nlp_to_drug(db,doc,matches,drug,drug_id)
+ 
