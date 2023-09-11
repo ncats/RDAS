@@ -1,10 +1,12 @@
 from skr_web_api import Submission, METAMAP_INTERACTIVE_URL
-from src import data_model as dm
 import json
 import os
+import sys
 import sysvars
 workspace = os.path.dirname(os.path.abspath(__file__))
+print(workspace)
 sys.path.append(workspace)
+from src import data_model as dm
 import requests
 import html
 import re
@@ -71,7 +73,6 @@ def get_nctids(name_list):
 
             # add trials to list
             for trial in response[11:]:
-                print(trial)
                 trials.append(trial.split(',')[1][1:-1])
 
         all_trials += trials
@@ -109,16 +110,34 @@ def extract_fields(nctid):
     
     return full_trial
 
-def cypher_generate(db,now,NCTID,data,node_type,return_single=None):
+def cypher_generate(db,now,NCTID,data,node_type,update=None,return_single=None):
+    if update:
+        print(data)
+        print(NCTID)
+
+
     ID = None
     existing_node = list()
     pattern = '\'\w+\':'
     query = str()
+
+
     
+    # GENERATE RDAS SPECIFIC LABELS
     if node_type == 'ClinicalTrial':
-        data['DateCreatedRDAS'] = now
+        if not update:
+            data['DateCreatedRDAS'] = now
+        else:
+            prev_create = db.run('MATCH (x:ClinicalTrial) WHERE x.NCTId = \"{NCTID}\" RETURN x.DateCreatedRDAS as created'.format(NCTID=NCTID)).data()
+            prev_create = prev_create[0]['created']
+            print(prev_create)
+            
+            data['DateCreatedRDAS'] = prev_create
         data['LastUpdatedRDAS'] = now
 
+
+
+    #PARSES DATA STRING
     data_string = str(data)    
     matches = re.finditer(pattern,data_string)
     for match in matches:
@@ -126,24 +145,37 @@ def cypher_generate(db,now,NCTID,data,node_type,return_single=None):
         end = match.end() - 2
         data_string = data_string[:start] + ' ' + data_string[start+1:]
         data_string = data_string[:end] + ' ' + data_string[end+1:]
+
+
  
     if return_single:
         return data_string
+
+
 
     try: 
         existing_node = 'MATCH (x:{node_type} {data_string}) RETURN ID(x) AS ID LIMIT 1'.format(node_type=node_type,data_string=data_string)
         existing_node = db.run(existing_node).data()
     except (KeyError, IndexError) as e:
         print(f'ERROR: {e}')
+
+
     
     if len(existing_node) > 0:
         ID = existing_node[0]['ID']
 
+
+
     if not node_type == 'ClinicalTrial':
         query += 'MATCH (ct: ClinicalTrial {{NCTId:\'{NCTID}\'}}) '.format(NCTID=NCTID)
-
     else:
-        query += 'MERGE ({node_abbr}:{node_type} {data_string}) '.format(node_abbr=dm.abbreviations[node_type],node_type=node_type,data_string=data_string)
+        if update:
+            query += 'MATCH ({node_abbr}:{node_type} {{NCTId:\"{NCTID}\"}}) SET {node_abbr} = {data_string} '.format(node_abbr=dm.abbreviations[node_type],node_type=node_type,data_string=data_string,NCTID=NCTID)
+        else:
+            query += 'MERGE ({node_abbr}:{node_type} {data_string}) '.format(node_abbr=dm.abbreviations[node_type],node_type=node_type,data_string=data_string)
+
+
+
 
     if not node_type == 'ClinicalTrial':
         if ID:
@@ -151,11 +183,13 @@ def cypher_generate(db,now,NCTID,data,node_type,return_single=None):
         else:
             query += 'MERGE ({node_abbr}:{node_type} {data_string}) MERGE (ct){dir1}[:{rel_name}]{dir2}({node_abbr}) '.format(data_string=data_string,ID=ID,node_type=node_type,dir1=dm.rel_directions[node_type][0],dir2=dm.rel_directions[node_type][1],rel_name=dm.relationships[node_type],node_abbr=dm.abbreviations[node_type])
 
-    query += 'RETURN TRUE'
 
+
+
+    query += 'RETURN TRUE'
     return query
 
-def format_node_data(db,now,trial,node_type,return_single=None):
+def format_node_data(db,now,trial,node_type,update=None,return_single=None):
     data_collection = None
     node_data = dict()
     node_data_list = list()
@@ -171,9 +205,7 @@ def format_node_data(db,now,trial,node_type,return_single=None):
         
     if data_collection:
         if node_type == 'Condition':
-            for cond in data_collection:
-                node_data[node_type] = cond
-                node_data_list.append(node_data)
+            node_data_list = [{node_type:i} for i in data_collection]
         
         else:
             for node in data_collection:
@@ -196,9 +228,9 @@ def format_node_data(db,now,trial,node_type,return_single=None):
 
     for ele in node_data_list:
         if not ele == {}: 
-            query = cypher_generate(db, now, NCTID, ele, node_type)
+            query = cypher_generate(db, now, NCTID, ele, node_type,update=update)
+            print(NCTID, 'MODIFIED')
             db.run(query)
-            queries.append(query)
     return queries
 
 def is_acronym(word):
@@ -213,23 +245,31 @@ def get_unmapped_conditions(db):
     conditions = db.run('MATCH (x:Condition) where not (x)-[:mapped_to_gard]-(:GARD) RETURN x.Condition, ID(x)').data()
     return conditions
 
-#GATHER DATA FROM A LIST OF METAMAP MAPPINGS FOR A DISEASE AND FILTER MAPPING TO SINGLE RESULT USING TEXT SIMILARITY ALGORITHMS
+#GATHER DATA FROM A LIST OF METAMAP MAPPINGS FOR A DISEASE AND TEXT SIMILARITY ALGORITHM SCORES
 def filter_mappings(mappings,cond_name):
-    map_details = dict()
+    cui_details = list()
+    pref_details = list()
+    fuzz_details = list()
+    meta_details = list()
+    sem_details = list()
+
     for idx,mapping in enumerate(mappings):
-        meta_score = int(mapping['MappingScore'].replace('-',''))
+        meta_score = int(mapping['MappingScore'].replace('-','')) // 10
         candidates = mapping['MappingCandidates'][0]
         CUI = candidates['CandidateCUI']
+        sem_types = candidates['SemTypes']
         candidate_pref = candidates['CandidatePreferred']
-        candidate_match = candidates['CandidateMatched']
-        fuzz_score_cond_pref = fuzz.token_sort_ratio(cond_name, candidate_pref)
+        fuzz_score_cond_pref = int(fuzz.token_sort_ratio(cond_name, candidate_pref))
 
-        map_details[idx] = {'meta_score':meta_score,'fuzz_score_cond_pref':fuzz_score_cond_pref,'CUI':CUI,'candidate_pref':candidate_pref,'candidate_match':candidate_match}
+        cui_details.append(CUI)
+        sem_details.append(sem_types)
+        pref_details.append(candidate_pref)
+        fuzz_details.append(fuzz_score_cond_pref)
+        meta_details.append(meta_score)
 
-    map_details = {k:v for (k,v) in map_details.items() if v['meta_score'] > 750}
-    if len(map_details) > 0:
-        max_cond_pref = max(map_details, key= lambda x: map_details[x]['fuzz_score_cond_pref'])
-        return map_details[max_cond_pref]['CUI']
+    if len(cui_details) > 0:
+        return {'CUI':cui_details, 'SEM':sem_details, 'PREF':pref_details, 'FUZZ':fuzz_details, 'META':meta_details}
+
 
 #CONVERT ACCENTED CHARACTERS TO THEIR ENGLISH EQUIVILANTS AND REMOVE TRAILING WHITESPACE
 def normalize(phrase):
@@ -237,31 +277,50 @@ def normalize(phrase):
     phrase = re.sub(r'\W+', ' ', phrase)
     return phrase
 
+def umls_to_gard(db,CUI):
+    res = db.run('MATCH (x:GARD) WHERE \"{CUI}\" IN x.UMLS RETURN x.GardId as gard_id, x.GardName as name'.format(CUI=CUI)).data()
+    if res:
+        data = list()
+        names = list()
+        for i in res:
+            gard_id = i['gard_id']
+            gard_name = i['name']
+            data.extend([gard_id])
+            names.extend([gard_name])
+        return {'gard_id':data, 'gard_name':names}
+
 def condition_map(db):
+    print('RUNNING SETUP')
     #SETUP DATABASE OBJECTS
     gard_db = AlertCypher('gard')
     
     #SETUP METAMAP INSTANCE
     INSTANCE = Submission(os.environ['METAMAP_EMAIL'],os.environ['METAMAP_KEY'])
-    INSTANCE.init_generic_batch('metamap','-J acab,anab,comd,cgab,dsyn,emod,fndg,inpo,mobd,neop,patf,sosy --JSONn') #--sldiID
+    INSTANCE.init_generic_batch('metamap','-J acab,anab,comd,cgab,dsyn,fndg,emod,inpo,mobd,neop,patf,sosy --JSONn') #--sldiID
     INSTANCE.form['SingLinePMID'] = True
+
+
     
+    print('RUNNING GARD POPULATION')
     #POPULATE CLINICAL DB WITH GARD DATA WITH UMLS MAPPINGS FROM GARD NEO4J DB
-    gard_res = gard_db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.GardName as GardName, x.Synonyms as Synonyms, x.UMLS as gUMLS')
+    gard_res = gard_db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.GardName as GardName, x.Synonyms as Synonyms, x.UMLS as gUMLS, x.UMLS_Source as usource')
     for gres in gard_res.data():
         gUMLS = gres['gUMLS']
         name = gres['GardName']
         gard_id = gres['GardId']
         syns = gres['Synonyms']
     
-    if gUMLS:
-        db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns},UMLS:{gUMLS}}})'.format(name=gres['GardName'],gard_id=gres['GardId'],syns=gres['Synonyms'],gUMLS=gres['gUMLS']))
-    else:
-        db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns}}})'.format(name=gres['GardName'],gard_id=gres['GardId'],syns=gres['Synonyms']))
+        if gUMLS:
+            db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns},UMLS:{gUMLS},UMLS_Source:\"{usource}\"}})'.format(name=gres['GardName'],gard_id=gres['GardId'],syns=gres['Synonyms'],gUMLS=gres['gUMLS'],usource=gres['usource']))
+        else:
+            db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns},UMLS_Source:\"{usource}\"}})'.format(name=gres['GardName'],gard_id=gres['GardId'],syns=gres['Synonyms'],usource=gres['usource']))
+
+
     
+    print('RUNNING METAMAP')
     #RUN BATCH METAMAP ON ALL CONDITIONS IN CLINICAL DB
     res = db.run('MATCH (c:Condition) RETURN c.Condition as condition, ID(c) as cond_id')
-    cond_strs = [f"{i['cond_id']}|{normalize(i['condition'])}\n" for i in res]
+    cond_strs = [f"{i['cond_id']}|{normalize(i['condition'])}\n" for i in res if not is_acronym(i['condition'])]
     with open(f'{sysvars.ct_files_path}metamap_cond.txt','w') as f:
         f.writelines(cond_strs)
     
@@ -288,26 +347,62 @@ def condition_map(db):
     else:
         with open(f'{sysvars.ct_files_path}metamap_cond_out.json','r') as f:
             data = json.load(f)['AllDocuments']
-            print(data)
 
+
+    
+    print('PARSING OUT METAMAP FILTERS')
     #PARSE OUT DATA FROM BATCH METAMAP AND FILTER MAPPINGS CANDIDATES TO ONE RESULT
+    ALL_SEM = dict()
     for entry in data:
         utterances = entry['Document']['Utterances'][0]
         utt_text = utterances['UttText']
         phrases = utterances['Phrases'][0]
         mappings = phrases['Mappings']
         cond_id = utterances['PMID']
-        CUI = filter_mappings(mappings,utt_text)
-        if CUI:
-            db.run('MATCH (x:Condition) WHERE ID(x) = {cond_id} SET x.UMLS = \"{CUI}\"'.format(CUI=CUI,cond_id=cond_id))
+        retrieved_mappings = filter_mappings(mappings,utt_text) #RETURNS A DICT IN FORMAT [CUI,PREF,FUZZ,META]
+        
+        if retrieved_mappings:
+            CUI = retrieved_mappings['CUI']
+            PREF = retrieved_mappings['PREF']
+            META = retrieved_mappings['META']
+            FUZZ = retrieved_mappings['FUZZ']
+            ALL_SEM[cond_id] = retrieved_mappings['SEM']
 
-    #CREATE RELATIONSHIPS BETWEEN CONDITION AND GARD BASED ON UMLS CODES MAPPED
-    res = db.run('MATCH (x:Condition) RETURN x.UMLS AS UMLS,ID(x) as cond_id')
-    cond_dict = {i['UMLS']:i['cond_id'] for i in res}
-    print('APPLYING MAPPINGS TO DATABASE')
-    for idx,(umls,cond_id) in enumerate(cond_dict.items()):
-        print(idx,cond_id,umls)
-        db.run('MATCH (x:GARD) WHERE \"{umls}\" IN x.UMLS MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (y)-[:mapped_to_gard]->(x)'.format(umls=umls,cond_id=cond_id))
+            db.run('MATCH (x:Condition) WHERE ID(x) = {cond_id} SET x.METAMAP_OUTPUT = {CUI} SET x.METAMAP_PREFERRED_TERM = {PREF} SET x.METAMAP_SCORE = {META} SET x.FUZZY_SCORE = {FUZZ}'.format(CUI=CUI,PREF=PREF,META=META,FUZZ=FUZZ,cond_id=cond_id))
+
+
+    
+    print('CREATING AND CONNECTING METAMAP ANNOTATIONS')
+    res = db.run('MATCH (x:Condition) WHERE x.METAMAP_OUTPUT IS NOT NULL RETURN ID(x) AS cond_id, x.METAMAP_OUTPUT AS cumls, x.METAMAP_PREFERRED_TERM AS prefs, x.FUZZY_SCORE as fuzz, x.METAMAP_SCORE as meta').data()
+    for entry in res:
+        cond_id = entry['cond_id']
+        CUMLS = entry['cumls']
+        prefs = entry['prefs']
+        sems = ALL_SEM[str(cond_id)]
+        fuzzy_scores = entry['fuzz']
+        meta_scores = entry['meta']
+
+        for idx,umls in enumerate(CUMLS):
+            gard_ids = umls_to_gard(gard_db,umls)
+            if gard_ids:
+                gard_ids = gard_ids['gard_id']
+                for gard_id in gard_ids:
+                    db.run('MATCH (z:GARD) WHERE z.GardId = \"{gard_id}\" MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:Annotation {{UMLS: \"{umls}\", CandidatePreferred: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y) MERGE (z)<-[:mapped_to_gard]-(x)'.format(gard_id=gard_id,cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
+            else:
+                db.run('MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:Annotation {{UMLS: \"{umls}\", CandidatePreferred: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y)'.format(cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
+
+
+
+    print('REMOVING UNNEEDED PROPERTIES')
+    db.run('MATCH (x:Condition) SET x.METAMAP_PREFERRED_TERM = NULL SET x.METAMAP_OUTPUT = NULL SET x.FUZZY_SCORE = NULL SET x.METAMAP_SCORE = NULL')
+    
+    print('ADDING GARD-CONDITION MAPPINGS BASED ON EXACT STRING MATCH')
+    res = db.run('MATCH (x:Condition) WHERE NOT (x)-[:has_annotation]-() RETURN ID(x) as cond_id, x.Condition as cond').data()
+    for entry in res:
+        cond_id = entry['cond_id']
+        cond = entry['cond']
+        db.run('MATCH (x:GARD) WHERE toLower(x.GardName) = toLower(\"{cond}\") MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (z:Annotation {{CandidatePreferred: \"{cond}\", MATCH_TYPE: \"STRING\"}}) MERGE (z)<-[:has_annotation]-(y) MERGE (x)<-[:mapped_to_gard]-(z)'.format(cond=cond,cond_id=cond_id))
+
 
 def drug_normalize(drug):
     print(drug)
@@ -317,13 +412,13 @@ def drug_normalize(drug):
     print(updated_str)
     return updated_str
 
-def create_drug_connection(db,rxdata,drug_id):
+def create_drug_connection(db,rxdata,drug_id,wspacy=False):
     rxnormid = rxdata['RxNormID']
-    db.run('MATCH (x:Intervention) WHERE ID(x)={drug_id} MERGE (y:Drug {{RxNormID:{rxnormid}}}) MERGE (y)<-[:has_participant]-(x)'.format(rxnormid=rxnormid, drug_id=drug_id))
+    db.run('MATCH (x:Intervention) WHERE ID(x)={drug_id} MERGE (y:Drug {{RxNormID:{rxnormid}}}) MERGE (y)<-[:mapped_to_rxnorm {{WITH_SPACY: {wspacy}}}]-(x)'.format(rxnormid=rxnormid, drug_id=drug_id, wspacy=wspacy))
 
     for k,v in rxdata.items():
         key = k.replace(' ','')
-        db.run('MERGE (y:Drug {{RxNormID:{rxnormid}}}) WITH y MATCH (x:Intervention) WHERE ID(x)={drug_id} MERGE (y)<-[:has_participant]-(x) SET y.{key} = {value}'.format(rxnormid=rxdata['RxNormID'], drug_id=drug_id, key=key, value=v))
+        db.run('MERGE (y:Drug {{RxNormID:{rxnormid}}}) WITH y MATCH (x:Intervention) WHERE ID(x)={drug_id} MERGE (y)<-[:mapped_to_rxnorm]-(x) SET y.{key} = {value}'.format(rxnormid=rxdata['RxNormID'], drug_id=drug_id, key=key, value=v))
 
 def get_rxnorm_data(drug):
     rq = 'https://rxnav.nlm.nih.gov/REST/rxcui.json?name={drug}&search=2'.format(drug=drug)
@@ -353,15 +448,18 @@ def get_rxnorm_data(drug):
         return
 
 
-def nlp_to_drug(db,doc,matches,drug_name,drug_id):
+def nlp_to_drug(db,doc,matches,drug_name,drug_id,map_spacy): #TEMP map_spacy
     for match_id, start, end in matches:
         span = doc[start:end].text
         rxdata = get_rxnorm_data(span.replace(' ','+'))
 
         if rxdata:
-            create_drug_connection(db,rxdata,drug_id)
+            create_drug_connection(db,rxdata,drug_id,wspacy=True)
+            map_spacy += 1 #TEMP
+            print('spacy', span) #TEMP
         else:
             print('Map to RxNorm failed for intervention name: {drug_name}'.format(drug_name=drug_name))
+    return map_spacy #TEMP
 
 def rxnorm_map(db):
     print('Starting RxNorm data mapping to Drug Interventions')
@@ -370,9 +468,18 @@ def rxnorm_map(db):
     matcher = Matcher(nlp.vocab)
     matcher.add('DRUG',[pattern])
 
-    results = db.run('MATCH (x:Intervention) WHERE x.InterventionType = "Drug" RETURN x.InterventionName, ID(x)')
+    results = db.run('MATCH (x:Intervention) WHERE x.InterventionType = "Drug" RETURN x.InterventionName, ID(x)').data()
 
-    for idx,res in enumerate(results.data()):
+    #TEMP
+    map_drugs = len(results)
+    map_spacy = 0
+    map_rxnorm = 0
+    #TEMP
+    print(map_drugs) #TEMP
+    for idx,res in enumerate(results):
+        if idx < 73571:
+            continue
+        print()
         print(idx)
         drug_id = res['ID(x)']
         drug = res['x.InterventionName']
@@ -382,8 +489,18 @@ def rxnorm_map(db):
 
         if rxdata:
             create_drug_connection(db, rxdata, drug_id)
+            map_rxnorm += 1 #TEMP
+            print('rxnorm') #TEMP
+            
         else:
             doc = nlp(drug)
             matches = matcher(doc)
-            nlp_to_drug(db,doc,matches,drug,drug_id)
-
+            add_match = nlp_to_drug(db,doc,matches,drug,drug_id,map_spacy)
+            if add_match: #TEMP
+                map_spacy += add_match #TEMP
+    #TEMP
+    print(map_rxnorm)
+    print(map_spacy)
+    print(map_rxnorm + map_spacy)
+    print(map_drugs)
+    

@@ -28,5 +28,10 @@ grant/src/
 __pycache__/
 clinical/__pycache__/
 pubmed/__pycache__/
+pubmed/init_new.py
+pubmed/methods_new.py
+pubmed/archive/
+grant/archive/
 gard/__pycache__/
 grant/__pycache__/
+email/__pycache__/

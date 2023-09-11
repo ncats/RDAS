@@ -1,11 +1,14 @@
 import os
-import sysvars
+import json
+from skr_web_api import Submission, METAMAP_INTERACTIVE_URL
+from unidecode import unidecode
 from AlertCypher import AlertCypher
 import re
 import requests
 import sys
 workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
+import sysvars
 from datetime import datetime, date
 from http import client
 from neo4j import GraphDatabase
@@ -13,6 +16,7 @@ from csv import DictReader
 import configparser
 import threading
 import pandas as pd
+from fuzzywuzzy import fuzz
 from ast import literal_eval
 
 def create_relationship_query(db, current, node, has_parent=False):
@@ -269,11 +273,116 @@ def add_phenotypes(db, data):
 
     db.run(query, args=params).single().value()
 
+def normalize(phrase):
+    phrase = unidecode(phrase)
+    phrase = re.sub(r'\W+', ' ', phrase)
+    return phrase
+
+def filter_mappings(mappings,cond_name):
+    cui_details = list()
+    pref_details = list()
+    fuzz_details = list()
+    meta_details = list()
+
+    for idx,mapping in enumerate(mappings):
+        meta_score = int(mapping['MappingScore'].replace('-',''))
+        candidates = mapping['MappingCandidates'][0]
+        CUI = candidates['CandidateCUI']
+        candidate_pref = candidates['CandidatePreferred']
+        fuzz_score_cond_pref = fuzz.token_sort_ratio(cond_name, candidate_pref)
+
+        cui_details.append(CUI)
+        pref_details.append(candidate_pref)
+        fuzz_details.append(fuzz_score_cond_pref)
+        meta_details.append(meta_score)
+
+    if len(cui_details) > 0:
+        return {'CUI':cui_details, 'PREF':pref_details, 'FUZZ':fuzz_details, 'META':meta_details}
+
+
+def get_remaining_umls(db):
+    '''
+    print('GETTING REMAINING UMLS CODES FOR GARD')
+    INSTANCE = Submission(os.environ['METAMAP_EMAIL'],os.environ['METAMAP_KEY'])
+    INSTANCE.init_generic_batch('metamap','-J acab,anab,comd,cgab,dsyn,fndg,emod,inpo,mobd,neop,patf,sosy --JSONn') #--sldiID We removed fndg (Finding)
+    INSTANCE.form['SingLinePMID'] = True
+
+    print('GATHERING GARD UMLS DATA')
+    db.run('MATCH (x:GARD) WHERE x.UMLS IS NOT NULL SET x.UMLS_Source = "DATALAKE"')
+    res = db.run('MATCH (x:GARD) WHERE x.UMLS IS NULL SET x.UMLS_Source = "METAMAP" RETURN x.GardId AS gard_id, x.GardName as gard_name').data()
+    gard_strs = [f"{i['gard_id'].replace('GARD:','')}|{normalize(i['gard_name'])}\n" for i in res]
+    with open(f'{sysvars.gard_files_path}metamap_gard.txt','w') as f:
+        f.writelines(gard_strs)
+    '''
+
+    print('RUNNING METAMAP')
+    if not os.path.exists(f'{sysvars.gard_files_path}metamap_gard_out.json'):
+        INSTANCE.set_batch_file(f'{sysvars.gard_files_path}metamap_gard.txt') #metamap_cond.txt
+        response = INSTANCE.submit()
+        try:
+            data = response.content.decode().replace("\n"," ")
+            data = re.search(r"({.+})", data).group(0)
+
+        except Exception as e:
+            print(e)
+            data = None
+
+        try:
+            data = json.loads(data)
+            with open(f'{sysvars.gard_files_path}metamap_gard_out.json','w') as f:
+                json.dump(data,f)
+                data = data['AllDocuments']
+
+        except Exception as e:
+            print(e)
+
+    else:
+        with open(f'{sysvars.gard_files_path}metamap_gard_out.json','r') as f:
+            data = json.load(f)['AllDocuments']
+    
+    print('PARSING METAMAP RESPONSE')
+    for entry in data:
+        utterances = entry['Document']['Utterances'][0]
+        utt_text = utterances['UttText']
+        phrases = utterances['Phrases'][0]
+        mappings = phrases['Mappings']
+        gard_id = 'GARD:' + utterances['PMID']
+        retrieved_mappings = filter_mappings(mappings,utt_text) #RETURNS A DICT IN FORMAT [CUI,PREF,FUZZ,META]
+
+        if retrieved_mappings:
+            CUI = retrieved_mappings['CUI']
+            db.run('MATCH (x:GARD) WHERE x.GardId = \"{gard_id}\" SET x.UMLS = {CUI} SET x.UMLS_Source = "METAMAP"'.format(CUI=CUI,gard_id=gard_id))
+
+def get_node_counts():
+    db = AlertCypher(sysvars.gard_db)
+    def populate_node_counts(db,data,prop_name):
+        for row in data:
+            gard_id = row['gard_id']
+            cnt = row['cnt']
+            query = 'MATCH (x:GARD) WHERE x.GardId = \"{gard_id}\" SET x.{prop_name} = {cnt}'.format(gard_id=gard_id,cnt=cnt,prop_name=prop_name)
+            db.run(query)
+        
+    ct_db = AlertCypher(sysvars.ct_db)
+    pm_db = AlertCypher(sysvars.pm_db)
+    gnt_db = AlertCypher(sysvars.gnt_db)
+
+    #db.run('MATCH (x:GARD) SET x.COUNT_GENES = 0 SET x.COUNT_PHENOTYPES = 0 SET x.COUNT_TRIALS = 0 SET x.COUNT_ARTICLES = 0 SET x.COUNT_PROJECTS = 0')
+
+    res1 = db.run('MATCH (x:GARD)--(y:Phenotype) WITH COUNT(DISTINCT y.HPOId) AS cnt,x SET x.COUNT_PHENOTYPES = cnt').data()
+    res2 = db.run('MATCH (x:GARD)--(y:Gene) WITH COUNT(DISTINCT y.GeneIdentifier) AS cnt,x SET x.COUNT_GENES = cnt').data()
+    res3 = ct_db.run('MATCH (x:GARD)--(y:Annotation)--(z:Condition)--(ct:ClinicalTrial) WITH COUNT(DISTINCT ct.NCTId) AS cnt,x RETURN cnt AS cnt,x.GardId AS gard_id').data()
+    res4 = pm_db.run('MATCH (x:GARD)--(y:Article) WITH COUNT(DISTINCT y.pubmed_id) AS cnt,x RETURN cnt AS cnt, x.GardId AS gard_id').data()
+    res5 = gnt_db.run('MATCH (x:GARD)--(y:Project) WITH COUNT(DISTINCT y.application_id) AS cnt,x RETURN cnt AS cnt, x.GardId as gard_id').data()
+
+    populate_node_counts(db,res3,'COUNT_TRIALS')
+    populate_node_counts(db,res4,'COUNT_ARTICLES')
+    populate_node_counts(db,res5,'COUNT_PROJECTS')
+
+
 def generate(db, data):
     '''
     Loops through all GARD diseases and creates all the nodes and relationships
     '''
-    
     print("Building new GARD nodes")
     # Erase database so it can be recreated
     db.run('MATCH ()-[r]-() DELETE r')
@@ -310,4 +419,8 @@ def generate(db, data):
         row = phenotypes.iloc[i]
         row = row.to_dict()
         add_phenotypes(db, row)
+    
+    get_remaining_umls(db)
+    
+    get_node_counts()
     

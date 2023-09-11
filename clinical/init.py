@@ -6,10 +6,12 @@ import sysvars
 workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
 import methods as rdas
+import gard.methods as gmethods
 from src import data_model as dm
 from AlertCypher import AlertCypher
 import pandas as pd
 import json
+from time import sleep
 from datetime import date
 
 cores = multiprocessing.cpu_count()
@@ -25,7 +27,7 @@ def generate_queries_populate(db, pnum, file_batch):
 
             for trial_data in full_data:
                 for node_type in dm.node_names:
-                    trial_string = rdas.format_node_data(db, trial_data, node_type)
+                    trial_string = rdas.format_node_data(db, now, trial_data, node_type)
 
 def gather_full_data(pnum, ctgov_nctids):
   total_diseases = len(ctgov_nctids)
@@ -46,9 +48,12 @@ def gather_full_data(pnum, ctgov_nctids):
         json.dump(all_info, outfile)
 
 def main ():
-    # Initialize database driver object, script will write to specified database
-    db = AlertCypher('clinical')
+    print(f"[CT] Database Selected: {sysvars.ct_db}\nContinuing with script in 5 seconds...")
+    sleep(5)
 
+    # Initialize database driver object, script will write to specified database
+    db = AlertCypher(sysvars.ct_db)
+    
     # Webscrapes rare disease names from the clinicaltrial.gov website
     if not os.path.exists(f'{sysvars.ct_files_path}ctgov_webscraped_names.csv'):
         print('[CT] WEBSCRAPING CTGOV RARE DISEASE NAMES')
@@ -99,16 +104,16 @@ def main ():
 
     # Generates queries to create each clinical trial and all additional nodes connected to it    
     if os.path.exists(f'{sysvars.ct_files_path}full_trial_data/'):
-      if not os.path.exists(f'{sysvars.ct_files_path}all_queries/'):
+      if not os.path.exists(f'{sysvars.ct_files_path}all_queries/'): #all_queries
         os.makedirs(f'{sysvars.ct_files_path}/all_queries')
         print('[CT] BUILDING QUERIES FOR NODE CREATION')
       
       processes = list()
-      filelist = os.listdir(f'{sysvars.ct_files_path}full_trial_data/')[progress:]
+      filelist = os.listdir(f'{sysvars.ct_files_path}full_trial_data/')#[41:len(filelist)-485]
       batch_size = (len(filelist)//cores)+1
       batches = [filelist[i:i + batch_size] for i in range(0, len(filelist), batch_size)]
 
-      print(f'[CT] STARTING PROCESSING FROM IDX {progress}')
+      #print(f'[CT] STARTING PROCESSING FROM IDX {progress}')
       for idx, batch in enumerate(batches):
           proc = Process(target=generate_queries_populate, args=(db,idx,batch))
           processes.append(proc)
@@ -120,10 +125,13 @@ def main ():
       # Maps clinical trial condition nodes to GARD disease nodes
       print('[CT] MAPPING CONDITION NODES TO GARD')
       rdas.condition_map(db)
-        
+
       # Creates Drug nodes from Intervention nodes; Maps RxNorm data to the Drug nodes
       print('[CT] MAPPING DRUG INTERVENTIONS TO RXNORM')
       rdas.rxnorm_map(db)
+
+      print('[CT] ADDING NODE COUNTS TO GARD')
+      gmethods.get_node_counts()
 
       print('[CT] DATABASE BUILD COMPLETED')
 
