@@ -1,16 +1,21 @@
-import sys
 import os
-import sysvars
+import sys
 workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
-import methods as rdas
+from datetime import datetime, date
 from AlertCypher import AlertCypher
-import pandas as pd
-import json
+import sysvars
+import grant.methods as rdas
+import gard.methods as gmethods
+from time import sleep
 
 def main():
-    pass
+    print(f"[GNT] Database Selected: {sysvars.gnt_db}\nContinuing with script in 5 seconds...")
+    sleep(5)
 
-if __name__ == '__main__':
-    main()
+    db = AlertCypher(sysvars.gnt_db)
+
+    rdas.start(db)
+
+    gmethods.get_node_counts()
 
