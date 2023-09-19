@@ -35,10 +35,10 @@ try:
 except KeyError:
     print('REQUIRED SERVER ARGUMENT [use -s {test/prod} or --server {test/prod}]')
 
-if server == sysvars.rdas_urls['test']::
+if server == sysvars.rdas_urls['test']:
     dump_dirs = sysvars.dump_dirs_test
     dump_path = sysvars.dump_path_test
-elif server == sysvars.rdas_urls['prod']::
+elif server == sysvars.rdas_urls['prod']:
     dump_dirs = sysvars.dump_dirs_prod
     dump_path = sysvars.dump_path_prod
 
