@@ -35,10 +35,10 @@ try:
 except KeyError:
     print('REQUIRED SERVER ARGUMENT [use -s {test/prod} or --server {test/prod}]')
 
-if server == 'test':
+if server == sysvars.rdas_urls['test']::
     dump_dirs = sysvars.dump_dirs_test
     dump_path = sysvars.dump_path_test
-elif server == 'prod':
+elif server == sysvars.rdas_urls['prod']::
     dump_dirs = sysvars.dump_dirs_prod
     dump_path = sysvars.dump_path_prod
 
@@ -49,7 +49,7 @@ if args.transfer_all: # IF TRANSFERING ALL DUMP FILES
         print('TRANSFERING MOST RECENTLY CREATED DUMP FILE FOR EACH DATABASE')
         if args.server == 'prod':
             for dump_dir in dump_dirs:
-                from_path = f'{dump_path}{dump_dir}'
+                from_path = f'{dump_path}{dump_dir}.dump'
                 transfer(dump_path=from_path,dump_dir=dump_dir,server=server)
         else:
             for from_dump_dir, to_dump_dir in dump_dirs.items():

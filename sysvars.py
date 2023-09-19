@@ -1,6 +1,6 @@
 import os
 
-current_version = 1.1
+current_version = 1.2
 
 current_user = os.environ['LOGNAME']
 base_directory_name = 'alert'
@@ -23,5 +23,5 @@ gnt_db = 'granttest'
 gard_db = 'gardtest'
 
 epiapi_url = "http://ncats-rdas-lnx-dev.ncats.nih.gov:80/api/"
-rdas_urls = {'test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod.ncats.nih.gov"}
+rdas_urls = {'test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}
 

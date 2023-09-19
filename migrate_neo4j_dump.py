@@ -17,16 +17,28 @@ def migrate(dump_folder, dump_name):
 
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'stop'], encoding='utf8')
     p.wait()
+
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'load', f'--from-path={dump_folder} {dump_name}', '--overwrite-destination=true'], encoding='utf8')
     p.wait()
+
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'migrate', f'{dump_name}', '--force-btree-indexes-to-range'], encoding='utf8')
     p.wait()
+
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'start'], encoding='utf8')
     p.wait()
 
     server_id = ac.run(f"SHOW servers YIELD * WHERE name = 'test01' RETURN serverId").data()['serverId']
 
     ac.run(f"CREATE DATABASE {dump_name} OPTIONS {existingData: \'use\', existingDataSeedInstance: \'{server_id}\'")
+    
+    p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'stop'], encoding='utf8')
+    p.wait()
+
+    p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'dump', f'--to-path={dump_folder}', '--overwrite-destination=true'], encoding='utf8')
+    p.wait()
+
+    p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'start'], encoding='utf8')
+    p.wait()
 
 dump_path = sysvars.dump_path_prod
 dump_filenames = sysvats.dump_dirs_prod
