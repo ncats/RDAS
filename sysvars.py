@@ -1,16 +1,15 @@
 import os
 
-current_version = 1.2
+current_version = 1.3
 
-current_user = os.environ['LOGNAME']
+current_user = ''
 base_directory_name = 'alert'
 base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 
-dump_path_test = '/home/{current_user}/dumps/'.format(current_user=current_user)
-dump_path_prod = '{base_path}transfer/'.format(base_path=base_path)
+backup_path = '{base_path}backup/'.format(base_path=base_path)
+transfer_path = '{base_path}transfer/'.format(base_path=base_path)
 
-dump_dirs_test = {'clinicaltrials':'clinical','publication':'pubmed','grant':'grant','gard':'gard'} #FROM:TO
-dump_dirs_prod = ['clinical','pubmed','grant','gard']
+dump_dirs = ['clinical','pubmed','grant','gard']
 
 ct_files_path = '{base_path}/clinical/src/'.format(base_path=base_path)
 pm_files_path = '{base_path}/pubmed/src/'.format(base_path=base_path)

@@ -35,5 +35,6 @@ grant/archive/
 gard/__pycache__/
 grant/__pycache__/
 email/__pycache__/
-transfer/test/*.dump
-transfer/prod/*.dump
+transfer/*.dump
+transfer/*.dump
+backup/*/*.dump
