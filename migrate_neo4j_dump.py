@@ -43,7 +43,7 @@ def migrate(dump_folder, dump_name):
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'start'], encoding='utf8')
     p.wait()
 
-dump_path = sysvars.dump_path_prod
+dump_path = sysvars.transfer_path
 dump_filenames = sysvars.dump_dirs
 
 parser = argparse.ArgumentParser()
