@@ -9,8 +9,8 @@ from subprocess import *
 #BEFORE RUNNING SCRIPT MAKE SURE YOU HAVE YOUR CONDA ENVIROMENT ENABLED
 
 def set_env (var, val):
-    p = Popen(f'conda env config vars set {var}=\"{val}\"', stdin=PIPE, stdout=PIPE, shell=True)
-    #p.communicate(b'{auth}')
+    p = Popen(['conda', 'env', 'config', 'vars', 'set', f'{var}=\"{val}\"'], encoding='utf8')
+    p.wait()
 
 #Populate required enviroment values before running script
 env = {

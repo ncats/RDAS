@@ -49,6 +49,7 @@ dump_filenames = sysvars.dump_dirs
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--db", dest = "db", help="Specific database name if just migrating one database")
 parser.add_argument("-a", "--all", dest = "migrate_all", action='store_true', help="migrate all dump files")
+
 args = parser.parse_args()
 
 if args.migrate_all:
