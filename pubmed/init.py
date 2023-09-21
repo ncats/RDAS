@@ -6,7 +6,6 @@ from datetime import datetime, date
 from AlertCypher import AlertCypher
 import sysvars
 import pubmed.methods as rdas
-import gard.methods as gmethods
 from time import sleep
 
 today = datetime.now()
@@ -25,5 +24,3 @@ def main(update_from=False):
         last_update = datetime.strptime(today, "%Y/%m/%d") - relativedelta(years=50)
 
     rdas.retrieve_articles(db, last_update, today)
-
-    gmethods.get_node_counts()

@@ -8,7 +8,6 @@ import methods as rdas
 from datetime import date
 import init
 import sysvars
-from gard.methods import get_node_counts
 from time import sleep
 
 def main():
@@ -73,9 +72,6 @@ def main():
                 data_string = rdas.format_node_data(db,today,trial_info,node_type)
         else:
             print('Error in add for finding full trial data for ' + ID)
-
-    get_node_counts()    
-
 
 if __name__ == "__main__":
     main()

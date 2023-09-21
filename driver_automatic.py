@@ -7,6 +7,8 @@ import clinical.update, pubmed.update, grant.update
 from datetime import date,datetime
 from AlertCypher import AlertCypher
 from time import sleep
+from gard.methods import get_node_counts
+from subprocess import *
 
 def check_update(db_type):
     db = AlertCypher('gard')
@@ -44,6 +46,9 @@ if args.db == 'ct':
             update_data = check_update(args.db)
             if update_data[0]:
                 clinical.update.main()
+                get_node_counts()
+                p = Popen(['sudo', 'python3', 'generate_dump.py', '-dir clinical', '-b', '-t', '-s dev'], encoding='utf8')
+                p.wait()
             sleep(3600)
 
 
@@ -53,12 +58,18 @@ elif args.db == 'pm':
             update_data = check_update(args.db)
             if update_data[0]:
                 pubmed.update.main(update_from=args.date.strftime("%d/%m/%y"))
+                get_node_counts()
+                p = Popen(['sudo', 'python3', 'generate_dump.py', '-dir pubmed', '-b', '-t', '-s dev'], encoding='utf8')
+                p.wait()
             sleep(3600)
     else:
         while True:
             update_data = check_update(args.db)
             if update_data[0]:
                 pubmed.update.main(update_from=update_data[1])
+                get_node_counts()
+                p = Popen(['sudo', 'python3', 'generate_dump.py', '-dir pubmed', '-b', '-t', '-s dev'], encoding='utf8')
+                p.wait()
             sleep(3600)
 
 
@@ -69,6 +80,10 @@ elif args.db == 'gnt':
         while True:
             if check_update(args.db):
                 grant.update.main()
+                get_node_counts()
+                p = Popen(['sudo', 'python3', 'generate_dump.py', '-dir grant', '-b', '-t', '-s dev'], encoding='utf8')
+                p.wait()
+
             sleep(3600)
 
 else:

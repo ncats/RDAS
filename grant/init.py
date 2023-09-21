@@ -6,7 +6,6 @@ from datetime import datetime, date
 from AlertCypher import AlertCypher
 import sysvars
 import grant.methods as rdas
-import gard.methods as gmethods
 from time import sleep
 
 def main():
@@ -16,6 +15,3 @@ def main():
     db = AlertCypher(sysvars.gnt_db)
 
     rdas.start(db)
-
-    gmethods.get_node_counts()
-

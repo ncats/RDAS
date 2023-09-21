@@ -2,7 +2,7 @@ import os
 
 current_version = 1.3
 
-current_user = ''
+current_user = 'leadmandj'
 base_directory_name = 'alert'
 base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 
@@ -22,5 +22,5 @@ gnt_db = 'granttest'
 gard_db = 'gardtest'
 
 epiapi_url = "http://ncats-rdas-lnx-dev.ncats.nih.gov:80/api/"
-rdas_urls = {'test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}
+rdas_urls = {'dev':'rdas-dev.ncats.nih.gov','test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}
 
