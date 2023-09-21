@@ -32,7 +32,7 @@ def migrate(dump_folder, dump_name):
 
     server_id = ac.run(f"SHOW servers YIELD * WHERE name = 'test01' RETURN serverId").data()['serverId']
 
-    ac.run(f"CREATE DATABASE {dump_name} OPTIONS {existingData: \'use\', existingDataSeedInstance: \'{server_id}\'")
+    ac.run(f"CREATE DATABASE {dump_name} OPTIONS {{existingData: \'use\', existingDataSeedInstance: \'{server_id}\'}}")
     
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'stop'], encoding='utf8')
     p.wait()
