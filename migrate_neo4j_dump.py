@@ -13,11 +13,6 @@ print(os.getcwd())
 import argparse
 
 def migrate(dump_folder, dump_name):
-    ac = AlertCypher('neo4j')
-
-    p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'stop'], encoding='utf8')
-    p.wait()
-
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'load', f'{dump_name}', f'--from-path={dump_folder} {dump_name}', '--overwrite-destination=true'], encoding='utf8')
     p.wait()
 
@@ -25,9 +20,6 @@ def migrate(dump_folder, dump_name):
     p.wait()
 
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'dump', f'{dump_name}', f'--to-path={dump_folder}', '--overwrite-destination=true'], encoding='utf8')
-    p.wait()
-
-    p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'start'], encoding='utf8')
     p.wait()
 
 def copy_to_cluster(dump_name):
@@ -46,6 +38,9 @@ parser.add_argument("-a", "--all", dest = "migrate_all", action='store_true', he
 
 args = parser.parse_args()
 
+p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'stop'], encoding='utf8')
+p.wait()
+
 if args.migrate_all:
     for dump_filename in dump_filenames:
         path = f'{dump_path}{dump_filename}.dump'
@@ -54,3 +49,6 @@ if args.migrate_all:
 elif args.db in dump_filenames and not args.migrate_all:
     migrate(dump_path, args.db)
     copy_to_cluster(args.db)
+
+p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'start'], encoding='utf8')
+p.wait()
