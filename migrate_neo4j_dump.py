@@ -24,7 +24,7 @@ def migrate(dump_folder, dump_name):
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'migrate', f'{dump_name}', '--force-btree-indexes-to-range'], encoding='utf8')
     p.wait()
 
-    p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'dump', f'--to-path={dump_folder}', '--overwrite-destination=true'], encoding='utf8')
+    p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'dump', f'{dump_name}', f'--to-path={dump_folder}', '--overwrite-destination=true'], encoding='utf8')
     p.wait()
 
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'start'], encoding='utf8')
