@@ -8,6 +8,7 @@ base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=cu
 
 backup_path = '{base_path}backup/'.format(base_path=base_path)
 transfer_path = '{base_path}transfer/'.format(base_path=base_path)
+migrated_path = '{base_path}migrated/'.format(base_path=base_path)
 
 dump_dirs = ['clinical','pubmed','grant','gard']
 

@@ -38,3 +38,4 @@ email/__pycache__/
 transfer/*.dump
 transfer/*.dump
 backup/*/*.dump
+migrated/*.dump
