@@ -36,7 +36,7 @@ except KeyError:
 if server == sysvars.rdas_urls['test']:
     dump_path = sysvars.backup_path
 elif server == sysvars.rdas_urls['prod']:
-    dump_path = sysvars.transfer_path
+    dump_path = sysvars.migrated_path
 
 if args.transfer_all: # IF TRANSFERING ALL DUMP FILES
     print('TRANSFERING MOST RECENTLY CREATED DUMP FILE FOR EACH DATABASE')
