@@ -181,7 +181,7 @@ pycparser==2.21
 pydantic==1.10.6
 pyee==8.2.2
 pygit==0.1
-Pygments==2.14.0
+Pygments==2.15.0
 PyJWT==2.6.0
 PyNaCl==1.5.0
 pyparsing==3.0.9
