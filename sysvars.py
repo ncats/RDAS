@@ -1,6 +1,6 @@
 import os
 
-current_version = 1.3.8
+current_version = 1.3
 
 current_user = 'leadmandj'
 base_directory_name = 'RDAS'
