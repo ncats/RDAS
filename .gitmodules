@@ -1,0 +1,3 @@
+[submodule "/home/leadmandj/RDAS/pubmed/NaturalHistory4GARD"]
+	path = /home/leadmandj/RDAS/pubmed/NaturalHistory4GARD
+	url = git@github.com:ncats/NaturalHistory4GARD.git
