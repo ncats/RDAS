@@ -16,7 +16,7 @@ class AlertCypher ():
         user = os.environ['NEO4J_USERNAME']
         password = os.environ['NEO4J_PASSWORD']
 
-        connection = GraphDatabase.driver(uri=server_uri, auth=(user, password))
+        connection = GraphDatabase.driver(uri=server_uri, auth=(user, password), trusted_certificates=neo4j.TrustSystemCAs())
         self.session = connection.session(database=db)
         self.type = db
 

@@ -19,7 +19,6 @@ while True:
 
     for db_name in new_dumps:
         seed_cluster.seed(db_name,sysvars.transfer_path)
-        # send email alerts here
 
     sleep(3600)
 
