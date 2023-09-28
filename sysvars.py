@@ -9,6 +9,7 @@ base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=cu
 backup_path = '{base_path}backup/'.format(base_path=base_path)
 transfer_path = '{base_path}transfer/'.format(base_path=base_path)
 migrated_path = '{base_path}migrated/'.format(base_path=base_path)
+approved_path = '{base_path}approved/'.format(base_path=base_path)
 
 dump_dirs = ['clinical','pubmed','grant','gard']
 
@@ -23,5 +24,5 @@ gnt_db = 'granttest'
 gard_db = 'gardtest'
 
 epiapi_url = "http://ncats-rdas-lnx-dev.ncats.nih.gov:80/api/"
-rdas_urls = {'dev':'rdas-dev.ncats.nih.gov','test':"ncats-neo4j-lnx-test3.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod3.ncats.nih.gov"}
+rdas_urls = {'dev':'rdas-dev.ncats.nih.gov','test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}
 

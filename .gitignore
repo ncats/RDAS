@@ -39,3 +39,4 @@ transfer/*.dump
 transfer/*.dump
 backup/*/*.dump
 migrated/*.dump
+approved/*.dump
