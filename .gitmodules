@@ -1,3 +1,6 @@
 [submodule "/home/leadmandj/RDAS/pubmed/NaturalHistory4GARD"]
 	path = pubmed/NaturalHistory4GARD
 	url = git@github.com:ncats/NaturalHistory4GARD.git
+[submodule "pubmed/epi4GARD"]
+	path = pubmed/epi4GARD
+	url = https://github.com/ncats/epi4GARD.git
