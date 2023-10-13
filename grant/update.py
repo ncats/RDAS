@@ -6,6 +6,7 @@ import sysvars
 import grant.init
 from time import sleep
 
-def main (update_from):
+def main ():
     grant.init.main()
 
+main()

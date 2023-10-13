@@ -1,4 +1,5 @@
-from neo4j import GraphDatabase
+from neo4j import GraphDatabase,TrustSystemCAs,TrustAll
+from neo4j.debug import watch
 import configparser
 import os
 
@@ -16,7 +17,9 @@ class AlertCypher ():
         user = os.environ['NEO4J_USERNAME']
         password = os.environ['NEO4J_PASSWORD']
 
-        connection = GraphDatabase.driver(uri=server_uri, auth=(user, password), trusted_certificates=neo4j.TrustSystemCAs())
+        watch("neo4j")
+
+        connection = GraphDatabase.driver(uri=server_uri, auth=(user, password)) #encrypted=True, trusted_certificates=TrustAll()
         self.session = connection.session(database=db)
         self.type = db
 

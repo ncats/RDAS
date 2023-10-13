@@ -18,10 +18,11 @@ while True:
     # Detects all new dump files in the transfer folder of the TEST server
     transfer_detection = detect_transfer.detect('test', sysvars.transfer_path)
     new_dumps = [k for (k,v) in transfer_detection.items() if v]
-    
+
     # Seeds all 3 clusters in the TEST server so that the databases will be visible
     for db_name in new_dumps:
-        seed_cluster.seed(db_name,sysvars.transfer_path)
+        print(f'{db_name} cluster seeded')
+        #seed_cluster.seed(db_name,sysvars.transfer_path)
 
     # Detects all new dumps files in the approved folder (quality checked files) of the TEST server
     approved_detection = detect_transfer.detect('test', sysvars.approved_path)
@@ -29,7 +30,9 @@ while True:
 
     # Transfers all newly approved dump files to the PROD server's transfer folder
     for db_name in new_dumps:
-        file_transfer.transfer(sysvars.transfer_path, db_name, sysvars.rdas_urls['prod'])
+        print(f'{db_name} file staged for transfer')
+        #file_transfer.transfer(sysvars.transfer_path, db_name, sysvars.rdas_urls['prod'])
 
     # Waits one hour before retrying process
-    sleep(3600)
+    sleep(5)
+    print('Next check initiated')

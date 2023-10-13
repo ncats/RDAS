@@ -27,6 +27,7 @@ gard/src/
 grant/src/
 __pycache__/
 clinical/__pycache__/
+grant/__pycache__/
 pubmed/__pycache__/
 pubmed/init_new.py
 pubmed/methods_new.py
@@ -40,3 +41,6 @@ transfer/*.dump
 backup/*/*.dump
 migrated/*.dump
 approved/*.dump
+grant/raw/*
+grant/processed/*
+removethis.py

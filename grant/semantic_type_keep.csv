@@ -1,0 +1,27 @@
+Abbreviation,TUI,Semantic Type Name,KEEP
+fngs,T004,Fungus,TRUE
+virs,T005,Virus,TRUE
+bact,T007,Bacterium,TRUE
+cgab,T019,Congenital Abnormality,TRUE
+acab,T020,Acquired Abnormality,TRUE
+gngm,T028,Gene or Genome,TRUE
+inpo,T037,Injury or Poisoning,TRUE
+dsyn,T047,Disease or Syndrome,TRUE
+mobd,T048,Mental or Behavioral Dysfunction,TRUE
+comd,T049,Cell or Molecular Dysfunction,TRUE
+emod,T050,Experimental Model of Disease,TRUE
+diap,T060,Diagnostic Procedure,TRUE
+topp,T061,Therapeutic or Preventive Procedure,TRUE
+mosq,T085,Molecular Sequence,TRUE
+nusq,T086,Nucleotide Sequence,TRUE
+amas,T087,Amino Acid Sequence,TRUE
+podg,T101,Patient or Disabled Group,TRUE
+chem,T103,Chemical,TRUE
+aapp,T116,"Amino Acid, Peptide, or Protein",TRUE
+irda,T130,"Indicator, Reagent, or Diagnostic Aid",TRUE
+hops,T131,Hazardous or Poisonous Substance,TRUE
+sosy,T184,Sign or Symptom,TRUE
+anab,T190,Anatomical Abnormality,TRUE
+neop,T191,Neoplastic Process,TRUE
+antb,T195,Antibiotic,TRUE
+clnd,T200,Clinical Drug,TRUE
