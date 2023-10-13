@@ -18,7 +18,7 @@ while True:
     new_dumps = [k for (k,v) in transfer_detection.items() if v]
 
     for db_name in new_dumps:
-        seed_cluster.seed(db_name,sysvars.transfer_path)
+        seed_cluster.seed(db_name,sysvars.transfer_path,'prod')
 
     sleep(3600)
 

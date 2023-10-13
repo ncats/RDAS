@@ -6,32 +6,32 @@ sys.path.append(workspace)
 import argparse
 from AlertCypher import AlertCypher
 import clinical.init, pubmed.init, grant.init, gard.init
+import clinical.update, pubmed.update, grant.update
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-db", "--database", dest = "db", help="Database name")
 parser.add_argument("-m", "--mode", dest = "mode", help="Database mode")
 args = parser.parse_args()
 
+print(args.db)
 if args.db == 'ct':
     if args.mode == 'create':
         clinical.init.main()
     elif args.mode == 'update':
-        # Not created yet
         clinical.update.main()
+
 elif args.db == 'pm':
     if args.mode == 'create':
-        # Not created yet
         pubmed.init.main()
     elif args.mode == 'update':
-        # Not created yet
         pubmed.update.main()
+
 elif args.db == 'gnt':
     if args.mode == 'create':
-        # Not created yet
         grant.init.main()
     elif args.mode == 'update':
-        # Not created yet
         grant.update.main()
+
 elif args.db == 'gard':
     if args.mode == 'create':
         gard.init.main()

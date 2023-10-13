@@ -12,16 +12,17 @@ migrated_path = '{base_path}migrated/'.format(base_path=base_path)
 approved_path = '{base_path}approved/'.format(base_path=base_path)
 
 dump_dirs = ['clinical','pubmed','grant','gard']
+db_abbrevs = {'ct':'clinical', 'pm':'pubmed', 'gnt':'grant'}
 
 ct_files_path = '{base_path}/clinical/src/'.format(base_path=base_path)
 pm_files_path = '{base_path}/pubmed/src/'.format(base_path=base_path)
 gnt_files_path = '{base_path}/grant/src/'.format(base_path=base_path)
 gard_files_path = '{base_path}/gard/src/'.format(base_path=base_path)
 
-ct_db = 'clinicaltest'
-pm_db = 'pubmedtest'
-gnt_db = 'granttest'
-gard_db = 'gardtest'
+ct_db = 'clinical'
+pm_db = 'pubmed'
+gnt_db = 'grant'
+gard_db = 'gard'
 
 epiapi_url = "http://ncats-rdas-lnx-dev.ncats.nih.gov:80/api/"
 rdas_urls = {'dev':'rdas-dev.ncats.nih.gov','test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}

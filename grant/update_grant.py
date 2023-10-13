@@ -5,7 +5,7 @@ from typing import TypedDict, Any, Callable, Optional
 from AlertCypher import AlertCypher
 from steps import steps
 from prep_neo4j_data import FilesToAdd, prep_data
-
+import sysvars
 
 def write(session: Session, query: str, params: dict) -> list:
 	"""
@@ -41,7 +41,7 @@ def step_to_fn(
 	return fn
 
 def main(db: AlertCypher):
-	fta = prep_data("alert/new/grant/raw", "alert/new/grant/processed")
+	fta = prep_data(f"{sysvars.base_path}grant/raw", f"{sysvars.base_path}grant/processed")
 
 	# run database upgrade steps on only new/modified files
 	for step in steps:

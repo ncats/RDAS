@@ -9,11 +9,6 @@ import grant.methods as rdas
 from time import sleep
 
 def main():
-    print(f"[GNT] Database Selected: {sysvars.gnt_db}\nContinuing with script in 5 seconds...")
-    sleep(5)
-
     db = AlertCypher(sysvars.gnt_db)
-
     rdas.start(db)
 
-main()

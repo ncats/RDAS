@@ -6,7 +6,6 @@ from AlertCypher import AlertCypher
 from src import data_model as dm 
 import methods as rdas
 from datetime import date
-import init
 import sysvars
 from time import sleep
 
@@ -19,7 +18,7 @@ def main():
     today = date.today().strftime('%m/%d/%y')
     refreshed_ctgov_trials = list()
 
-    ctgov_diseases,listed_trials = rdas.webscrape_ctgov_diseases()    
+    ctgov_diseases,listed_trials = rdas.webscrape_ctgov_diseases()
     for idx,ct_disease in enumerate(ctgov_diseases):
         ctgov_trials = rdas.get_nctids([ct_disease])
         refreshed_ctgov_trials.extend(ctgov_trials)

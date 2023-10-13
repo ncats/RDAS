@@ -9,4 +9,3 @@ from time import sleep
 def main ():
     grant.init.main()
 
-main()

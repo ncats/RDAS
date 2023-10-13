@@ -7,7 +7,7 @@ import json
 from neo4j import GraphDatabase, basic_auth
 import configparser
 from datetime import datetime, date
-from new.AlertCypher import AlertCypher
+from AlertCypher import AlertCypher
 from dateutil.relativedelta import relativedelta
 from collections import OrderedDict
 import time
@@ -679,7 +679,7 @@ def save_disease_articles(db, mindate, maxdate):
         
         searchterms = filter_synonyms(rd['synonyms'])
         searchterms.extend([rd['name']])
-        
+       
         for searchterm in searchterms:
           try:
             pubmedIDs = find_articles(searchterm,mindate,maxdate) #Use names AND synonyms (only include syns with more than 1 word, if more than 1 word then count if they have more than 5 characters???)
@@ -769,7 +769,7 @@ def retrieve_articles(db, last_update, today):
   save_disease_articles(db, last_update, today)
   gather_epi(db, today)
   gather_pubtator(db, today)
-  #save_omim_articles(db, last_update, today) #NEEDS TO BE FIXED TO USE CURRENT NEO4J
+  save_omim_articles(db, last_update, today) #NEEDS TO BE FIXED TO USE CURRENT NEO4J
 
 def retrieve_specific_article(pmid):
   url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/epost.fcgi?db=pubmed&id={pmid}&retmode=json&retmax=10000"

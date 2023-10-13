@@ -6,7 +6,6 @@ import sysvars
 workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
 import methods as rdas
-import gard.methods as gmethods
 from src import data_model as dm
 from AlertCypher import AlertCypher
 import pandas as pd
@@ -129,9 +128,6 @@ def main ():
       # Creates Drug nodes from Intervention nodes; Maps RxNorm data to the Drug nodes
       print('[CT] MAPPING DRUG INTERVENTIONS TO RXNORM')
       rdas.rxnorm_map(db)
-
-      print('[CT] ADDING NODE COUNTS TO GARD')
-      gmethods.get_node_counts()
 
       print('[CT] DATABASE BUILD COMPLETED')
 
