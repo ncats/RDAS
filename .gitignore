@@ -43,4 +43,5 @@ migrated/*.dump
 approved/*.dump
 grant/raw/*
 grant/processed/*
+crt/*.json
 removethis.py

@@ -1,3 +1,0 @@
-Hello {{name}},
-{{num}} NIH grants have just been added to RDAS
--Rare Disease Alert System

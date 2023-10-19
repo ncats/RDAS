@@ -1,3 +1,0 @@
-Hello {{name}},
-{{num}} PubMed articles have just been added to RDAS
--Rare Disease Alert System

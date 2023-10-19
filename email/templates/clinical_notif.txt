@@ -1,3 +1,0 @@
-Hello {{name}},
-{{num}} Clinical Trials have just been added to RDAS
--Rare Disease Alert System
