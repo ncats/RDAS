@@ -22,55 +22,68 @@ def fill_template(type,data):
 
     html += """
         <html>
-        <head></head>
-        <body style='background-color:purple;'>
-        <div>
-        <img src="https://rdas.ncats.nih.gov/assets/rdas_final_gradient.png" alt="Rare Disease Alert System" style="display:block;margin:auto;">
+        <head>
+        </head>
+        <body style="background-color:white">
+        <div style="text-align:center">
+        <img src="https://rdas.ncats.nih.gov/assets/rdas_final_gradient.png" alt="Rare Disease Alert System" width="500" style="display:block;margin:auto">
         </div>
-        <div style='text-align:center;background-color:white;padding:10px 100px 100px 100px;margin:10px 100px 100px 100px'>
+        <div style="text-align:center;margin:auto">
         <h1>{name}</h1>
         <h1>On {date}, You have {num} new entries for your subscribed rare diseases in the {db_title} database</h1>
         <h2>Out of that {num},</h2>
-        <br>
-        <p>
+        <table style="border:5 solid purple;margin:auto;">
+        <tr>
+        <th>Name</th>
+        <th>GARD ID</th>
+        <th>Nodes Modified</th>
+        <th></th>
+        </tr>
     """.format(num=data['total'],images_path=sysvars.images_path,db_title=txt_db[type],name=data['name'],date=data['update_date'])
 
     for gard in data['subscriptions']:
         if data[gard]['num'] > 0:
-            full_msg += '{name} [{ID}] - {num} new additions have been added to the database\n'.format(name=data[gard]['name'], num=data[gard]['num'], ID=gard)
+            full_msg += '{name} [{gardId}] - {num} new additions have been added to the database\n'.format(name=data[gard]['name'], num=data[gard]['num'], gardId=gard)
             html += """
-                <a href='https://rdas.ncats.nih.gov/disease?id={ID}#{tab}'>{name} [{ID}]</a> - {num} new additions have been added to the database
-                <br>
-            """.format(name=data[gard]['name'], num=data[gard]['num'], ID=gard, tab=tabs[type])
+                <tr>
+                <td>{name}</td>
+                <td>{gardId}</td>
+                <td>{num}</td>
+                <td><a href='https://rdas.ncats.nih.gov/disease?id={gardId}#{tab}'>Visit Page</a></td>
+                </tr>
+            """.format(name=data[gard]['name'], num=data[gard]['num'], gardId=gard, tab=tabs[type])
+            #table_data.append({'name':data[gard]['name'], 'id':gard, 'num':data[gard]['num']})
 
     html += """
-        <p>
+        </table>
         </div>
         <body>
         <html>
     """
+
+    print(html)
     return (full_msg,html)
 
 def send_mail(type, data):
-    print(data['total'],data['email'])
-    if data['total'] > 0 and data['email'] == 'zhuqianzq@gmail.com':
+    print(f"[{data['total']}, {data['email']}]")
+    if data['total'] > 0 and data['email'] == 'timothy.sheils@ncats.nih.gov' or data['email'] == 'zhuqianzq@gmail.com':
 
-        data['email'] = 'devon.leadman@axleinfo.com' # TEST EMAIL
+        #data['email'] = 'devon.leadman@nih.gov' # TEST EMAIL
 
         if type == "clinical":
             txt,html = fill_template(type,data)
             alert.send_email('RDAS-Alert: Clinical Trial update regarding your subscriptions', txt, data['email'], html=html) #data['email'] in place of email
-            print('Email Sent...')
+            print('[Email Sent...]')
 
         if type == "pubmed":
             txt,html = fill_template(type,data)
             alert.send_email('RDAS-Alert: Publication update regarding your subscriptions', txt, data['email'], html=html)
-            print('Email Sent...')
+            print('[Email Sent...]')
 
         if type == "grant":
             txt,html = fill_template(type,data)
             alert.send_email('RDAS-Alert: Funded Project update regarding your subscriptions', txt, data['email'], html=html)
-            print('Email Sent...')
+            print('[Email Sent...]')
 
 def get_stats(type, gards, date=None):
     db = AlertCypher(type)

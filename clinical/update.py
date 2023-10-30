@@ -18,6 +18,7 @@ def main():
     today = date.today().strftime('%m/%d/%y')
     refreshed_ctgov_trials = list()
 
+    print('Webscraping rare disease list')
     ctgov_diseases,listed_trials = rdas.webscrape_ctgov_diseases()
     for idx,ct_disease in enumerate(ctgov_diseases):
         ctgov_trials = rdas.get_nctids([ct_disease])
@@ -31,6 +32,7 @@ def main():
     length = len(current_nctids)
     ids_to_add = list()
 
+    print('Sorting trials to update and addition lists')
     for idx,(k,v) in enumerate(current_nctids.items()):
         if not k in refreshed_ctgov_trials:
             exist = db.run('MATCH (x:ClinicalTrial) WHERE x.NCTId = \"{k}\" RETURN x.NCTId'.format(k=k)).data()
@@ -45,8 +47,9 @@ def main():
     print('Checking ' + str(len(ids_to_update)) + ' Trials for Updates')
     print('Adding ' + str(len(ids_to_add)) + ' Brand New Trials')
 
+    print('Updating trials already in database')
     for idx,ID in enumerate(ids_to_update):
-        print(idx)
+        print(idx, ID)
         trial_info = rdas.extract_fields(ID)
         if trial_info:
             if not trial_info['LastUpdatePostDate'] == current_nctids[ID]:
@@ -64,7 +67,9 @@ def main():
             print('Error in update for finding full trial data for ' + ID)
 
     #ADDS BRAND NEW TRIALS
-    for ID in ids_to_add:
+    print('Adding non existent trials in database')
+    for idx,ID in enumerate(ids_to_add):
+        print(idx, ID)
         trial_info = rdas.extract_fields(ID)
         if trial_info:
             for node_type in dm.node_names:

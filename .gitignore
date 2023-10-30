@@ -45,3 +45,6 @@ grant/raw/*
 grant/processed/*
 crt/*.json
 removethis.py
+start_dev.out
+start_test.out
+start_prod.out
