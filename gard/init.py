@@ -2,8 +2,12 @@ import pandas as pd
 import sysvars
 from gard import methods as rdas
 from AlertCypher import AlertCypher
+from time import sleep
 
 def main():
+    print(f"[CT] Database Selected: {sysvars.gard_db}\nContinuing with script in 5 seconds...")
+    sleep(5)
+
     db = AlertCypher('gard')
     rdas.retrieve_gard_data()
     gard = pd.read_csv(f'{sysvars.gard_files_path}GARD.csv', index_col=False)

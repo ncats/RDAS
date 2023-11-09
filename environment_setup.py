@@ -24,7 +24,7 @@ env = {
     'METAMAP_KEY': None,
     'METAMAP_EMAIL': None,
     'OMIM_KEY': None,
-    'CMD_AUTH': None
+    'NCBI_KEY': None
 }
 
 for k,v in env.items():

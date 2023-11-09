@@ -8,7 +8,7 @@ import sysvars
 import pubmed.methods as rdas
 from time import sleep
 
-today = datetime.now()
+today = datetime.now().strftime("%Y/%m/%d")
 
 def main(update_from=False):
     print(f"[PM] Database Selected: {sysvars.pm_db}\nContinuing with script in 5 seconds...")

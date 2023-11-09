@@ -22,7 +22,7 @@ import sysvars
 def get_gard_list():
   #Returns list of the GARD Diseases
   GARDdb = AlertCypher(sysvars.gard_db)
-  cypher_query = 'match (m:GARD) return m'
+  cypher_query = 'match (m:GARD)--(x:Article) where count(x) = 0 return m' # TEST: orig: match (m:GARD) return m
   nodes = GARDdb.run(cypher_query)
   results = nodes.data()
 
@@ -110,7 +110,7 @@ def get_article_id(pubmed_id, driver):
 
 def get_disease_id(gard_id, driver):
   id = None
-  result = driver.run("MATCH(a:Disease {gard_id:$gard_id}) return id(a) as id", args = {'gard_id':gard_id})
+  result = driver.run("MATCH(a:GARD {GardId:$gard_id}) return id(a) as id", args = {'gard_id':gard_id})
   record = result.single()
   #logging.info(f'record: {record}')
   if record:
@@ -174,8 +174,8 @@ def save_omim_article_relation(article_id, omim_id, sections, driver, today):
     "article_id":article_id,
     "omim_id":omim_id,
     "sections":sections,
-    "rdascreated":'\"'+today.strftime("%m/%d/%y")+'\"',
-    "rdasupdated":'\"'+today.strftime("%m/%d/%y")+'\"'
+    "rdascreated":datetime.strptime(today,"%Y/%m/%d").strftime("%m/%d/%y"),
+    "rdasupdated":datetime.strptime(today,"%Y/%m/%d").strftime("%m/%d/%y")
   })
           
 def save_omim_remaining_articles(gard_id, omim_id, sections, search_source, driver, today):
@@ -196,7 +196,7 @@ def create_indexes():
   with GraphDatabase.driver(neo4j_uri, auth=(user,password)) as driver:
     with driver.session() as session:
       cypher_query = [
-      "CREATE INDEX IF NOT EXISTS FOR (n:Disease) ON (n.gard_id)",
+      "CREATE INDEX IF NOT EXISTS FOR (n:GARD) ON (n.gard_id)",
       "CREATE INDEX IF NOT EXISTS FOR (n:Article) ON (n.pubmed_id)",
       "CREATE INDEX IF NOT EXISTS FOR (n:MeshTerm) ON (n.isMajorTopic, n.descriptorName)",
       "CREATE INDEX IF NOT EXISTS FOR (n:MeshQualifier) ON (n.abbreviation, n.qualifierName, n.isMajorTopic)",
@@ -213,7 +213,8 @@ def create_indexes():
 
 def find_articles(keyword, mindate, maxdate):
   #fetch articles and return a map
-  url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=\"{keyword}\"[~1]&mindate={mindate}&maxdate={maxdate}&retmode=json&retmax=10000"
+  api_key = os.environ['NCBI_KEY']
+  url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=\"{keyword}\"[~1]&mindate={mindate}&maxdate={maxdate}&retmode=json&retmax=10000&api_key={api_key}" #retmax=10000
   response = requests.post(url).json()
   return response
 
@@ -259,7 +260,8 @@ def fetch_pubtator_annotations(pubmedId):
     
 def fetch_pmc_fulltext_xml(pmcId):
   #fetch full text xml from pmc
-  pmcUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id=" + pmcId
+  api_key = os.environ['NCBI_KEY']
+  pmcUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&api_key={api_key}&id=" + pmcId
   return requests.get(pmcUrl)
 
 def fetch_pmc_fulltext_json(pubmedId):
@@ -269,13 +271,13 @@ def fetch_pmc_fulltext_json(pubmedId):
 
 def create_disease(session, gard_id, rd):
   query = '''
-  MERGE (d:Disease {gard_id:$gard_id}) 
+  MERGE (d:GARD {gard_id:$gard_id}) 
   ON CREATE SET
-    d.gard_id = $gard_id,
-    d.name = $name,
-    d.classification = $classification, 
-    d.synonyms = $synonyms,
-    d.type = $type
+    d.GardId = $gard_id,
+    d.GardName = $name,
+    d.Classification = $classification, 
+    d.Synonyms = $synonyms,
+    d.Type = $type
   RETURN id(d)
   '''
   params = {
@@ -289,9 +291,9 @@ def create_disease(session, gard_id, rd):
 
   return session.run(query, args=params).single().value()
 
-def create_article(tx, abstractDataRel, disease_node, search_source):
+def create_article(tx, abstractDataRel, disease_node, search_source, now):
   create_article_query = '''
-  MATCH (d:Disease) WHERE id(d)=$id
+  MATCH (d:GARD) WHERE id(d)=$id
   MERGE (n:Article {pubmed_id:$pubmed_id})
   ON CREATE SET
     n.pubmed_id = $pubmed_id,
@@ -309,6 +311,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     n.source = $source,
     n.pubType = $pubtype,
     n.DateCreatedRDAS = $now,
+    n.LastUpdatedRDAS = $now,
     n.''' + search_source + ''' = true
   MERGE (d)-[r:MENTIONED_IN]->(n)
   RETURN id(n)
@@ -329,13 +332,14 @@ def create_article(tx, abstractDataRel, disease_node, search_source):
     "inPMC":True if 'inPMC' in abstractDataRel else False,
     "hasPDF":True if 'hasPDF' in abstractDataRel else False,
     "pubtype":abstractDataRel['pubTypeList']['pubType'] if 'pubTypeList' in abstractDataRel else '',
-    "now": date.today().strftime("%m/%d/%y"),
+    "now": datetime.strptime(maxdate,"%Y/%m/%d").strftime("%m/%d/%y"),
     "isEpi": False, #Defaults to False, changes to True if there is Epi data in article later on
     "citedByCount":int(abstractDataRel['citedByCount']) if 'citedByCount' in abstractDataRel else 0,
     }
   
   response = tx.run(create_article_query, args=params).single().value()
-  return tx.run(create_article_query, args=params).single().value()
+  print('+', end='', flush=True)
+  return response
 
 def create_authors(tx, abstractDataRel, article_node):
   create_author_query = '''
@@ -397,10 +401,14 @@ def create_keywords(tx, abstractDataRel, article_node):
 def get_isEpi(text, url=f"{sysvars.epiapi_url}postEpiClassifyText/"):
   #check if the article is an Epi article using API
   try:
-    response = requests.post(url, json={'text': text}, verify=False)
+    response = requests.post(url, json={'text': text}) # verify=False
     response = response.json()
-    print(response)
-    return response['IsEpi']
+
+    if 'isEpi' in response:
+        return response['IsEpi']
+    else:
+        return None
+
   except Exception as e:
     logging.error(f'Exception during get_isEpi. text: {text}, error: {e}')
     raise e
@@ -427,8 +435,11 @@ def create_epidemiology(tx, abstractDataRel, article_node, today):
   text = abstractDataRel['title'] + ' ' + abstractDataRel['abstractText']
   
   isEpi = get_isEpi(text)
+  print('isEpi Result: ', isEpi)
   if isEpi:
     epi_info = get_epiExtract(text)
+    print('getEpi Info: ')
+    print(epi_info)
     #This checks if each of the values in the epi_info dictionary is empty. If they all are empty, then the node is not added.
     if sum([1 for x in epi_info.values() if x]) > 0:
       try:
@@ -447,8 +458,8 @@ def create_epidemiology(tx, abstractDataRel, article_node, today):
           "location":epi_info['LOC'] if epi_info['LOC'] else [], 
           "sex":epi_info['SEX'] if epi_info['SEX'] else [], 
           "ethnicity":epi_info['ETHN'] if epi_info['ETHN'] else [],
-          "rdascreated": '\"'+today.strftime("%m/%d/%y")+'\"',
-          "rdasupdated": '\"'+today.strftime("%m/%d/%y")+'\"'
+          "rdascreated": datetime.strptime(today,"%Y/%m/%d").strftime("%m/%d/%y"),
+          "rdasupdated": datetime.strptime(today,"%Y/%m/%d").strftime("%m/%d/%y")
         })
       except Exception as e:
         logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is True.')
@@ -567,7 +578,7 @@ def create_annotations(tx, pubtatorData, article_node, today):
 def create_disease_article_relation(tx, disease_node, article_node):
   query = '''
   MATCH (a: Article) WHERE id(a) = $article_id
-  MATCH (d: Disease) WHERE id(d) = $disease_id
+  MATCH (d: GARD) WHERE id(d) = $disease_id
   MERGE (d)-[:MENTIONED_IN]->(a)
   '''
   tx.run(query, parameters={
@@ -581,9 +592,10 @@ def save_disease_article_relation(disease_node, article_node, session):
   create_disease_article_relation(tx, disease_node, article_node)
   tx.commit()
       
-def save_all(abstract, disease_node, pubmedID, search_source, session):
+def save_all(abstract, disease_node, pubmedID, search_source, session, maxdate):
     logging.info(f'Invoking create_article')
-    article_node = create_article(session, abstract, disease_node, search_source)
+    article_node = create_article(session, abstract, disease_node, search_source, maxdate)
+
     if ('meshHeadingList' in abstract and 
     'meshHeading' in abstract['meshHeadingList']):
       logging.info(f'Invoking create_meshHeading')
@@ -649,7 +661,7 @@ def save_articles(disease_node, pubmed_ids, search_source, session):
         logging.error(f" Exception when iterating abstracts['resultList']['result'], result: {result}, error: {e}")  
 
 def filter_existing(db, gard_id, pmids):
-  query = fr'MATCH (x:Disease)--(y:Article) WHERE x.gard_id = "{gard_id}" AND y.pubmed_id IN {pmids} RETURN y.pubmed_id'
+  query = fr'MATCH (x:GARD)--(y:Article) WHERE x.gard_id = "{gard_id}" AND y.pubmed_id IN {pmids} RETURN y.pubmed_id'
   response = db.run(query).data()
   if len(response) > 0:
     for id in response:
@@ -669,6 +681,7 @@ def save_disease_articles(db, mindate, maxdate):
   #Find and save article data for GARD diseases between from mindate to maxdate
       results = get_gard_list()
       search_source = 'pubmed_evidence'
+      date_db_now = datetime.strptime(maxdate,"%Y/%m/%d").strftime("%m/%d/%y")
         
       for idx, gard_id in enumerate(results):
         if gard_id == None:
@@ -734,7 +747,7 @@ def save_disease_articles(db, mindate, maxdate):
                   if (matching_articles > 0):
                     pass
                   else:
-                    save_all(result, disease_node, pubmedID, search_source, db)
+                    save_all(result, disease_node, pubmedID, search_source, db, maxdate)
 
           except Exception as e:
             logging.error(f'Exception when finding articles for disease {gard_id}, error2: {e}')
@@ -769,17 +782,19 @@ def retrieve_articles(db, last_update, today):
   save_disease_articles(db, last_update, today)
   gather_epi(db, today)
   gather_pubtator(db, today)
-  save_omim_articles(db, last_update, today) #NEEDS TO BE FIXED TO USE CURRENT NEO4J
+  save_omim_articles(db, last_update, today)
 
 def retrieve_specific_article(pmid):
-  url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/epost.fcgi?db=pubmed&id={pmid}&retmode=json&retmax=10000"
+  api_key = os.environ['NCBI_KEY']
+  url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/epost.fcgi?db=pubmed&id={pmid}&retmode=json&retmax=10000&api_key={api_key}"
   response = requests.post(url).json()
   return response
  
 
 def update_missing_abstracts(db, today):
   print('Searching for missing abstracts of articles with missing abstract')
-  maxsearchdate = today - relativedelta(years=1)
+  maxsearchdate = datetime.strptime(today,"%Y/%m/%d") - relativedelta(years=1)
+  today = today.strftime("%m/%d/%y")
   
   query = 'MATCH (x:Article) WHERE x.abstractText = \"\" RETURN x.pubmed_id, x.firstPublicationDate, x.title, ID(x)'
   response = db.run(query).data()
@@ -800,12 +815,15 @@ def update_missing_abstracts(db, today):
       article = article[0]['resultList']['result'][0]
       if 'abstractText' in article:
         print(f'New Abstract Found for Article: {pmid}')
-        new_abstract = article['abstractText']
-        query = f"MATCH (x:Article) WHERE ID(x) = {article_node} SET x.abstractText = \"{new_abstract}\" RETURN true"
+
+        new_abstract = article['abstractText'].replace("\"","")
+
+        query = f"MATCH (x:Article) WHERE ID(x) = {article_node} SET x.abstractText = \"{new_abstract}\" SET x.LastUpdatedRDAS = \"{today}\" RETURN true"
         db.run(query)
 
         abstractDataRel = {'abstractText': new_abstract,'title': title}
         create_epidemiology(db, abstractDataRel, article_node, today)
+
     except IndexError as e:
       continue
 

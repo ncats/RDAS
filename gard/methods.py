@@ -137,16 +137,18 @@ def retrieve_gard_data():
     '''
     Retrieves GARD disease files from Palantir workspace
     '''
+    branch = 'datalake_v1.00_Salesforce_remove_OMIM_HPO'
+
     print("Retrieving GARD data from Palantir")
-    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.ec51a84a-3b60-44d8-9625-3fc2a2b1d481/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=f'{sysvars.gard_files_path}GARD.csv')
+    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.ec51a84a-3b60-44d8-9625-3fc2a2b1d481/branches/{branch}/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=f'{sysvars.gard_files_path}GARD.csv', branch=branch)
     os.system(command)
-    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.363c2a9e-3213-4e66-a5db-052af2309f02/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=f'{sysvars.gard_files_path}GARD_classification.csv')
+    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.363c2a9e-3213-4e66-a5db-052af2309f02/branches/{branch}/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=f'{sysvars.gard_files_path}GARD_classification.csv', branch=branch)
     os.system(command)
-    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.95f22ad1-90fc-48a1-9c40-c4c632f9c310/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=f'{sysvars.gard_files_path}GARD_xrefs.csv')
+    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.95f22ad1-90fc-48a1-9c40-c4c632f9c310/branches/{branch}/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=f'{sysvars.gard_files_path}GARD_xrefs.csv', branch=branch)
     os.system(command)
-    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.32bdc41d-a8eb-4101-a2e7-0701a58c354b/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=f'{sysvars.gard_files_path}GARD_genes.csv')
+    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.32bdc41d-a8eb-4101-a2e7-0701a58c354b/branches/{branch}/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=f'{sysvars.gard_files_path}GARD_genes.csv', branch=branch)
     os.system(command)
-    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.2b15e594-f3e7-4abc-a9b1-e067eedcc51e/branches/master/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=f'{sysvars.gard_files_path}GARD_phenotypes.csv')
+    command = 'curl -X GET -H "Authorization: Bearer {PALANTIR_KEY}" -o {PATH} https://nidap.nih.gov/foundry-data-proxy/api/dataproxy/datasets/ri.foundry.main.dataset.2b15e594-f3e7-4abc-a9b1-e067eedcc51e/branches/{branch}/csv?includeColumnNames=true'.format(PALANTIR_KEY=os.environ['PALANTIR_KEY'], PATH=f'{sysvars.gard_files_path}GARD_phenotypes.csv', branch=branch)
     os.system(command)
 
 def add_genes(db, data):
@@ -172,17 +174,19 @@ def add_genes(db, data):
     RETURN TRUE
     '''
     
+    #d.Reactome = $reactome
+ 
     try:
         data['GeneSynonym'] = data['GeneSynonym'].strip('][').split(', ')
     except Exception as e:
-        print(e)
+        print(e, 'GeneSynonym')
         pass
 
     try:
         data['Reference'] = data['Reference'].strip('][').split(', ')
     
     except Exception as e:
-        print(e)
+        print(e, 'Reference')
         pass
 
     params = {
@@ -199,9 +203,10 @@ def add_genes(db, data):
     "omim":data['OMIM'] if not type(data['OMIM']) == float else None,
     "ensembl":data['Ensembl'] if not type(data['Ensembl']) == float else None,
     "iuphar":data['IUPHAR'] if not type(data['IUPHAR']) == float else None,
+    "reactome":data['Reactome'] if not type(data['Reactome']) == float else None,
     "swissprot":data['SwissProt'] if not type(data['SwissProt']) == float else None,
-    "reactome":data['Reactome'] if not type(data['Reactome']) == float else None
     }
+    #"reactome":data['Reactome'] if not type(data['Reactome']) == float else None
 
     db.run(query, args=params).single().value()
 
@@ -271,10 +276,12 @@ def add_phenotypes(db, data):
     "validation_status":data['ValidationStatus'] if not type(data['ValidationStatus']) == float else None,
     }
 
-    db.run(query, args=params).single().value()
+    db.run(query, args=params)
 
 def normalize(phrase):
+    print(phrase)
     phrase = unidecode(phrase)
+    phrase = phrase.replace("\'","")
     phrase = re.sub(r'\W+', ' ', phrase)
     return phrase
 
@@ -300,8 +307,8 @@ def filter_mappings(mappings,cond_name):
         return {'CUI':cui_details, 'PREF':pref_details, 'FUZZ':fuzz_details, 'META':meta_details}
 
 
-def get_remaining_umls(db):
-    '''
+def get_remaining_umls(db, umls_update=True):
+    
     print('GETTING REMAINING UMLS CODES FOR GARD')
     INSTANCE = Submission(os.environ['METAMAP_EMAIL'],os.environ['METAMAP_KEY'])
     INSTANCE.init_generic_batch('metamap','-J acab,anab,comd,cgab,dsyn,fndg,emod,inpo,mobd,neop,patf,sosy --JSONn') #--sldiID We removed fndg (Finding)
@@ -310,12 +317,18 @@ def get_remaining_umls(db):
     print('GATHERING GARD UMLS DATA')
     db.run('MATCH (x:GARD) WHERE x.UMLS IS NOT NULL SET x.UMLS_Source = "DATALAKE"')
     res = db.run('MATCH (x:GARD) WHERE x.UMLS IS NULL SET x.UMLS_Source = "METAMAP" RETURN x.GardId AS gard_id, x.GardName as gard_name').data()
-    gard_strs = [f"{i['gard_id'].replace('GARD:','')}|{normalize(i['gard_name'])}\n" for i in res]
+    
+    gard_strs = [f"{i['gard_id'].replace('GARD:','')}|{normalize(i['gard_name'])}\n" for i in res if i['gard_name']]
+
     with open(f'{sysvars.gard_files_path}metamap_gard.txt','w') as f:
         f.writelines(gard_strs)
-    '''
+    
 
     print('RUNNING METAMAP')
+    if umls_update:
+        if os.path.exists(f'{sysvars.gard_files_path}metamap_gard_out.json'):
+            os.remove(f'{sysvars.gard_files_path}metamap_gard_out.json')
+
     if not os.path.exists(f'{sysvars.gard_files_path}metamap_gard_out.json'):
         INSTANCE.set_batch_file(f'{sysvars.gard_files_path}metamap_gard.txt') #metamap_cond.txt
         response = INSTANCE.submit()
@@ -366,7 +379,7 @@ def get_node_counts():
     pm_db = AlertCypher(sysvars.pm_db)
     gnt_db = AlertCypher(sysvars.gnt_db)
 
-    #db.run('MATCH (x:GARD) SET x.COUNT_GENES = 0 SET x.COUNT_PHENOTYPES = 0 SET x.COUNT_TRIALS = 0 SET x.COUNT_ARTICLES = 0 SET x.COUNT_PROJECTS = 0')
+    db.run('MATCH (x:GARD) SET x.COUNT_GENES = 0 SET x.COUNT_PHENOTYPES = 0 SET x.COUNT_TRIALS = 0 SET x.COUNT_ARTICLES = 0 SET x.COUNT_PROJECTS = 0')
 
     res1 = db.run('MATCH (x:GARD)--(y:Phenotype) WITH COUNT(DISTINCT y.HPOId) AS cnt,x SET x.COUNT_PHENOTYPES = cnt').data()
     res2 = db.run('MATCH (x:GARD)--(y:Gene) WITH COUNT(DISTINCT y.GeneIdentifier) AS cnt,x SET x.COUNT_GENES = cnt').data()
@@ -383,6 +396,7 @@ def generate(db, data):
     '''
     Loops through all GARD diseases and creates all the nodes and relationships
     '''
+    
     print("Building new GARD nodes")
     # Erase database so it can be recreated
     db.run('MATCH ()-[r]-() DELETE r')
@@ -403,7 +417,7 @@ def generate(db, data):
         row = classification.iloc[i]
         row = row.to_dict()
         create_relationship(db, row)
-    
+     
     print('Building Gene data')
     genes = data['genes']
     r,c = genes.shape
@@ -411,7 +425,7 @@ def generate(db, data):
         row = genes.iloc[i]
         row = row.to_dict()
         add_genes(db, row)
-    
+     
     print('Building Phenotype data')
     phenotypes = data['phenotypes']
     r,c = phenotypes.shape
@@ -419,8 +433,9 @@ def generate(db, data):
         row = phenotypes.iloc[i]
         row = row.to_dict()
         add_phenotypes(db, row)
-    
-    get_remaining_umls(db)
+     
+    get_remaining_umls(db, umls_update=True)
     
     get_node_counts()
-    
+
+get_node_counts()

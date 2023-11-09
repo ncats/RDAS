@@ -54,12 +54,16 @@ def get_nctids(name_list):
 
         initial_query = 'https://clinicaltrials.gov/api/query/study_fields?expr=AREA[ConditionBrowseBranchAbbrev] Rare AND \"' + name + '\"&fields=NCTId&'
         query_end1 = 'min_rnk=1&max_rnk=1000&fmt=csv'
-        response = requests.get(initial_query + query_end1).text.splitlines()
+        
         try:
+            response = requests.get(initial_query + query_end1).text.splitlines()
             total_trials = int(response[4][16:-1])
-        except (IndexError,ValueError) as e:
+        except Exception as e:
+            print('ERROR in retrieving NCTIDS, retrying...')
             print(response)
-            continue
+            response = requests.get(initial_query + query_end1).text.splitlines()
+            total_trials = int(response[4][16:-1])
+
         # add trials to list
         trials = list()
         for trial in response[11:]:
@@ -111,28 +115,27 @@ def extract_fields(nctid):
     return full_trial
 
 def cypher_generate(db,now,NCTID,data,node_type,update=None,return_single=None):
-    if update:
-        print(data)
-        print(NCTID)
-
-
     ID = None
     existing_node = list()
     pattern = '\'\w+\':'
     query = str()
-
-
+    prev_create = str()
     
     # GENERATE RDAS SPECIFIC LABELS
     if node_type == 'ClinicalTrial':
         if not update:
             data['DateCreatedRDAS'] = now
         else:
-            prev_create = db.run('MATCH (x:ClinicalTrial) WHERE x.NCTId = \"{NCTID}\" RETURN x.DateCreatedRDAS as created'.format(NCTID=NCTID)).data()
-            prev_create = prev_create[0]['created']
-            print(prev_create)
-            
-            data['DateCreatedRDAS'] = prev_create
+            try:
+                prev_create = db.run('MATCH (x:ClinicalTrial) WHERE x.NCTId = \"{NCTID}\" RETURN x.DateCreatedRDAS as created'.format(NCTID=NCTID)).data()
+                prev_create = prev_create[0]['created']
+                data['DateCreatedRDAS'] = prev_create
+            except Exception as e:
+                print(f'ERROR. Not Committing Changes')
+                print(NCTID)
+                print(prev_create)
+                return
+
         data['LastUpdatedRDAS'] = now
 
 
@@ -156,9 +159,9 @@ def cypher_generate(db,now,NCTID,data,node_type,update=None,return_single=None):
     try: 
         existing_node = 'MATCH (x:{node_type} {data_string}) RETURN ID(x) AS ID LIMIT 1'.format(node_type=node_type,data_string=data_string)
         existing_node = db.run(existing_node).data()
-    except (KeyError, IndexError) as e:
-        print(f'ERROR: {e}')
-
+    except Exception as e:
+        print('ERROR. Not Committing Changes')
+        return
 
     
     if len(existing_node) > 0:
@@ -229,8 +232,10 @@ def format_node_data(db,now,trial,node_type,update=None,return_single=None):
     for ele in node_data_list:
         if not ele == {}: 
             query = cypher_generate(db, now, NCTID, ele, node_type,update=update)
-            print(NCTID, 'MODIFIED')
-            db.run(query)
+            if query:
+                db.run(query)
+            else:
+                print('ERROR: Query Returned Empty')
     return queries
 
 def is_acronym(word):
@@ -246,7 +251,7 @@ def get_unmapped_conditions(db):
     return conditions
 
 #GATHER DATA FROM A LIST OF METAMAP MAPPINGS FOR A DISEASE AND TEXT SIMILARITY ALGORITHM SCORES
-def filter_mappings(mappings,cond_name):
+def filter_mappings(mappings,cond_name,cond_id):
     cui_details = list()
     pref_details = list()
     fuzz_details = list()
@@ -274,7 +279,8 @@ def filter_mappings(mappings,cond_name):
 #CONVERT ACCENTED CHARACTERS TO THEIR ENGLISH EQUIVILANTS AND REMOVE TRAILING WHITESPACE
 def normalize(phrase):
     phrase = unidecode(phrase)
-    phrase = re.sub(r'\W+', ' ', phrase)
+    phrase = phrase.replace("\'","")
+    phrase = re.sub('\W+', ' ', phrase)
     return phrase
 
 def umls_to_gard(db,CUI):
@@ -289,7 +295,7 @@ def umls_to_gard(db,CUI):
             names.extend([gard_name])
         return {'gard_id':data, 'gard_name':names}
 
-def condition_map(db):
+def condition_map(db, update_metamap=True):
     print('RUNNING SETUP')
     #SETUP DATABASE OBJECTS
     gard_db = AlertCypher('gard')
@@ -323,10 +329,17 @@ def condition_map(db):
     cond_strs = [f"{i['cond_id']}|{normalize(i['condition'])}\n" for i in res if not is_acronym(i['condition'])]
     with open(f'{sysvars.ct_files_path}metamap_cond.txt','w') as f:
         f.writelines(cond_strs)
-    
+     
+    if update_metamap:
+        if os.path.exists(f'{sysvars.ct_files_path}metamap_cond_out.json'):
+            os.remove(f'{sysvars.ct_files_path}metamap_cond_out.json')
+            print('INITIATING UPDATE... METAMAP_COND_OUT.JSON REMOVED')
+
     if not os.path.exists(f'{sysvars.ct_files_path}metamap_cond_out.json'):
         INSTANCE.set_batch_file(f'{sysvars.ct_files_path}metamap_cond.txt') #metamap_cond.txt
+        print('METAMAP JOB SUBMITTED')
         response = INSTANCE.submit()
+
         try:
             data = response.content.decode().replace("\n"," ")
             data = re.search(r"({.+})", data).group(0)
@@ -345,6 +358,7 @@ def condition_map(db):
             print(e)
     
     else:
+        print('USING PREVIOUSLY CREATED METAMAP_COND_OUT.JSON')
         with open(f'{sysvars.ct_files_path}metamap_cond_out.json','r') as f:
             data = json.load(f)['AllDocuments']
 
@@ -359,8 +373,8 @@ def condition_map(db):
         phrases = utterances['Phrases'][0]
         mappings = phrases['Mappings']
         cond_id = utterances['PMID']
-        retrieved_mappings = filter_mappings(mappings,utt_text) #RETURNS A DICT IN FORMAT [CUI,PREF,FUZZ,META]
-        
+        retrieved_mappings = filter_mappings(mappings,utt_text,cond_id) #RETURNS A DICT IN FORMAT [CUI,PREF,FUZZ,META]
+       
         if retrieved_mappings:
             CUI = retrieved_mappings['CUI']
             PREF = retrieved_mappings['PREF']
@@ -368,12 +382,16 @@ def condition_map(db):
             FUZZ = retrieved_mappings['FUZZ']
             ALL_SEM[cond_id] = retrieved_mappings['SEM']
 
-            db.run('MATCH (x:Condition) WHERE ID(x) = {cond_id} SET x.METAMAP_OUTPUT = {CUI} SET x.METAMAP_PREFERRED_TERM = {PREF} SET x.METAMAP_SCORE = {META} SET x.FUZZY_SCORE = {FUZZ}'.format(CUI=CUI,PREF=PREF,META=META,FUZZ=FUZZ,cond_id=cond_id))
-
-
-    
+            query = 'MATCH (x:Condition) WHERE ID(x) = {cond_id} SET x.METAMAP_OUTPUT = {CUI} SET x.METAMAP_PREFERRED_TERM = {PREF} SET x.METAMAP_SCORE = {META} SET x.FUZZY_SCORE = {FUZZ}'.format(CUI=CUI,PREF=PREF,META=META,FUZZ=FUZZ,cond_id=cond_id)
+            db.run(query)
+            
     print('CREATING AND CONNECTING METAMAP ANNOTATIONS')
+    db.run('MATCH (x:Annotation) DETACH DELETE x')
     res = db.run('MATCH (x:Condition) WHERE x.METAMAP_OUTPUT IS NOT NULL RETURN ID(x) AS cond_id, x.METAMAP_OUTPUT AS cumls, x.METAMAP_PREFERRED_TERM AS prefs, x.FUZZY_SCORE as fuzz, x.METAMAP_SCORE as meta').data()
+
+    #LIST OF UMLS CODES TO BE EXCLUDED IMPORTED FROM ANOTHER FILE
+    exclude_umls = sysvars.umls_blacklist
+
     for entry in res:
         cond_id = entry['cond_id']
         CUMLS = entry['cumls']
@@ -383,6 +401,10 @@ def condition_map(db):
         meta_scores = entry['meta']
 
         for idx,umls in enumerate(CUMLS):
+            #EXCLUDES UMLS CODES
+            if umls in exclude_umls or umls == None:
+                continue            
+
             gard_ids = umls_to_gard(gard_db,umls)
             if gard_ids:
                 gard_ids = gard_ids['gard_id']
@@ -390,7 +412,6 @@ def condition_map(db):
                     db.run('MATCH (z:GARD) WHERE z.GardId = \"{gard_id}\" MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:Annotation {{UMLS: \"{umls}\", CandidatePreferred: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y) MERGE (z)<-[:mapped_to_gard]-(x)'.format(gard_id=gard_id,cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
             else:
                 db.run('MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:Annotation {{UMLS: \"{umls}\", CandidatePreferred: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y)'.format(cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
-
 
 
     print('REMOVING UNNEEDED PROPERTIES')

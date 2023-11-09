@@ -55,20 +55,23 @@ while True:
             print('Updating Node Counts on GARD db')
             get_node_counts()
 
+            db = AlertCypher('system')
+            db.setConf('DATABASE', f'{k}_update', datetime.strftime(datetime.now(),"%m/%d/%y"))
+
             print('Dumping GARD db')
-            p = Popen(['sudo', 'python3', 'generate_dump.py', '-dir gard', '-b', '-t', '-s dev'], encoding='utf8')
+            p = Popen(['python3', 'generate_dump.py', '-dir', 'gard', '-t'], encoding='utf8')
             p.wait()
 
             print(f'Dumping {full_db_name} db')
-            p = Popen(['sudo', 'python3', 'generate_dump.py', f'-dir {full_db_name}', '-b', '-t', '-s dev'], encoding='utf8')
+            p = Popen(['python3', 'generate_dump.py', '-dir', f'{full_db_name}', '-t'], encoding='utf8')
             p.wait()
 
             print(f'Transfering GARD dump to TEST server')
-            p = Popen(['sudo', 'python3', 'file_transfer.py', f'-dir {full_db_name}', '-s test'], encoding='utf8')
+            p = Popen(['python3', 'file_transfer.py', f'-dir gard', '-s test'], encoding='utf8')
             p.wait()
 
             print(f'Transfering {full_db_name} dump to TEST server')
-            p = Popen(['sudo', 'python3', 'file_transfer.py', f'-dir {full_db_name}', '-s test'], encoding='utf8')
+            p = Popen(['python3', 'file_transfer.py', f'-dir {full_db_name}', '-s test'], encoding='utf8')
             p.wait()
 
             print(f'Update of {full_db_name} Database Complete...')

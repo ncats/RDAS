@@ -24,7 +24,9 @@ elif args.db == 'pm':
     if args.mode == 'create':
         pubmed.init.main()
     elif args.mode == 'update':
-        pubmed.update.main()
+        db = AlertCypher(sysvars.pm_db)
+        last_updated = db.getConf('DATABASE','pubmed_update')
+        pubmed.update.main(last_updated)
 
 elif args.db == 'gnt':
     if args.mode == 'create':

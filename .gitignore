@@ -23,7 +23,9 @@ clinical/src/metamap_cond.txt
 clinical/src/metamap_gard.txt
 clinical/src/metamap_cond_out.json
 pubmed/src/
-gard/src/
+gard/src/*.csv
+gard/src/*.json
+gard/src/*.txt
 grant/src/
 __pycache__/
 clinical/__pycache__/
@@ -48,3 +50,5 @@ removethis.py
 start_dev.out
 start_test.out
 start_prod.out
+adapt_gard.py
+update_clinical.out

@@ -6,7 +6,8 @@ sys.path.append(workspace)
 sys.path.append(os.getcwd())
 import sysvars
 from AlertCypher import AlertCypher
-from datetime import date
+from datetime import date,datetime
+from dateutil.relativedelta import relativedelta
 import firebase_admin
 from firebase_admin import auth
 from firebase_admin import credentials
@@ -24,42 +25,42 @@ def fill_template(type,data):
         <html>
         <head>
         </head>
-        <body style="background-color:white">
+        <body style="background-color:white;font-family: Arial, sans-serif;">
         <div style="text-align:center">
-        <img src="https://rdas.ncats.nih.gov/assets/rdas_final_gradient.png" alt="Rare Disease Alert System" width="500" style="display:block;margin:auto">
+        <h1 style="font-size:50;color:purple"><u>Rare Disease Alert System</u></h1>
         </div>
         <div style="text-align:center;margin:auto">
-        <h1>{name}</h1>
-        <h1>On {date}, You have {num} new entries for your subscribed rare diseases in the {db_title} database</h1>
-        <h2>Out of that {num},</h2>
-        <table style="border:5 solid purple;margin:auto;">
+        <h1 style=font-size:25>{name}</h1>
+        <h1>Within the last week, <b>{num}</b> new entries for your subscribed rare diseases have been added to the {db_title} database</h1>
+        <table style="border:5 solid purple;margin:auto;text-align:center" width="750">
         <tr>
         <th>Name</th>
         <th>GARD ID</th>
         <th>Nodes Modified</th>
-        <th></th>
         </tr>
-    """.format(num=data['total'],images_path=sysvars.images_path,db_title=txt_db[type],name=data['name'],date=data['update_date'])
+    """.format(num=data['total'],images_path=sysvars.images_path,db_title=txt_db[type],name=data['name'])
 
     for gard in data['subscriptions']:
         if data[gard]['num'] > 0:
             full_msg += '{name} [{gardId}] - {num} new additions have been added to the database\n'.format(name=data[gard]['name'], num=data[gard]['num'], gardId=gard)
             html += """
                 <tr>
-                <td>{name}</td>
+                <td><a href='https://rdas.ncats.nih.gov/disease?id={gardId}#{tab}'>{name}</a></td>
                 <td>{gardId}</td>
                 <td>{num}</td>
-                <td><a href='https://rdas.ncats.nih.gov/disease?id={gardId}#{tab}'>Visit Page</a></td>
                 </tr>
             """.format(name=data[gard]['name'], num=data[gard]['num'], gardId=gard, tab=tabs[type])
-            #table_data.append({'name':data[gard]['name'], 'id':gard, 'num':data[gard]['num']})
 
     html += """
         </table>
+        <h4>Results gathered within the time period of {date_start}-{date_end}</h4>
+        <br>
         </div>
+        <div style="text-align:center">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6e/National_Center_for_Advancing_Translational_Sciences_logo.png" alt="Rare Disease Alert System" width="300" style="display:block;margin:auto">
         <body>
         <html>
-    """
+    """.format(date_start=data['update_date_start'],date_end=data['update_date_end'])
 
     print(html)
     return (full_msg,html)
@@ -68,7 +69,7 @@ def send_mail(type, data):
     print(f"[{data['total']}, {data['email']}]")
     if data['total'] > 0 and data['email'] == 'timothy.sheils@ncats.nih.gov' or data['email'] == 'zhuqianzq@gmail.com':
 
-        #data['email'] = 'devon.leadman@nih.gov' # TEST EMAIL
+        data['email'] = 'devon.leadman@nih.gov' # TEST EMAIL
 
         if type == "clinical":
             txt,html = fill_template(type,data)
@@ -91,24 +92,35 @@ def get_stats(type, gards, date=None):
 
     if date:
         now = date
+        start_search_date = datetime.strptime(now,"%m/%d/%y") - relativedelta(days=7)
+        end_search_date = datetime.strptime(now,"%m/%d/%y")
+        now_end = now.replace("/","-")
+        now_start = start_search_date.strftime("%m/%d/%y")
+        print(now_start, now)
     else:
-        now = date.today()
-        now = now.strftime("%m/%d/%y")
-    print(f'Searching for nodes created on {now}')
+        end_search_date = date.today()
+        start_search_date = now - relativedelta(days=7)
+        now = end_search_date.strftime("%m/%d/%y")
+        now_end = now.replace("/","-")
+        now_start = start_search_date.strftime("%m/%d/%y")
+
+    print(f'Searching for nodes created between {now_start} and {now}')
 
     convert = {'clinical':['ClinicalTrial','GARD','GardId'], 'pubmed':['Article','GARD','GardId'], 'grant':['Project','GARD','GardId']}
     connect_to_gard = {'clinical':'--(:Condition)--(:Annotation)--','pubmed':'--','grant':'--'}
+    query = 'MATCH (x:{node}){connection}(y:{gardnode}) WHERE x.DateCreatedRDAS = \"{now}\" AND y.{property} IN {list} RETURN COUNT(x)'.format(node=convert[type][0], gardnode=convert[type][1], property=convert[type][2], list=list(gards.keys()), now=now, connection=connect_to_gard[type])
 
-    response = db.run('MATCH (x:{node}){connection}(y:{gardnode}) WHERE x.DateCreatedRDAS = \"{now}\" AND y.{property} IN {list} RETURN COUNT(x)'
-        .format(node=convert[type][0], gardnode=convert[type][1], property=convert[type][2], list=list(gards.keys()), now=now, connection=connect_to_gard[type]))
+    print(query)
+
+    response = db.run(query)
     return_data['total'] = response.data()[0]['COUNT(x)']
 
     for gard in gards.keys():
-        response = db.run('MATCH (x:{node}){connection}(y:{gardnode}) WHERE x.DateCreatedRDAS = \"{now}\" AND y.{property} = \"{gard}\" RETURN COUNT(x)'
-            .format(node=convert[type][0], gardnode=convert[type][1], property=convert[type][2], gard=gard, now=now, connection=connect_to_gard[type]))
+        response = db.run('MATCH (x:{node}){connection}(y:{gardnode}) WHERE x.DateCreatedRDAS = \"{now}\" AND y.{property} = \"{gard}\" RETURN COUNT(x)'.format(node=convert[type][0], gardnode=convert[type][1], property=convert[type][2], gard=gard, now=now, connection=connect_to_gard[type]))
         return_data[gard] = {'name':gards[gard],'num':response.data()[0]['COUNT(x)']}
 
-    return_data['update_date'] = now
+    return_data['update_date_end'] = now
+    return_data['update_date_start'] = now_start
     return return_data
 
 def trigger_email(type,date=None):
@@ -147,4 +159,4 @@ def trigger_email(type,date=None):
                     update_data['subscriptions'] = list(subscript_gard.keys())
                     send_mail(type, update_data)
 
-trigger_email(sysvars.gnt_db, '04/27/23')
+#trigger_email(sysvars.gnt_db, '04/27/23') #TEST
