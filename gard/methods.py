@@ -437,5 +437,3 @@ def generate(db, data):
     get_remaining_umls(db, umls_update=True)
     
     get_node_counts()
-
-get_node_counts()

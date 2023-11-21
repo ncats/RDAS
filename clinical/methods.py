@@ -27,7 +27,7 @@ from fuzzywuzzy import fuzz
 def webscrape_ctgov_diseases():
     url = 'https://clinicaltrials.gov/ct2/search/browse?brwse=ord_alpha_all'
 
-    service = Service('/home/leadmandj/alert_remake/clinical/src/chromedriver')
+    service = Service(f'{sysvars.ct_files_path}chromedriver')
     options = webdriver.ChromeOptions()
     options.add_argument('--headless=new')
     driver = webdriver.Chrome(service=service,options=options)

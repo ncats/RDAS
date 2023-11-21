@@ -1,6 +1,6 @@
 import os
 
-current_version = 2
+current_version = 2.1
 
 # Basic user information
 current_user = 'leadmandj'
@@ -27,13 +27,13 @@ gnt_files_path = '{base_path}/grant/src/'.format(base_path=base_path)
 gard_files_path = '{base_path}/gard/src/'.format(base_path=base_path)
 
 # Database names being used on the current server
-ct_db = 'clinical'
-pm_db = 'pubmed'
-gnt_db = 'grant'
-gard_db = 'gard'
+ct_db = 'test.clinical'
+pm_db = 'test.pubmed'
+gnt_db = 'test.grant'
+gard_db = 'test.gard'
 
 # Server URLS and addresses
-epiapi_url = "https://rdas.ncats.nih.gov/api/epi/docs/"
+epiapi_url = "https://rdas.ncats.nih.gov/api/epi/"
 rdas_urls = {'dev':'rdas-dev.ncats.nih.gov','test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}
 
 # UMLS code blacklist exclusively used for the clinical trial database

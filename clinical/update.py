@@ -56,10 +56,11 @@ def main():
     
     print('Webscraping rare disease list')
     ctgov_diseases,listed_trials = rdas.webscrape_ctgov_diseases()
+    
     for idx,ct_disease in enumerate(ctgov_diseases):
         ctgov_trials = rdas.get_nctids([ct_disease])
         refreshed_ctgov_trials.extend(ctgov_trials)
-        print(idx, ct_disease)
+        print(idx, ct_disease, len(ctgov_trials))
 
     response = db.run('MATCH (x:ClinicalTrial) RETURN x.NCTId,x.LastUpdatePostDate').data()
     current_nctids = {i['x.NCTId']:i['x.LastUpdatePostDate'] for i in response}
