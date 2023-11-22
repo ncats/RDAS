@@ -24,109 +24,271 @@ nltk.download("punkt")
 from spacy.matcher import Matcher
 from fuzzywuzzy import fuzz
 
+
+
+
 def webscrape_ctgov_diseases():
+    """
+    Scrapes disease names and corresponding trial numbers from the ClinicalTrials.gov browse page.
+
+    Returns:
+        list: A list containing two lists:
+            - The first list contains parsed disease names.
+            - The second list contains corresponding trial numbers (as integers).
+
+    Dependencies:
+        - Selenium: Python library for automating web browser interaction.
+        - Chromedriver: ChromeDriver executable must be available and its path provided in sysvars.
+
+    Example:
+        parsed_data = webscrape_ctgov_diseases()
+        print(parsed_data)
+        # Output: [['Disease1', 'Disease2', ...], [123, 456, ...]]
+    """
+
+    # Define the URL for the ClinicalTrials.gov browse page (Rare Diseases Section)
     url = 'https://clinicaltrials.gov/ct2/search/browse?brwse=ord_alpha_all'
 
+    # Set up a headless Chrome browser using Selenium
     service = Service(f'{sysvars.ct_files_path}chromedriver')
     options = webdriver.ChromeOptions()
     options.add_argument('--headless=new')
     driver = webdriver.Chrome(service=service,options=options)
+
+    # Navigate to the specified URL
     driver.get(url)
 
+    # Set the number of items to display on one page to all
     select = Select(driver.find_element('name','theDataTable_length'))
     select.select_by_value('-1')
+
+    # Find elements in the table containing disease names and corresponding trial numbers
     table = driver.find_elements(By.XPATH, '//*[@id="theDataTable"]/tbody/tr/td/a')
     listed_trials = driver.find_elements(By.XPATH, '//*[@id="theDataTable"]/tbody/tr/td[2]')
+
+    # Initialize lists to store parsed data
     parsed_table = list()
     parsed_trial_nums = list()
+
+    # Parse disease names from the table
     for ele in table:
         parsed_table.append(ele.text)
+
+    # Parse trial numbers from the table, removing commas and converting to integers
     for ele in listed_trials:
         parsed_trial_nums.append(int(ele.text.replace(',','')))
 
+    # Return a list containing parsed disease names and corresponding trial numbers
     return [parsed_table,parsed_trial_nums]
 
+
+
+
 def get_nctids(name_list):
-    # check total number of trials
+    """
+    Retrieves ClinicalTrials.gov Identifiers (NCTIDs) for a list of rare disease names.
+
+    Args:
+        name_list (list): List of rare disease names.
+
+    Returns:
+        list: List of ClinicalTrials.gov Identifiers (NCTIDs) associated with the provided rare disease names.
+
+    Example:
+        disease_names = ["Disease1", "Disease2", ...]
+        nct_ids = get_nctids(disease_names)
+        print(nct_ids)
+        # Output: ["NCT123", "NCT456", ...]
+    """
+
+    # Initialize a list to store all retrieved NCTIDs
     all_trials = list()
+
+    # Iterate through each rare disease name
     for name in name_list:
+        # Replace double quotes to prevent issues with the URL
         name = name.replace('"','\"')
 
+        # Construct the initial API query to get the total number of trials
         initial_query = 'https://clinicaltrials.gov/api/query/study_fields?expr=AREA[ConditionBrowseBranchAbbrev] Rare AND \"' + name + '\"&fields=NCTId&'
         query_end1 = 'min_rnk=1&max_rnk=1000&fmt=csv'
         
         try:
+            # Make the API request to get the total number of trials
             response = requests.get(initial_query + query_end1).text.splitlines()
             total_trials = int(response[4][16:-1])
         except Exception as e:
+            # Retry in case of an error
             print('ERROR in retrieving NCTIDS, retrying...')
             print(response)
             response = requests.get(initial_query + query_end1).text.splitlines()
             total_trials = int(response[4][16:-1])
 
-        # add trials to list
+        # Add trials to a temporary list
         trials = list()
         for trial in response[11:]:
             trials.append(trial.split(',')[1][1:-1])
 
-        # break into extra queries of 1000 trials if necessary
+        # Break into extra queries of 1000 trials if necessary
         for rank in range(1, total_trials//1000 + 1):
-            # get next 1000 trials
+            # Get next 1000 trials
             query_end2 = 'min_rnk=' + str(rank*1000+1) + '&max_rnk=' + str((rank+1)*1000) + '&fmt=csv'
             response = requests.get(initial_query + query_end2).text.splitlines()
 
-            # add trials to list
+            # Add trials to the temporary list
             for trial in response[11:]:
                 trials.append(trial.split(',')[1][1:-1])
 
+        # Add the trials from the temporary list to the overall list
         all_trials += trials
 
-    # return list of trials
+    # Return the list of all retrived NCTIDs
     return all_trials
 
+
+
+
 def parse_module(module, trial):
+    """
+    Recursively parses a nested dictionary structure (module) and adds its key-value pairs to the trial dictionary.
+
+    Args:
+        module (dict): Nested dictionary structure to be parsed.
+        trial (dict): Dictionary to which the key-value pairs will be added.
+
+    Returns:
+        dict: Modified trial dictionary containing key-value pairs from the provided module.
+
+    Example:
+        module_data = {"field1": "value1", "field2": {"nested_field": "nested_value"}}
+        trial_data = parse_module(module_data, {})
+        print(trial_data)
+        # Output: {"field1": "value1", "field2": {"nested_field": "nested_value"}}
+    """
+
+    # Iterate through each key in the dictionary
     for key in module.keys():
         field = module[key]
+
+        # Check if the current field is a nested dictionary
         if type(field) == dict:
+            # Recursively parse the nested dictionary
             parse_module(field,trial)
         else:
+            # Add the key-value pair to the trial dictionary
             trial[key] = module[key]
 
+    # Return the modified trial dictionary
     return trial
 
+
+
+
 def parse_trial_fields(trial):
+    """
+    Parses trial fields from a nested dictionary structure and returns a flattened dictionary.
+
+    Args:
+        trial (dict): Nested dictionary structure representing trial data.
+
+    Returns:
+        dict: Flattened dictionary containing parsed trial fields.
+
+    Example:
+        trial_data = {"FullStudiesResponse": {"FullStudies": [{"Study": {"field1": "value1", "field2": {"nested_field": "nested_value"}}}]}}
+        parsed_data = parse_trial_fields(trial_data)
+        print(parsed_data)
+        # Output: {"field1": "value1", "field2": {"nested_field": "nested_value"}}
+    """
+
     try:
+        # Extract the base dictionary containing trial information
         base = trial['FullStudiesResponse']['FullStudies'][0]['Study']
+
+        # Use the parse_module function to flatten the nested structure
         parsed_trial = parse_module(base, dict())
     except KeyError:
+        # Return None if the expected keys are not found
         return None
     
+    # Return the flattened dictionary containing parsed trial fields
     return parsed_trial
 
+
+
+
 def extract_fields(nctid):
+    """
+    Extracts trial fields for a given ClinicalTrials.gov Identifier (NCTID) and returns a flattened dictionary.
+
+    Args:
+        nctid (str): ClinicalTrials.gov Identifier (NCTID) for the trial.
+
+    Returns:
+        dict: Flattened dictionary containing parsed trial fields.
+
+    Example:
+        nct_id = "NCT12345678"
+        trial_fields = extract_fields(nct_id)
+        print(trial_fields)
+        # Output: {"field1": "value1", "field2": {"nested_field": "nested_value"}}
+    """
+
+    # Contruct the API query to retrieve full study information
     full_trial_query = 'https://clinicaltrials.gov/api/query/full_studies?expr=' + nctid + '&min_rnk=1&max_rnk=1&fmt=json'
     
     try:
+        # Make the API request and parse the JSON response
         full_trial_response = requests.get(full_trial_query).json()
+
+        # Use the parse_trial_fields function to flatten the nested structure
         full_trial = parse_trial_fields(full_trial_response)
     except ValueError:
+        # Return None if there is an issue with the JSON response
         return None
     
+    # Return the flattened dictionary containing parsed trial fields
     return full_trial
 
+
+
+
 def cypher_generate(db,now,NCTID,data,node_type,update=None,return_single=None):
+    """
+    Generates a Cypher query for creating or updating nodes and relationships in a Neo4j database.
+
+    Args:
+        db: Neo4j database connection.
+        now (str): Current date in string format.
+        NCTID (str): ClinicalTrials.gov Identifier (NCTID) for the trial.
+        data (dict): Dictionary containing node properties.
+        node_type (str): Type of node in the Neo4j database.
+        update (bool): Flag indicating whether to update an existing node.
+        return_single (bool): Flag indicating whether to return data for a single clinical trial.
+
+    Returns:
+        str: Cypher query for creating or updating nodes and relationships.
+
+    Example:
+        db_connection = get_neo4j_connection()
+        now_date = datetime.now().strftime("%m/%d/%y")
+        trial_data = {"field1": "value1", "field2": "value2"}
+        cypher_query = cypher_generate(db_connection, now_date, "NCT12345678", trial_data, "ClinicalTrial", update=True)
+        print(cypher_query)
+    """
+        
     ID = None
     existing_node = list()
     pattern = '\'\w+\':'
     query = str()
     prev_create = str()
     
-    # GENERATE RDAS SPECIFIC LABELS
     if node_type == 'ClinicalTrial':
         if not update:
             data['DateCreatedRDAS'] = now
         else:
             try:
+                # Get the previous creation date for an existing ClinicalTrial node, When a new ClinicalTrial node is created for the update it will keep the previous nodes DateCreatedRDAS
                 prev_create = db.run('MATCH (x:ClinicalTrial) WHERE x.NCTId = \"{NCTID}\" RETURN x.DateCreatedRDAS as created'.format(NCTID=NCTID)).data()
                 prev_create = prev_create[0]['created']
                 data['DateCreatedRDAS'] = prev_create
@@ -138,9 +300,7 @@ def cypher_generate(db,now,NCTID,data,node_type,update=None,return_single=None):
 
         data['LastUpdatedRDAS'] = now
 
-
-
-    #PARSES DATA STRING
+    # Removes the quotation marks from around the strings for preparation to convert the data to a Cypher query
     data_string = str(data)    
     matches = re.finditer(pattern,data_string)
     for match in matches:
@@ -149,48 +309,43 @@ def cypher_generate(db,now,NCTID,data,node_type,update=None,return_single=None):
         data_string = data_string[:start] + ' ' + data_string[start+1:]
         data_string = data_string[:end] + ' ' + data_string[end+1:]
 
-
- 
+    # Returns back just the string of data (Not the Cypher query) if the flag is set to True
     if return_single:
         return data_string
 
-
-
-    try: 
+    try:
+        # Check if a node with the given properties already exists
         existing_node = 'MATCH (x:{node_type} {data_string}) RETURN ID(x) AS ID LIMIT 1'.format(node_type=node_type,data_string=data_string)
         existing_node = db.run(existing_node).data()
     except Exception as e:
         print('ERROR. Not Committing Changes')
-        return
-
-    
+        return    
     if len(existing_node) > 0:
         ID = existing_node[0]['ID']
 
-
-
+    # Generates the Cypher query used to create the node on the Neo4j Database
     if not node_type == 'ClinicalTrial':
         query += 'MATCH (ct: ClinicalTrial {{NCTId:\'{NCTID}\'}}) '.format(NCTID=NCTID)
     else:
         if update:
+            # Update an existing ClinicalTrial node
             query += 'MATCH ({node_abbr}:{node_type} {{NCTId:\"{NCTID}\"}}) SET {node_abbr} = {data_string} '.format(node_abbr=dm.abbreviations[node_type],node_type=node_type,data_string=data_string,NCTID=NCTID)
         else:
+            # Create a new ClinicalTrial node
             query += 'MERGE ({node_abbr}:{node_type} {data_string}) '.format(node_abbr=dm.abbreviations[node_type],node_type=node_type,data_string=data_string)
-
-
-
 
     if not node_type == 'ClinicalTrial':
         if ID:
+            # Create a relationship between the ClinicalTrial node and the existing node
             query += 'MATCH ({node_abbr}:{node_type}) WHERE ID({node_abbr}) = {ID} MERGE (ct){dir1}[:{rel_name}]{dir2}({node_abbr})'.format(ID=ID,node_type=node_type,dir1=dm.rel_directions[node_type][0],dir2=dm.rel_directions[node_type][1],rel_name=dm.relationships[node_type],node_abbr=dm.abbreviations[node_type])
         else:
+            # Create a relationship between the ClinicalTrial node and a new node
             query += 'MERGE ({node_abbr}:{node_type} {data_string}) MERGE (ct){dir1}[:{rel_name}]{dir2}({node_abbr}) '.format(data_string=data_string,ID=ID,node_type=node_type,dir1=dm.rel_directions[node_type][0],dir2=dm.rel_directions[node_type][1],rel_name=dm.relationships[node_type],node_abbr=dm.abbreviations[node_type])
-
-
-
-
     query += 'RETURN TRUE'
     return query
+
+
+
 
 def format_node_data(db,now,trial,node_type,update=None,return_single=None):
     data_collection = None
@@ -238,20 +393,79 @@ def format_node_data(db,now,trial,node_type,update=None,return_single=None):
                 print('ERROR: Query Returned Empty')
     return queries
 
+
+
+
 def is_acronym(word):
+    """
+    Checks if a word is an acronym.
+
+    Args:
+        word (str): The word to be checked.
+
+    Returns:
+        bool: True if the word is an acronym, False otherwise.
+
+    Example:
+        result = is_acronym("NASA")
+        print(result)  # Output: True
+    """
+
+    # Check if the word contains spaces
     if len(word.split(' ')) > 1:
         return False
+    # Check if the word follows the pattern of an acronym
     elif bool(re.match(r'\w*[A-Z]\w*', word[:len(word)-1])) and (word[len(word)-1].isupper() or word[len(word)-1].isnumeric()):
         return True
     else:
         return False
 
+
+
+
 def get_unmapped_conditions(db):
+    """
+    Retrieves conditions that are not mapped to GARD in the database.
+
+    Args:
+        db: The database connection.
+
+    Returns:
+        list: List of dictionaries containing condition names and their corresponding IDs.
+
+    Example:
+        conditions = get_unmapped_conditions(my_database)
+        print(conditions)
+        # Output: [{'Condition': 'Unmapped Condition 1', 'ID': 1}, {'Condition': 'Unmapped Condition 2', 'ID': 2}, ...]
+    """
+
+    # Query to find conditions that are not mapped to GARD
     conditions = db.run('MATCH (x:Condition) where not (x)-[:mapped_to_gard]-(:GARD) RETURN x.Condition, ID(x)').data()
     return conditions
 
-#GATHER DATA FROM A LIST OF METAMAP MAPPINGS FOR A DISEASE AND TEXT SIMILARITY ALGORITHM SCORES
+
+
+
 def filter_mappings(mappings,cond_name,cond_id):
+    """
+    Filters and extracts relevant details from condition mappings.
+
+    Args:
+        mappings (list): List of dictionaries containing condition mappings.
+        cond_name (str): Name of the condition.
+        cond_id: ID of the condition.
+
+    Returns:
+        dict: Dictionary containing filtered details (CUI, SEM, PREF, FUZZ, META).
+
+    Example:
+        mappings = get_condition_mappings(my_database, 'Some Condition', 1)
+        filtered_details = filter_mappings(mappings, 'Some Condition', 1)
+        print(filtered_details)
+        # Output: {'CUI': ['C12345', 'C67890'], 'SEM': [['T047', 'T191'], ['T123', 'T456']],
+        # 'PREF': ['PreferredTerm1', 'PreferredTerm2'], 'FUZZ': [90, 75], 'META': [7, 8]}
+    """
+
     cui_details = list()
     pref_details = list()
     fuzz_details = list()
@@ -259,35 +473,83 @@ def filter_mappings(mappings,cond_name,cond_id):
     sem_details = list()
 
     for idx,mapping in enumerate(mappings):
+        # Extracting MetaMap score
         meta_score = int(mapping['MappingScore'].replace('-','')) // 10
+        
+        # Extracting details from the candidate
         candidates = mapping['MappingCandidates'][0]
         CUI = candidates['CandidateCUI']
         sem_types = candidates['SemTypes']
         candidate_pref = candidates['CandidatePreferred']
+
+        # Calculating fuzziness score between condition name and preferred term
         fuzz_score_cond_pref = int(fuzz.token_sort_ratio(cond_name, candidate_pref))
 
+        # Appending details to respective lists
         cui_details.append(CUI)
         sem_details.append(sem_types)
         pref_details.append(candidate_pref)
         fuzz_details.append(fuzz_score_cond_pref)
         meta_details.append(meta_score)
 
+    # Creating a dictionary with filtered details
     if len(cui_details) > 0:
         return {'CUI':cui_details, 'SEM':sem_details, 'PREF':pref_details, 'FUZZ':fuzz_details, 'META':meta_details}
 
 
-#CONVERT ACCENTED CHARACTERS TO THEIR ENGLISH EQUIVILANTS AND REMOVE TRAILING WHITESPACE
+
+
 def normalize(phrase):
-    phrase = unidecode(phrase)
-    phrase = phrase.replace("\'","")
-    phrase = re.sub('\W+', ' ', phrase)
+    """
+    Normalizes a given phrase by removing diacritics, replacing single quotes,
+    and removing non-alphanumeric characters.
+
+    Args:
+        phrase (str): The input phrase.
+
+    Returns:
+        str: The normalized phrase.
+
+    Example:
+        input_phrase = "Café au lait!"
+        normalized_result = normalize(input_phrase)
+        print(normalized_result)
+        # Output: 'Cafe au lait'
+    """
+    phrase = unidecode(phrase) # Remove diacritics
+    phrase = phrase.replace("\'","") # Replace single quotes
+    phrase = re.sub('\W+', ' ', phrase) # Remove non-alphanumeric characters
     return phrase
 
+
+
+
 def umls_to_gard(db,CUI):
+    """
+    Maps a UMLS CUI to GARD entries in the database.
+
+    Args:
+        db: The database connection.
+        CUI (str): The UMLS CUI.
+
+    Returns:
+        dict: A dictionary containing GARD IDs and names corresponding to the given UMLS CUI.
+
+    Example:
+        db_connection = get_database_connection()
+        umls_cui = "C0002736"
+        result_mapping = umls_to_gard(db_connection, umls_cui)
+        print(result_mapping)
+        # Output: {'gard_id': ['12345', '67890'], 'gard_name': ['Example GARD 1', 'Example GARD 2']}
+    """
+
+    # Query the database to find GARD entries that have the given UMLS CUI
     res = db.run('MATCH (x:GARD) WHERE \"{CUI}\" IN x.UMLS RETURN x.GardId as gard_id, x.GardName as name'.format(CUI=CUI)).data()
+    
     if res:
         data = list()
         names = list()
+        # Extract GARD IDs and names from the query result
         for i in res:
             gard_id = i['gard_id']
             gard_name = i['name']
@@ -295,46 +557,64 @@ def umls_to_gard(db,CUI):
             names.extend([gard_name])
         return {'gard_id':data, 'gard_name':names}
 
+
+
+
 def condition_map(db, update_metamap=True):
+    """
+    Maps conditions to UMLS concepts using MetaMap annotations.
+
+    Args:
+        db: The database connection.
+        update_metamap (bool): Flag to update MetaMap results. Defaults to True.
+
+    Returns:
+        None
+
+    Example:
+        db_connection = get_database_connection()  # Replace with actual function to get the database connection
+        condition_map(db_connection)
+    """
+
     print('RUNNING SETUP')
-    #SETUP DATABASE OBJECTS
     gard_db = AlertCypher('gard')
     
-    #SETUP METAMAP INSTANCE
+    # # Initialize MetaMap instance
     INSTANCE = Submission(os.environ['METAMAP_EMAIL'],os.environ['METAMAP_KEY'])
     INSTANCE.init_generic_batch('metamap','-J acab,anab,comd,cgab,dsyn,fndg,emod,inpo,mobd,neop,patf,sosy --JSONn') #--sldiID
     INSTANCE.form['SingLinePMID'] = True
 
-
-    
     print('RUNNING GARD POPULATION')
-    #POPULATE CLINICAL DB WITH GARD DATA WITH UMLS MAPPINGS FROM GARD NEO4J DB
+    # Fetch GARD entries from the database
     gard_res = gard_db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.GardName as GardName, x.Synonyms as Synonyms, x.UMLS as gUMLS, x.UMLS_Source as usource')
     for gres in gard_res.data():
         gUMLS = gres['gUMLS']
         name = gres['GardName']
         gard_id = gres['GardId']
         syns = gres['Synonyms']
-    
+
+        # Check if UMLS data is present and create GARD node accordingly
         if gUMLS:
             db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns},UMLS:{gUMLS},UMLS_Source:\"{usource}\"}})'.format(name=gres['GardName'],gard_id=gres['GardId'],syns=gres['Synonyms'],gUMLS=gres['gUMLS'],usource=gres['usource']))
         else:
             db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns},UMLS_Source:\"{usource}\"}})'.format(name=gres['GardName'],gard_id=gres['GardId'],syns=gres['Synonyms'],usource=gres['usource']))
 
-
-    
     print('RUNNING METAMAP')
-    #RUN BATCH METAMAP ON ALL CONDITIONS IN CLINICAL DB
+    # Fetch conditions from the database
     res = db.run('MATCH (c:Condition) RETURN c.Condition as condition, ID(c) as cond_id')
     cond_strs = [f"{i['cond_id']}|{normalize(i['condition'])}\n" for i in res if not is_acronym(i['condition'])]
+    
+    # Write condition strings to a file for MetaMap processing
     with open(f'{sysvars.ct_files_path}metamap_cond.txt','w') as f:
         f.writelines(cond_strs)
-     
+    
+    # Update MetaMap results if required
     if update_metamap:
         if os.path.exists(f'{sysvars.ct_files_path}metamap_cond_out.json'):
             os.remove(f'{sysvars.ct_files_path}metamap_cond_out.json')
             print('INITIATING UPDATE... METAMAP_COND_OUT.JSON REMOVED')
 
+    # Run MetaMap and store results
     if not os.path.exists(f'{sysvars.ct_files_path}metamap_cond_out.json'):
         INSTANCE.set_batch_file(f'{sysvars.ct_files_path}metamap_cond.txt') #metamap_cond.txt
         print('METAMAP JOB SUBMITTED')
@@ -362,18 +642,17 @@ def condition_map(db, update_metamap=True):
         with open(f'{sysvars.ct_files_path}metamap_cond_out.json','r') as f:
             data = json.load(f)['AllDocuments']
 
-
-    
     print('PARSING OUT METAMAP FILTERS')
-    #PARSE OUT DATA FROM BATCH METAMAP AND FILTER MAPPINGS CANDIDATES TO ONE RESULT
     ALL_SEM = dict()
+
+    # Process MetaMap results and update database
     for entry in data:
         utterances = entry['Document']['Utterances'][0]
         utt_text = utterances['UttText']
         phrases = utterances['Phrases'][0]
         mappings = phrases['Mappings']
         cond_id = utterances['PMID']
-        retrieved_mappings = filter_mappings(mappings,utt_text,cond_id) #RETURNS A DICT IN FORMAT [CUI,PREF,FUZZ,META]
+        retrieved_mappings = filter_mappings(mappings,utt_text,cond_id)
        
         if retrieved_mappings:
             CUI = retrieved_mappings['CUI']
@@ -382,16 +661,19 @@ def condition_map(db, update_metamap=True):
             FUZZ = retrieved_mappings['FUZZ']
             ALL_SEM[cond_id] = retrieved_mappings['SEM']
 
+            # Update MetaMap-related properties in the Condition node
             query = 'MATCH (x:Condition) WHERE ID(x) = {cond_id} SET x.METAMAP_OUTPUT = {CUI} SET x.METAMAP_PREFERRED_TERM = {PREF} SET x.METAMAP_SCORE = {META} SET x.FUZZY_SCORE = {FUZZ}'.format(CUI=CUI,PREF=PREF,META=META,FUZZ=FUZZ,cond_id=cond_id)
             db.run(query)
             
     print('CREATING AND CONNECTING METAMAP ANNOTATIONS')
+    # Delete existing annotations
     db.run('MATCH (x:Annotation) DETACH DELETE x')
+    # Fetch relevant data from Condition nodes
     res = db.run('MATCH (x:Condition) WHERE x.METAMAP_OUTPUT IS NOT NULL RETURN ID(x) AS cond_id, x.METAMAP_OUTPUT AS cumls, x.METAMAP_PREFERRED_TERM AS prefs, x.FUZZY_SCORE as fuzz, x.METAMAP_SCORE as meta').data()
 
-    #LIST OF UMLS CODES TO BE EXCLUDED IMPORTED FROM ANOTHER FILE
     exclude_umls = sysvars.umls_blacklist
 
+    # Process and create annotations based on MetaMap results
     for entry in res:
         cond_id = entry['cond_id']
         CUMLS = entry['cumls']
@@ -401,7 +683,7 @@ def condition_map(db, update_metamap=True):
         meta_scores = entry['meta']
 
         for idx,umls in enumerate(CUMLS):
-            #EXCLUDES UMLS CODES
+            # Skip blacklisted or None UMLS entries
             if umls in exclude_umls or umls == None:
                 continue            
 
@@ -409,48 +691,108 @@ def condition_map(db, update_metamap=True):
             if gard_ids:
                 gard_ids = gard_ids['gard_id']
                 for gard_id in gard_ids:
+                    # Create Annotation nodes and connect to Condition and GARD nodes
                     db.run('MATCH (z:GARD) WHERE z.GardId = \"{gard_id}\" MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:Annotation {{UMLS: \"{umls}\", CandidatePreferred: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y) MERGE (z)<-[:mapped_to_gard]-(x)'.format(gard_id=gard_id,cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
             else:
+                # Create Annotation nodes and connect to Condition nodes
                 db.run('MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:Annotation {{UMLS: \"{umls}\", CandidatePreferred: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y)'.format(cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
 
-
     print('REMOVING UNNEEDED PROPERTIES')
+    # Remove unnecessary properties from Condition nodes that were used during processing
     db.run('MATCH (x:Condition) SET x.METAMAP_PREFERRED_TERM = NULL SET x.METAMAP_OUTPUT = NULL SET x.FUZZY_SCORE = NULL SET x.METAMAP_SCORE = NULL')
     
     print('ADDING GARD-CONDITION MAPPINGS BASED ON EXACT STRING MATCH')
+    # Fetch Condition nodes without existing annotations
     res = db.run('MATCH (x:Condition) WHERE NOT (x)-[:has_annotation]-() RETURN ID(x) as cond_id, x.Condition as cond').data()
+    
+    # Create annotations based on exact string match and connect to GARD nodes
     for entry in res:
         cond_id = entry['cond_id']
         cond = entry['cond']
         db.run('MATCH (x:GARD) WHERE toLower(x.GardName) = toLower(\"{cond}\") MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (z:Annotation {{CandidatePreferred: \"{cond}\", MATCH_TYPE: \"STRING\"}}) MERGE (z)<-[:has_annotation]-(y) MERGE (x)<-[:mapped_to_gard]-(z)'.format(cond=cond,cond_id=cond_id))
 
 
+
+
 def drug_normalize(drug):
+    """
+    Normalize a drug name by removing non-ASCII characters and replacing non-word characters with spaces.
+
+    Parameters:
+    - drug (str): The input drug name to be normalized.
+
+    Returns:
+    - str: The normalized drug name.
+    """
+
+    # Remove non-ASCII characters
     new_val = drug.encode("ascii", "ignore")
+
+    # Decode the bytes to string
     updated_str = new_val.decode()
+
+    # Replace non-word characters with spaces
     updated_str = re.sub('\W+',' ', updated_str)
+
     return updated_str
 
+
+
+
 def create_drug_connection(db,rxdata,drug_id,wspacy=False):
+    """
+    Create a connection between an Intervention node and a Drug node based on RxNormID.
+
+    Parameters:
+    - db: Neo4j database connection.
+    - rxdata (dict): Dictionary containing RxNorm data for the drug.
+    - drug_id (int): ID of the Intervention (ClinicalTrial node) to connect with the Drug node.
+    - wspacy (bool): Flag indicating whether the connection involves SpaCy processing.
+
+    Returns:
+    - None
+    """
+
     rxnormid = rxdata['RxNormID']
+
+    # Create or merge Drug node with RxNormID
     db.run('MATCH (x:Intervention) WHERE ID(x)={drug_id} MERGE (y:Drug {{RxNormID:{rxnormid}}}) MERGE (y)<-[:mapped_to_rxnorm {{WITH_SPACY: {wspacy}}}]-(x)'.format(rxnormid=rxnormid, drug_id=drug_id, wspacy=wspacy))
 
+    # Set additional properties on the Drug node
     for k,v in rxdata.items():
         key = k.replace(' ','')
         db.run('MERGE (y:Drug {{RxNormID:{rxnormid}}}) WITH y MATCH (x:Intervention) WHERE ID(x)={drug_id} MERGE (y)<-[:mapped_to_rxnorm]-(x) SET y.{key} = {value}'.format(rxnormid=rxdata['RxNormID'], drug_id=drug_id, key=key, value=v))
 
+
+
+
 def get_rxnorm_data(drug):
+    """
+    Retrieve RxNorm data for a given drug name from the RxNav API.
+
+    Parameters:
+    - drug (str): Name of the drug for which RxNorm data is to be retrieved.
+
+    Returns:
+    - dict or None: Dictionary containing RxNorm data for the drug, or None if data retrieval fails.
+    """
+
+    # Form RxNav API request to get RxNormID based on drug name
     rq = 'https://rxnav.nlm.nih.gov/REST/rxcui.json?name={drug}&search=2'.format(drug=drug)
     response = requests.get(rq)
     try:
         rxdata = dict()
+
+        # Extract RxNormID from the response
         response = response.json()['idGroup']['rxnormId'][0]
         rxdata['RxNormID'] = response
 
+        # Form RxNav API request to get all properties of the drug using RxNormID
         rq2 = 'https://rxnav.nlm.nih.gov/REST/rxcui/{rxnormid}/allProperties.json?prop=codes+attributes+names+sources'.format(rxnormid=response)
         response = requests.get(rq2)
         response = response.json()['propConceptGroup']['propConcept']
 
+        # Extract and organize properties of the drug
         for r in response:
             if r['propName'] in rxdata:
                 rxdata[r['propName']].append(r['propValue'])
@@ -467,37 +809,78 @@ def get_rxnorm_data(drug):
         return
 
 
+
+
 def nlp_to_drug(db,doc,matches,drug_name,drug_id):
+    """
+    Map drug names detected in NLP to RxNorm data and create connections in the database.
+
+    Parameters:
+    - db: Neo4j database connection.
+    - doc: SpaCy NLP document containing the text.
+    - matches: List of matches detected in the document.
+    - drug_name (str): Name of the drug for which connections are to be created.
+    - drug_id (int): ID of the drug node in the database.
+
+    Returns:
+    - None
+    """
+
     for match_id, start, end in matches:
         span = doc[start:end].text
+
+        # Retrieve RxNorm data for the drug name
         rxdata = get_rxnorm_data(span.replace(' ','+'))
 
         if rxdata:
+            # Create connections in the database using RxNorm data
             create_drug_connection(db,rxdata,drug_id,wspacy=True)
         else:
             print('Map to RxNorm failed for intervention name: {drug_name}'.format(drug_name=drug_name))
 
+
+
+
 def rxnorm_map(db):
+    """
+    Map RxNorm data to Drug Interventions in the Neo4j database.
+
+    Parameters:
+    - db: Neo4j database connection.
+
+    Returns:
+    - None
+    """
+
     print('Starting RxNorm data mapping to Drug Interventions')
+
+    # Load SpaCy NLP model and set up matcher
     nlp = spacy.load('en_ner_bc5cdr_md')
     pattern = [{'ENT_TYPE':'CHEMICAL'}]
     matcher = Matcher(nlp.vocab)
     matcher.add('DRUG',[pattern])
 
+    # Retrieve drug interventions from the database
     results = db.run('MATCH (x:Intervention) WHERE x.InterventionType = "Drug" RETURN x.InterventionName, ID(x)').data()
 
+    # Iterate over drug interventions and map RxNorm data
     for idx,res in enumerate(results):
         drug_id = res['ID(x)']
         drug = res['x.InterventionName']
+
+        # Normalize drug name and prepare for RxNorm mapping
         drug = drug_normalize(drug)
         drug_url = drug.replace(' ','+')
+
+        # Retrieve RxNorm data for the drug name
         rxdata = get_rxnorm_data(drug_url)
 
         if rxdata:
+            # Create connections in the database using RxNorm data
             create_drug_connection(db, rxdata, drug_id)
             
         else:
+            # If RxNorm data not found, use SpaCy NLP to detect drug names and map to RxNorm
             doc = nlp(drug)
             matches = matcher(doc)
             nlp_to_drug(db,doc,matches,drug,drug_id)
- 

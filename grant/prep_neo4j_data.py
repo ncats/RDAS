@@ -577,6 +577,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	raw_path = to_abs_path(data_raw_path)
 	neo4j_path = to_abs_path(data_neo4j_path)
 
+	# Initializes folders to be created that store processed CSV files
 	print("Reading raw data from", raw_path, "and outputting processed data to", neo4j_path)
 	folders_to_create = [
 			"abstracts",

@@ -17,10 +17,12 @@ parser.add_argument("-db", "--database", dest = "db", help="name of database to 
 parser.add_argument("-a", "--all", dest = "transfer_all", action='store_true', help="approve all of the databases")
 args = parser.parse_args()
 
+# Ask for approval to proceed
 print('STARTING APPROVAL PROCESS; THIS SHOULD ONLY BE RAN ON THE TEST SERVER; APPROVE? (y/n)')
 res = input()
 
-if res == 'y':    
+if res == 'y':
+    # If approved, either a single or all databases will have a backup created and they will be sent to the approved directory, in which they will then be transfered to the Production server    
     if args.transfer_all: # IF TRANSFERING ALL DUMP FILES
         for dump_dir in sysvars.dump_dirs:
             generate_dump.dump(sysvars.approved_path, f'{dump_dir}.dump', '/opt/neo4j/bin/', dump_dir)

@@ -1,6 +1,6 @@
 import os
 
-current_version = 2.1
+current_version = 2.2
 
 # Basic user information
 current_user = 'leadmandj'

@@ -1,6 +1,7 @@
 import os
 import sys
 workspace = os.path.dirname(os.path.abspath(__file__))
+print(workspace)
 sys.path.append(workspace)
 import sysvars
 import pubmed.init

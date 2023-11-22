@@ -33,8 +33,11 @@ def step_to_fn(
 	function (`fn`) with the data_folder, constraint, and query from the step.
 	"""
 	def fn(session: Session, fta: FilesToAdd) -> None:
+		# Creates the constraint on the database if one exists
 		if constraint is not None:
 			write(session, constraint, {})
+		
+		# Iterates through each file in the currently selected processed data folder and loads the CSV into the Neo4j Database
 		for file in fta[data_folder]:
 			print("Processing file " + file)
 			write(session, "LOAD CSV WITH HEADERS FROM $path AS data\n" + query, {"path": file})

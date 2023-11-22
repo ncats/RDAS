@@ -415,6 +415,9 @@ def save_omim_remaining_articles(gard_id, omim_id, sections, search_source, driv
 
 def find_articles(keyword, mindate, maxdate):
   """
+  NOTE: A maximum of 9999 articles are retrieved during an update, a batch of queries will need to be ran to get the full number of articles during an update
+  """
+  """
   Search for articles in the PubMed database using the NCBI API.
 
   Parameters:
@@ -439,7 +442,7 @@ def find_articles(keyword, mindate, maxdate):
   url = str()
   term_search_query = str()
   api_key = os.environ['NCBI_KEY']
-  keyword = keyword.replace('-',' ')
+  keyword = keyword.replace('-',' ').replace('\"','')
   tokens = keyword.split(';')
   
   # Construct the search query
@@ -1385,7 +1388,6 @@ def save_articles(disease_node, pubmed_ids, search_source, session, maxdate):
   # Iterate through the fetched abstracts
   for abstracts in all_abstracts:
     if ('resultList' in abstracts and 'result' in abstracts['resultList'] and len(abstracts['resultList']['result']) > 0):
-      
       try:
         # Iterate through the results in the fetched abstracts
         for result in abstracts['resultList']['result']:
@@ -1415,6 +1417,9 @@ def save_articles(disease_node, pubmed_ids, search_source, session, maxdate):
       except Exception as e:
         logging.error(f" Exception when iterating abstracts['resultList']['result'], result: {result}, error: {e}")  
 
+    else:
+      # No data was returned from fetch_abstracts, skips adding them to the database
+      print(f'No data from function fetch_abstracts was returned for PubMed IDs: ', pubmed_ids)
 
 
 
@@ -1451,10 +1456,11 @@ def filter_existing(db, gard_id, pmids):
   query = f'MATCH (x:GARD)--(y:Article) WHERE x.GardId = \"{gard_id}\" AND y.pubmed_id IN {pmids} RETURN y.pubmed_id'
   response = db.run(query).data()
 
-  # if there are PubMed IDs already in the database, filter them out
+  # if there are PubMed IDs already in the database, filter them out from the PubMed API query response of PMIDs
   if len(response) > 0:
     for id in response:
-      pmids.remove(id['y.pubmed_id'])
+      if id['y.pubmed_id'] in pmids:
+        pmids.remove(id['y.pubmed_id'])
     # If all PubMed IDs are already in the database, return None
     if len(pmids) == 0:
       pmids = None   
@@ -1542,7 +1548,7 @@ def save_disease_articles(db, mindate, maxdate):
         db_article_count = int(db.run(check_query).data()[0]['cnt'])
         print('ORIGINAL ARTICLE COUNT IN DB: ', db_article_count, gard_id)
 
-        if idx < 547: #TEST
+        if idx < 2013: #TEST start at 733 to get missing
           continue #TEST
 
         if gard_id == None:
