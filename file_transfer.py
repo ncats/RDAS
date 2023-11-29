@@ -26,7 +26,6 @@ def get_latest_file (path):
 def transfer (dump_path=None,dump_dir=None,server=None):
     print(dump_path, dump_dir)
     p = Popen(['scp', f'{dump_path}', f'{sysvars.current_user}@{server}:{sysvars.transfer_path}{dump_dir}.dump'], encoding='utf8')
-    #WRITE CODE THAT RESPONDS TO PROMPTS TO AUTOMATE TRANSFER
     p.wait()
 
 try:
@@ -67,7 +66,7 @@ else: # IF TRANSFERING A SINGLE DUMP FILE
         print('TRANSFERING LATEST DUMP FILE FOR SPECIFIC DATABASE')
         if args.server == 'prod':
             path = f'{dump_path}{args.dump_dir}.dump'
-            transfer(dump_path=transfer_path,dump_dir=args.dump_dir,server=server)
+            transfer(dump_path=path,dump_dir=args.dump_dir,server=server)
 
         else:
             path = f'{dump_path}{args.dump_dir}/*.dump'

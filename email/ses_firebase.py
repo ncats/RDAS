@@ -7,6 +7,7 @@ sys.path.append(os.getcwd())
 import sysvars
 from AlertCypher import AlertCypher
 from datetime import date,datetime
+import pandas as pd
 from dateutil.relativedelta import relativedelta
 import firebase_admin
 from firebase_admin import auth
@@ -86,44 +87,37 @@ def send_mail(type, data):
             alert.send_email('RDAS-Alert: Funded Project update regarding your subscriptions', txt, data['email'], html=html)
             print('[Email Sent...]')
 
-def get_stats(type, gards, date=None):
+def get_stats(type, gards, date_start=datetime.today().strftime('%m/%d/%y'), date_end=datetime.today().strftime('%m/%d/%y')):
     db = AlertCypher(type)
     return_data = dict()
 
-    if date:
-        now = date
-        start_search_date = datetime.strptime(now,"%m/%d/%y") - relativedelta(days=7)
-        end_search_date = datetime.strptime(now,"%m/%d/%y")
-        now_end = now.replace("/","-")
-        now_start = start_search_date.strftime("%m/%d/%y")
-        print(now_start, now)
-    else:
-        end_search_date = date.today()
-        start_search_date = now - relativedelta(days=7)
-        now = end_search_date.strftime("%m/%d/%y")
-        now_end = now.replace("/","-")
-        now_start = start_search_date.strftime("%m/%d/%y")
+    date_start_string = date_start
+    date_end_string = date_end
+    date_start_obj = datetime.strptime(date_start, '%m/%d/%y')
+    date_end_obj = datetime.strptime(date_end, '%m/%d/%y')
 
-    print(f'Searching for nodes created between {now_start} and {now}')
+    date_list = pd.date_range(date_start_obj, date_end_obj, freq='D').strftime('%m/%d/%y').to_list()
+
+    print(f'Searching for nodes created between {date_start_string} and {date_end_string}')
 
     convert = {'clinical':['ClinicalTrial','GARD','GardId'], 'pubmed':['Article','GARD','GardId'], 'grant':['Project','GARD','GardId']}
     connect_to_gard = {'clinical':'--(:Condition)--(:Annotation)--','pubmed':'--','grant':'--'}
-    query = 'MATCH (x:{node}){connection}(y:{gardnode}) WHERE x.DateCreatedRDAS = \"{now}\" AND y.{property} IN {list} RETURN COUNT(x)'.format(node=convert[type][0], gardnode=convert[type][1], property=convert[type][2], list=list(gards.keys()), now=now, connection=connect_to_gard[type])
 
-    print(query)
+    query = 'MATCH (x:{node}){connection}(y:{gardnode}) WHERE x.DateCreatedRDAS IN {date_list} AND y.{property} IN {list} RETURN COUNT(x)'.format(node=convert[type][0], gardnode=convert[type][1], property=convert[type][2], list=list(gards.keys()), date_list=date_list, connection=connect_to_gard[type])
 
     response = db.run(query)
     return_data['total'] = response.data()[0]['COUNT(x)']
 
     for gard in gards.keys():
-        response = db.run('MATCH (x:{node}){connection}(y:{gardnode}) WHERE x.DateCreatedRDAS = \"{now}\" AND y.{property} = \"{gard}\" RETURN COUNT(x)'.format(node=convert[type][0], gardnode=convert[type][1], property=convert[type][2], gard=gard, now=now, connection=connect_to_gard[type]))
+        response = db.run('MATCH (x:{node}){connection}(y:{gardnode}) WHERE x.DateCreatedRDAS IN {date_list} AND y.{property} = \"{gard}\" RETURN COUNT(x)'.format(node=convert[type][0], gardnode=convert[type][1], property=convert[type][2], gard=gard, date_list=date_list, connection=connect_to_gard[type]))
         return_data[gard] = {'name':gards[gard],'num':response.data()[0]['COUNT(x)']}
 
-    return_data['update_date_end'] = now
-    return_data['update_date_start'] = now_start
+    return_data['update_date_end'] = date_end_string
+    return_data['update_date_start'] = date_start_string
+
     return return_data
 
-def trigger_email(type,date=None):
+def trigger_email(type,date_start=None,date_end=None):
     convert = {'clinical':'trials', 'pubmed':'articles', 'grant':'grants'}
     user_data = dict()
     cred = credentials.Certificate(sysvars.firebase_key_path)
@@ -131,12 +125,12 @@ def trigger_email(type,date=None):
     firestore_db = firestore.client()
 
     firestore_docs = firestore_db.collection(u'users').stream()
-
+    
     for doc in firestore_docs:
         if doc.exists:
             user_data[doc.id] = doc.to_dict()
         else:
-            print(u'Document Doesnt Exist')
+            print('Document Doesnt Exist')
 
     for firestore_user, data in user_data.items():
         subscript_gard = dict()
@@ -153,10 +147,18 @@ def trigger_email(type,date=None):
             for user in users:
                 uid = user.uid
                 if uid == firestore_user and len(subscript_gard) > 0:
-                    update_data = get_stats(type, subscript_gard, date)
+                    if not date_start and not date_end:
+                        update_data = get_stats(type, subscript_gard)
+                    elif date_start and date_end:
+                        update_data = get_stats(type, subscript_gard, date_start=date_start, date_end=date_end)
+                    elif date_start:
+                        update_data = get_stats(type, subscript_gard, date_start=date_start)
+                    elif date_end:
+                        update_data = get_stats(type, subscript_gard, date_end=date_end)
+
                     update_data['email'] = user.email
                     update_data['name'] = user_data[uid]['displayName']
                     update_data['subscriptions'] = list(subscript_gard.keys())
                     send_mail(type, update_data)
 
-#trigger_email(sysvars.gnt_db, '04/27/23') #TEST
+#trigger_email(sysvars.pm_db, date_start='12/07/22') #TEST

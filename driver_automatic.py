@@ -87,5 +87,5 @@ elif args.db == 'gnt':
             sleep(3600)
 
 else:
-    print(r'Invalid arguments/flags [TRY: python3 driver_automatic.py -db {ct/pm/gnt} -u 06/30/23]')
+    print(r'Invalid arguments/flags')
 

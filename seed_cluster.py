@@ -48,6 +48,6 @@ if not args.server:
 
 if args.migrate_all:
     for dump_filename in dump_filenames: 
-        seed(dump_path, dump_filename, server)
+        seed(dump_path, dump_filename, args.server)
 elif args.db in dump_filenames and not args.migrate_all:
-    seed(dump_path, args.db, server)
+    seed(dump_path, args.db, args.server)

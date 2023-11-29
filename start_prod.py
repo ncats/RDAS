@@ -22,6 +22,8 @@ while True:
     for db_name in new_dumps:
         seed_cluster.seed(db_name,sysvars.transfer_path,'prod')
 
+    # TODO: Add code to initiate email service
+
     # Sleep for an hour before checking for new dumps again
     sleep(3600)
 

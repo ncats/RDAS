@@ -720,7 +720,8 @@ def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
     n.title = $title, 
     n.abstractText = $abstractText, 
     n.affiliation = $affiliation, 
-    n.firstPublicationDate = $firstPublicationDate, 
+    n.firstPublicationDate = $firstPublicationDate,
+    n.publicationYear = $year,
     n.citedByCount = $citedByCount,
     n.isOpenAccess = $isOpenAccess, 
     n.inEPMC = $inEPMC,
@@ -745,6 +746,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
     "abstractText":abstractDataRel['abstractText'] if 'abstractText' in abstractDataRel else '',
     "affiliation":abstractDataRel['affiliation'] if 'affiliation' in abstractDataRel else '',
     "firstPublicationDate":abstractDataRel['firstPublicationDate'] if 'firstPublicationDate' in abstractDataRel else '',
+    "year":datetime.strptime(abstractDataRel['firstPublicationDate'], '%Y-%m-%d').year if 'firstPublicationDate' in abstractDataRel else '',
     "isOpenAccess": True if 'isOpenAccess' in abstractDataRel else False,
     "inEPMC": True if 'inEPMC' in abstractDataRel else False,
     "inPMC":True if 'inPMC' in abstractDataRel else False,
@@ -1548,9 +1550,6 @@ def save_disease_articles(db, mindate, maxdate):
         db_article_count = int(db.run(check_query).data()[0]['cnt'])
         print('ORIGINAL ARTICLE COUNT IN DB: ', db_article_count, gard_id)
 
-        if idx < 2013: #TEST start at 733 to get missing
-          continue #TEST
-
         if gard_id == None:
           continue
         no = 0
@@ -1743,7 +1742,7 @@ def retrieve_articles(db, last_update, today):
   """
 
   # Retrieve articles related to GARD diseases from PubMed and update the database
-  save_disease_articles(db, last_update, today)
+  #save_disease_articles(db, last_update, today) #TEST, remove comment keep code
 
   # Gather epidemiology annotations for articles with non-empty titles and abstracts
   gather_epi(db, today)

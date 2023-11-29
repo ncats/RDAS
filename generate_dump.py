@@ -4,6 +4,7 @@ import sys
 workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
 sys.path.append(os.getcwd())
+from AlertCypher import AlertCypher
 print(sys.path)
 import sysvars
 import datetime
@@ -24,14 +25,19 @@ def copy_to_backup(path, filename, dump_name):
     p.wait()
 
 def dump_file (path, db_name):
-    p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'stop'], encoding='utf8')
-    p.wait()
+    db = AlertCypher('system')
+    db.run(f'STOP DATABASE {db_name}')
+    
+    #p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'stop'], encoding='utf8')
+    #p.wait()
 
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'dump', f'{db_name}', f'--to-path={path}', '--overwrite-destination'], encoding='utf8')
     p.wait()
 
-    p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'start'], encoding='utf8')
-    p.wait()
+    db.run(f'START DATABASE {db_name}')
+
+    #p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'start'], encoding='utf8')
+    #p.wait()
     
 today = datetime.datetime.today()
 today = today.strftime('%m-%d-%Y')
