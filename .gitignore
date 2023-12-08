@@ -58,3 +58,6 @@ langchain.out
 rdas_condition.txt
 dateyearadd.py
 dateadd.txt
+removeepi.py
+apitest.py
+chatgpt.py

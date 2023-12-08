@@ -24,4 +24,4 @@ def main (update_from):
     pubmed.init.main(update_from=update_from)
 
 main(update_from=False) #TEST
-#get_node_counts() #TEST
+get_node_counts() #TEST

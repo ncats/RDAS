@@ -101,7 +101,7 @@ def get_gard_omim_mapping(db):
 
 
 
-def find_OMIM_articles(db, OMIMNumber):
+def find_OMIM_articles(OMIMNumber):
   """
     Finds articles related to a specific OMIM entry using the OMIM API.
 
@@ -117,9 +117,19 @@ def find_OMIM_articles(db, OMIMNumber):
 
   # Set parameters for the OMIM API request and send a POST request to the API
   params = {'mimNumber': OMIMNumber, 'include':"all", 'format': 'json', 'apiKey': os.environ['OMIM_KEY']}
-
+  
   # Return the JSON response containing information about articles related to the specified OMIM entry
-  return requests.post("https://api.omim.org/api/entry?%s", data=params).json()
+  try:
+    query = f"https://api.omim.org/api/entry?mimNumber={params['mimNumber']}&include={params['include']}&format={params['format']}&apiKey={params['apiKey']}"
+    return_data = requests.get(query)
+    return_data = return_data.json()
+  except Exception as e:
+    print('Retrying find OMIM after 60 Seconds', e)
+    time.sleep(60)
+    return_data = requests.post(f"https://api.omim.org/api/entry?mimNumber={params['mimNumber']}&include={params['include']}&format={params['format']}&apiKey={params['apiKey']}")
+    return_data = return_data.json()
+
+  return return_data
 
 
 
@@ -140,6 +150,7 @@ def get_article_in_section(omim_reference):
   """
 
   # Extract text sections from the OMIM reference data
+  prefTitle = jmespath.search("omim.entryList[0].entry.titles.preferredTitle",omim_reference)
   textSections = jmespath.search("omim.entryList[0].entry.textSectionList[*].textSection",omim_reference)
 
   # Create a dictionary to store references by section
@@ -184,7 +195,7 @@ def get_article_in_section(omim_reference):
       articleString[str(pmid)] = ['See Also']
       
   # Return the dictionary containing PubMed IDs and corresponding sections
-  return articleString
+  return {'prefTitle':prefTitle, 'sections':articleString}
 
 
 
@@ -276,10 +287,13 @@ def save_omim_articles(db, today):
   results = get_gard_list()
 
   # Define search source
-  search_source = 'omim_evidence'
+  search_source = 'OMIM'
 
   # Iterate over GARD diseases
-  for no, gard_id in enumerate(results):
+  for idx, gard_id in enumerate(results):
+    #if idx < 500: #TEST
+    #  continue
+
     print('UPDATING OMIM: ' + gard_id)
     try:
       omim_ids = results[gard_id]["OMIM"]
@@ -297,13 +311,20 @@ def save_omim_articles(db, today):
 
       # Retrieve OMIM articles using the OMIM API
       try:
-        omim_json = find_OMIM_articles(db, omim)
+        omim_json = find_OMIM_articles(omim)
       except Exception as e:
         logging.error(f' Exception when search omim_id {omim}: error {e}')
         continue
         
       # Extract sections from OMIM articles
-      sections = get_article_in_section(omim_json)
+      section_dict = get_article_in_section(omim_json)
+
+      if len(section_dict) > 0:
+        prefTitle = section_dict['prefTitle']
+        sections = section_dict['sections']
+      else:
+        continue
+
       logging.info(f'sections: {sections}')
 
       # Create a copy of the sections dictionary
@@ -318,22 +339,22 @@ def save_omim_articles(db, today):
         if (article_id):
           logging.info(f'PubMed evidence article already exists: {pubmed_id}, {article_id}')
           # Save OMIM article relation in the database
-          save_omim_article_relation(article_id, omim, sections[pubmed_id], db, today)
+          save_omim_article_relation(article_id, prefTitle, omim, sections[pubmed_id], db, today)
           # Remove the PubMed ID from the copy of sections
           new_sections.pop(pubmed_id)
 
         else:
           logging.info(f'PubMed evidence article NOT exists: {pubmed_id}, {article_id}')
 
-    logging.info(f'sections after loop: {new_sections}' )
+      logging.info(f'sections after loop: {new_sections}' )
 
-    # Save remaining OMIM articles to the database
-    save_omim_remaining_articles(gard_id, omim, new_sections, search_source, db, today)      
+      # Save remaining OMIM articles to the database
+      save_omim_remaining_articles(gard_id, prefTitle, omim, new_sections, search_source, db, today)      
 
 
 
       
-def save_omim_article_relation(article_id, omim_id, sections, driver, today):
+def save_omim_article_relation(article_id, prefTitle, omim_id, sections, driver, today):
   """
     Saves the relationship between an article and an OMIM entry in the Neo4j database.
 
@@ -350,27 +371,34 @@ def save_omim_article_relation(article_id, omim_id, sections, driver, today):
     None
   """
 
+  rdascreated = datetime.strptime(today,"%Y/%m/%d").strftime("%m/%d/%y")
+  rdasupdated = datetime.strptime(today,"%Y/%m/%d").strftime("%m/%d/%y")
+
+  # Check if reference source already in ReferenceOrigin
+  ref_check = driver.run(f'MATCH (a:Article) WHERE id(a) = {article_id} RETURN a.ReferenceOrigin as ref').data()[0]['ref']
+
+  if 'OMIM' in ref_check:
+    query = f'''
+    MATCH (a:Article) WHERE id(a) = {article_id}
+    MERGE (p:OMIMRef {{omimId: {omim_id}, omimName: \"{prefTitle}\", omimSections: {sections}}}) SET p.DateCreatedRDAS = \"{rdascreated}\" SET p.LastUpdatedRDAS = \"{rdasupdated}\"
+    MERGE (a) - [r:HAS_OMIM_REF] -> (p)
+    '''
+  else:
   # Define the Cypher query for creating the relationship
-  query = '''
-  MATCH (a:Article) WHERE id(a) = $article_id
-  SET a.refInOMIM = TRUE
-  MERGE (p:OMIMRef {omimId:$omim_id, omimSections:$sections, DateCreatedRDAS:$rdascreated, LastUpdatedRDAS:$rdasupdated})
-  MERGE (a) - [r:HAS_OMIM_REF] -> (p)
-  '''
+    query = f'''
+    MATCH (a:Article) WHERE id(a) = {article_id}
+    SET a.ReferenceOrigin = ['OMIM'] + a.ReferenceOrigin
+    MERGE (p:OMIMRef {{omimId: {omim_id}, omimName: \"{prefTitle}\", omimSections: {sections}}}) SET p.DateCreatedRDAS = \"{rdascreated}\" SET p.LastUpdatedRDAS = \"{rdasupdated}\"
+    MERGE (a) - [r:HAS_OMIM_REF] -> (p)
+    '''
 
   # Execute the Cypher query
-  driver.run(query, args={
-    "article_id":article_id,
-    "omim_id":omim_id,
-    "sections":sections,
-    "rdascreated":datetime.strptime(today,"%Y/%m/%d").strftime("%m/%d/%y"),
-    "rdasupdated":datetime.strptime(today,"%Y/%m/%d").strftime("%m/%d/%y")
-  })
+  driver.run(query)
 
 
 
       
-def save_omim_remaining_articles(gard_id, omim_id, sections, search_source, driver, today):
+def save_omim_remaining_articles(gard_id, prefTitle, omim_id, sections, search_source, driver, today):
   """
     Saves remaining OMIM-related articles and their relationships in the Neo4j database.
 
@@ -406,7 +434,7 @@ def save_omim_remaining_articles(gard_id, omim_id, sections, search_source, driv
     # Check if the article ID is available
     if (article_id):
       # Save OMIM article relation in the database
-      save_omim_article_relation(article_id, omim_id, sections[pubmed_id], driver, today)
+      save_omim_article_relation(article_id, prefTitle, omim_id, sections[pubmed_id], driver, today)
     else:
       logging.error(f'Something wrong with adding omim article relation: {pubmed_id}, {article_id}')            
 
@@ -711,6 +739,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
     789
   """
 
+  # Creating an article with search_source as 'OMIM' implies that there is no pubmed source available therefore ReferenceOrigin would just be ['OMIM']
   create_article_query = '''
   MATCH (d:GARD) WHERE id(d)=$id
   MERGE (n:Article {pubmed_id:$pubmed_id})
@@ -724,18 +753,20 @@ def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
     n.publicationYear = $year,
     n.citedByCount = $citedByCount,
     n.isOpenAccess = $isOpenAccess, 
-    n.inEPMC = $inEPMC,
-    n.isEpi = $isEpi, 
+    n.inEPMC = $inEPMC, 
     n.inPMC = $inPMC, 
     n.hasPDF = $hasPDF, 
     n.source = $source,
     n.pubType = $pubtype,
     n.DateCreatedRDAS = $now,
     n.LastUpdatedRDAS = $now,
-    n.''' + search_source + ''' = true
+    n.ReferenceOrigin = [\'''' + search_source + '''\']
   MERGE (d)-[r:MENTIONED_IN]->(n)
   RETURN id(n)
   '''
+
+  # TEST May have to add: ON MERGE SET n.search_source = true
+  # TEST i removed the line n.isEpi = $isEpi, in the query since the default is Null now
 
   params={
     "id":disease_node,
@@ -752,8 +783,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
     "inPMC":True if 'inPMC' in abstractDataRel else False,
     "hasPDF":True if 'hasPDF' in abstractDataRel else False,
     "pubtype":abstractDataRel['pubTypeList']['pubType'] if 'pubTypeList' in abstractDataRel else '',
-    "now": datetime.strptime(maxdate,"%Y/%m/%d").strftime("%m/%d/%y"),
-    "isEpi": False, #Defaults to False, changes to True if there is Epi data in article later on
+    "now": datetime.strptime(maxdate,"%Y/%m/%d").strftime("%m/%d/%y"), #"isEpi": False
     "citedByCount":int(abstractDataRel['citedByCount']) if 'citedByCount' in abstractDataRel else 0,
     }
   
@@ -1007,11 +1037,12 @@ def create_epidemiology(tx, abstractDataRel, article_node, today):
       except Exception as e:
         logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is True.')
         raise e
-
+      
   # Update the Article node with isEpi information
-  create_epidemiology_query = '''
-      MATCH (a:Article) WHERE id(a) = $article_id
-      SET a.isEpi = $isEpi'''
+  else:
+    create_epidemiology_query = '''
+        MATCH (a:Article) WHERE id(a) = $article_id
+        SET a.isEpi = $isEpi'''
   try:
     tx.run(create_epidemiology_query, args={"article_id":article_node, 'isEpi': isEpi})
   except Exception as e:
@@ -1201,8 +1232,8 @@ def create_annotations(tx, pubtatorData, article_node, today):
           "infons_identifier": annotation['infons']['identifier'] if ('identifier' in annotation['infons'] and annotation['infons']['identifier'])  else '',
           "infons_type": annotation['infons']['type'] if ('type' in annotation['infons'] and annotation['infons']['type']) else '',
           "text": annotation['text'] if 'text' in annotation else '',
-          "rdascreated": '\"'+today.strftime("%m/%d/%y")+'\"',
-          "rdasupdated": '\"'+today.strftime("%m/%d/%y")+'\"'
+          "rdascreated": datetime.strptime(today, "%Y/%m/%d").strftime("%m/%d/%y"),
+          "rdasupdated": datetime.strptime(today, "%Y/%m/%d").strftime("%m/%d/%y")
         }
 
         # Split the 'text' field into a list if it contains commas
@@ -1540,7 +1571,7 @@ def save_disease_articles(db, mindate, maxdate):
 
       # Step 1: Retrieve GARD diseases list
       results = get_gard_list()
-      search_source = 'pubmed_evidence'
+      search_source = 'Pubmed'
       date_db_now = datetime.strptime(maxdate,"%Y/%m/%d").strftime("%m/%d/%y")
       
       # Iterate over GARD diseases
@@ -1597,6 +1628,9 @@ def save_disease_articles(db, mindate, maxdate):
             logging.error(f'Exception when finding articles for disease {gard_id}, error1: {e}')
             continue
 
+
+          """
+          # REPEAT WORK??
           # Step 6: Fetch abstracts for the articles and update the database
           try:
             all_abstracts = fetch_abstracts(pubmed_ids)
@@ -1626,6 +1660,7 @@ def save_disease_articles(db, mindate, maxdate):
           except Exception as e:
             logging.error(f'Exception when finding articles for disease {gard_id}, error2: {e}')
             continue
+          """
 
 
 
@@ -1657,9 +1692,12 @@ def gather_pubtator(db, today):
 
   # Retrieve articles without Pubtator annotations
   res = db.run('MATCH (x:Article) WHERE NOT (x)--(:PubtatorAnnotation) RETURN x.pubmed_id AS pmid, ID(x) AS id').data()
+  print(len(res))
 
   # Iterate over the articles and fetch Pubtator annotations
-  for r in res:
+  for idx,r in enumerate(res):
+    print(idx)
+
     pmid = r['pmid']
     ID = r['id']
     try:
@@ -1698,12 +1736,14 @@ def gather_epi(db, today):
     None
   """
 
-  # Retrieve articles with non-empty titles and abstracts without EpidemiologyAnnotations
-  res = db.run('MATCH (x:Article) WHERE NOT (x.abstractText = \"\" OR x.title = \"\") AND NOT (x)--(:EpidemiologyAnnotation) RETURN x.abstractText AS abstract, x.title AS title, ID(x) AS id').data()
+  # Retrieve articles with non-empty titles and abstracts that havent already been processed by the API
+  res = db.run('MATCH (x:Article) WHERE NOT (x.abstractText = \"\" OR x.title = \"\") AND x.isEpi IS NULL RETURN x.abstractText AS abstract, x.title AS title, ID(x) AS id').data()
   print(len(res))  
 
   # Iterate over articles and create EpidemiologyAnnotation nodes
   for idx,r in enumerate(res):
+    #if idx < 413246: #TEST
+    #  continue
     print(idx)
     abstract = r['abstract']
     title = r['title']
@@ -1742,16 +1782,22 @@ def retrieve_articles(db, last_update, today):
   """
 
   # Retrieve articles related to GARD diseases from PubMed and update the database
+  print('Populating PubMed Articles')
   #save_disease_articles(db, last_update, today) #TEST, remove comment keep code
 
+  # Save OMIM articles and update the database
+  print('Populating OMIM Articles and Information')
+  #save_omim_articles(db, today) #TEST, remove comment keep code
+
   # Gather epidemiology annotations for articles with non-empty titles and abstracts
-  gather_epi(db, today)
+  print('Populating Epidemiology Information')
+  gather_epi(db, today) #TEST, remove comment keep code
 
   # Gather Pubtator annotations for articles that do not have associated annotations
+  print('Populating Pubtator Information')
   gather_pubtator(db, today)
 
-  # Save OMIM articles and update the database
-  save_omim_articles(db, today)
+  
 
 
 
