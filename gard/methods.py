@@ -381,14 +381,14 @@ def get_node_counts():
 
     db.run('MATCH (x:GARD) SET x.COUNT_GENES = 0 SET x.COUNT_PHENOTYPES = 0 SET x.COUNT_TRIALS = 0 SET x.COUNT_ARTICLES = 0 SET x.COUNT_PROJECTS = 0')
 
-    res1 = db.run('MATCH (x:GARD)--(y:Phenotype) WITH COUNT(DISTINCT y.HPOId) AS cnt,x SET x.COUNT_PHENOTYPES = cnt').data()
-    res2 = db.run('MATCH (x:GARD)--(y:Gene) WITH COUNT(DISTINCT y.GeneIdentifier) AS cnt,x SET x.COUNT_GENES = cnt').data()
-    res3 = ct_db.run('MATCH (x:GARD)--(y:Annotation)--(z:Condition)--(ct:ClinicalTrial) WITH COUNT(DISTINCT ct.NCTId) AS cnt,x RETURN cnt AS cnt,x.GardId AS gard_id').data()
-    res4 = pm_db.run('MATCH (x:GARD)--(y:Article) WITH COUNT(DISTINCT y.pubmed_id) AS cnt,x RETURN cnt AS cnt, x.GardId AS gard_id').data()
-    res5 = gnt_db.run('MATCH (x:GARD)--(y:Project)--(z:CoreProject) WITH COUNT(DISTINCT z.core_project_num) AS cnt,x RETURN cnt AS cnt, x.GardId as gard_id').data()
+    res1 = db.run('MATCH (x:GARD)--(y:Phenotype) WITH COUNT(DISTINCT y) AS cnt,x SET x.COUNT_PHENOTYPES = cnt').data()
+    res2 = db.run('MATCH (x:GARD)--(y:Gene) WITH COUNT(DISTINCT y) AS cnt,x SET x.COUNT_GENES = cnt').data()
+    res3 = ct_db.run('MATCH (x:GARD)--(y:Annotation)--(z:Condition)--(ct:ClinicalTrial) WITH COUNT(DISTINCT ct) AS cnt,x RETURN cnt AS cnt,x.GardId AS gard_id').data()
+    res4 = pm_db.run('MATCH (x:GARD)--(y:Article) WITH COUNT(DISTINCT y) AS cnt,x RETURN cnt AS cnt, x.GardId AS gard_id').data()
+    res5 = gnt_db.run('MATCH (x:GARD)--(y:Project)--(z:CoreProject) WITH COUNT(DISTINCT z) AS cnt,x RETURN cnt AS cnt, x.GardId as gard_id').data()
 
-    populate_node_counts(db,res1,'COUNT_PHENOTYPES')
-    populate_node_counts(db,res2,'COUNT_GENES')
+    #populate_node_counts(db,res1,'COUNT_PHENOTYPES')
+    #populate_node_counts(db,res2,'COUNT_GENES')
     populate_node_counts(db,res3,'COUNT_TRIALS')
     populate_node_counts(db,res4,'COUNT_ARTICLES')
     populate_node_counts(db,res5,'COUNT_PROJECTS')

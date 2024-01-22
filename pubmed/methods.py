@@ -18,6 +18,10 @@ import jmespath
 import re
 import ast
 import sysvars
+import pandas as pd
+import string
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import pipeline
 
 
 
@@ -79,24 +83,7 @@ def get_gard_omim_mapping(db):
   """
 
   # Get the list of GARD diseases
-  results = get_gard_list()
-  gardlist = list()
-  for res in results:
-    gardlist.append(results[res]['gard_id'])
-
-  with GraphDatabase.driver(os.environ['DISEASE_URI']) as driver:
-    with driver.session() as session:
-      cypher_query = '''
-      MATCH (o:S_ORDO_ORPHANET)-[:R_exactMatch|:R_equivalentClass]-(m:S_MONDO)-[:R_exactMatch|:R_equivalentClass]-(n:S_GARD)<-[:PAYLOAD]-(d:DATA)
-      WHERE d.is_rare=true and d.gard_id in $glist
-      WITH o,n,m,d
-      MATCH (o)-[e:R_exactMatch|R_closeMatch]-(k:S_OMIM)<-[:PAYLOAD]-(h)
-      RETURN DISTINCT d.gard_id as gard_id,d.name as name, e.name as match_type,h.notation as omim_id,h.label as omim_name
-      ORDER BY gard_id
-      '''
-      nodes = session.run(cypher_query, parameters={'glist':gardlist})
-      omim = [record for record in nodes.data()]
-      return omim
+  
 
 
 
@@ -124,8 +111,8 @@ def find_OMIM_articles(OMIMNumber):
     return_data = requests.get(query)
     return_data = return_data.json()
   except Exception as e:
-    print('Retrying find OMIM after 60 Seconds', e)
-    time.sleep(60)
+    print('Retrying find OMIM after 1 day to reset API limit', e)
+    time.sleep(87000) # Sleep for a day to reset API limit
     return_data = requests.post(f"https://api.omim.org/api/entry?mimNumber={params['mimNumber']}&include={params['include']}&format={params['format']}&apiKey={params['apiKey']}")
     return_data = return_data.json()
 
@@ -148,6 +135,7 @@ def get_article_in_section(omim_reference):
     :return: A dictionary containing PubMed IDs and the corresponding sections in which they are referenced.
              The keys are PubMed IDs, and the values are lists of section names.
   """
+  all_omim_data = {'non-pubmed':[], 'pubmed':{}}
 
   # Extract text sections from the OMIM reference data
   prefTitle = jmespath.search("omim.entryList[0].entry.titles.preferredTitle",omim_reference)
@@ -167,35 +155,41 @@ def get_article_in_section(omim_reference):
       references[t['textSectionName']] = sectionReferenced
 
   # Extract reference numbers and PubMed IDs from the OMIM reference data
-  refNumbers = jmespath.search("omim.entryList[0].entry.referenceList[*].reference.[referenceNumber,pubmedID]",omim_reference)
+  refNumbers = jmespath.search("omim.entryList[0].entry.referenceList[*].reference.[referenceNumber,pubmedID,title,authors,doi,source]",omim_reference)
 
   # Create a dictionary to store PubMed IDs and corresponding sections
   articleString = {}
 
   # Check if there are no reference numbers
   if refNumbers is None:
-    return articleString
+    return all_omim_data
   
   # Iterate over reference numbers and PubMed IDs
-  for refNumber,pmid in refNumbers:
+  for refNumber,pmid,title,authors,doi,source in refNumbers:
     # Skip references without PubMed IDs
-    if not pmid: continue
-    
-    tsections = []
+    if pmid:
+      tsections = []
 
-    # Identify sections referencing the current PubMed ID
-    for idx, sectionName in enumerate(references):
-      if references[sectionName].intersection(set([str(refNumber)])):
-        tsections.append(sectionName)
-        
-    # Update the dictionary with PubMed ID and corresponding sections
-    if tsections:
-      articleString[str(pmid)] = tsections
+      # Identify sections referencing the current PubMed ID
+      for idx, sectionName in enumerate(references):
+        if references[sectionName].intersection(set([str(refNumber)])):
+          tsections.append(sectionName)
+          
+      # Update the dictionary with PubMed ID and corresponding sections
+      if tsections:
+        articleString[str(pmid)] = tsections
+      else:
+        articleString[str(pmid)] = ['See Also']
+
+      all_omim_data['pubmed'] = {'prefTitle':prefTitle, 'sections':articleString}
+
     else:
-      articleString[str(pmid)] = ['See Also']
+      current_non_pubmed_list = all_omim_data['non-pubmed']
+      current_non_pubmed_list.append({'refNumber':refNumber, 'title':title, 'authors':{'fullName':authors}, 'doi':doi})
+      all_omim_data['non-pubmed'] = current_non_pubmed_list
       
   # Return the dictionary containing PubMed IDs and corresponding sections
-  return {'prefTitle':prefTitle, 'sections':articleString}
+  return all_omim_data
 
 
 
@@ -261,6 +255,61 @@ def get_disease_id(gard_id, driver):
 
 
 
+def create_omim_article_no_pubmed(db, omim_data, gard_id, search_source, maxdate):
+    # Excludes OMIM articles named Personal Communication, since their data is incaccessible
+    if omim_data['title'] == 'Personal Communication.':
+      return None
+
+    create_article_query = '''
+    MATCH (d:GARD) WHERE d.GardId=$gard_id
+    MERGE (n:Article {doi: $doi, title: $title})
+    ON CREATE SET
+      n.doi = $doi, 
+      n.title = $title,
+      n.isEpi = $epi,
+      n.epi_processed = $epi_proc,
+      n.DateCreatedRDAS = $now,
+      n.LastUpdatedRDAS = $now,
+      n.ReferenceOrigin = [\'''' + search_source + '''\']
+    MERGE (d)-[r:MENTIONED_IN]->(n)
+    RETURN id(n)
+    '''
+
+    params={
+      "gard_id":gard_id,
+      "doi":omim_data['doi'] if 'doi' in omim_data and omim_data['doi'] else '',
+      "title":omim_data['title'] if 'title' in omim_data and omim_data['title'] else '',
+      "epi": False,
+      "epi_proc": False,
+      "now": datetime.strptime(maxdate,"%Y/%m/%d").strftime("%m/%d/%y"), #"isEpi": False
+      }
+    
+    # Execute the Cypher query and retrieve the ID of the created Article node
+    response = db.run(create_article_query, args=params).single().value()
+    print('+', end='', flush=True)
+    return response
+
+
+
+
+def mask_name(name, nlp):
+    name = name.rstrip(string.punctuation)
+    name = name.title()
+    entities = nlp(name)
+    person_entities = [entity['word'] for entity in entities if entity['entity'] == 'B-PER' or entity['entity'] == 'I-PER']
+    if person_entities == []:
+        reversed_name = ' '.join(name.split()[::-1])
+        entities = nlp(reversed_name)
+        person_entities = [entity['word'] for entity in entities if entity['entity'] == 'B-PER' or entity['entity'] == 'I-PER']
+    masked_name = ' '.join(person_entities) if person_entities else None
+    masked_name = masked_name.replace(' ##', '') if masked_name is not None else None
+    if masked_name != None:
+             name=name.replace('"', '').replace("'", '')
+             #masked_name=', '.join([i.strip() for i in name.split(',') if len(i.strip())>=4 ])
+    return masked_name
+
+
+
     
 def save_omim_articles(db, today):
   """
@@ -291,8 +340,7 @@ def save_omim_articles(db, today):
 
   # Iterate over GARD diseases
   for idx, gard_id in enumerate(results):
-    #if idx < 500: #TEST
-    #  continue
+    print(idx)
 
     print('UPDATING OMIM: ' + gard_id)
     try:
@@ -315,43 +363,53 @@ def save_omim_articles(db, today):
       except Exception as e:
         logging.error(f' Exception when search omim_id {omim}: error {e}')
         continue
-        
+
       # Extract sections from OMIM articles
-      section_dict = get_article_in_section(omim_json)
+      omim_data = get_article_in_section(omim_json)
+      #print(omim_data['non-pubmed'])
+      #print(len(omim_data['non-pubmed']))
 
-      if len(section_dict) > 0:
-        prefTitle = section_dict['prefTitle']
-        sections = section_dict['sections']
-      else:
-        continue
+      if len(omim_data['pubmed']) > 0:
+        prefTitle = omim_data['pubmed']['prefTitle']
+        sections = omim_data['pubmed']['sections']
 
-      logging.info(f'sections: {sections}')
+        logging.info(f'sections: {sections}')
 
-      # Create a copy of the sections dictionary
-      new_sections = dict(sections)
-    
-      # Iterate over the PubMed IDs in sections
-      for pubmed_id in sections:
-        # Get the Neo4j database ID of the article
-        article_id = get_article_id(pubmed_id, db)
+        # Create a copy of the sections dictionary
+        new_sections = dict(sections)
+      
+        # Iterate over the PubMed IDs in sections
+        for pubmed_id in sections:
+          # Get the Neo4j database ID of the article
+          article_id = get_article_id(pubmed_id, db)
 
-        # Check if the article already exists in the database
-        if (article_id):
-          logging.info(f'PubMed evidence article already exists: {pubmed_id}, {article_id}')
-          # Save OMIM article relation in the database
-          save_omim_article_relation(article_id, prefTitle, omim, sections[pubmed_id], db, today)
-          # Remove the PubMed ID from the copy of sections
-          new_sections.pop(pubmed_id)
+          # Check if the article already exists in the database
+          if (article_id):
+            logging.info(f'PubMed evidence article already exists: {pubmed_id}, {article_id}')
+            # Save OMIM article relation in the database
+            save_omim_article_relation(article_id, prefTitle, omim, sections[pubmed_id], db, today)
+            # Remove the PubMed ID from the copy of sections
+            new_sections.pop(pubmed_id)
 
-        else:
-          logging.info(f'PubMed evidence article NOT exists: {pubmed_id}, {article_id}')
+          else:
+            logging.info(f'PubMed evidence article NOT exists: {pubmed_id}, {article_id}')
 
-      logging.info(f'sections after loop: {new_sections}' )
+        logging.info(f'sections after loop: {new_sections}' )
 
-      # Save remaining OMIM articles to the database
-      save_omim_remaining_articles(gard_id, prefTitle, omim, new_sections, search_source, db, today)      
+        # Save remaining OMIM articles to the database
+        save_omim_remaining_articles(gard_id, prefTitle, omim, new_sections, search_source, db, today) 
 
+      # If the OMIM reference has no PubMed ID, create an article node with just the information supplied by OMIM
+      
+      if len(omim_data['non-pubmed']) > 0:
+        nlp_tokens = list()
+        last_entity = None
+        for omim_data_index in omim_data['non-pubmed']:
+          article_id = create_omim_article_no_pubmed(db, omim_data_index, gard_id, search_source, today)
+          create_authors(db, omim_data_index['authors'], article_id, omim=True)
+          save_omim_article_relation(article_id, prefTitle, omim, None, db, today)
 
+           
 
       
 def save_omim_article_relation(article_id, prefTitle, omim_id, sections, driver, today):
@@ -376,21 +434,28 @@ def save_omim_article_relation(article_id, prefTitle, omim_id, sections, driver,
 
   # Check if reference source already in ReferenceOrigin
   ref_check = driver.run(f'MATCH (a:Article) WHERE id(a) = {article_id} RETURN a.ReferenceOrigin as ref').data()[0]['ref']
-
-  if 'OMIM' in ref_check:
-    query = f'''
-    MATCH (a:Article) WHERE id(a) = {article_id}
-    MERGE (p:OMIMRef {{omimId: {omim_id}, omimName: \"{prefTitle}\", omimSections: {sections}}}) SET p.DateCreatedRDAS = \"{rdascreated}\" SET p.LastUpdatedRDAS = \"{rdasupdated}\"
-    MERGE (a) - [r:HAS_OMIM_REF] -> (p)
-    '''
+  
+  if sections:
+    if 'OMIM' in ref_check:
+      query = f'''
+      MATCH (a:Article) WHERE id(a) = {article_id}
+      MERGE (p:OMIMRef {{omimId: {omim_id}, omimName: \"{prefTitle}\", omimSections: {sections}}}) SET p.DateCreatedRDAS = \"{rdascreated}\" SET p.LastUpdatedRDAS = \"{rdasupdated}\"
+      MERGE (a) - [r:HAS_OMIM_REF] -> (p)
+      '''
+    else:
+    # Define the Cypher query for creating the relationship
+      query = f'''
+      MATCH (a:Article) WHERE id(a) = {article_id}
+      SET a.ReferenceOrigin = ['OMIM'] + a.ReferenceOrigin
+      MERGE (p:OMIMRef {{omimId: {omim_id}, omimName: \"{prefTitle}\", omimSections: {sections}}}) SET p.DateCreatedRDAS = \"{rdascreated}\" SET p.LastUpdatedRDAS = \"{rdasupdated}\"
+      MERGE (a) - [r:HAS_OMIM_REF] -> (p)
+      '''
   else:
-  # Define the Cypher query for creating the relationship
     query = f'''
-    MATCH (a:Article) WHERE id(a) = {article_id}
-    SET a.ReferenceOrigin = ['OMIM'] + a.ReferenceOrigin
-    MERGE (p:OMIMRef {{omimId: {omim_id}, omimName: \"{prefTitle}\", omimSections: {sections}}}) SET p.DateCreatedRDAS = \"{rdascreated}\" SET p.LastUpdatedRDAS = \"{rdasupdated}\"
-    MERGE (a) - [r:HAS_OMIM_REF] -> (p)
-    '''
+      MATCH (a:Article) WHERE id(a) = {article_id}
+      MERGE (p:OMIMRef {{omimId: {omim_id}, omimName: \"{prefTitle}\", omimSections: []}}) SET p.DateCreatedRDAS = \"{rdascreated}\" SET p.LastUpdatedRDAS = \"{rdasupdated}\"
+      MERGE (a) - [r:HAS_OMIM_REF] -> (p)
+      '''
 
   # Execute the Cypher query
   driver.run(query)
@@ -758,6 +823,8 @@ def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
     n.hasPDF = $hasPDF, 
     n.source = $source,
     n.pubType = $pubtype,
+    n.isEpi = $epi,
+    n.epi_processed = $epi_proc,
     n.DateCreatedRDAS = $now,
     n.LastUpdatedRDAS = $now,
     n.ReferenceOrigin = [\'''' + search_source + '''\']
@@ -782,6 +849,8 @@ def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
     "inEPMC": True if 'inEPMC' in abstractDataRel else False,
     "inPMC":True if 'inPMC' in abstractDataRel else False,
     "hasPDF":True if 'hasPDF' in abstractDataRel else False,
+    "epi": False,
+    "epi_proc": False,
     "pubtype":abstractDataRel['pubTypeList']['pubType'] if 'pubTypeList' in abstractDataRel else '',
     "now": datetime.strptime(maxdate,"%Y/%m/%d").strftime("%m/%d/%y"), #"isEpi": False
     "citedByCount":int(abstractDataRel['citedByCount']) if 'citedByCount' in abstractDataRel else 0,
@@ -795,7 +864,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
 
 
 
-def create_authors(tx, abstractDataRel, article_node):
+def create_authors(tx, abstractDataRel, article_node, omim=False):
   """
     Create Author nodes and WROTE relationships in the Neo4j graph database based on the provided article information.
 
@@ -819,13 +888,21 @@ def create_authors(tx, abstractDataRel, article_node):
   MERGE (p:Author {fullName:$fullName, firstName:$firstName, lastName:$lastName})
   MERGE (p) - [r:WROTE] -> (a)
   '''
-  for author in abstractDataRel['authorList']['author']:
+  if omim:
     tx.run(create_author_query, args={
       "article_id":article_node,
-      "fullName": author['fullName'] if 'fullName' in author else '',
-      "firstName": author['firstName'] if 'firstName' in author else '',
-      "lastName": author['lastName'] if 'lastName' in author else ''
+      "fullName": abstractDataRel['fullName'] if 'fullName' in abstractDataRel else '',
+      "firstName": abstractDataRel['firstName'] if 'firstName' in abstractDataRel else '',
+      "lastName": abstractDataRel['lastName'] if 'lastName' in abstractDataRel else ''
     })
+  else:
+    for author in abstractDataRel['authorList']['author']:
+      tx.run(create_author_query, args={
+        "article_id":article_node,
+        "fullName": author['fullName'] if 'fullName' in author else '',
+        "firstName": author['firstName'] if 'firstName' in author else '',
+        "lastName": author['lastName'] if 'lastName' in author else ''
+      })
 
 
 
@@ -934,24 +1011,26 @@ def get_isEpi(text, url=f"{sysvars.epiapi_url}postEpiClassifyText/"):
   try:
     # Send a POST request to the external API for epidemiology classification
     response = requests.post(url, json={'text': text})
+    print(response.status_code)
+    print(response)
 
     # Parse the JSON response
     response = response.json()
+    print(response)
 
     # Check if 'isEpi' is present in the response
-    if 'isEpi' in response:
-        return response['IsEpi']
+    if 'IsEpi' in response:
+        return {'isEpi':response['IsEpi'], 'probability':response['EPI_PROB']}
     else:
-        return False
+        return {'isEpi':response['IsEpi'], 'probability':None}
 
   except Exception as e:
-    logging.error(f'Exception during get_isEpi. text: {text}, error: {e}')
-    raise e
+    logging.error(f'Exception during get_isEpi 2. text: {text}, error: {e}')
 
 
 
 
-def get_epiExtract(text, url=f"{sysvars.epiapi_url}postEpiExtractText"):
+def get_epiExtract(text, url=f"{sysvars.epiapi_url}postEpiExtractText/"):
   """
     Extract epidemiological information from the given text using an external API.
 
@@ -976,8 +1055,8 @@ def get_epiExtract(text, url=f"{sysvars.epiapi_url}postEpiExtractText"):
     return epi_info
 
   except Exception as e:
-    logging.error(f'Exception during get_isEpi. text: {text}, error: {e}')
-    print(requests.post(url,json={'text': text,'extract_diseases':False}))
+    logging.error(f'Exception during get_isEpi 1. text: {text}, error: {e}')
+    return None
 
 
 
@@ -1006,25 +1085,29 @@ def create_epidemiology(tx, abstractDataRel, article_node, today):
   text = abstractDataRel['title'] + ' ' + abstractDataRel['abstractText']
   
   # Check if the article is classified as epidemiology
-  isEpi = get_isEpi(text)
+  epi_data = get_isEpi(text)
+  if not epi_data:
+    return
 
-  if isEpi:
+  if epi_data['isEpi']:
+    print(epi_data['isEpi'])
     epi_info = get_epiExtract(text)
-    print('getEpi Info: ')
-    print(epi_info)
+    print('getEpi Info: ', str(epi_info), article_node)
 
     # Check if any values in epi_info are not empty
-    if sum([1 for x in epi_info.values() if x]) > 0:
+    if epi_info and sum([1 for x in epi_info.values() if x]) > 0:
       try:
         create_epidemiology_query = '''
           MATCH (a:Article) WHERE id(a) = $article_id
           SET a.isEpi = $isEpi
+          SET a.epi_processed = TRUE
           MERGE (n:EpidemiologyAnnotation {isEpi:$isEpi, epidemiology_type:$epidemiology_type, epidemiology_rate:$epidemiology_rate, date:$date, location:$location, sex:$sex, ethnicity:$ethnicity, DateCreatedRDAS:$rdascreated, LastUpdatedRDAS:$rdasupdated})
-          MERGE (n) -[r:EPIDEMIOLOGY_ANNOTATION_FOR]-> (a)
+          MERGE (n) -[r:EPIDEMIOLOGY_ANNOTATION_FOR {epidemiology_probability:$epi_prob}]-> (a)
           '''
         tx.run(create_epidemiology_query, args={
           "article_id":article_node,
-          "isEpi": isEpi,
+          "isEpi": epi_data['isEpi'],
+          "epi_prob": epi_data['probability'],
           "epidemiology_type":epi_info['EPI'] if epi_info['EPI'] else [], 
           "epidemiology_rate":epi_info['STAT'] if epi_info['STAT'] else [], 
           "date":epi_info['DATE'] if epi_info['DATE'] else [], 
@@ -1038,16 +1121,35 @@ def create_epidemiology(tx, abstractDataRel, article_node, today):
         logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is True.')
         raise e
       
+    # If all the epi_info values are empty, set is_Epi to false
+    else:
+      try:
+        create_epidemiology_query = '''
+            MATCH (a:Article) WHERE id(a) = $article_id
+            SET a.isEpi = $isEpi
+            SET a.epi_processed = TRUE
+            '''
+        tx.run(create_epidemiology_query, args={
+          "article_id":article_node,
+          "isEpi": epi_data['isEpi']
+        })
+
+      except Exception as e:
+        logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is True, but no epi_info.')
+        raise e
+
   # Update the Article node with isEpi information
   else:
     create_epidemiology_query = '''
         MATCH (a:Article) WHERE id(a) = $article_id
-        SET a.isEpi = $isEpi'''
-  try:
-    tx.run(create_epidemiology_query, args={"article_id":article_node, 'isEpi': isEpi})
-  except Exception as e:
-    logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is False.')
-    raise e
+        SET a.isEpi = $isEpi
+        SET a.epi_processed = TRUE
+        '''
+    try:
+      tx.run(create_epidemiology_query, args={"article_id":article_node, 'isEpi': epi_data['isEpi']})
+    except Exception as e:
+      logging.error(f'Exception during tx.run(create_epidemiology_query) where isEpi is False.')
+      raise e
 
 
 
@@ -1427,7 +1529,7 @@ def save_articles(disease_node, pubmed_ids, search_source, session, maxdate):
           pubmedID = result['id'] if 'id' in result else None
           logging.info(f'pubmedID: {pubmedID}')
         
-          # Skip to the next iteration if PubMed ID is None
+          # Skip to the next iteration if PubMed ID is None or title = Personal Communication.
           if pubmedID is None:
             print('.', end='', flush=True)
             continue
@@ -1442,7 +1544,7 @@ def save_articles(disease_node, pubmed_ids, search_source, session, maxdate):
               print('o', end="", flush=True)
             else:
               try:
-                # Call the save_all function to create/update nodes and relationships for the article
+                # Call the function to create/update nodes and relationships for the article
                 save_all(result, disease_node, pubmedID, search_source, session, maxdate)
               except Exception as e:
                 logging.error(f" Exception when calling save_all, error: {e}")
@@ -1691,8 +1793,11 @@ def gather_pubtator(db, today):
   """
 
   # Retrieve articles without Pubtator annotations
-  res = db.run('MATCH (x:Article) WHERE NOT (x)--(:PubtatorAnnotation) RETURN x.pubmed_id AS pmid, ID(x) AS id').data()
+  res = db.run('MATCH (x:Article) WHERE NOT (x)--(:PubtatorAnnotation) AND x.pubmed_id IS NOT NULL AND x.hasPubtatorAnnotation IS NULL RETURN x.pubmed_id AS pmid, ID(x) AS id').data()
   print(len(res))
+
+  # Set OMIM only articles to hasPubtatorAnnotation = False since they dont have pubmed_id's
+  db.run('MATCH (x:Article) WHERE x.pubmed_id IS NULL AND x.hasPubtatorAnnotation IS NULL SET x.hasPubtatorAnnotation = FALSE')
 
   # Iterate over the articles and fetch Pubtator annotations
   for idx,r in enumerate(res):
@@ -1702,11 +1807,18 @@ def gather_pubtator(db, today):
     ID = r['id']
     try:
       # Fetch Pubtator annotations for the article
+      print(ID)
       annos = fetch_pubtator_annotations(pmid)
 
       if annos:
         # Create PubtatorAnnotation nodes in the database
         create_annotations(db, annos, ID, today)
+        db.run(f'MATCH (a:Article) WHERE ID(a) = {ID} SET a.hasPubtatorAnnotation = TRUE')
+        print('annotations created') #TEST
+      else:
+        db.run(f'MATCH (a:Article) WHERE ID(a) = {ID} SET a.hasPubtatorAnnotation = FALSE')
+        print('annotation not created') #TEST
+
 
     except Exception as e:
       logging.warning(f'\nException creating annotations for article {pmid}:  {e}')
@@ -1736,15 +1848,14 @@ def gather_epi(db, today):
     None
   """
 
-  # Retrieve articles with non-empty titles and abstracts that havent already been processed by the API
-  res = db.run('MATCH (x:Article) WHERE NOT (x.abstractText = \"\" OR x.title = \"\") AND x.isEpi IS NULL RETURN x.abstractText AS abstract, x.title AS title, ID(x) AS id').data()
+  # Retrieve articles with non-empty titles and abstracts that havent already been processed by the API (epi_processed = FALSE)
+  res = db.run('MATCH (x:Article) WHERE NOT (x.abstractText = \"\" OR x.title = \"\") AND ((x.epi_processed = TRUE AND x.isEpi = TRUE) AND NOT exists((x)--(:EpidemiologyAnnotation))) OR NOT (x.abstractText = \"\" OR x.title = \"\") AND (x.epi_processed = FALSE AND x.isEpi = FALSE) RETURN x.abstractText AS abstract, x.title AS title, ID(x) AS id').data() #TEST DateCreatedRDAS needs to be removed after
   print(len(res))  
 
   # Iterate over articles and create EpidemiologyAnnotation nodes
   for idx,r in enumerate(res):
-    #if idx < 413246: #TEST
-    #  continue
     print(idx)
+
     abstract = r['abstract']
     title = r['title']
     abstractDataRel = {'abstractText':abstract,'title':title}
@@ -1788,14 +1899,14 @@ def retrieve_articles(db, last_update, today):
   # Save OMIM articles and update the database
   print('Populating OMIM Articles and Information')
   #save_omim_articles(db, today) #TEST, remove comment keep code
-
+  
   # Gather epidemiology annotations for articles with non-empty titles and abstracts
   print('Populating Epidemiology Information')
   gather_epi(db, today) #TEST, remove comment keep code
 
   # Gather Pubtator annotations for articles that do not have associated annotations
   print('Populating Pubtator Information')
-  gather_pubtator(db, today)
+  #gather_pubtator(db, today)
 
   
 
