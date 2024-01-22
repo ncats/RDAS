@@ -68,7 +68,7 @@ def fill_template(type,data):
 
 def send_mail(type, data):
     print(f"[{data['total']}, {data['email']}]")
-    if data['total'] > 0 and data['email'] == 'timothy.sheils@ncats.nih.gov' or data['email'] == 'zhuqianzq@gmail.com':
+    if data['total'] > 0 and data['email'] == 'timothy.sheils@ncats.nih.gov' or data['email'] == 'zhuqianzq@gmail.com': #TEST
 
         data['email'] = 'devon.leadman@nih.gov' # TEST EMAIL
 

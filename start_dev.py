@@ -87,7 +87,7 @@ while True:
 
             # Update last update date in the system database configuration
             db = AlertCypher('system')
-            db.setConf('DATABASE', f'{k}_update', datetime.strftime(datetime.now(),"%m/%d/%y"))
+            db.setConf('DATABASE', f'{full_db_name}_update', datetime.strftime(datetime.now(),"%m/%d/%y"))
 
             # Creates a backup file for the current state of the GARD database, puts that file in the transfer directory
             print('Dumping GARD db')
@@ -101,12 +101,12 @@ while True:
 
             # Transfers the GARD backup file to the Testing Server's transfer folder
             print(f'Transfering GARD dump to TEST server')
-            p = Popen(['python3', 'file_transfer.py', f'-dir gard', '-s test'], encoding='utf8')
+            p = Popen(['python3', 'file_transfer.py', '-dir', 'gard', '-s', 'test'], encoding='utf8')
             p.wait()
 
             # Transfers the current databases of this iteration's backup file to the Testing Server's transfer folder
             print(f'Transfering {full_db_name} dump to TEST server')
-            p = Popen(['python3', 'file_transfer.py', f'-dir {full_db_name}', '-s test'], encoding='utf8')
+            p = Popen(['python3', 'file_transfer.py', '-dir', f'{full_db_name}', '-s', 'test'], encoding='utf8')
             p.wait()
 
             print(f'Update of {full_db_name} Database Complete...')

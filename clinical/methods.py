@@ -23,6 +23,10 @@ from nltk.stem import PorterStemmer
 nltk.download("punkt")
 from spacy.matcher import Matcher
 from fuzzywuzzy import fuzz
+import string
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import pipeline
+from time import sleep
 
 
 
@@ -236,6 +240,7 @@ def extract_fields(nctid):
 
     # Contruct the API query to retrieve full study information
     full_trial_query = 'https://clinicaltrials.gov/api/query/full_studies?expr=' + nctid + '&min_rnk=1&max_rnk=1&fmt=json'
+    sleep(0.5)
     
     try:
         # Make the API request and parse the JSON response
@@ -341,20 +346,20 @@ def cypher_generate(db,now,NCTID,data,node_type,update=None,return_single=None):
         else:
             # Create a relationship between the ClinicalTrial node and a new node
             query += 'MERGE ({node_abbr}:{node_type} {data_string}) MERGE (ct){dir1}[:{rel_name}]{dir2}({node_abbr}) '.format(data_string=data_string,ID=ID,node_type=node_type,dir1=dm.rel_directions[node_type][0],dir2=dm.rel_directions[node_type][1],rel_name=dm.relationships[node_type],node_abbr=dm.abbreviations[node_type])
-    query += 'RETURN TRUE'
+    query += 'RETURN ID({node_abbr}) as id'.format(node_abbr=dm.abbreviations[node_type])
     return query
 
 
 
 
-def format_node_data(db,now,trial,node_type,update=None,return_single=None):
+def format_node_data(db,now,trial,node_type,NCTID,update=None,return_single=None):
     data_collection = None
     node_data = dict()
     node_data_list = list()
     queries = list()
     query = str()
     fields = dm.fields[node_type]
-    NCTID = trial['NCTId']
+    #NCTID = trial.get('NCTId')
 
     if node_type in dm.lists_of_nodes:
         list_of_nodes = dm.lists_of_nodes[node_type]
@@ -374,25 +379,269 @@ def format_node_data(db,now,trial,node_type,update=None,return_single=None):
                         node_data[field] = value
                 node_data_list.append(node_data)
         
-    else:
+    elif trial:
         for field in fields:
             if field in trial:
                 value = trial[field]
                 node_data[field] = value
+        
         node_data_list.append(node_data)
 
-    if return_single:
-        return cypher_generate(db,now,NCTID,node_data_list[0],node_type,return_single=return_single)
+    else:
+        return None
 
+
+    if return_single:
+        # Returns only the Cypher query and does not run it
+        return cypher_generate(db,now,NCTID,node_data_list[0],node_type,return_single=return_single)
+    
     for ele in node_data_list:
-        if not ele == {}: 
+        if not ele == {}:
             query = cypher_generate(db, now, NCTID, ele, node_type,update=update)
-            if query:
-                db.run(query)
+            if query and node_type == 'ClinicalTrial':
+                db.run(query) #TEST response = db.run(query)
+
+            elif query and not node_type == 'ClinicalTrial':
+                # Steps to be ran to create additional nodes after a base node is created (ex. A Condition Leaf Node that connects to a Condition Node)
+                if node_type in dm.process_nodes:
+                    queries = unpack_nested_data(db, now, NCTID, trial, node_type)
+                else:
+                    queries = [query]
+
+                if queries:
+                    for q in queries:
+                        db.run(q)
             else:
                 print('ERROR: Query Returned Empty')
+            
+            
+
+    return query
+
+
+
+def unpack_nested_data (db, now, nctid, trial, node_type):
+    """
+    #POSTPONED FOR NOW
+    if node_type == 'Condition':
+        create_ancestor_nodes(db, trial, node_id, node_type)
+        create_leaf_nodes(db, trial, node_id, node_type)
+
+    if node_type == 'Intervention':
+        #create_other_properties(db, trial, node_id, node_type)
+        #ALSO POSTPONED
+        #create_leaf_nodes(db, trial, node_id, node_type)
+    """
+
+    if node_type == 'ClinicalTrial':
+        tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER")
+        model = AutoModelForTokenClassification.from_pretrained("dslim/bert-base-NER", config={'output_hidden_states': False})
+        nlp = pipeline("ner", model=model, tokenizer=tokenizer)
+
+        queries = create_investigator_nodes(db, nlp, nctid, trial)
+
+    elif node_type == 'Organization':
+        queries = create_organization_node(db, now, nctid, trial)
+
+    elif node_type == 'PrimaryOutcome':
+        queries = create_primary_outcome_nodes(db, nctid, trial)
+
     return queries
 
+
+
+def create_primary_outcome_nodes (db, nctid, trial):
+    queries = list()
+
+    pout_list = trial.get('PrimaryOutcome')
+    if pout_list:
+        for pout in pout_list:
+            desc = pout.get('PrimaryOutcomeDescription')
+            if desc:
+                desc = desc.replace('\"','').replace('\'','')
+
+            timeframe = pout.get('PrimaryOutcomeTimeFrame')
+            if timeframe:
+                timeframe = timeframe.replace('\"','').replace('\'','')
+
+            measure = pout.get('PrimaryOutcomeMeasure')
+            if measure:
+                measure = measure.replace('\"','').replace('\'','')
+
+            queries.append(f'MATCH (x:ClinicalTrial) WHERE x.NCTId = \"{nctid}\" MERGE (y:PrimaryOutcome {{PrimaryOutcomeDescription: \"{desc}\", PrimaryOutcomeTimeFrame: \"{timeframe}\", PrimaryOutcomeMeasure: \"{measure}\"}}) MERGE (x)-[:has_outcome]->(y)')
+
+    return queries
+
+
+
+def create_organization_node (db, now, nctid, trial):
+    full_org_list = list()
+    query_list = list()
+
+    sname = trial.get('LeadSponsorName')
+    sclass = trial.get('LeadSponsorClass')
+    oname = trial.get('OrgFullName')
+    oclass = trial.get('OrgClass')
+
+    if sname and sclass:
+        full_org_list.append({'OrgName':sname, 'OrgClass':sclass, 'OrgType': 'Sponsor'})
+    elif sname:
+        full_org_list.append({'OrgName':sname, 'OrgType': 'Sponsor'})
+    elif sclass:
+        full_org_list.append({'OrgClass':sclass, 'OrgType': 'Sponsor'})
+
+    if oname and oclass:
+        full_org_list.append({'OrgName':oname, 'OrgClass':oclass, 'OrgType': 'Organization'})
+    elif oname:
+        full_org_list.append({'OrgName':oname, 'OrgType': 'Organization'})
+    elif oclass:
+        full_org_list.append({'OrgClass':oclass, 'OrgType': 'Organization'})
+
+
+    collaborator = trial.get('Collaborator')
+
+    if collaborator:
+        for collab in collaborator:
+            full_org_list.append({'OrgName':collab['CollaboratorName'], 'OrgClass':collab['CollaboratorClass'], 'OrgType': 'Collaborator'})
+
+    for org in full_org_list:
+        query = cypher_generate(db, now, nctid, org, 'Organization')
+        query_list.append(query)
+
+    return query_list
+
+
+def create_ancestor_nodes (db, trial, node_id, node_type):
+    if node_type == 'Condition':
+        pass
+
+
+def create_leaf_nodes (db, trial, node_id, node_type):
+    if node_type == 'Condition':
+        pass
+    elif node_type == 'Intervention':
+        pass
+
+
+
+"""
+# MAY NOT NEED FUNCTION
+def create_other_properties (db, nctid, trial, node_type):
+    if node_type == 'Intervention':
+        isDrug = trial.get('IsFDARegulatedDrug')
+        isDevice = trial.get('IsFDARegulatedDevice')
+
+        if not isDrug:
+            isDrug = 'NULL'
+        if not isDevice:
+            isDevice = 'NULL'
+
+        db.run(f'MATCH (x:ClinicalTrial)--(y:Intervention) WHERE x.NCTId = \"{nctid}\" SET y.IsFDARegulatedDrug = {isDrug} SET y.IsFDARegulatedDevice = {isDevice} RETURN TRUE')
+"""
+
+
+
+def create_investigator_nodes (db, nlp, nctid, full_trial):
+    queries = list()
+    contacts = dict()
+    locations = dict()
+
+    if 'Location' in full_trial:
+        location_list = full_trial['Location']
+        for info in location_list:
+            if 'LocationContactList' in info:
+                info = info['LocationContactList']['LocationContact']
+                for list_loc_contact in info:
+                    if 'LocationContactName' in list_loc_contact and ('LocationContactPhone' in list_loc_contact or 'LocationContactEMail' in list_loc_contact):
+                        locations[list_loc_contact['LocationContactName']] = list_loc_contact
+
+    if 'CentralContact' in full_trial:
+        contact_list = full_trial['CentralContact']
+        for info in contact_list:
+            if 'CentralContactName' in contact_list and ('CentralContactPhone' in contact_list or 'CentralContactEMail' in contact_list):
+                contacts[info['CentralContactName']] = info
+    
+    if 'OverallOfficial' in full_trial:
+        overall_official_list = full_trial['OverallOfficial']
+
+        for official in overall_official_list:
+            neo4j_query = '{'
+
+            if 'OverallOfficialName' in official:
+                name = official['OverallOfficialName']
+            else:
+                name = None
+            if 'OverallOfficialAffiliation' in official:
+                location = official['OverallOfficialAffiliation']
+            else:
+                location = None
+            if 'OverallOfficialRole' in official:
+                role = official['OverallOfficialRole']
+            else:
+                role = None
+
+            if name:
+                name = name.replace('\'','')
+                masked_name = mask_name(nlp, name)
+                if masked_name:
+                    neo4j_query += f'OfficialName:\'{masked_name}\'~'
+                else:
+                    neo4j_query += f'OfficialName:\'{name}\'~'
+            if location:
+                location = location.replace('\'','')
+                neo4j_query += f'OfficialAffiliation:\'{location}\'~'
+            if role:
+                role = role.replace('\'','')
+                neo4j_query += f'OfficialRole:\'{role}\'~'
+
+            end_term = neo4j_query.rfind('~')
+            neo4j_query = neo4j_query[:end_term] + neo4j_query[end_term+1:]
+            neo4j_query = neo4j_query.replace('~',',')
+
+            neo4j_query += '}'
+            print(neo4j_query)
+
+            investigator_id = db.run(f'MATCH (x:ClinicalTrial) WHERE x.NCTId = \'{nctid}\' MERGE (y:Investigator {neo4j_query}) MERGE (x)<-[:investigates]-(y) RETURN ID(y) as id').data()[0]['id']
+
+            if name in locations:
+                contact_query = ''
+                populate_info = locations[name]
+
+                if 'LocationContactPhone' in populate_info:
+                    contact_query += f"SET x.ContactPhone = \"{populate_info['LocationContactPhone']}\""
+                if 'LocationContactEMail' in populate_info:
+                    contact_query += f"SET x.ContactEmail = \"{populate_info['LocationContactEMail']}\""
+
+                db.run(f'MATCH (x:Investigator) WHERE ID(x) = {investigator_id} {contact_query}')
+
+            if name in contacts:
+                contact_query = ''
+                populate_info = contacts[name]
+
+                if 'CentralContactPhone' in populate_info:
+                    contact_query += f"SET x.ContactPhone = \"{populate_info['CentralContactPhone']}\""
+                if 'CentralContactEMail' in populate_info:
+                    contact_query += f"SET x.ContactEmail = \"{populate_info['CentralContactEMail']}\""
+
+                db.run(f'MATCH (x:Investigator) WHERE ID(x) = {investigator_id} {contact_query}')
+
+
+
+def mask_name(nlp, name):
+    name = name.rstrip(string.punctuation)
+    name = name.title()
+    entities = nlp(name)
+    person_entities = [entity['word'] for entity in entities if entity['entity'] == 'B-PER' or entity['entity'] == 'I-PER']
+    if person_entities == []:
+        reversed_name = ' '.join(name.split()[::-1])
+        entities = nlp(reversed_name)
+        person_entities = [entity['word'] for entity in entities if entity['entity'] == 'B-PER' or entity['entity'] == 'I-PER']
+    masked_name = ' '.join(person_entities) if person_entities else None
+    masked_name = masked_name.replace(' ##', '') if masked_name is not None else None
+    if masked_name != None:
+             name=name.replace('"', '').replace("'", '')
+             masked_name=', '.join([i.strip() for i in name.split(',') if len(i.strip())>=4 ])
+    return masked_name
 
 
 
