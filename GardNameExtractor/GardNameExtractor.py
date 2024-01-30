@@ -20,6 +20,9 @@ import re
 import json
 import ast
 from itertools import permutations
+from sentence_transformers import SentenceTransformer, util
+from transformers import AutoTokenizer, AutoModel
+import torch
 
 # Sample text
 #text = "The goal of tis project was ird. This aim is not to go the first sentence. This is not the second sentence? And this is the third sentence."
@@ -104,6 +107,7 @@ def check_sen(text):
   # Process the text
   doc = nlp(text)
   # Iterate over sentences in the document
+  first_sentence = ''
   Priority,Future_positive,present_positive,positive='','','',''
   for i, sent in enumerate(doc.sents, 1):
     # Initialize a set to store unique tenses in the sentence
@@ -118,14 +122,16 @@ def check_sen(text):
 
     # Determine the overall tense of the sentence
     if is_sentence_negated(sent)==False and  ("past" not in sentence_tenses):
+        if i == 1:    first_sentence = sent.text
         #positive+=sent.text
-        if  ("the goal of" in sent.text.lower()) or ("aim" in sent.text.lower()):
+        elif  ("the goal of" in sent.text.lower()) or ("aim" in sent.text.lower()):
            Priority+=sent.text
         elif "future" in sentence_tenses:
            Future_positive+=sent.text
         elif "present" in sentence_tenses and is_sentence_negated(sent)==False:
            present_positive+=sent.text
-  return Priority,Future_positive,present_positive #,
+        if i == 1:    first_sentence = sent.text
+  return first_sentence,Priority,Future_positive,present_positive 
 
 
 def get_sentence_with_word(paragraph, target_word):
@@ -267,13 +273,39 @@ def get_gard_abstract_stem_exact(text):
   return {}
 
 
-def normalize_combined_dictionary(dict1, dict2, dict3, min_, max_):
-    # Make the values of the first dictionary three times
-    dict1 = {key: value * 3 for key, value in dict1.items()}
+def is_about_term(input_text, target_term):
+    # Load ClinicalBERT model and tokenizer
+    model_name = "emilyalsentzer/Bio_ClinicalBERT"
+    # ClinicalBERT: "emilyalsentzer/Bio_ClinicalBERT"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModel.from_pretrained(model_name)
+
+    # Tokenize input text and target term
+    input_tokens = tokenizer(input_text, return_tensors="pt", padding=True, truncation=True, max_length=512)
+    term_tokens = tokenizer(target_term, return_tensors="pt", padding=True, truncation=True, max_length=512)
+
+    # Get embeddings from ClinicalBERT
+    with torch.no_grad():
+        input_embedding = model(**input_tokens).last_hidden_state.mean(dim=1)
+        term_embedding = model(**term_tokens).last_hidden_state.mean(dim=1)
+
+    # Calculate cosine similarity between text and term
+    similarity = util.pytorch_cos_sim(input_embedding, term_embedding)
+
+    # Define a threshold for similarity
+    similarity_threshold = 0.7
+
+    # Return True if similarity is above the threshold, indicating the text is about the term
+    return similarity.item() #> similarity_threshold
+
+
+def normalize_combined_dictionary(input_text,dict1, dict2, dict3, dict4,min_, max_):
+    dict1 = {key: value * 4 for key, value in dict1.items()}
     # Make the values of the second dictionary two times
-    dict2 = {key: value * 2 for key, value in dict2.items()}
+    dict2 = {key: value * 3 for key, value in dict2.items()}
+    dict3 = {key: value * 2 for key, value in dict3.items()}
     # Combine all dictionaries
-    combined_dict = {key: dict1.get(key, 0) + dict2.get(key, 0) + dict3.get(key, 0) for key in set(dict1) | set(dict2) | set(dict3)}
+    combined_dict = {key: dict1.get(key, 0) + dict2.get(key, 0) + dict3.get(key, 0) + dict4.get(key, 0) for key in set(dict1) | set(dict2) | set(dict3) | set(dict4)}
     # Normalize the values of the combined dictionary
     total_frequency = sum(combined_dict.values())
 
@@ -281,7 +313,25 @@ def normalize_combined_dictionary(dict1, dict2, dict3, min_, max_):
     if total_frequency == 0:
         return {}
     normalized_dict = {key: min_ + (max_ - min_) * (value / total_frequency) for key, value in combined_dict.items()}
-    return normalized_dict
+    
+    result_dict = {}
+    for key, value in normalized_dict.items():
+      if  is_about_term(input_text.lower(), key) >=0.7:
+        result_dict[key] = [value, is_about_term(input_text.lower(), key)]
+    return result_dict
+
+
+def update_dictionary(dictionary):
+    updated_dict = {}
+    for key, value in dictionary.items():
+        new_key = Gard[Gard['GardName'] == key]['GardId'].tolist()
+        if new_key:
+            new_key = new_key[0].replace('"', '')
+            updated_dict[(key,new_key)] = value
+        else:
+            updated_dict[key] = value
+    return updated_dict
+
 
 
 def grad_id(title_, Public_health_relevance_statement, abstract_):
@@ -292,20 +342,24 @@ def grad_id(title_, Public_health_relevance_statement, abstract_):
         if name: return name
 
     if Public_health_relevance_statement and isinstance(Public_health_relevance_statement, str):
-        A, B, C = check_sen(Public_health_relevance_statement)
+        A, B, C,D = check_sen(Public_health_relevance_statement)
         name1 = get_gard_abstract_stem_exact(A)
         name2 = get_gard_abstract_stem_exact(B)
         name3 = get_gard_abstract_stem_exact(C)
-        name=normalize_combined_dictionary(name1,name2,name3,0.7,0.9)
+        name4 = get_gard_abstract_stem_exact(D)
+        name=normalize_combined_dictionary(Public_health_relevance_statement,name1,name2,name3,name4,0.7,0.9)
         if name and (name !={}): return name
 
     if abstract_ and isinstance(abstract_, str):
-        A, B, C = check_sen(abstract_)
+        A, B, C , D = check_sen(abstract_)
         name1 = get_gard_abstract_stem_exact(A)
         name2 = get_gard_abstract_stem_exact(B)
         name3 = get_gard_abstract_stem_exact(C)
-        name=normalize_combined_dictionary(name1,name2,name3,0,0.7)
+        name4 = get_gard_abstract_stem_exact(D)
+        name=normalize_combined_dictionary(abstract_,name1,name2,name3,name4,0,0.7)
         if name and (name !={}): return name
+
+        
 
 def GardNameExtractor(project_title,phr_text,abstract_text):
   #Abstract1['Gard_name']=Abstract1.apply(lambda x: grad_id(x['project_title'],x['phr_text'],x['abstract_text']), axis=1)

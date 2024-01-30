@@ -42,7 +42,7 @@ def remove_similar_strings(df):
                         list_b.remove(item)
     return df
 
-def extract_words_from_json_string(input_string):
+def extract_words_from_json_string2(input_string):
     try:
         # Use ast.literal_eval to safely convert the string to a list
         result_list = ast.literal_eval(input_string)
@@ -55,7 +55,8 @@ def extract_words_from_json_string(input_string):
         return None
 
 def len_chcek(row):
-      return [w for w in row if (len(w) >3) and (w != 'plan') ]
+        return [w for w in row if (len(w) >4) or (w == "sars") ]
+
 
 
 #Gard = pd.read_csv('/content/Gard_V1.csv')
