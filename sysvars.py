@@ -1,6 +1,6 @@
 import os
 
-current_version = 2.2
+current_version = 2.5
 
 # Basic user information
 current_user = 'leadmandj'
@@ -13,7 +13,7 @@ transfer_path = '{base_path}transfer/'.format(base_path=base_path)
 migrated_path = '{base_path}migrated/'.format(base_path=base_path)
 approved_path = '{base_path}approved/'.format(base_path=base_path)
 images_path = '{base_path}img/'.format(base_path=base_path)
-firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz-a4e783d24c.json'.format(base_path=base_path)
+firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz-a4e783d24c.json'.format(base_path=base_path) # May have to set this in new enviroment
 
 # Conversions
 dump_dirs = ['clinical','pubmed','grant','gard']
@@ -32,7 +32,7 @@ pm_db = 'test.pubmed'
 gnt_db = 'test.grant'
 gard_db = 'test.gard'
 
-# Server URLS and addresses
+# Server URLS and addresses # Original epiapi_url is https://rdas.ncats.nih.gov/api/epi/
 epiapi_url = "https://rdas.ncats.nih.gov/api/epi/"
 rdas_urls = {'dev':'rdas-dev.ncats.nih.gov','test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}
 

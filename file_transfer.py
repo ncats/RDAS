@@ -27,7 +27,8 @@ def transfer (dump_path=None,dump_dir=None,server=None):
     print(dump_path, dump_dir)
     p = Popen(['scp', f'{dump_path}', f'{sysvars.current_user}@{server}:{sysvars.transfer_path}{dump_dir}.dump'], encoding='utf8')
     p.wait()
-
+    
+server = None
 try:
     server = sysvars.rdas_urls[args.server]
 except KeyError:

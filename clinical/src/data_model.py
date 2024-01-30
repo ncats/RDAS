@@ -20,7 +20,8 @@ StudyDesign = ['DesignAllocation','DesignInterventionModel','DesignInterventionM
     'DetailedDescription','PrimaryOutcomeDescription','PrimaryOutcomeMeasure','PrimaryOutcomeTimeFrame',
     'SamplingMethod']
 
-Participant = ['EligibilityCriteria']
+Participant = ['EligibilityCriteria', 'EnrollmentCount', 'EnrollmentType', 'Gender', 'GenderBased', 'GenderDescription',
+                'HealthyVolunteers', 'MaxiumumAge', 'MinimumAge', 'StdAge', 'StudyPopulation']
 
 ExpandedAccess = ['ExpAccTypeIndividual','ExpAccTypeIntermediate','ExpAccTypeTreatment','ExpandedAccessNCTId',
     'ExpandedAccessStatusForNCTId','HasExpandedAccess']
@@ -64,13 +65,16 @@ additional_class_variable_names = ['ind','spo','col','con','stu','par','exp','in
 ##################################################################
 #new
 
-node_names = ['ClinicalTrial', 'IndividualPatientData', 'Sponsor', 'Collaborator', 'Condition', 'StudyDesign', 'Participant', 'ExpandedAccess', 'Intervention', 'Location', 'PatientRegistry', 'Reference']
+node_names = ['ClinicalTrial', 'IndividualPatientData', 'Organization', 'Investigator', 'Condition', 'StudyDesign', 'PrimaryOutcome', 'Participant', 'ExpandedAccess', 'Intervention', 'Location', 'PatientRegistry', 'Reference']
 
 abbreviations = {
     'ClinicalTrial': 'ct',
     'IndividualPatientData': 'ind',
-    'Sponsor': 'spo',
-    'Collaborator': 'col',
+    'Organization': 'org',
+    'PrimaryOutcome': 'pout',
+    'Investigator': 'inv',
+    #'Sponsor': 'spo',
+    #'Collaborator': 'col',
     'Condition': 'con',
     'StudyDesign': 'stu',
     'Participant': 'par',
@@ -83,8 +87,11 @@ abbreviations = {
 
 relationships = {
     'IndividualPatientData': 'has_individual_patient_data',
-    'Sponsor': 'sponsored_by',
-    'Collaborator': 'collaborated_with',
+    #'Sponsor': 'sponsored_by',
+    #'Collaborator': 'collaborated_with',
+    'Organization': 'conducted_by',
+    'PrimaryOutcome': 'has_outcome',
+    'Investigator': 'investigated_by',
     'Condition': 'investigates_condition',
     'StudyDesign': 'has_study_design',
     'Participant': 'has_participant_info',
@@ -97,8 +104,11 @@ relationships = {
 
 rel_directions = {
     'IndividualPatientData': ['-','->'],
-    'Sponsor': ['-','->'],
-    'Collaborator': ['-','->'],
+    #'Sponsor': ['-','->'],
+    #'Collaborator': ['-','->'],
+    'Organization': ['-','->'],
+    'PrimaryOutcome': ['-','->'],
+    'Investigator': ['-','->'],
     'Condition': ['-','->'],
     'StudyDesign': ['-','->'],
     'Participant': ['-','->'],
@@ -120,23 +130,29 @@ fields = {
     'IndividualPatientData': ['AvailIPDComment','AvailIPDId','AvailIPDType','AvailIPDURL','IPDSharing',
     'IPDSharingAccessCriteria','IPDSharingDescription','IPDSharingInfoType','IPDSharingTimeFrame','IPDSharingURL'],
     
-    'Sponsor': ['LeadSponsorName','LeadSponsorClass'],
+    #'Sponsor': ['LeadSponsorName','LeadSponsorClass'],
 
-    'Collaborator': ['CollaboratorName','CollaboratorClass'],
+    #'Collaborator': ['CollaboratorName','CollaboratorClass'],
 
-    'Condition': ['Condition'],
+    'Organization': ['OrgName', 'OrgClass', 'OrgType'],
+
+    'Investigator': ['OfficialName', 'ContactEmail', 'OfficialAffiliation', 'ContactPhone', 'OfficialRole'],
+
+    'Condition': ['Condition'], #'ConditionAncestorId', 'ConditionAncestorTerm', 'ConditionBrowseBranchAbbrev', 'ConditionBrowseBranchName', 'ConditionBrowseLeafAsFound', 'ConditionBrowseLeafId', 'ConditionBrowseLeafName', 'ConditionBrowseLeafRelevance', 'ConditionMeshId', 'ConditionMeshTerm'
 
     'StudyDesign': ['DesignAllocation','DesignInterventionModel','DesignInterventionModelDescription','DesignMasking',
     'DesignMaskingDescription','DesignObservationalModel','DesignPrimaryPurpose','DesignTimePerspective',
-    'DetailedDescription','PrimaryOutcomeDescription','PrimaryOutcomeMeasure','PrimaryOutcomeTimeFrame',
-    'SamplingMethod'],
+    'DetailedDescription','SamplingMethod'],
 
-    'Participant': ['EligibilityCriteria'],
+    'PrimaryOutcome': ['PrimaryOutcomeDescription', 'PrimaryOutcomeMeasure', 'PrimaryOutcomeTimeFrame'],
+
+    'Participant': ['EligibilityCriteria', 'EnrollmentCount', 'EnrollmentType', 'Gender', 'GenderBased', 'GenderDescription',
+                'HealthyVolunteers', 'MaxiumumAge', 'MinimumAge', 'StdAge', 'StudyPopulation'],
 
     'ExpandedAccess': ['ExpAccTypeIndividual','ExpAccTypeIntermediate','ExpAccTypeTreatment','ExpandedAccessNCTId',
     'ExpandedAccessStatusForNCTId','HasExpandedAccess'],
 
-    'Intervention': ['InterventionName','InterventionType','InterventionDescription'],
+    'Intervention': ['InterventionName','InterventionType','InterventionDescription', 'InterventionOtherName', 'IsFDARegulatedDevice', 'IsFDARegulatedDrug'], # 'InterventionBrowseLeafId', 'InterventionBrowseLeafName', 'InterventionBrowseLeafRelevance', 'InterventionMeshId', 'InterventionMeshTerm', 'InterventionOtherName'
 
     'Location': ['LocationCity','LocationCountry','LocationFacility','LocationState',
     'LocationStatus','LocationZip'],
@@ -147,16 +163,22 @@ fields = {
 
 }
 
+# Nodes that need additional processing to create additional nodes
+process_nodes = ['Intervention', 'Condition', 'ClinicalTrial', 'Organization', 'PrimaryOutcome']
+
+# Types of nodes that contain more than one entry
 lists_of_nodes = {
 'Collaborator': 'Collaborator',
 'Condition': 'Condition',
 'Intervention': 'Intervention',
 'Location': 'Location',
 'Reference': 'Reference',
+'PrimaryOutcome':'PrimaryOutcome',
 
-'Unassigned': ['SecondaryIdInfo','ArmGroup','PrimaryOutcome','SecondaryOutcome','OtherOutcome','StdAge','OverallOfficial','IPDSharingInfoType','ConditionMesh','ConditionAncestor','ConditionBrowseLeaf','ConditionBrowseBranch','InterventionMesh','InterventionAncestor','InterventionBrowseLeaf','InterventionBrowseBranch']
+'Unassigned': ['SecondaryIdInfo','ArmGroup','SecondaryOutcome','OtherOutcome','StdAge','OverallOfficial','IPDSharingInfoType', 'ConditionMesh', 'ConditionAncestor','ConditionBrowseLeaf','ConditionBrowseBranch','InterventionMesh','InterventionAncestor','InterventionBrowseLeaf','InterventionBrowseBranch']
 }
 
+# Propeties that are in list form
 fields_as_properties = {
 'ClinicalTrial': ['Phase']
 }

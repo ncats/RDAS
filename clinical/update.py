@@ -116,7 +116,7 @@ def main():
             if not trial_info['LastUpdatePostDate'] == current_nctids[ID]:
                 print('UPDATING...')
                 for node_type in dm.node_names:
-                    data_string = rdas.format_node_data(db,today,trial_info,node_type,update=True)
+                    data_string = rdas.format_node_data(db,today,trial_info,node_type,ID,update=True)
                 
                 #BELOW CREATES HISTORY NODE, POSTPONED FOR NOW
                 
@@ -133,7 +133,7 @@ def main():
         if trial_info:
             print(f'Adding {ID}...')
             for node_type in dm.node_names:
-                data_string = rdas.format_node_data(db,today,trial_info,node_type)
+                data_string = rdas.format_node_data(db,today,trial_info,node_type,ID)
         else:
             print('Error in add for finding full trial data for ' + ID)
      

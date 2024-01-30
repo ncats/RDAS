@@ -61,3 +61,15 @@ dateadd.txt
 removeepi.py
 apitest.py
 chatgpt.py
+add_investigator.out
+add_omim.out
+investigator_add.py
+update_pubtator.txt
+update_epi.txt
+epi_extract_text.py
+dummy_trainer
+convert_organization.txt
+add_outcome.txt
+add_participant_info.py
+add_participant.txt
+epifix.py
