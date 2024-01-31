@@ -29,7 +29,7 @@ gard_files_path = '{base_path}/gard/src/'.format(base_path=base_path)
 # Database names being used on the current server
 ct_db = 'test.clinical'
 pm_db = 'test.pubmed'
-gnt_db = 'test.grant'
+gnt_db = 'new.grant'
 gard_db = 'test.gard'
 
 # Server URLS and addresses # Original epiapi_url is https://rdas.ncats.nih.gov/api/epi/

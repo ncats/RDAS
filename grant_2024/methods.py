@@ -3,7 +3,6 @@ import os
 import sysvars
 workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
-import update_grant
 import pandas as pd
 from AlertCypher import AlertCypher
 import requests
@@ -25,66 +24,17 @@ from sentence_transformers import SentenceTransformer, util
 from transformers import AutoTokenizer, AutoModel
 import torch
 
-def start(db):
-    update_grant.main(db)
+'''
+def extract_words_from_json_string(json_string):
+    try:
+        word_list = json.loads(json_string)
+        words = [word.replace('"', '').strip() for word in word_list ]
+        return words
+    except (json.JSONDecodeError, TypeError) as e:
+        #print(f"Error decoding JSON: {e}")
+        return []
+'''
 
-def download_nih_data():
-    print('Downloading NIH Exporter files')
-    # Clinical Studies
-    if not os.path.exists(f'{sysvars.base_path}grant/src/raw/clinical_studies/clinical_studies.csv'):
-        command = f'curl -L -X GET https://reporter.nih.gov/exporter/clinicalstudies/download -o {sysvars.base_path}grant/src/raw/clinical_studies/clinical_studies.csv'
-        os.system(command)
-    else:
-        print('Clinical Studies file already downloaded... bypassing')
-    # Patents
-    if not os.path.exists(f'{sysvars.base_path}grant/src/raw/patents/patents.csv'):
-        command = f'curl -L -X GET https://reporter.nih.gov/exporter/patents/download -o {sysvars.base_path}grant/src/raw/patents/patents.csv'
-        os.system(command)
-    else:
-        print('Patents file already downloaded... bypassing')
-
-    types = ['abstracts','linktables','projects','publications']
-    for i in range(1985,2024):
-        for type in types:
-            command = f'curl -L -X GET https://reporter.nih.gov/exporter/{type}/download/{i} -o {sysvars.base_path}grant/src/raw/{type}/{type}{i}.zip'
-            os.system(command)
-            command = f'unzip {sysvars.base_path}grant/src/raw/{type}/{type}{i}.zip -d {sysvars.base_path}grant/src/raw/{type}'
-            os.system(command)
-            command = f'rm {sysvars.base_path}grant/src/raw/{type}/{type}{i}.zip'
-            os.system(command)
-
-def get_project_data (appl_id):
-    url = 'https://api.reporter.nih.gov/v2/projects/search'
-    headers = {
-        'accept': 'application/json',
-        'Content-Type': 'application/json',
-    }
-
-    # Define parameters
-    total_data = []
-    limit = 1
-    num_requests = 1 // limit
-
-    data = {
-        "criteria": {"appl_ids":[int(f'{appl_id}')]},
-        "sort_field": "project_start_date",
-        "sort_order": "desc"
-    }
-
-    # Send POST request
-    response = requests.post(url, headers=headers, json=data)
-
-    # Check if the request was successful (status code 200)
-    if response.status_code == 200:
-        # Parse and append the response JSON data to the total_data list
-        result_data = response.json()
-        return result_data
-        
-    else:
-        # Print an error message if the request was not successful
-        print(f"Error: {response.status_code}, {response.text}")
-        return
-    
 def update_dictionary(dictionary):
     updated_dict = {}
     for key, value in dictionary.items():
@@ -240,6 +190,79 @@ else:
 
 
 nlp = spacy.load("en_core_web_sm")
+
+'''
+Available fields:
+appl_id
+subproject_id
+fiscal_year
+project_num
+project_serial_num
+organization
+award_type
+activity_code
+award_amount
+is_active
+project_num_split
+principal_investigators
+contact_pi_name
+program_officers
+agency_ic_admin
+agency_ic_fundings
+cong_dist
+spending_categories
+project_start_date
+project_end_date
+organization_type
+opportunity_number
+full_study_section
+award_notice_date
+is_new
+mechanism_code_dc
+core_project_num
+terms
+pref_terms
+abstract_text
+project_title
+phr_text
+spending_categories_desc
+agency_code
+covid_response
+arra_funded
+budget_start
+budget_end
+cfda_code
+funding_mechanism
+direct_cost_amt
+indirect_cost_amt
+project_detail_url
+date_added
+'''
+
+def download_nih_data():
+    print('Downloading NIH Exporter files')
+    # Clinical Studies
+    if not os.path.exists(f'{sysvars.base_path}grant_2024/src/raw/clinical_studies/clinical_studies.csv'):
+        command = f'curl -L -X GET https://reporter.nih.gov/exporter/clinicalstudies/download -o {sysvars.base_path}grant_2024/src/raw/clinical_studies/clinical_studies.csv'
+        os.system(command)
+    else:
+        print('Clinical Studies file already downloaded... bypassing')
+    # Patents
+    if not os.path.exists(f'{sysvars.base_path}grant_2024/src/raw/patents/patents.csv'):
+        command = f'curl -L -X GET https://reporter.nih.gov/exporter/patents/download -o {sysvars.base_path}grant_2024/src/raw/patents/patents.csv'
+        os.system(command)
+    else:
+        print('Patents file already downloaded... bypassing')
+
+    types = ['abstracts','linktables','projects','publications']
+    for i in range(1985,2024):
+        for type in types:
+            command = f'curl -L -X GET https://reporter.nih.gov/exporter/{type}/download/{i} -o {sysvars.base_path}grant_2024/src/raw/{type}/{type}{i}.zip'
+            os.system(command)
+            command = f'unzip {sysvars.base_path}grant_2024/src/raw/{type}/{type}{i}.zip -d {sysvars.base_path}grant_2024/src/raw/{type}'
+            os.system(command)
+            command = f'rm {sysvars.base_path}grant_2024/src/raw/{type}/{type}{i}.zip'
+            os.system(command)
 
 def is_about_term(input_text, target_term):
     # Load ClinicalBERT model and tokenizer
@@ -935,3 +958,6 @@ def create_data_model (db, gard_matches, project_data, today):
     create_clinical_study_nodes(db, core_project_num, core_project_node_id)
 
     create_patent_nodes(db, core_project_num, core_project_node_id)
+
+
+    

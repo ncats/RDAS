@@ -9,6 +9,10 @@ which files need to be added to the database.
 """
 
 import os
+import sys
+import sysvars
+workspace = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(workspace)
 import json
 import re
 import ast
@@ -20,8 +24,9 @@ import pandas as pd
 from prepare_annotation_text import prepare_phr_aim
 from annotate_text import *
 from remove_general_umls_concepts import clean_annotation_output
-from rdsmproj import Blacklist, AbstractMap
 from AlertCypher import AlertCypher
+import grant.methods as rdas
+import threading
 
 ENCODING = "latin1"
 raw_path = ""
@@ -64,10 +69,10 @@ def years_to_files(subdir: str):
 
 
 def aggregate_disease_data():
-	normmap_df = pd.read_csv(data_raw('normmap_results.csv'),index_col=False,usecols=['ID','GARD_id'])
+	normmap_df = pd.read_csv(data_raw('normmap_results.csv'),index_col=False,usecols=['ID','GARD_id','CONF_SCORE','SEM_SIM'])
 	normmap_df = normmap_df.rename(columns={'ID':'APPLICATION_ID', 'GARD_id': 'GARD_ID'})
 
-	disease_df = pd.read_csv(data_raw('ncats_disease_list.csv'),index_col=False)
+	disease_df = pd.read_json(data_raw('all_gards.json'))
 	disease_df = disease_df.rename(columns={'GARD id':'GARD_ID', 'Name':'NAME', 'Synonyms':'SYNONYMS'})
 
 	merged_df = pd.merge(normmap_df, disease_df, on=['GARD_ID'])
@@ -86,17 +91,59 @@ def combine_projects():
 
 	combine_df.to_csv(raw_path + '/RePORTER_PRJABS_C_FY_ALL.csv')
 
+lock = threading.Lock()
+def batch_normmap(df):
+	r,c = df.shape
+	for idx in range(r):
+		row = df.iloc[idx]
+		appl_id = row['APPLICATION_ID']
+		abstract = row['ABSTRACT_TEXT']
+
+		project_data = rdas.get_project_data(appl_id).get('results')[0]
+		
+		title = project_data.get('project_title')
+		phr = project_data.get('phr_text')
+		
+
+		gard_ids = rdas.GardNameExtractor(title, phr, abstract)
+		if gard_ids:
+			for gard,add_data in gard_ids.items():
+				if add_data == 1:
+					add_data = [1,1]
+
+				print({'ID': appl_id, 'GARD_id': gard, 'CONF_SCORE': add_data[0], 'SEM_SIM': add_data[1]})
+				with lock:
+					with open(data_raw('normmap_results.csv'), "a") as f:
+   						f.writelines([f'{appl_id},{gard},{add_data[0]},{add_data[1]}\n'])
+
+
 def run_normmap():
 	print('Running NormMap')
-	combine_projects()
-	bl = Blacklist.Blacklist()
-	absmap = AbstractMap.AbstractMap(bl=bl)
-	absmap._set_input_path(raw_path)
-	absmap._set_output_path(raw_path)
-	print(absmap._get_input_path())
-	print(absmap._get_output_path())
-	# RePORTER_PRJABS_C_FY1985
-	absmap._match('/RePORTER_PRJABS_C_FY_ALL.csv', 'ncats_disease_list.json',IDcol='APPLICATION_ID',TEXTcols=['ABSTRACT_TEXT'])
+
+	#combine_projects() # TEST remove #
+
+	# Create CSV files headers
+	with open(data_raw('normmap_results.csv'), "w") as f:
+		f.writelines(['ID,GARD_id,CONF_SCORE,SEM_SIM\n'])
+
+	chunk_size = 100
+	thread_list = list()
+
+	df = pd.read_csv(raw_path + '/RePORTER_PRJABS_C_FY_ALL.csv', index_col=False)
+	df = df[0:1000]
+	list_df = [df[i:i+chunk_size] for i in range(0,len(df),chunk_size)]
+
+	for lst in list_df:
+		thread = threading.Thread(target=batch_normmap, args=(lst,), daemon=True)
+		thread_list.append(thread)
+
+	for thr in thread_list:
+		thr.start()
+
+	for thr in thread_list:
+		thr.join()
+
+	print('GARD to Project connections made')
 
 def get_RD_project_ids():
 	run_normmap()
@@ -174,6 +221,9 @@ def select_RD_projects():
 		apps.to_csv(output_file, index=False, encoding=ENCODING)
 		print('Finished ', output_file)
 
+def clean_pi (pi_info):
+	pi_info = pi_info[:len(pi_info)-1]
+	return pi_info
 
 def cleanup_project_IC_NAME_totalcost():
 	# Get CSV files lists from a folder
@@ -184,7 +234,7 @@ def cleanup_project_IC_NAME_totalcost():
 									'PROJECT_TERMS', 'PROJECT_TITLE', 'SUBPROJECT_ID', 'TOTAL_COST', 'TOTAL_COST_SUB_PROJECT']
 
 	# Build Agent names lookup dictionary
-	agents = pd.read_csv('alert/new/grant/agent_names.csv')
+	agents = pd.read_csv(data_raw('agent_names.csv'))
 	agent_lkup = dict(zip(agents['IC_NAME_OLD'], agents['IC_NAME_NEW']))
 
 	# Clean all files
@@ -195,6 +245,10 @@ def cleanup_project_IC_NAME_totalcost():
 		app = pd.read_csv(file, usecols=cols_to_read, encoding=ENCODING, low_memory=False)
 		app['IC_NAME'] = app['IC_NAME'].fillna('Unknown')
 		app['IC_NAME'] = app['IC_NAME'].map(agent_lkup)
+
+		# Clean PI_IDS and PI_NAMES
+		app['PI_IDS'] = app['PI_IDS'].apply(clean_pi)
+		app['PI_NAMEs'] = app['PI_NAMEs'].apply(clean_pi)
 
 		# Combine TOTAL_COST and TOTAL_COST_SUB_PROJECT
 		app.loc[app['TOTAL_COST'].isnull(), 'TOTAL_COST'] = app['TOTAL_COST_SUB_PROJECT']
@@ -362,7 +416,7 @@ def cleanup_pub_country():
 	files = glob.glob(input_path + '*.csv')
 
 	# Build country lookup dictionary
-	countries = pd.read_csv('alert/new/grant/countries.csv')
+	countries = pd.read_csv(data_raw('countries.csv'))
 	country_lkup = dict(zip(countries['COUNTRY_OLD'], countries['COUNTRY_NEW']))
 
 	# Clean all files
@@ -465,22 +519,33 @@ def annotate_grant_abstracts():
 	for model in MODELS:
 		print(f'*** Annotate with {model} model ***')
 
+		nlp = load_model(model)
 		for file in input_files:
 			year = file[-8:-4]
 			print('///////')
-			nlp = load_model(model)
+			
 			print('///////')
-			text = pd.read_csv(file, encoding=ENCODING, dtype={'APPLICATION_ID':int, 'ABSTRACT_TEXT':str})
-			umls = get_umls_concepts(nlp, text)
+			
+			try:
+				text = pd.read_csv(file, encoding=ENCODING, dtype={'APPLICATION_ID':int, 'ABSTRACT_TEXT':str})
 
-			output_file = output_file_path + year + ".csv"
+				if len(text) == 0:
+					continue
 
-			if model == 'en_ner_craft_md':
-				umls.to_csv(output_file, index=False)
-			else:
-				umls.to_csv(output_file, index=False, mode='a', header=False)
+				umls = get_umls_concepts(nlp, text)
 
-			print("Added annotations to", output_file)
+				output_file = output_file_path + year + ".csv"
+
+				if model == 'en_ner_craft_md':
+					umls.to_csv(output_file, index=False)
+				else:
+					umls.to_csv(output_file, index=False, mode='a', header=False)
+
+				print("Added annotations to", output_file)
+
+			except Exception as e:
+				print(e)
+				continue
 
 	print("***** ALL DONE *****")
 
@@ -491,10 +556,10 @@ def clean_umls_concepts():
 
 	# Clean all files
 	output_path = data_neo4j(data_neo4j('grants_umls/'))
-	keep_semantic_types = pd.read_csv('alert/new/grant/semantic_type_keep.csv', usecols=['TUI'])
+	keep_semantic_types = pd.read_csv(data_raw('semantic_type_keep.csv'), usecols=['TUI'])
 	keep_semantic_types = keep_semantic_types['TUI'].to_list()
 
-	remove_umls_concepts = pd.read_csv('alert/new/grant/umls_concepts_remove.csv', usecols=['UMLS_CUI'])
+	remove_umls_concepts = pd.read_csv(data_raw('umls_concepts_remove.csv'), usecols=['UMLS_CUI'])
 	remove_umls_concepts = remove_umls_concepts['UMLS_CUI'].to_list()
 
 	for file in files:
@@ -519,7 +584,7 @@ def clean_annotation_source():
 
 
 def map_semantic_types():
-	names = pd.read_csv("alert/new/grant/SemanticTypes_2018AB.csv", delimiter='|', header=None)
+	names = pd.read_csv(data_raw("SemanticTypes_2018AB.csv"), delimiter='|', header=None)
 	names = {k: v for [k, v] in names.values}
 	input_file_path = data_neo4j("grants_umls/")
 	output_file_path = data_neo4j("annotation_umls/")
@@ -540,7 +605,7 @@ def to_abs_path(path: str):
 	return os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
 
 def get_disease_data():
-	db = AlertCypher('gard')
+	db = AlertCypher(f'{sysvars.gard_db}')
 	query = 'MATCH (x:GARD) RETURN COLLECT(x)'
 
 	response = db.run(query).data()[0]['COLLECT(x)']
@@ -554,9 +619,9 @@ def get_disease_data():
 		json_list.append(json_dict)
 
 	json_df = pd.DataFrame.from_records(json_list)
-	json_df.to_csv(data_raw('ncats_disease_list.csv'),index=False)
+	json_df.to_json(data_raw('all_gards.json'))
 
-	with open(data_raw('ncats_disease_list.json'), 'w+') as f:
+	with open(data_raw('all_gards.json'), 'w+') as f:
 		json.dump(json_list, f)
 
 def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
@@ -577,6 +642,8 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	raw_path = to_abs_path(data_raw_path)
 	neo4j_path = to_abs_path(data_neo4j_path)
 
+	
+
 	# Initializes folders to be created that store processed CSV files
 	print("Reading raw data from", raw_path, "and outputting processed data to", neo4j_path)
 	folders_to_create = [
@@ -593,6 +660,8 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 			"projects_with_funds",
 			"publications"
 	]
+
+	
 
 	# Clear out old files, or initialize new repo for them if the given data_neo4j path does
 	# not already exist.
@@ -619,6 +688,8 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 
 	print("Creating empty output directories")
 	'''
+
+	
 	# add empty folders for the generated files
 	add_folder = lambda folder_name: os.mkdir(data_neo4j(folder_name))
 	for folder in folders_to_create:
@@ -629,6 +700,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	##############################################
 	# Run preprocessing stages one after another.#
 	##############################################
+	
 	print('Running get_disease_data')
 	get_disease_data()
 	print("Running get_RD_project_ids")
@@ -637,8 +709,10 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	merge_project_funding()
 	print("Running select_RD_projects")
 	select_RD_projects()
+	
 	print("Running cleanup_project_IC_NAME_totalcost")
 	cleanup_project_IC_NAME_totalcost()
+	
 	print("Running find_RD_core_projects")
 	find_RD_core_projects()
 	print("Running select_RD_patents")
@@ -653,14 +727,16 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	cleanup_pub_country()
 	print("Running select_RD_abstracts")
 	select_RD_abstracts()
-
+	
 	# The below stages are extremely slow, so we will only run them for
 	# years that have changed data.
+	
 	'''
 	years_to_annotate = {k[-8:-4] for k,v in repo.status().items()
 											 if (k.startswith("abstracts/") or k.startswith("projects/"))
 											 and v in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_WT_NEW]}
 	'''	
+	
 	print("Running annotation_preprocess_grant")
 	annotation_preprocess_grant()
 	print("Running annotate_grant_abstracts")
@@ -674,6 +750,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	
 	print("Running fix_escaped_endings")
 	fix_escaped_endings()
+	
 	
 	################################################
 
@@ -709,7 +786,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	fta = {}
 
 	for subdir in FilesToAdd.__dict__['__annotations__'].keys():
-		fta[subdir] = ['file:///'+data_neo4j(subdir)+'/'+d for d in os.listdir(data_neo4j(subdir))]
+		fta[subdir] = ['file:///' + data_neo4j(subdir)+'/'+d for d in os.listdir(data_neo4j(subdir))] #'file:/'
 		print(fta)
 	return fta
 

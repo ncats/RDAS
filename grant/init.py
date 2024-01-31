@@ -12,3 +12,4 @@ def main():
     db = AlertCypher(sysvars.gnt_db)
     rdas.start(db)
 
+main()

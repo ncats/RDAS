@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 from neo4j import GraphDatabase, Session, Record
 from typing import TypedDict, Any, Callable, Optional
@@ -6,6 +7,7 @@ from AlertCypher import AlertCypher
 from steps import steps
 from prep_neo4j_data import FilesToAdd, prep_data
 import sysvars
+import grant.methods as rdas
 
 def write(session: Session, query: str, params: dict) -> list:
 	"""
@@ -44,7 +46,9 @@ def step_to_fn(
 	return fn
 
 def main(db: AlertCypher):
-	fta = prep_data(f"{sysvars.base_path}grant/raw", f"{sysvars.base_path}grant/processed")
+	#rdas.download_nih_data() #TEST
+
+	fta = prep_data(f"{sysvars.base_path}grant/src/raw", f"{sysvars.base_path}grant/src/processed")
 
 	# run database upgrade steps on only new/modified files
 	for step in steps:

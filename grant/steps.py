@@ -34,8 +34,8 @@ steps: list = [
 		"data_folder": "projects",
 		"constraint":
 			"""
-			CREATE CONSTRAINT unique_core_num IF NOT EXISTS ON (c:CoreProject)
-			ASSERT c.core_project_num IS UNIQUE
+			CREATE CONSTRAINT unique_core_num IF NOT EXISTS FOR (c:CoreProject)
+			REQUIRE c.core_project_num IS UNIQUE
 			""",
 		"query":
 			"""
@@ -57,8 +57,8 @@ steps: list = [
 		"data_folder": "projects",
 		"constraint": 
 			"""
-			CREATE CONSTRAINT unique_agent_name IF NOT EXISTS ON (a:Agent)
-			ASSERT a.name IS UNIQUE
+			CREATE CONSTRAINT unique_agent_name IF NOT EXISTS FOR (a:Agent)
+			REQUIRE a.name IS UNIQUE
 			""",
 		"query":
 			"WITH data WHERE data.IC_NAME IS NOT NULL MERGE (a:Agent {name: data.IC_NAME}) WITH a,data MATCH (c:CoreProject {core_project_num: data.CORE_PROJECT_NUM}) MERGE (a)<-[:FUNDED_BY]-(c)"
@@ -105,8 +105,8 @@ steps: list = [
 		"data_folder": "publications",
 		"constraint":
 			"""
-			CREATE CONSTRAINT unique_journal_title IF NOT EXISTS ON (j:Journal)
-			ASSERT j.title IS UNIQUE
+			CREATE CONSTRAINT unique_journal_title IF NOT EXISTS FOR (j:Journal)
+			REQUIRE j.title IS UNIQUE
 			""",
 		"query":
 			"""
@@ -124,8 +124,8 @@ steps: list = [
 		"data_folder": "publications",
 		"constraint":
 			"""
-			CREATE CONSTRAINT unique_pmid_date IF NOT EXISTS ON (n:Publication)
-			ASSERT (n.pmid, n.date) IS UNIQUE
+			CREATE CONSTRAINT unique_pmid_date IF NOT EXISTS FOR (n:Publication)
+			REQUIRE (n.pmid, n.date) IS UNIQUE
 			""",
 		"query":
 			"""
@@ -197,8 +197,8 @@ steps: list = [
 		"data_folder": "projects",
 		"constraint":
 			"""
-			CREATE CONSTRAINT unique_application_id_fy IF NOT EXISTS ON (p:Project)
-			ASSERT (p.application_id, p.funding_year) IS UNIQUE
+			CREATE CONSTRAINT unique_application_id_fy IF NOT EXISTS FOR (p:Project)
+			REQUIRE (p.application_id, p.funding_year) IS UNIQUE
 			""",
 		"query":
 			f"""
@@ -259,8 +259,8 @@ steps: list = [
 	#	"data_folder": "disease",
 	#	"constraint":
 	#		"""
-	#		CREATE CONSTRAINT unique_disease_category IF NOT EXISTS ON (d:DiseaseCategory)
-	#		ASSERT d.name IS UNIQUE
+	#		CREATE CONSTRAINT unique_disease_category IF NOT EXISTS FOR (d:DiseaseCategory)
+	#		REQUIRE d.name IS UNIQUE
 	#		""",
 	#	"query":
 	#		"""
@@ -278,16 +278,16 @@ steps: list = [
 		"data_folder": "disease",
 		"query":
 			"""
-			MERGE (d:Disease {
-				name: data.NAME,
-				gard_id: data.GARD_ID})
+			MERGE (d:GARD {
+				GardName: data.NAME,
+				GardId: data.GARD_ID})
 				ON CREATE SET
-					d.synonyms = apoc.text.split(apoc.text.replace(apoc.text.replace(data.SYNONYMS,"[\[\]]+",""),"[']+",""),", ")
+					d.Synonyms = apoc.text.split(apoc.text.replace(apoc.text.replace(data.SYNONYMS,"[\[\]]+",""),"[']+",""),", ")
 				ON MATCH SET
-					d.synonyms = apoc.text.split(apoc.text.replace(apoc.text.replace(data.SYNONYMS,"[\[\]]+",""),"[']+",""),", ")
+					d.Synonyms = apoc.text.split(apoc.text.replace(apoc.text.replace(data.SYNONYMS,"[\[\]]+",""),"[']+",""),", ")
 			WITH d, data
 			MATCH (r:Project {application_id: toInteger(data.APPLICATION_ID)})
-			MERGE (r)<-[:RESEARCHED_BY]-(d)
+			MERGE (r)<-[:RESEARCHED_BY {confidence_score: toFloat(data.CONF_SCORE), semantic_similarity: toFloat(data.SEM_SIM)}]-(d)
 			"""
 	},
 

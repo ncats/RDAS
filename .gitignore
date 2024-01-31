@@ -26,7 +26,6 @@ pubmed/src/
 gard/src/*.csv
 gard/src/*.json
 gard/src/*.txt
-grant/src/
 __pycache__/
 clinical/__pycache__/
 grant/__pycache__/
@@ -36,15 +35,16 @@ pubmed/methods_new.py
 pubmed/archive/
 grant/archive/
 gard/__pycache__/
-grant/__pycache__/
 email/__pycache__/
 transfer/*.dump
 transfer/*.dump
 backup/*/*.dump
 migrated/*.dump
 approved/*.dump
-grant/raw/*
-grant/processed/*
+grant/src/**/**/*.csv
+grant/src/**/**/*.json
+grant_2024/src/**/**/*.csv
+grant_2024/src/**/**/*.json
 crt/*.json
 removethis.py
 start_dev.out
@@ -73,3 +73,5 @@ add_outcome.txt
 add_participant_info.py
 add_participant.txt
 epifix.py
+grant_pipeline.txt
+result.json
