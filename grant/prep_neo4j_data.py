@@ -69,22 +69,21 @@ def years_to_files(subdir: str):
 
 
 def aggregate_disease_data():
+	# Rename GARD-Project mapping results columns to match the names listed in the GARD data
 	normmap_df = pd.read_csv(data_raw('normmap_results.csv'),index_col=False,usecols=['ID','GARD_id','CONF_SCORE','SEM_SIM'])
 	normmap_df = normmap_df.rename(columns={'ID':'APPLICATION_ID', 'GARD_id': 'GARD_ID'})
 
 	disease_df = pd.read_json(data_raw('all_gards.json'))
 	disease_df = disease_df.rename(columns={'GARD id':'GARD_ID', 'Name':'NAME', 'Synonyms':'SYNONYMS'})
 
+	# Merge the GARD-Project mapping results with the GARD data
 	merged_df = pd.merge(normmap_df, disease_df, on=['GARD_ID'])
 	merged_df.to_csv(data_neo4j('disease/disease_to_application.csv'),index=False)
 
 def combine_projects():
-	# iterate through all files in raw/abstracts
-	# read as a dataframe with pandas
-	# read next csv as dataframe and append to last
-	# repeat
-	# export to csv into raw directory
 	combine_df = pd.DataFrame()
+
+        # Appends each abstract CSV to the last CSV for all abstracts CSVs in folder
 	for filename in os.listdir(data_raw('abstracts')):
 		tmp = pd.read_csv(data_raw('abstracts/{filename}'.format(filename=filename)),index_col=False, encoding = "ISO-8859-1")
 		combine_df = pd.concat([combine_df,tmp], axis=0)
@@ -120,7 +119,8 @@ def batch_normmap(df):
 def run_normmap():
 	print('Running NormMap')
 
-	#combine_projects() # TEST remove #
+	# Combine all project files into a single file
+	combine_projects() # TEST remove #
 
 	# Create CSV files headers
 	with open(data_raw('normmap_results.csv'), "w") as f:
@@ -133,6 +133,7 @@ def run_normmap():
 	df = df[0:1000]
 	list_df = [df[i:i+chunk_size] for i in range(0,len(df),chunk_size)]
 
+	# Create threads to process results
 	for lst in list_df:
 		thread = threading.Thread(target=batch_normmap, args=(lst,), daemon=True)
 		thread_list.append(thread)
@@ -146,9 +147,12 @@ def run_normmap():
 	print('GARD to Project connections made')
 
 def get_RD_project_ids():
+        # Get GARD to Project mappings
 	run_normmap()
 	aggregate_disease_data()
 	apps = pd.read_csv(data_raw("normmap_results.csv"), usecols=["ID"])
+
+	# Drop duplicate results and sort by Application ID
 	apps = apps.drop_duplicates()
 	apps = apps.sort_values(by=["ID"])
 
@@ -159,12 +163,15 @@ def merge_project_funding():
 	input_file_path = data_raw("projects/")
 	output_file_path = data_neo4j("projects_with_funds/")
 
+	# Processes for pre-2000 files
 	for year in range(1985, 2000, 1):
+		# Loads and sorts each Project Funding file by Application ID
 		funding_file_name = input_file_path + "RePORTER_PRJFUNDING_C_FY" + str(year) + ".csv"
 		funding = pd.read_csv(funding_file_name, encoding=ENCODING)
 		funding.columns = ['APPLICATION_ID','FULL_PROJECT_NUM','FUNDING_ICs','FY','ORG_DUNS','SUBPROJECT_ID','TOTAL_COST','TOTAL_COST_SUB_PROJECT']
 		funding.sort_values('APPLICATION_ID', inplace=True)
 
+		# Loads and sorts each Project file by Application ID
 		project_file_name = input_file_path + "RePORTER_PRJ_C_FY" + str(year) + ".csv"
 		project = pd.read_csv(project_file_name, encoding=ENCODING, low_memory=False)
 		project.sort_values('APPLICATION_ID', inplace=True)
@@ -172,6 +179,8 @@ def merge_project_funding():
 		match_col = 'APPLICATION_ID'
 		replace_cols = ['FULL_PROJECT_NUM','FUNDING_ICs','FY','ORG_DUNS','SUBPROJECT_ID','TOTAL_COST','TOTAL_COST_SUB_PROJECT']
 
+		# Searches each application ID in Project file for the same ID in the Project Funding file and merges the respective result from Funding file into the Project file
+		# Before 2000 the Project funding data was not included in the Project CSV file, so this is retrieving the up to date funding info
 		project.loc[project[match_col].isin(funding[match_col]), replace_cols] = funding.loc[funding[match_col].isin(project[match_col]), replace_cols].values
 
 		output_file_name = output_file_path + "RePORTER_PRJ_C_FY" + str(year) + "_cleaned.csv"
@@ -182,6 +191,8 @@ def merge_project_funding():
 	print("Copying over post-1999 project files")
 	all_files = glob.glob(input_file_path + "*.csv")
 	p = re.compile("([0-9]{4})[^0-9]*$")
+
+	# Nothing is changed in the post-2000 files, therefore are just copied over into the "processed" folder
 	for f in all_files:
 		m = p.search(f)
 		if m is not None and int(m.group(1)) > 1999:
@@ -199,7 +210,7 @@ def select_RD_projects():
 		'''
 		apps = pd.read_csv(input_file, encoding=ENCODING, low_memory=False)
 
-		# Get RD-related applications
+		# Searches the Project CSVs for Projects listed in the GARD-Project mapping results
 		rd_related = apps['APPLICATION_ID'].isin(rd_ids)
 		apps = apps[rd_related]
 		apps.sort_values(by=['APPLICATION_ID'], inplace=True)
@@ -235,22 +246,25 @@ def cleanup_project_IC_NAME_totalcost():
 
 	# Build Agent names lookup dictionary
 	agents = pd.read_csv(data_raw('agent_names.csv'))
+	# Creates a dictionary in the formation {'IC_NAME_OLD': 'IC_NAME_NEW'}
 	agent_lkup = dict(zip(agents['IC_NAME_OLD'], agents['IC_NAME_NEW']))
 
 	# Clean all files
 	output_path = data_neo4j('projects/')
 
 	for file in files:
-		# Clean Agent names
+		# Clean Agent names by filling NULL values with string 'Unknown'
 		app = pd.read_csv(file, usecols=cols_to_read, encoding=ENCODING, low_memory=False)
 		app['IC_NAME'] = app['IC_NAME'].fillna('Unknown')
+		# Replaces the IC_NAME with the new one from the dictionary
 		app['IC_NAME'] = app['IC_NAME'].map(agent_lkup)
 
 		# Clean PI_IDS and PI_NAMES
+		# Results are listed as a string seperated by semi-colons, this removes the last semi-colon in the string because it causes issues when converting to a list
 		app['PI_IDS'] = app['PI_IDS'].apply(clean_pi)
 		app['PI_NAMEs'] = app['PI_NAMEs'].apply(clean_pi)
 
-		# Combine TOTAL_COST and TOTAL_COST_SUB_PROJECT
+		# Finds NULL TOTAL_COST values and replaces them with the value in field TOTAL_COST_SUB_PROJECT
 		app.loc[app['TOTAL_COST'].isnull(), 'TOTAL_COST'] = app['TOTAL_COST_SUB_PROJECT']
 		app.drop(columns=['TOTAL_COST_SUB_PROJECT'], inplace=True)
 
@@ -260,6 +274,7 @@ def cleanup_project_IC_NAME_totalcost():
 
 
 def find_RD_core_projects():
+	# Load GARD-Project mapping results
 	apps = pd.read_csv(data_neo4j('NormMap_mapped_app_ids.csv'))
 
 	match_col = 'ID'
@@ -269,8 +284,10 @@ def find_RD_core_projects():
 	files = glob.glob(input_path + '*.csv')
 
 	for file in files:
+		# For each project CSV, gets the application ID and Core Project Number
 		proj = pd.read_csv(file, usecols=['APPLICATION_ID', 'CORE_PROJECT_NUM'], encoding=ENCODING)
 		proj.sort_values('APPLICATION_ID', inplace=True)
+		# Searches rows in the GARD-Project mapping for Application IDs that are in the Project CSV and then replace the application ID with the projects Core Project number
 		apps.loc[apps[match_col].isin(proj['APPLICATION_ID']), new_col] = proj.loc[proj['APPLICATION_ID'].isin(apps[match_col]), new_col].values
 
 		# Export RD related APPLICATION_ID and CORE_PROJECT_NUM pairs
@@ -296,6 +313,7 @@ def select_RD_patents():
 
 		proj = pd.read_csv(input_file, encoding=ENCODING, low_memory=False)
 		headers = proj.columns
+		# Replaces the PROJECT_ID listed with the patents Core Project number
 		proj.columns = list(map(lambda x: x.replace(col_name_to_replace, 'CORE_PROJECT_NUM'), headers))
 
 		# Get RD-related applications
@@ -304,13 +322,14 @@ def select_RD_patents():
 		proj = proj[rd_related]
 		proj.sort_values(by=['CORE_PROJECT_NUM'], inplace=True)
 
+		# Returns back patents that are only rare disease related
 		return proj
 
 	# Read the list of RD related core project numbers
 	core_proj_nums = pd.read_csv(data_neo4j('RD_coreProjNum.csv'))
 	core_proj_nums = core_proj_nums['CORE_PROJECT_NUM'].tolist()
 
-	file = data_raw('patents/Patents_1659288919587.csv')
+	file = data_raw('patents/patents.csv')
 	proj = find_RD_core_project(file, 'PROJECT_ID', core_proj_nums)
 	output_file = data_neo4j('patents/RD_PATENTS.csv')
 
@@ -329,6 +348,7 @@ def select_RD_clinical_studies():
 
 		proj = pd.read_csv(input_file, encoding=ENCODING, low_memory=False)
 		headers = proj.columns
+		# Replaces the Core Project Number field with CORE_PROJECT_NUM
 		proj.columns = list(map(lambda x: x.replace(col_name_to_replace, 'CORE_PROJECT_NUM'), headers))
 
 		# Get RD-related applications
@@ -336,13 +356,14 @@ def select_RD_clinical_studies():
 		proj = proj[rd_related]
 		proj.sort_values(by=['CORE_PROJECT_NUM'], inplace=True)
 
+		# Returns back only rare disease related clinical studies
 		return proj
 
 	# Read the list of RD related core project numbers
 	core_proj_nums = pd.read_csv(data_neo4j('RD_coreProjNum.csv'))
 	core_proj_nums = core_proj_nums['CORE_PROJECT_NUM'].tolist()
 
-	file = data_raw('clinical_studies/ClinicalStudies_1659286507775.csv')
+	file = data_raw('clinical_studies/clinical_studies.csv')
 	proj = find_RD_core_project(file, 'Core Project Number', core_proj_nums)
 	output_file = data_neo4j('clinical_studies/RD_CLINICAL_STUDIES.csv')
 
@@ -361,6 +382,7 @@ def select_RD_link_tables():
 
 		proj = pd.read_csv(input_file, encoding=ENCODING, low_memory=False)
 		headers = proj.columns
+		# Replaces the PROJECT_NUMBER column with CORE_PROJECT_NUM
 		proj.columns = list(map(lambda x: x.replace(col_name_to_replace, 'CORE_PROJECT_NUM'), headers))
 
 		# Get RD-related applications
@@ -368,13 +390,14 @@ def select_RD_link_tables():
 		proj = proj[rd_related]
 		proj.sort_values(by=['CORE_PROJECT_NUM'], inplace=True)
 
+		# Returns only rare disease related link table rows
 		return proj
 
 	# Read the list of RD related core project numbers
 	core_proj_nums = pd.read_csv(data_neo4j('RD_coreProjNum.csv'))
 	core_proj_nums = core_proj_nums['CORE_PROJECT_NUM'].tolist()
 
-	##### For files in a folder #####
+	# Gets all link tables in the folder
 	input_path = data_raw('link_tables/')
 	files = glob.glob(input_path + '*.csv')
 
@@ -399,12 +422,16 @@ def select_RD_publications():
 
 		for lnk_file in lnk_files:
 			lnk = pd.read_csv(lnk_file)
+			# Get unique PMIDs
 			pmid_lst = lnk['PMID'].unique()
 
+			# Search the Publication CSV for PMIDs that are in the respective link table
 			is_rd = pub['PMID'].isin(pmid_lst).tolist()
+			# Labels publications as either rare disease related or not
 			mask = [mask or is_rd for mask, is_rd in zip(mask, is_rd)]
 
 		output_file = data_neo4j('publications/RD_PUB_' + pub_file[-8:-4] + '.csv')
+		# Gets only rows of publications that are rare disease realted
 		pub = pub[mask]
 		pub.to_csv(output_file, index=False)
 		print("Finished ", output_file)
@@ -417,13 +444,16 @@ def cleanup_pub_country():
 
 	# Build country lookup dictionary
 	countries = pd.read_csv(data_raw('countries.csv'))
+	# Builds dictionary in format {'COUNTRY_OLD': 'COUNTRY_NEW'}
 	country_lkup = dict(zip(countries['COUNTRY_OLD'], countries['COUNTRY_NEW']))
 
-	# Clean all files
+	# Clean all publication files
 	output_path = data_neo4j('publications/')
 	for file in files:
 		pub = pd.read_csv(file, encoding=ENCODING, low_memory=False)
+		# Fills null Country values with 'Unknown'
 		pub['COUNTRY'] = pub['COUNTRY'].fillna('Unknown')
+		# Replaces countries found in publication CSV with new country value
 		pub['COUNTRY'] = pub['COUNTRY'].map(country_lkup)
 
 		output_file = output_path + "RD_PUB_" + file[-8:-4] + '.csv'
@@ -455,25 +485,27 @@ def select_RD_abstracts():
 		input_file: path and filename of the file
 		rd_ids: a list of rare disease related application IDs
 		'''
-
+		
 		apps = pd.read_csv(input_file, encoding=ENCODING, low_memory=False)
 
-		# Get RD-related applications
+		# Finds the Abstracts CSV application IDs that are also found in the GARD-Project mapping results
 		rd_related = apps['APPLICATION_ID'].isin(rd_ids)
 		apps = apps[rd_related]
 		apps.sort_values(by=['APPLICATION_ID'], inplace=True)
 
+		# Returns sorted list of rare disease related abstract rows
 		return apps
 
 	# Read the list of RD Application IDs
 	rd_ids = pd.read_csv(data_neo4j('NormMap_mapped_app_ids.csv'))
 	rd_ids = rd_ids['ID'].tolist()
 
-	# Get CSV files lists from a folder
+	# Get abstracts CSV files lists from a folder
 	input_path = data_raw('abstracts/')
 	files = glob.glob(input_path + '*.csv')
 
 	for file in files:
+		# This accounts for updated information with "new.csv" appended to them
 		if file.endswith("new.csv"):
 			output_file = data_neo4j('abstracts/RD_ABSTRACTS_' + file[-12:-8] + '.csv')
 		else:
@@ -495,6 +527,7 @@ def annotation_preprocess_grant():
 		if projects_file == None or abstracts_file == None:
 			continue
 
+		# Preprocesses information related to PHR and AIM (May not be needed due to Jaber's code)
 		annotate_text = prepare_phr_aim(projects_file, abstracts_file)
 
 		year = projects_file[-8:-4]
@@ -563,6 +596,7 @@ def clean_umls_concepts():
 	remove_umls_concepts = remove_umls_concepts['UMLS_CUI'].to_list()
 
 	for file in files:
+		# Removes unwanted semantic types
 		umls = clean_annotation_output(file, keep_semantic_types, remove_umls_concepts)
 		output_file = output_path + "RD_UMLS_CONCEPTS_" + file[-8:-4] + '.csv'
 		umls.to_csv(output_file, index=False)
@@ -605,6 +639,7 @@ def to_abs_path(path: str):
 	return os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
 
 def get_disease_data():
+        # Gather GARD information from RDAS GARD neo4j
 	db = AlertCypher(f'{sysvars.gard_db}')
 	query = 'MATCH (x:GARD) RETURN COLLECT(x)'
 
@@ -617,7 +652,8 @@ def get_disease_data():
 		json_dict['Name'] = res['GardName']
 		json_dict['Synonyms'] = res['Synonyms']
 		json_list.append(json_dict)
-
+        
+        # Convert dictionary to JSON and save file
 	json_df = pd.DataFrame.from_records(json_list)
 	json_df.to_json(data_raw('all_gards.json'))
 
@@ -783,8 +819,8 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	repo.create_commit(ref, author, committer, message, tree, parents)
 	'''
 
+	# Gets the names of every processed file added for the rest of the code to add to the neo4j
 	fta = {}
-
 	for subdir in FilesToAdd.__dict__['__annotations__'].keys():
 		fta[subdir] = ['file:///' + data_neo4j(subdir)+'/'+d for d in os.listdir(data_neo4j(subdir))] #'file:/'
 		print(fta)

@@ -885,7 +885,7 @@ def create_authors(tx, abstractDataRel, article_node, omim=False):
 
   create_author_query = '''
   MATCH (a:Article) WHERE id(a) = $article_id
-  MERGE (p:Author {fullName:$fullName, firstName:$firstName, lastName:$lastName})
+  MERGE (p:Author {fullName:$fullName, firstName:$firstName, lastName:$lastName, affiliation:$affiliation})
   MERGE (p) - [r:WROTE] -> (a)
   '''
   if omim:
@@ -897,11 +897,36 @@ def create_authors(tx, abstractDataRel, article_node, omim=False):
     })
   else:
     for author in abstractDataRel['authorList']['author']:
+
+      affiliation_data = author['authorAffiliationDetailsList']['authorAffiliation']
+      affiliation = [aff['affiliation'] for aff in affiliation_data]
+
+      affiliation = None
+      auth_val = None
+      args = None
+      if 'collectiveName' in author:
+          continue
+
+      if not 'authorAffiliationDetailsList' and 'authorId' in author:
+          continue
+
+      if 'authorAffiliationDetailsList' in author:
+          affiliation_data = author['authorAffiliationDetailsList']['authorAffiliation']
+          affiliation = [aff['affiliation'] for aff in affiliation_data]
+
+      if 'authorId' in author:
+          author_id_info = author['authorId']
+          auth_type = author_id_info['type']
+          if auth_type == 'ORCID':
+              auth_val = author_id_info['value']
+
       tx.run(create_author_query, args={
         "article_id":article_node,
         "fullName": author['fullName'] if 'fullName' in author else '',
         "firstName": author['firstName'] if 'firstName' in author else '',
-        "lastName": author['lastName'] if 'lastName' in author else ''
+        "lastName": author['lastName'] if 'lastName' in author else '',
+        "affiliation": affiliation if affiliation else '',
+        "orc_id": auth_val if auth_val else ''
       })
 
 
@@ -1867,6 +1892,50 @@ def gather_epi(db, today):
 
 
 
+def download_genereview_articles():
+  if not os.path.exists(f'{sysvars.base_path}pubmed/src/genereviews_pmid.txt'):
+    command = f'curl -L -X GET https://ftp.ncbi.nih.gov/pub/GeneReviews/GRtitle_shortname_NBKid.txt -o {sysvars.base_path}pubmed/src/genereviews_pmid.txt'
+    os.system(command)
+
+
+
+
+def generate_missing_genereviews(response, review_list, df)
+  not_mapped = [i['pmid'] for i in response]
+
+  missing = list(set(review_list)-set(not_mapped))
+  missing = [int(i) for i in missing]
+  df = df[df['PMID'].isin(missing)]
+
+  df.to_csv(f'{sysvars.base_path}pubmed/src/genereviews_pmid_missing.csv')
+
+
+
+
+def label_genereview(db):
+  download_genereview_articles()
+
+  df = pd.read_csv(f'{sysvars.base_path}pubmed/src/genereviews_pmid.txt', encoding='ISO-8859-1', sep='\t')
+  review_list = df['PMID'].tolist()
+  review_list = [str(i) for i in review_list]
+  
+  # Labels all genereview articles
+  query = 'MATCH (x:Article) WHERE x.pubmed_id IN $pmid_list SET x.is_genereview = TRUE RETURN x.pubmed_id as pmid'
+  args = {'pmid_list': review_list}
+
+  response = db.run(query, args=args).data()
+  generate_missing_genereviews(response, review_list, df)
+
+  print('Genereview Articles Labeled')
+
+  # Labels all other articles as not a gene review article
+  query = 'MATCH (x:Article) WHERE NOT x.pubmed_id IN $pmid_list SET x.is_genereview = FALSE'
+  args = {'pmid_list': review_list}
+
+  db.run(query, args=args)
+
+
+
 def retrieve_articles(db, last_update, today):
   """
     Gets articles from multiple different sources (PubMed, NCATS databases, OMIM) within a 50-year rolling window or since
@@ -1907,6 +1976,9 @@ def retrieve_articles(db, last_update, today):
   # Gather Pubtator annotations for articles that do not have associated annotations
   print('Populating Pubtator Information')
   #gather_pubtator(db, today)
+
+  print('Labeling GeneReview Articles')
+  label_genereview(db)
 
   
 

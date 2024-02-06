@@ -1,0 +1,308 @@
+<mxfile host="app.diagrams.net" modified="2024-02-06T20:13:20.739Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36" etag="Ak-XX9dNFAhqt_0CnPfs" version="23.1.1" type="device">
+  <diagram name="Page-1" id="5K1SdxLLArzqGwJ5-ovQ">
+    <mxGraphModel dx="3457" dy="2442" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="dUA0qm7geQA-AynK664a-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-1" target="dUA0qm7geQA-AynK664a-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-1" value="Download all raw data from NIH ExPORTER" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="-20" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-3" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;abstracts&lt;br&gt;clinical studies&lt;br&gt;projects&lt;br&gt;link tables&lt;br&gt;patents&lt;br&gt;publications&lt;br&gt;CSV files&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="20" y="-20" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=112;entryDy=30;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-1" target="dUA0qm7geQA-AynK664a-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-5" target="dUA0qm7geQA-AynK664a-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-5" value="Generate GARD JSON data file&lt;br&gt;from Neo4J" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="60" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-6" target="dUA0qm7geQA-AynK664a-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-6" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;All GARD data JSON file&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="310" y="-20" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-5" target="dUA0qm7geQA-AynK664a-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-10" target="dUA0qm7geQA-AynK664a-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-10" value="Run GARD-Project Mapping (Jaber&#39;s Code)&lt;br&gt;[uses projects]" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="140" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-13" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;GARD-Project Mapping CSV&lt;br&gt;&lt;br&gt;[Contains mapped app ID and all GARD information]&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="20" y="140" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=112;entryDy=30;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-10" target="dUA0qm7geQA-AynK664a-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-15" target="dUA0qm7geQA-AynK664a-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-15" value="START" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="160" y="-100" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-31" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-18" target="dUA0qm7geQA-AynK664a-29">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-18" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;GARD-Project Mapping CSV 2&lt;br&gt;&lt;br&gt;[Single column of just mapped Application ID&#39;s]&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="-130" y="140" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0;entryDx=112;entryDy=85;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-13" target="dUA0qm7geQA-AynK664a-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-25" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-20" target="dUA0qm7geQA-AynK664a-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-20" value="Populate pre-2000 project files with funding data" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="220" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-23" value="Copy over post-1999 project files to the processed folder" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="300" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-26" target="dUA0qm7geQA-AynK664a-29">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-26" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Processed projects CSV files with funding data&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="310" y="220" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-27" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-20" target="dUA0qm7geQA-AynK664a-26">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-28" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-23" target="dUA0qm7geQA-AynK664a-26">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-37" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-29" target="dUA0qm7geQA-AynK664a-34">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-29" value="Create CSV files containing full project data that are RD related" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="380" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-32" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Project data CSVs of only RD related projects&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="450" y="340" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-33" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-29" target="dUA0qm7geQA-AynK664a-32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-38" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-34" target="dUA0qm7geQA-AynK664a-35">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-34" value="Fill in NULL IC_NAME fields" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="460" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-39" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-35" target="dUA0qm7geQA-AynK664a-36">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-35" value="Clean up PI_NAME and PI_ID fields" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="540" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-41" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-36" target="dUA0qm7geQA-AynK664a-40">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-36" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Fill in NULL TOTAL_COST fields&lt;/font&gt;" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="620" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-65" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-40" target="dUA0qm7geQA-AynK664a-45">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-40" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Create file with RD related app IDs paired to their Core Project&lt;/font&gt;" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="700" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-50" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-42" target="dUA0qm7geQA-AynK664a-45">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-52" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-42" target="dUA0qm7geQA-AynK664a-51">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-42" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;RD Related CoreProject to App ID CSV&lt;br&gt;[Only the 2 columns]&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="310" y="660" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-43" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-40" target="dUA0qm7geQA-AynK664a-42">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-44" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;NOTE: The reason why a seperate file is created&lt;br&gt;even though a project file was created earlier with this same information&lt;br&gt;is so that when the core project nodes are created in the neo4j it has a smaller&lt;br&gt;file to load and doesnt have to load the other project&lt;br&gt;related data that it doesnt need at that moment in the neo4j&lt;br&gt;creation&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="440" y="680" width="370" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-66" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-45" target="dUA0qm7geQA-AynK664a-51">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-45" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Create Patent file with only RD related Core Project Numbers&lt;/font&gt;" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="780" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-46" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Patent CSVs&lt;br&gt;[Found through RD related Core Project Number file]&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry y="650" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-48" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=112;entryDy=30;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-45" target="dUA0qm7geQA-AynK664a-46">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-56" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-51" target="dUA0qm7geQA-AynK664a-55">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-51" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Create Clinical Study file with only RD related Core Project&lt;/font&gt;" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="860" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-53" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Clinical Study CSVs&lt;br&gt;[Found through RD related Core Project Number file]&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry y="800" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-54" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=112;entryDy=30;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-51" target="dUA0qm7geQA-AynK664a-53">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-61" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-55" target="dUA0qm7geQA-AynK664a-59">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-55" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Create link tables&lt;/font&gt;" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="940" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-60" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-57" target="dUA0qm7geQA-AynK664a-59">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-57" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Link table CSVs&lt;br&gt;[2 columns with PMID of publication and Core Project Number]&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="310" y="900" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-58" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-55" target="dUA0qm7geQA-AynK664a-57">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-67" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-59" target="dUA0qm7geQA-AynK664a-64">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-59" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Create RD related publication files&lt;/font&gt;" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="1020" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-62" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Publication CSVs&lt;br&gt;[Contains only RD related publication data]&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry y="1020" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-63" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=112;entryDy=85;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-59" target="dUA0qm7geQA-AynK664a-62">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-70" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-64" target="dUA0qm7geQA-AynK664a-69">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-64" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Clean COUNTRY field in publications&lt;/font&gt;" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="1100" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-68" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=112;entryDy=85;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-64" target="dUA0qm7geQA-AynK664a-62">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-74" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-69" target="dUA0qm7geQA-AynK664a-73">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="1330" />
+              <mxPoint x="990" y="1330" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-69" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Creates RD related abstracts files&lt;/font&gt;" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="1180" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-71" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Abstracts CSV&lt;br&gt;[All abstracts of RD related projects]&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="313" y="1140" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-72" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-69" target="dUA0qm7geQA-AynK664a-71">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-82" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-73" target="dUA0qm7geQA-AynK664a-76">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-73" value="Merge project and abstract files" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="930" y="1180" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-83" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-76" target="dUA0qm7geQA-AynK664a-77">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-76" value="Fill NULL abstracts and project titles with a space" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="930" y="1100" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-84" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-77" target="dUA0qm7geQA-AynK664a-78">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-77" value="Use only PHR with more than 20 words, else use abstract" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="930" y="1020" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-85" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-78" target="dUA0qm7geQA-AynK664a-79">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-78" value="Normalize Unicode and remove trailing spaces" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="930" y="940" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-86" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-79" target="dUA0qm7geQA-AynK664a-80">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-79" value="Replace abbreviations" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="930" y="860" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-80" value="Extract AIM section of abstract" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="930" y="780" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-93" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-81" target="dUA0qm7geQA-AynK664a-92">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1090" y="660" />
+              <mxPoint x="990" y="660" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-81" value="CSV files containing information to be annotated&lt;br&gt;[Contains either PHR or the project title and abstract, this information will be annotated]" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="1090" y="670" width="136" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-87" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-80" target="dUA0qm7geQA-AynK664a-81">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-88" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;NOTE: Replaces abbreviated tokens with its long form&lt;br&gt;and replaces plural tokens with singular form&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="870" width="260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-89" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="800" y="300" width="520" height="1050" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-91" value="ANNOTATION PROCESS" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="1290" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-101" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-92" target="dUA0qm7geQA-AynK664a-99">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-92" value="Match UMLS concepts and Semantic Types" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="930" y="580" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-96" value="&lt;div style=&quot;font-size: 10px;&quot;&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;NOTE: Uses 4 scispacy models to annotate:&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;&#39;en_ner_craft_md&#39;,&lt;br&gt;&amp;nbsp;&#39;en_ner_jnlpba_md&#39;,&lt;br&gt;&amp;nbsp;&#39;en_ner_bc5cdr_md&#39;,&lt;br&gt;&amp;nbsp;&#39;en_ner_bionlp13cg_md&#39;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1090" y="570" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-109" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0;exitDx=111.99999999999999;exitDy=85;exitPerimeter=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-97" target="dUA0qm7geQA-AynK664a-99">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-97" value="CSV files containing UMLS code, UMLS concepts, Semantic types and Application ID of a project" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="810" y="440" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-98" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-92" target="dUA0qm7geQA-AynK664a-97">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-106" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-99" target="dUA0qm7geQA-AynK664a-104">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-99" value="Remove unwanted semantic types" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="960" y="480" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-102" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;Cleaned UMLS CSV files&lt;br&gt;&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;" vertex="1" parent="1">
+          <mxGeometry x="1102" y="340" width="112" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-112" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-104" target="dUA0qm7geQA-AynK664a-111">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-104" value="Map Semantic Type codes to Semantic type names" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="930" y="380" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-107" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;shape=link;" edge="1" parent="1" source="dUA0qm7geQA-AynK664a-104" target="dUA0qm7geQA-AynK664a-102">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dUA0qm7geQA-AynK664a-111" value="END&lt;br&gt;[Use processed CSV files to populate Neo4j]" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="930" y="220" width="120" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

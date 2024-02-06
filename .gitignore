@@ -75,3 +75,6 @@ add_participant.txt
 epifix.py
 grant_pipeline.txt
 result.json
+pubmed/test_affiliation.py
+pubmed/test_genereview.py
+pubmed/test_affiliation.txt
