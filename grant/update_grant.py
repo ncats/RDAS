@@ -46,7 +46,7 @@ def step_to_fn(
 	return fn
 
 def main(db: AlertCypher):
-	#rdas.download_nih_data() #TEST
+	rdas.download_nih_data() #TEST
 
 	fta = prep_data(f"{sysvars.base_path}grant/src/raw", f"{sysvars.base_path}grant/src/processed")
 

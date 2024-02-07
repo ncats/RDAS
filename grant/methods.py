@@ -214,24 +214,24 @@ def download_gard_data_from_db ():
     db = AlertCypher(sysvars.gard_db)
     response = db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.GardName as GardName, x.Synonyms as Synonyms').data()
 
-    myFile = open(f'{sysvars.base_path}grant_2024/src/raw/all_gards.csv', 'w')
+    myFile = open(f'{sysvars.base_path}grant/src/raw/all_gards.csv', 'w')
     writer = csv.writer(myFile)
     writer.writerow(['GardId', 'GardName', 'Synonyms'])
     for dictionary in response:
         writer.writerow(dictionary.values())
     myFile.close()
-    df = pd.read_csv(f'{sysvars.base_path}grant_2024/src/raw/all_gards.csv')
+    df = pd.read_csv(f'{sysvars.base_path}grant/src/raw/all_gards.csv')
 
     df = GardNamePreprocessor(df)
-    df.to_csv(f'{sysvars.base_path}grant_2024/src/processed/all_gards_processed.csv')
+    df.to_csv(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv')
 
     return df
 
 # Global Objects for Processing
-if not os.path.exists(f'{sysvars.base_path}grant_2024/src/processed/all_gards_processed.csv'):
+if not os.path.exists(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv'):
     Gard = download_gard_data_from_db()
 else:
-    Gard = pd.read_csv(f'{sysvars.base_path}grant_2024/src/processed/all_gards_processed.csv')
+    Gard = pd.read_csv(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv')
     Gard['Synonyms_sw'] = Gard['Synonyms_sw'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
     Gard['Synonyms_sw_bow'] = Gard['Synonyms_sw_bow'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
     Gard['Synonyms_sw_stem'] = Gard['Synonyms_sw_stem'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))

@@ -21,7 +21,7 @@ parser.add_argument("-qc", "--approved", dest = "approved", action='store_true',
 args = parser.parse_args()
 
 def copy_to_backup(path, filename, dump_name):
-    p = Popen(['cp', f'{path}{dump_name}.dump', f'{sysvars.backup_path}{dump_name}/{filename}'])
+    p = Popen(['sudo', 'cp', f'{path}{dump_name}.dump', f'{sysvars.backup_path}{dump_name}/{filename}'])
     p.wait()
 
 def dump_file (path, db_name):

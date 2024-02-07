@@ -77,4 +77,4 @@ grant_pipeline.txt
 result.json
 pubmed/test_affiliation.py
 pubmed/test_genereview.py
-pubmed/test_affiliation.txt
+test_affiliation.txt
