@@ -1900,7 +1900,7 @@ def download_genereview_articles():
 
 
 
-def generate_missing_genereviews(response, review_list, df)
+def generate_missing_genereviews(response, review_list, df):
   not_mapped = [i['pmid'] for i in response]
 
   missing = list(set(review_list)-set(not_mapped))

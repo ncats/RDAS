@@ -43,6 +43,7 @@ migrated/*.dump
 approved/*.dump
 grant/src/**/**/*.csv
 grant/src/**/**/*.json
+grant/src/**/**/*.zip
 grant_2024/src/**/**/*.csv
 grant_2024/src/**/**/*.json
 crt/*.json
@@ -78,3 +79,4 @@ result.json
 pubmed/test_affiliation.py
 pubmed/test_genereview.py
 test_affiliation.txt
+logs/

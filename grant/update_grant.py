@@ -46,8 +46,8 @@ def step_to_fn(
 	return fn
 
 def main(db: AlertCypher):
-	rdas.download_nih_data() #TEST
-
+	rdas.download_nih_data(clear_previous=True) #There is no way to CURL project funding data, must be downloaded manually
+	exit()
 	fta = prep_data(f"{sysvars.base_path}grant/src/raw", f"{sysvars.base_path}grant/src/processed")
 
 	# run database upgrade steps on only new/modified files

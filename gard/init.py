@@ -8,7 +8,7 @@ def main():
     print(f"[CT] Database Selected: {sysvars.gard_db}\nContinuing with script in 5 seconds...")
     sleep(5)
 
-    db = AlertCypher('gard')
+    db = AlertCypher(f'{sysvars.gard_db}')
     rdas.retrieve_gard_data()
     gard = pd.read_csv(f'{sysvars.gard_files_path}GARD.csv', index_col=False)
     classification = pd.read_csv(f'{sysvars.gard_files_path}GARD_classification.csv', index_col=False)

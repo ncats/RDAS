@@ -21,10 +21,10 @@ db_abbrevs = {'ct':'clinical', 'pm':'pubmed', 'gnt':'grant'}
 db_abbrevs2 = {'clinical':'ct', 'pubmed':'pm', 'grant':'gnt'}
 
 # Paths to database creation and update source files
-ct_files_path = '{base_path}/clinical/src/'.format(base_path=base_path)
-pm_files_path = '{base_path}/pubmed/src/'.format(base_path=base_path)
-gnt_files_path = '{base_path}/grant/src/'.format(base_path=base_path)
-gard_files_path = '{base_path}/gard/src/'.format(base_path=base_path)
+ct_files_path = '{base_path}clinical/src/'.format(base_path=base_path)
+pm_files_path = '{base_path}pubmed/src/'.format(base_path=base_path)
+gnt_files_path = '{base_path}grant/src/'.format(base_path=base_path)
+gard_files_path = '{base_path}gard/src/'.format(base_path=base_path)
 
 # Database names being used on the current server
 ct_db = 'test.clinical'

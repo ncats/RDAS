@@ -28,30 +28,61 @@ import torch
 def start(db):
     update_grant.main(db)
 
-def download_nih_data():
+def download_nih_data(clear_previous=False):
+    current_year = int(datetime.today().year)
+
     print('Downloading NIH Exporter files')
+
     # Clinical Studies
-    if not os.path.exists(f'{sysvars.base_path}grant/src/raw/clinical_studies/clinical_studies.csv'):
-        command = f'curl -L -X GET https://reporter.nih.gov/exporter/clinicalstudies/download -o {sysvars.base_path}grant/src/raw/clinical_studies/clinical_studies.csv'
+    if clear_previous:
+        os.remove(f'{sysvars.gnt_files_path}raw/clinical_studies/clinical_studies.csv')
+    if not os.path.exists(f'{sysvars.gnt_files_path}raw/clinical_studies/clinical_studies.csv'):
+        command = f'curl -L -X GET https://reporter.nih.gov/exporter/clinicalstudies/download -o {sysvars.gnt_files_path}raw/clinical_studies/clinical_studies.csv'
         os.system(command)
     else:
         print('Clinical Studies file already downloaded... bypassing')
+
     # Patents
-    if not os.path.exists(f'{sysvars.base_path}grant/src/raw/patents/patents.csv'):
-        command = f'curl -L -X GET https://reporter.nih.gov/exporter/patents/download -o {sysvars.base_path}grant/src/raw/patents/patents.csv'
+    if clear_previous:
+        os.remove(f'{sysvars.gnt_files_path}raw/patents/patents.csv')
+    if not os.path.exists(f'{sysvars.gnt_files_path}raw/patents/patents.csv'):
+        command = f'curl -L -X GET https://reporter.nih.gov/exporter/patents/download -o {sysvars.gnt_files_path}raw/patents/patents.csv'
         os.system(command)
     else:
         print('Patents file already downloaded... bypassing')
 
     types = ['abstracts','linktables','projects','publications']
-    for i in range(1985,2024):
-        for type in types:
-            command = f'curl -L -X GET https://reporter.nih.gov/exporter/{type}/download/{i} -o {sysvars.base_path}grant/src/raw/{type}/{type}{i}.zip'
+    for type in types:
+        if type == 'linktables':
+            file_dir = 'link_tables'
+        else:
+            file_dir = type
+
+        if clear_previous:
+            cur_path_files = os.listdir(f'{sysvars.gnt_files_path}raw/{file_dir}/')
+            for item in cur_path_files:
+                if item.endswith(".csv"):
+                    os.remove(os.path.join(f'{sysvars.gnt_files_path}raw/{file_dir}/', item))
+
+        if len(os.listdir(f'{sysvars.gnt_files_path}raw/{file_dir}/')) == 1:
+            for i in range(1985,current_year):
+                command = f'curl -L -X GET https://reporter.nih.gov/exporter/{type}/download/{i} -o {sysvars.base_path}grant/src/raw/{file_dir}/{type}{i}.zip'
+                os.system(command)
+                command = f'unzip {sysvars.gnt_files_path}raw/{file_dir}/{type}{i}.zip -d {sysvars.base_path}grant/src/raw/{file_dir}'
+                os.system(command)
+                command = f'rm {sysvars.gnt_files_path}raw/{file_dir}/{type}{i}.zip'
+                os.system(command)
+        else:
+            print(f'Files exist in {file_dir} folder... bypassing')
+                
+    # Copies over 1985-1999 project funding files stored in the grant/src/raw/ folder to the grant/src/raw/projects folder because it can not be downloaded with CURL
+    if os.path.exists(f'{sysvars.gnt_files_path}raw/RePORTER_PRJFUNDING_C_FY1985_FY1999/'):
+        funding_files = os.listdir(f'{sysvars.gnt_files_path}raw/RePORTER_PRJFUNDING_C_FY1985_FY1999/')
+        for fund_file in funding_files:
+            command = f'cp {sysvars.gnt_files_path}raw/RePORTER_PRJFUNDING_C_FY1985_FY1999/{fund_file} {sysvars.gnt_files_path}raw/projects/{fund_file}'
             os.system(command)
-            command = f'unzip {sysvars.base_path}grant/src/raw/{type}/{type}{i}.zip -d {sysvars.base_path}grant/src/raw/{type}'
-            os.system(command)
-            command = f'rm {sysvars.base_path}grant/src/raw/{type}/{type}{i}.zip'
-            os.system(command)
+    else:
+        print('Project funding files cannot be downloaded automatically, please visit the project tab on https://reporter.nih.gov/exporter and download the FY 1985-1999 Updated funding and DUNS information into the RDAS/grant/src/raw/projects directory')
 
 def get_project_data (appl_id):
     url = 'https://api.reporter.nih.gov/v2/projects/search'
