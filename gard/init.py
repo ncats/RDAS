@@ -1,3 +1,9 @@
+import os,sys
+
+workspace = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(workspace)
+# sys.path.append(os.getcwd())
+sys.path.append('/home/aom2/RDAS')
 import pandas as pd
 import sysvars
 from gard import methods as rdas

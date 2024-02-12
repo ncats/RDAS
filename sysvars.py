@@ -3,7 +3,7 @@ import os
 current_version = 2.5
 
 # Basic user information
-current_user = 'leadmandj'
+current_user = 'aom2'
 base_directory_name = 'RDAS'
 base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 
@@ -15,10 +15,12 @@ approved_path = '{base_path}approved/'.format(base_path=base_path)
 images_path = '{base_path}img/'.format(base_path=base_path)
 firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz-a4e783d24c.json'.format(base_path=base_path) # May have to set this in new enviroment
 
+# if you are not using minghui's test dataset, make db_prefix=""
+db_prefix="minghui."
+
 # Conversions
 dump_dirs = ['clinical','pubmed','grant','gard']
 db_abbrevs = {'ct':'clinical', 'pm':'pubmed', 'gnt':'grant'}
-db_abbrevs2 = {'clinical':'ct', 'pubmed':'pm', 'grant':'gnt'}
 
 # Paths to database creation and update source files
 ct_files_path = '{base_path}clinical/src/'.format(base_path=base_path)
@@ -27,10 +29,10 @@ gnt_files_path = '{base_path}grant/src/'.format(base_path=base_path)
 gard_files_path = '{base_path}gard/src/'.format(base_path=base_path)
 
 # Database names being used on the current server
-ct_db = 'test.clinical'
-pm_db = 'test.pubmed'
-gnt_db = 'new.grant'
-gard_db = 'test.gard'
+ct_db = 'clinical'
+pm_db = 'pubmed'
+gnt_db = 'grant'
+gard_db = 'gard'
 
 # Server URLS and addresses # Original epiapi_url is https://rdas.ncats.nih.gov/api/epi/
 epiapi_url = "https://rdas.ncats.nih.gov/api/epi/"

@@ -14,7 +14,10 @@ import argparse
 from datetime import date,datetime
 from AlertCypher import AlertCypher
 from gard.methods import get_node_counts
-
+import firebase_admin
+from firebase_admin import auth
+from firebase_admin import credentials
+from firebase_admin import firestore
 
 
 
@@ -35,19 +38,21 @@ def check_update(db_type):
     # Get the current date and time
     today = datetime.now()
 
-    # Mapping of database abbreviations to configuration fields
     config_selection = {'ct':['clinical_update', 'ct_interval'], 'pm':['pubmed_update', 'pm_interval'], 'gnt':['grant_update', 'gnt_interval']}
     selection = config_selection[db_type]
+    print("selection::",selection)
 
     # Get the last update date from the configuration
     last_update = db.getConf('DATABASE',selection[0])
     last_update = datetime.strptime(last_update,"%m/%d/%y")
+    print("last_update::",last_update)
 
     # Calculate the time difference between today and the last update
     delta = today - last_update
 
     interval = db.getConf('DATABASE',selection[1])
     interval = int(interval)
+    print("interval::",interval)
 
     # Get the update interval from the configuration
     last_update = datetime.strftime(last_update,"%m/%d/%y")
@@ -58,26 +63,22 @@ def check_update(db_type):
     else:
         return [False,last_update]
 
-
-
-
 while True:
     # Initialize a dictionary to track update status for each database
     current_updates = {k:False for k,v in sysvars.db_abbrevs.items()}
-    
+    print("\n","current_updates::", current_updates)
     print('Checking for Updates')
     # Check update status for each database
     for db_abbrev in sysvars.db_abbrevs:
         current_updates[db_abbrev] = check_update(db_abbrev)[0]
 
     print('Triggering Database Updates')
-    # Trigger updates for databases that require it
     for k,v in current_updates.items():
+        print("updates:::",k,v)
         if v == True:
             full_db_name = sysvars.db_abbrevs[k]
-            print(f'{full_db_name} Update Initiated',k,v)
+            print(f'{full_db_name} Update Initiated')
             
-            # Execute manual update script for the database
             p = Popen(['python3', 'driver_manual.py', '-db', f'{k}', '-m', 'update'], encoding='utf8')
             p.wait()
             
@@ -96,22 +97,20 @@ while True:
 
             # Creates a backup file for the current state of the database being updated in this iteration, puts that file in the transfer directory
             print(f'Dumping {full_db_name} db')
-            p = Popen(['python3', 'generate_dump.py', '-dir', f'{full_db_name}', '-t'], encoding='utf8')
+            p = Popen(['sudo', 'python3', 'generate_dump.py', f'-dir {full_db_name}', '-b', '-t', '-s dev'], encoding='utf8')
             p.wait()
 
-            # Transfers the GARD backup file to the Testing Server's transfer folder
             print(f'Transfering GARD dump to TEST server')
-            p = Popen(['python3', 'file_transfer.py', '-dir', 'gard', '-s', 'test'], encoding='utf8')
+            p = Popen(['sudo', 'python3', 'file_transfer.py', f'-dir {full_db_name}', '-s test'], encoding='utf8')
             p.wait()
 
             # Transfers the current databases of this iteration's backup file to the Testing Server's transfer folder
             print(f'Transfering {full_db_name} dump to TEST server')
-            p = Popen(['python3', 'file_transfer.py', '-dir', f'{full_db_name}', '-s', 'test'], encoding='utf8')
+            p = Popen(['sudo', 'python3', 'file_transfer.py', f'-dir {full_db_name}', '-s test'], encoding='utf8')
             p.wait()
 
             print(f'Update of {full_db_name} Database Complete...')
-
-    # Sleep for an hour before checking for updates again          
+            
     sleep(3600)
 
 

@@ -71,6 +71,8 @@ def years_to_files(subdir: str):
 def aggregate_disease_data():
 	# Rename GARD-Project mapping results columns to match the names listed in the GARD data
 	normmap_df = pd.read_csv(data_raw('normmap_results.csv'),index_col=False,usecols=['ID','GARD_id','CONF_SCORE','SEM_SIM'])
+	# Rename GARD-Project mapping results columns to match the names listed in the GARD data
+	normmap_df = pd.read_csv(data_raw('normmap_results.csv'),index_col=False,usecols=['ID','GARD_id','CONF_SCORE','SEM_SIM'])
 	normmap_df = normmap_df.rename(columns={'ID':'APPLICATION_ID', 'GARD_id': 'GARD_ID'})
 
 	disease_df = pd.read_json(data_raw('all_gards.json'))
@@ -89,32 +91,6 @@ def combine_projects():
 		combine_df = pd.concat([combine_df,tmp], axis=0)
 
 	combine_df.to_csv(raw_path + '/RePORTER_PRJABS_C_FY_ALL.csv')
-
-lock = threading.Lock()
-def batch_normmap(df):
-	r,c = df.shape
-	for idx in range(r):
-		row = df.iloc[idx]
-		appl_id = row['APPLICATION_ID']
-		abstract = row['ABSTRACT_TEXT']
-
-		project_data = rdas.get_project_data(appl_id).get('results')[0]
-		
-		title = project_data.get('project_title')
-		phr = project_data.get('phr_text')
-		
-
-		gard_ids = rdas.GardNameExtractor(title, phr, abstract)
-		if gard_ids:
-			for gard,add_data in gard_ids.items():
-				if add_data == 1:
-					add_data = [1,1]
-
-				print({'ID': appl_id, 'GARD_id': gard, 'CONF_SCORE': add_data[0], 'SEM_SIM': add_data[1]})
-				with lock:
-					with open(data_raw('normmap_results.csv'), "a") as f:
-   						f.writelines([f'{appl_id},{gard},{add_data[0]},{add_data[1]}\n'])
-
 
 def run_normmap():
 	print('Running NormMap')
@@ -522,8 +498,8 @@ def annotation_preprocess_grant():
 	abstracts_files = sorted(years_to_files("abstracts"))
 
 	for projects_file, abstracts_file in zip(projects_files, abstracts_files):
-		print(projects_file)
-		print(abstracts_file)
+		# print(projects_file)
+		# print(abstracts_file)
 		if projects_file == None or abstracts_file == None:
 			continue
 

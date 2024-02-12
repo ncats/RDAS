@@ -17,7 +17,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
-import spacy
+# import spacy
 import nltk
 from nltk.stem import PorterStemmer
 nltk.download("punkt")

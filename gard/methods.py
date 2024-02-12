@@ -352,9 +352,10 @@ def get_remaining_umls(db, umls_update=True):
     else:
         with open(f'{sysvars.gard_files_path}metamap_gard_out.json','r') as f:
             data = json.load(f)['AllDocuments']
-    
+            # print("data::",data)
     print('PARSING METAMAP RESPONSE')
     for entry in data:
+        # print("entry::",entry)
         utterances = entry['Document']['Utterances'][0]
         utt_text = utterances['UttText']
         phrases = utterances['Phrases'][0]
@@ -438,6 +439,6 @@ def generate(db, data):
         row = row.to_dict()
         add_phenotypes(db, row)
      
-    get_remaining_umls(db, umls_update=True)
+    get_remaining_umls(db, umls_update=False)
     
     get_node_counts()

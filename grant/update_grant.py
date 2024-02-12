@@ -1,6 +1,11 @@
 import os
 import sys
 import time
+workspace = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(workspace)
+# sys.path.append(os.getcwd())
+sys.path.append('/home/aom2/RDAS')
+
 from neo4j import GraphDatabase, Session, Record
 from typing import TypedDict, Any, Callable, Optional
 from AlertCypher import AlertCypher
