@@ -80,3 +80,6 @@ pubmed/test_affiliation.py
 pubmed/test_genereview.py
 test_affiliation.txt
 logs/
+terms_mapped.csv
+terms_unmapped.csv
+test_term_map.py
