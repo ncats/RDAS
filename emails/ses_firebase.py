@@ -39,9 +39,9 @@ def send_mail(type, data):
     data['tabs'] = tabs
     data["db_title"]=str(txt_db[type])
    
-    if data['total'] > 0 and data['email'] == 'timothy.sheils@ncats.nih.gov' or data['email'] == 'zhuqianzq@gmail.com':# for testing
+    if data['total'] > 0 and data['email'] == '' or data['email'] == '':# for testing
 
-        data['email'] = 'minghui.ao@nih.gov' # TEST EMAIL 
+        data['email'] = '' # TEST EMAIL 
         html_content = render_template('email_template1.html', data=data)
         alert.send_email(f'RDAS-Alert: {str(txt_db[type])} update regarding your subscriptions',  html_content, data['email'])# change to your alert.py sending email method.you may need to adjust your method abit to read in these parameters.
         print("finish sending enail")

@@ -24,10 +24,10 @@ db_abbrevs = {'ct':db_prefix+'clinical', 'pm':db_prefix+'pubmed', 'gnt':db_prefi
 db_abbrevs2 = {db_prefix+'clinical':'ct', db_prefix+'pubmed':'pm', db_prefix+'grant':'gnt'}
 
 # Paths to database creation and update source files
-ct_files_path = '{base_path}/clinical/src/'.format(base_path=base_path)
-pm_files_path = '{base_path}/pubmed/src/'.format(base_path=base_path)
-gnt_files_path = '{base_path}/grant/src/'.format(base_path=base_path)
-gard_files_path = '{base_path}/gard/src/'.format(base_path=base_path)
+ct_files_path = '{base_path}clinical/src/'.format(base_path=base_path)
+pm_files_path = '{base_path}pubmed/src/'.format(base_path=base_path)
+gnt_files_path = '{base_path}grant/src/'.format(base_path=base_path)
+gard_files_path = '{base_path}gard/src/'.format(base_path=base_path)
 
 # Database names being used on the current server
 
