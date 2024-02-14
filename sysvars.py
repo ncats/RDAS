@@ -20,7 +20,8 @@ db_prefix="minghui."
 
 # Conversions
 dump_dirs = ['clinical','pubmed','grant','gard']
-db_abbrevs = {'ct':'clinical', 'pm':'pubmed', 'gnt':'grant'}
+db_abbrevs = {'ct':db_prefix+'clinical', 'pm':db_prefix+'pubmed', 'gnt':db_prefix+'grant'}
+db_abbrevs2 = {db_prefix+'clinical':'ct', db_prefix+'pubmed':'pm', db_prefix+'grant':'gnt'}
 
 # Paths to database creation and update source files
 ct_files_path = '{base_path}clinical/src/'.format(base_path=base_path)
@@ -29,10 +30,12 @@ gnt_files_path = '{base_path}grant/src/'.format(base_path=base_path)
 gard_files_path = '{base_path}gard/src/'.format(base_path=base_path)
 
 # Database names being used on the current server
-ct_db = 'clinical'
-pm_db = 'pubmed'
-gnt_db = 'grant'
-gard_db = 'gard'
+
+ct_db = db_prefix+'clinical'
+pm_db = db_prefix+'pubmed'
+gnt_db = db_prefix+'grant'
+gard_db = db_prefix+'gard'
+convert = {ct_db:'trials', pm_db:'articles', gnt_db:'grants'}
 
 # Server URLS and addresses # Original epiapi_url is https://rdas.ncats.nih.gov/api/epi/
 epiapi_url = "https://rdas.ncats.nih.gov/api/epi/"

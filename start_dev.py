@@ -14,6 +14,9 @@ import argparse
 from datetime import date,datetime
 from AlertCypher import AlertCypher
 from gard.methods import get_node_counts
+sys.path.append('/home/aom2/RDAS')
+sys.path.append('/home/aom2/RDAS/emails')
+import ses_firebase
 import firebase_admin
 from firebase_admin import auth
 from firebase_admin import credentials
@@ -63,6 +66,10 @@ def check_update(db_type):
     else:
         return [False,last_update]
 
+cred = credentials.Certificate(sysvars.firebase_key_path)
+firebase_admin.initialize_app(cred)
+firestore_db = firestore.client()
+
 while True:
     # Initialize a dictionary to track update status for each database
     current_updates = {k:False for k,v in sysvars.db_abbrevs.items()}
@@ -78,7 +85,7 @@ while True:
         if v == True:
             full_db_name = sysvars.db_abbrevs[k]
             print(f'{full_db_name} Update Initiated')
-            
+           
             p = Popen(['python3', 'driver_manual.py', '-db', f'{k}', '-m', 'update'], encoding='utf8')
             p.wait()
             
@@ -110,6 +117,9 @@ while True:
             p.wait()
 
             print(f'Update of {full_db_name} Database Complete...')
+
+            ses_firebase.trigger_email(firestore_db,sysvars.ct_db, date_start='12/07/22') 
+
             
     sleep(3600)
 
