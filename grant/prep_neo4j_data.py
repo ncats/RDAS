@@ -28,7 +28,7 @@ from AlertCypher import AlertCypher
 import grant.methods as rdas
 import threading
 
-ENCODING = "latin1"
+ENCODING = "latin-1" #latin-1
 raw_path = ""
 neo4j_path = ""
 years_to_annotate = set()
@@ -64,13 +64,15 @@ def data_neo4j(subpath: str):
 
 def years_to_files(subdir: str):
 	all_files = glob.glob(data_neo4j(subdir) + "/*.csv")
+	all_files = sorted(all_files)
 	#return [f for f in all_files if f[-8:-4] in years_to_annotate]
 	return [f for f in all_files]
 
 
 def aggregate_disease_data():
 	# Rename GARD-Project mapping results columns to match the names listed in the GARD data
-	normmap_df = pd.read_csv(data_raw('normmap_results.csv'),index_col=False,usecols=['ID','GARD_id','CONF_SCORE','SEM_SIM'])
+	normmap_df = pd.read_csv(data_neo4j('normmap_results.csv'),index_col=False,usecols=['ID','GARD_id','CONF_SCORE','SEM_SIM'])
+	normmap_df = normmap_df.rename(columns={'ID':'APPLICATION_ID', 'GARD_id': 'GARD_ID'})
 
 	disease_df = pd.read_json(data_raw('all_gards.json'))
 	disease_df = disease_df.rename(columns={'GARD id':'GARD_ID', 'Name':'NAME', 'Synonyms':'SYNONYMS'})
@@ -79,77 +81,152 @@ def aggregate_disease_data():
 	merged_df = pd.merge(normmap_df, disease_df, on=['GARD_ID'])
 	merged_df.to_csv(data_neo4j('disease/disease_to_application.csv'),index=False)
 
-def combine_projects():
+def combine_normmap_results():
 	combine_df = pd.DataFrame()
 
-        # Appends each abstract CSV to the last CSV for all abstracts CSVs in folder
-	for filename in os.listdir(data_raw('abstracts')):
-		tmp = pd.read_csv(data_raw('abstracts/{filename}'.format(filename=filename)),index_col=False, encoding = "ISO-8859-1")
+	files = glob.glob(data_neo4j('normmap') + '/*.csv')
+	files = sorted(files)
+
+	for filename in files:
+		print(f'Combining abstract file {filename} into the last')
+		tmp = pd.read_csv(('{filename}'.format(filename=filename)),index_col=False, encoding = "ISO-8859-1")
 		combine_df = pd.concat([combine_df,tmp], axis=0)
 
-	combine_df.to_csv(raw_path + '/RePORTER_PRJABS_C_FY_ALL.csv')
+	combine_df['APPLICATION_ID'] = combine_df['ID'].astype(int)
+
+	combine_df.to_csv(data_neo4j('normmap_results.csv'), index=False)
 
 
 lock = threading.Lock()
-def batch_normmap(df):
+def batch_normmap(df, thr, year):
 	r,c = df.shape
 	for idx in range(r):
-		row = df.iloc[idx]
-		appl_id = row['APPLICATION_ID']
-		abstract = row['ABSTRACT_TEXT']
+		try:
+			with lock:
+				print(f'{idx}/{r} [{thr}]')
+				 
+			row = df.iloc[idx]
+			appl_id = row['APPLICATION_ID']
+			abstract = row['ABSTRACT_TEXT']
+			phr = row['PHR']
+			title = row['PROJECT_TITLE']
 
-		project_data = rdas.get_project_data(appl_id).get('results')[0]
+			gard_ids = rdas.GardNameExtractor(title, phr, abstract)
+			if gard_ids:
+				for gard,add_data in gard_ids.items():
+					if add_data == 1:
+						add_data = [1,1]
 
-		title = project_data.get('project_title')
-		phr = project_data.get('phr_text')
+					with lock:
+						print({'ID': appl_id, 'GARD_id': gard, 'CONF_SCORE': add_data[0], 'SEM_SIM': add_data[1]})
+						with open(data_neo4j(f'normmap/normmap_results_{year}.csv'), "a") as f:
+							f.writelines([f'{appl_id},{gard},{add_data[0]},{add_data[1]}\n'])
+
+		except Exception as e:
+			print(e)
+			continue
+
+"""
+def normmap_process (df):
+	r,c = df.shape
+	for idx in range(r):
+		try:
+			print(f'{idx}/{r}') 
+			row = df.iloc[idx]
+			appl_id = row['APPLICATION_ID']
+			abstract = row['ABSTRACT_TEXT']
+			phr = row['PHR']
+			title = row['PROJECT_TITLE']
+
+			#project_data = rdas.get_project_data(appl_id).get('results')[0]
+
+			#title = project_data.get('project_title')
+			#phr = project_data.get('phr_text')
 
 
-		gard_ids = rdas.GardNameExtractor(title, phr, abstract)
-		if gard_ids:
-			for gard,add_data in gard_ids.items():
-				if add_data == 1:
-					add_data = [1,1]
+			gard_ids = rdas.GardNameExtractor(title, phr, abstract)
+			if gard_ids:
+				for gard,add_data in gard_ids.items():
+					if add_data == 1:
+						add_data = [1,1]
 
-				print({'ID': appl_id, 'GARD_id': gard, 'CONF_SCORE': add_data[0], 'SEM_SIM': add_data[1]})
-				with lock:
-					with open(data_raw('normmap_results.csv'), "a") as f:
-   						f.writelines([f'{appl_id},{gard},{add_data[0]},{add_data[1]}\n'])
+					with lock:
+						print({'ID': appl_id, 'GARD_id': gard, 'CONF_SCORE': add_data[0], 'SEM_SIM': add_data[1]})
+						with open(data_raw('normmap_results.csv'), "a") as f:
+							f.writelines([f'{appl_id},{gard},{add_data[0]},{add_data[1]}\n'])
+
+		except Exception as e:
+			print(e)
+			continue
+"""
+
+
 
 def run_normmap():
 	print('Running NormMap')
 
-	# Combine all project files into a single file
-	combine_projects() # TEST remove #
+	abs_files = glob.glob(data_raw('abstracts') + '/*.csv')
+	abs_files = sorted(abs_files)
 
-	# Create CSV files headers
-	with open(data_raw('normmap_results.csv'), "w") as f:
-		f.writelines(['ID,GARD_id,CONF_SCORE,SEM_SIM\n'])
+	prj_files = glob.glob(data_raw('projects') + '/RePORTER_PRJ_C_FY*.csv')
+	prj_files = sorted(prj_files)
 
-	chunk_size = 100
-	thread_list = list()
+	for idx, abs_file in enumerate(abs_files):
+		prj_file = prj_files[idx]
 
-	df = pd.read_csv(raw_path + '/RePORTER_PRJABS_C_FY_ALL.csv', index_col=False)
-	df = df[0:1000]
-	list_df = [df[i:i+chunk_size] for i in range(0,len(df),chunk_size)]
+		print(abs_file, ' -merged- ',prj_file)
 
-	# Create threads to process results
-	for lst in list_df:
-		thread = threading.Thread(target=batch_normmap, args=(lst,), daemon=True)
-		thread_list.append(thread)
+		tmp = pd.read_csv(('{filename}'.format(filename=abs_file)),index_col=False, encoding = "ISO-8859-1")
+		tmp2 = pd.read_csv(('{filename}'.format(filename=prj_file)),index_col=False, usecols=['APPLICATION_ID','PHR', 'PROJECT_TITLE'], encoding = "ISO-8859-1", low_memory=False)
 
-	for thr in thread_list:
-		thr.start()
+		merged_df = pd.merge(tmp, tmp2, on=['APPLICATION_ID'])
+		merged_df['APPLICATION_ID'] = merged_df['APPLICATION_ID'].astype(int)
 
-	for thr in thread_list:
-		thr.join()
+		year = re.findall(r'\d+', abs_file)[0]
+
+		merged_df.to_csv(data_raw(f'normmap/RePORTER_NORMMAP_{year}.csv'), index=False)
+
+
+	norm_files = glob.glob(data_raw('normmap') + '/*.csv')
+	norm_files = sorted(norm_files)
+
+	for norm_file in norm_files:
+		year = re.findall(r'\d+', norm_file)[0]
+
+		if os.path.exists(data_neo4j(f'normmap/normmap_results_{year}.csv')):
+			print(f'{year} Gard-Project mapping file already exists... bypassing')
+			continue
+
+		# Create CSV files headers
+		with open(data_neo4j(f'normmap/normmap_results_{year}.csv'), "w") as f:
+			f.writelines(['ID,GARD_id,CONF_SCORE,SEM_SIM\n'])
+
+		df = pd.read_csv(norm_file, index_col=False, low_memory=False)
+		chunk_size = int(len(df)/5)
+		thread_list = list()
+
+		list_df = [df[i:i+chunk_size] for i in range(0,len(df),chunk_size)]
+
+		# Create threads to process results
+		for thrnum, lst in enumerate(list_df):
+			thread = threading.Thread(target=batch_normmap, args=(lst, thrnum, year), daemon=True)
+			thread_list.append(thread)
+
+		for thr in thread_list:
+			thr.start()
+
+		for thr in thread_list:
+			thr.join()
+
+	combine_normmap_results()
 
 	print('GARD to Project connections made')
 
 def get_RD_project_ids():
-        # Get GARD to Project mappings
+    # Get GARD to Project mappings
 	run_normmap()
 	aggregate_disease_data()
-	apps = pd.read_csv(data_raw("normmap_results.csv"), usecols=["ID"])
+	apps = pd.read_csv(data_neo4j("normmap_results.csv"), usecols=["ID"])
 
 	# Drop duplicate results and sort by Application ID
 	apps = apps.drop_duplicates()
@@ -189,6 +266,8 @@ def merge_project_funding():
 
 	print("Copying over post-1999 project files")
 	all_files = glob.glob(input_file_path + "*.csv")
+	all_files = sorted(all_files)
+
 	p = re.compile("([0-9]{4})[^0-9]*$")
 
 	# Nothing is changed in the post-2000 files, therefore are just copied over into the "processed" folder
@@ -207,7 +286,7 @@ def select_RD_projects():
 		input_file: path and filename of the file
 		rd_ids: a list of rare disease related application IDs
 		'''
-		apps = pd.read_csv(input_file, encoding=ENCODING, low_memory=False)
+		apps = pd.read_csv(input_file, encoding=ENCODING, low_memory=False, on_bad_lines='skip')
 
 		# Searches the Project CSVs for Projects listed in the GARD-Project mapping results
 		rd_related = apps['APPLICATION_ID'].isin(rd_ids)
@@ -223,12 +302,13 @@ def select_RD_projects():
 	# Get CSV files lists from a folder
 	input_path = data_neo4j('projects_with_funds/')
 	files = glob.glob(input_path + '*.csv')
+	files = sorted(files)
 
 	for file in files:
 		output_file = data_neo4j('projects/RD_PROJECTS_' + file[-16:-12] + '.csv')
 
 		apps = find_RD_apps(file, rd_ids)
-		apps.to_csv(output_file, index=False, encoding=ENCODING)
+		apps.to_csv(output_file, index=False, encoding=ENCODING) #encoding=ENCODING
 		print('Finished ', output_file)
 
 def clean_pi (pi_info):
@@ -239,6 +319,8 @@ def cleanup_project_IC_NAME_totalcost():
 	# Get CSV files lists from a folder
 	input_path = data_neo4j('projects/')
 	files = glob.glob(input_path + '*.csv')
+	files = sorted(files)
+
 	cols_to_read = ['APPLICATION_ID' , 'APPLICATION_TYPE', 'CORE_PROJECT_NUM', 'FY', 'IC_NAME',
 									'ORG_NAME', 'ORG_STATE', 'PHR', 'PI_IDS', 'PI_NAMEs',
 									'PROJECT_TERMS', 'PROJECT_TITLE', 'SUBPROJECT_ID', 'TOTAL_COST', 'TOTAL_COST_SUB_PROJECT']
@@ -260,6 +342,9 @@ def cleanup_project_IC_NAME_totalcost():
 
 		# Clean PI_IDS and PI_NAMES
 		# Results are listed as a string seperated by semi-colons, this removes the last semi-colon in the string because it causes issues when converting to a list
+		app['PI_IDS'] = app['PI_IDS'].astype(str)
+		app['PI_NAMEs'] = app['PI_NAMEs'].astype(str)
+
 		app['PI_IDS'] = app['PI_IDS'].apply(clean_pi)
 		app['PI_NAMEs'] = app['PI_NAMEs'].apply(clean_pi)
 
@@ -281,6 +366,7 @@ def find_RD_core_projects():
 
 	input_path = data_neo4j('projects/')
 	files = glob.glob(input_path + '*.csv')
+	files = sorted(files)
 
 	for file in files:
 		# For each project CSV, gets the application ID and Core Project Number
@@ -399,6 +485,7 @@ def select_RD_link_tables():
 	# Gets all link tables in the folder
 	input_path = data_raw('link_tables/')
 	files = glob.glob(input_path + '*.csv')
+	files = sorted(files)
 
 	for file in files:
 		proj = find_RD_core_project(file, 'PROJECT_NUMBER', core_proj_nums)
@@ -411,9 +498,11 @@ def select_RD_link_tables():
 def select_RD_publications():
 	pub_path = data_raw('publications/')
 	pub_files = glob.glob(pub_path + '*.csv')
+	pub_files = sorted(pub_files)
 
 	lnk_path = data_neo4j('link_tables/')
 	lnk_files = glob.glob(lnk_path + '*.csv')
+	lnk_files = sorted(lnk_files)
 
 	for pub_file in pub_files:
 		pub = pd.read_csv(pub_file, encoding=ENCODING)
@@ -440,6 +529,7 @@ def cleanup_pub_country():
 	# Get CSV files lists from a folder
 	input_path = data_neo4j('publications/')
 	files = glob.glob(input_path + '*.csv')
+	files = sorted(files)
 
 	# Build country lookup dictionary
 	countries = pd.read_csv(data_raw('countries.csv'))
@@ -468,9 +558,11 @@ def fix_escaped_endings():
 			return val
 
 	files = glob.glob(data_neo4j("*/*.csv"))
+	files = sorted(files)
+
 	for file in files:
 		print(file)
-		df = pd.read_csv(file, low_memory=False, dtype=str, encoding=ENCODING)
+		df = pd.read_csv(file, low_memory=False, dtype=str, encoding=ENCODING, on_bad_lines='skip')
 		df = df.applymap(tf)
 		df.to_csv(file, index=False, encoding="utf-8")
 		print("Finished", file)
@@ -502,6 +594,7 @@ def select_RD_abstracts():
 	# Get abstracts CSV files lists from a folder
 	input_path = data_raw('abstracts/')
 	files = glob.glob(input_path + '*.csv')
+	files = sorted(files)
 
 	for file in files:
 		# This accounts for updated information with "new.csv" appended to them
@@ -554,9 +647,6 @@ def annotate_grant_abstracts():
 		nlp = load_model(model)
 		for file in input_files:
 			year = file[-8:-4]
-			print('///////')
-			
-			print('///////')
 			
 			try:
 				text = pd.read_csv(file, encoding=ENCODING, dtype={'APPLICATION_ID':int, 'ABSTRACT_TEXT':str})
@@ -622,6 +712,8 @@ def map_semantic_types():
 	input_file_path = data_neo4j("grants_umls/")
 	output_file_path = data_neo4j("annotation_umls/")
 	all_files = glob.glob(input_file_path + "RD_UMLS_CONCEPTS_*.csv")
+	all_files = sorted(all_files)
+
 	for file in all_files:
 		data = pd.read_csv(file, encoding=ENCODING)
 		semantic_types_names = []
@@ -693,7 +785,8 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 			"patents",
 			"projects",
 			"projects_with_funds",
-			"publications"
+			"publications",
+			"normmap"
 	]
 
 	

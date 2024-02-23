@@ -90,7 +90,7 @@ steps: list = [
 			MERGE (p:Patent {
 				id: data.PATENT_ID,
 				title: data.PATENT_TITLE,
-				org_name: data.PATENT_ORG_NAME})
+				org_name: coalesce(data.PATENT_ORG_NAME, \'\')})
 			WITH p, data
 			MATCH (c:CoreProject {core_project_num: data.CORE_PROJECT_NUM})
 			MERGE (p)<-[:PATENTED]-(c)

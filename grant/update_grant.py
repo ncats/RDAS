@@ -50,12 +50,13 @@ def step_to_fn(
 			write(session, "LOAD CSV WITH HEADERS FROM $path AS data\n" + query, {"path": file})
 	return fn
 
-def main(db: AlertCypher):
-	rdas.download_nih_data(clear_previous=True) #There is no way to CURL project funding data, must be downloaded manually
-	exit()
+def main(db: AlertCypher, restart_raw=False, restart_processed=False):
+	rdas.download_nih_data(restart_raw) #There is no way to CURL project funding data, must be downloaded manually
+	rdas.clear_processed_files(restart_processed)
+	
 	fta = prep_data(f"{sysvars.base_path}grant/src/raw", f"{sysvars.base_path}grant/src/processed")
 
 	# run database upgrade steps on only new/modified files
-	for step in steps:
+	for step in steps: #TEST, remove [9:]
 		print("\n\n" + step["description"] + "...")
 		step_to_fn(**step)(db, fta)

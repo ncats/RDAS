@@ -8,8 +8,12 @@ import sysvars
 import grant.methods as rdas
 from time import sleep
 
-def main():
+def main(restart_raw=False, restart_processed=False):
+    print(f"[CT] Database Selected: {sysvars.gnt_db}\nContinuing with script in 5 seconds...")
+    print(f"Variables initialized: restart_raw -> {restart_raw}, restart_processed -> {restart_processed}")
+    sleep(5)
+
     db = AlertCypher(sysvars.gnt_db)
-    rdas.start(db)
+    rdas.start(db, restart_raw=restart_raw, restart_processed=restart_processed)
 
 main()

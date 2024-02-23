@@ -24,17 +24,18 @@ from datetime import datetime
 from sentence_transformers import SentenceTransformer, util
 from transformers import AutoTokenizer, AutoModel
 import torch
+import glob
 
-def start(db):
-    update_grant.main(db)
+def start(db, restart_raw=False, restart_processed=False):
+    update_grant.main(db, restart_raw=restart_raw, restart_processed=restart_processed)
 
-def download_nih_data(clear_previous=False):
+def download_nih_data(restart_raw=False):
     current_year = int(datetime.today().year)
 
     print('Downloading NIH Exporter files')
 
     # Clinical Studies
-    if clear_previous:
+    if restart_raw:
         os.remove(f'{sysvars.gnt_files_path}raw/clinical_studies/clinical_studies.csv')
     if not os.path.exists(f'{sysvars.gnt_files_path}raw/clinical_studies/clinical_studies.csv'):
         command = f'curl -L -X GET https://reporter.nih.gov/exporter/clinicalstudies/download -o {sysvars.gnt_files_path}raw/clinical_studies/clinical_studies.csv'
@@ -43,7 +44,7 @@ def download_nih_data(clear_previous=False):
         print('Clinical Studies file already downloaded... bypassing')
 
     # Patents
-    if clear_previous:
+    if restart_raw:
         os.remove(f'{sysvars.gnt_files_path}raw/patents/patents.csv')
     if not os.path.exists(f'{sysvars.gnt_files_path}raw/patents/patents.csv'):
         command = f'curl -L -X GET https://reporter.nih.gov/exporter/patents/download -o {sysvars.gnt_files_path}raw/patents/patents.csv'
@@ -58,14 +59,14 @@ def download_nih_data(clear_previous=False):
         else:
             file_dir = type
 
-        if clear_previous:
+        if restart_raw:
             cur_path_files = os.listdir(f'{sysvars.gnt_files_path}raw/{file_dir}/')
             for item in cur_path_files:
                 if item.endswith(".csv"):
                     os.remove(os.path.join(f'{sysvars.gnt_files_path}raw/{file_dir}/', item))
 
         if len(os.listdir(f'{sysvars.gnt_files_path}raw/{file_dir}/')) == 1:
-            for i in range(1985,current_year):
+            for i in range(1985,current_year+1):
                 command = f'curl -L -X GET https://reporter.nih.gov/exporter/{type}/download/{i} -o {sysvars.base_path}grant/src/raw/{file_dir}/{type}{i}.zip'
                 os.system(command)
                 command = f'unzip {sysvars.gnt_files_path}raw/{file_dir}/{type}{i}.zip -d {sysvars.base_path}grant/src/raw/{file_dir}'
@@ -116,6 +117,15 @@ def get_project_data (appl_id):
         print(f"Error: {response.status_code}, {response.text}")
         return
     
+def clear_processed_files (restart_processed=False):
+    if restart_processed:
+        files = glob.glob(f'{sysvars.gnt_files_path}processed/**/*.csv', recursive=True)
+        for f in files:
+            print(f)
+            os.remove(f)
+
+    print('All files in processed folder removed')
+
 def update_dictionary(dictionary):
     updated_dict = {}
     for key, value in dictionary.items():
@@ -222,11 +232,11 @@ def extract_words_from_json_string2(input_string):
 def GardNamePreprocessor(Gard):
    Gard['GardName'] = Gard['GardName'].apply(lambda x: str(x).replace('"', '').lower())
    Gard['Synonyms'] = Gard['Synonyms'].apply(lambda x: extract_words_from_json_string(str(x).lower()))
-   #Gard= remove_similar_strings(Gard)
+   Gard = remove_similar_strings(Gard)
    Gard['Synonyms'] = Gard['Synonyms'].apply(lambda x: extract_words_from_json_string(str(x)))
    Gard['Synonyms'] =Gard['GardName'].apply(lambda x: [x])+Gard['Synonyms']
    #Gard['Synonyms_bow']=Gard['Synonyms'].apply(lambda x: generate_term_orders_list_of_sords(x) )
-   Gard['Synonyms_sw'] = Gard['Synonyms'].apply(lambda x: process_row_list(x))
+   Gard['Synonyms_sw'] = Gard['Synonyms'].apply(lambda x: process_row_list(x)) #.apply(lambda x: process_row_list(x))
    Gard['Synonyms_sw_bow']=Gard['Synonyms_sw'].apply(lambda x: generate_term_orders_list_of_sords(x) )
    Gard['Synonyms_sw_bow']=Gard['Synonyms_sw_bow'].apply(lambda x: list(set(len_chcek(x))) )
    #Gard['Synonyms_sw_nltk'] = Gard['Synonyms_sw'].apply(lambda x: process_row_list_2(x))
@@ -236,9 +246,14 @@ def GardNamePreprocessor(Gard):
    #Gard['Synonyms_stem_bow']=Gard['Synonyms_stem'].apply(lambda x: generate_term_orders_list_of_sords(x) )
    Gard['Synonyms_sw_stem'] = Gard['Synonyms_sw'].apply(lambda x: stem_text_list(x))
    Gard['Synonyms_sw_stem_bow']=Gard['Synonyms_sw_stem'].apply(lambda x: generate_term_orders_list_of_sords(x) )
-   Gard['Synonyms_sw_stem'] = Gard['Synonyms_sw'].apply(lambda x:list(set(len_chcek(x))) )
+   Gard['Synonyms_sw_stem'] = Gard['Synonyms_sw_stem'].apply(lambda x:list(set(len_chcek(x))) )
    Gard['Synonyms_sw_stem_bow']=Gard['Synonyms_sw_stem_bow'].apply(lambda x: list(set(len_chcek(x))) )
-   Gard['Synonyms_sw'] = Gard['Synonyms_sw'].apply(lambda x: list(set(len_chcek(x))) )
+   Gard['Synonyms_sw'] = Gard['Synonyms_sw_stem'].apply(lambda x: list(set(len_chcek(x))) )
+
+   Excluding_list = ['GARD:{:07d}'.format(int(gard_id.split(':')[1])) for gard_id in sysvars.gard_preprocessor_exclude]
+   Gard['GardId'] = Gard['GardId'].str.strip('"')
+   Gard = Gard[~Gard['GardId'].isin(Excluding_list)]
+
    return Gard
 
 def download_gard_data_from_db ():
@@ -258,8 +273,10 @@ def download_gard_data_from_db ():
 
     return df
 
+
 # Global Objects for Processing
 if not os.path.exists(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv'):
+    pass
     Gard = download_gard_data_from_db()
 else:
     Gard = pd.read_csv(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv')
@@ -580,7 +597,7 @@ def normalize_combined_dictionary(input_text,dict1, dict2, dict3, dict4,min_, ma
     normalized_dict = {key: min_ + (max_ - min_) * (value / total_frequency) for key, value in combined_dict.items()}
     result_dict = {}
     for key, value in normalized_dict.items():
-      if  is_about_term(input_text.lower(), key) >=0.7:
+    #if  is_about_term(input_text.lower(), key) >=0.7:
         result_dict[key] = [value, is_about_term(input_text.lower(), key)]
     return result_dict
 
