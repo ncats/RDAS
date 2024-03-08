@@ -128,23 +128,29 @@ def get_nctids(name_list):
             response = requests.get(initial_query + query_end1).text.splitlines()
             total_trials = int(response[4][16:-1])
 
-        # Add trials to a temporary list
-        trials = list()
-        for trial in response[11:]:
-            trials.append(trial.split(',')[1][1:-1])
-
-        # Break into extra queries of 1000 trials if necessary
-        for rank in range(1, total_trials//1000 + 1):
-            # Get next 1000 trials
-            query_end2 = 'min_rnk=' + str(rank*1000+1) + '&max_rnk=' + str((rank+1)*1000) + '&fmt=csv'
-            response = requests.get(initial_query + query_end2).text.splitlines()
-
-            # Add trials to the temporary list
+        try:
+            # Add trials to a temporary list
+            trials = list()
             for trial in response[11:]:
                 trials.append(trial.split(',')[1][1:-1])
 
-        # Add the trials from the temporary list to the overall list
-        all_trials += trials
+            # Break into extra queries of 1000 trials if necessary
+            for rank in range(1, total_trials//1000 + 1):
+                # Get next 1000 trials
+                query_end2 = 'min_rnk=' + str(rank*1000+1) + '&max_rnk=' + str((rank+1)*1000) + '&fmt=csv'
+                response = requests.get(initial_query + query_end2).text.splitlines()
+
+                # Add trials to the temporary list
+                for trial in response[11:]:
+                    trials.append(trial.split(',')[1][1:-1])
+
+            # Add the trials from the temporary list to the overall list
+            all_trials += trials
+
+        except Exception as e:
+            print(e)
+            print(initial_query + query_end2)
+            print(trial)
 
     # Return the list of all retrived NCTIDs
     return all_trials
@@ -255,6 +261,19 @@ def extract_fields(nctid):
     # Return the flattened dictionary containing parsed trial fields
     return full_trial
 
+
+def get_lastupdated_postdate (ID):
+    postdate_query = f'https://clinicaltrials.gov/api/query/field_values?expr={ID}&field=LastUpdatePostDate&fmt=json'
+    try:
+        # Make the API request and parse the JSON response
+        full_response = requests.get(postdate_query).json()
+        postdate = full_response['FieldValuesResponse']['FieldValues'][0]['FieldValue']
+
+        return postdate
+
+    except ValueError:
+        # Return None if there is an issue with the JSON response
+        return None
 
 
 
@@ -432,6 +451,7 @@ def unpack_nested_data (db, now, nctid, trial, node_type):
         #ALSO POSTPONED
         #create_leaf_nodes(db, trial, node_id, node_type)
     """
+    queries = None
 
     if node_type == 'ClinicalTrial':
         tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER")
@@ -835,12 +855,12 @@ def condition_map(db, update_metamap=True):
 
     print('RUNNING GARD POPULATION')
     # Fetch GARD entries from the database
-    gard_res = gard_db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.GardName as GardName, x.Synonyms as Synonyms, x.UMLS as gUMLS, x.UMLS_Source as usource')
+    gard_res = gard_db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.UMLS as gUMLS, x.UMLS_Source as usource') # x.GardName as GardName, x.Synonyms as Synonyms, 
     for gres in gard_res.data():
         gUMLS = gres['gUMLS']
-        name = gres['GardName']
+        #name = gres['GardName']
         gard_id = gres['GardId']
-        syns = gres['Synonyms']
+        #syns = gres['Synonyms']
 
         # Check if UMLS data is present and create GARD node accordingly
         if gUMLS:

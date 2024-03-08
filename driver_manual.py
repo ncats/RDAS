@@ -14,6 +14,8 @@ parser.add_argument("-m", "--mode", dest = "mode", help="Database mode")
 args = parser.parse_args()
 
 print(args.db)
+db = AlertCypher('system')
+
 if args.db == 'ct':
     if args.mode == 'create':
         clinical.init.main()
@@ -32,6 +34,7 @@ elif args.db == 'gnt':
     if args.mode == 'create':
         grant.init.main()
     elif args.mode == 'update':
+        db.getConf('UPDATE_PROGRESS','grant_progress', 'True')
         grant.update.main()
 
 elif args.db == 'gard':

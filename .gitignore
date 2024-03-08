@@ -83,3 +83,7 @@ logs/
 terms_mapped.csv
 terms_unmapped.csv
 test_term_map.py
+clinical/src/ids_to_add.csv
+clinical/src/ids_to_update.csv
+
+clinical/src/ids_to_update_confirmed.csv

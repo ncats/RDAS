@@ -19,7 +19,6 @@ scikit_learn==1.2.2
 scispacy==0.5.1
 selenium==4.16.0
 seqeval==1.2.2
-skr_web_api==0.1
 spacy==3.4.4
 spacy-legacy==3.0.12
 spacy-loggers==1.0.4

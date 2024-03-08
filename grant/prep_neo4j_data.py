@@ -98,7 +98,7 @@ def combine_normmap_results():
 
 
 lock = threading.Lock()
-def batch_normmap(df, thr, year):
+def batch_normmap(df, thr, year, nlp):
 	r,c = df.shape
 	for idx in range(r):
 		try:
@@ -111,7 +111,7 @@ def batch_normmap(df, thr, year):
 			phr = row['PHR']
 			title = row['PROJECT_TITLE']
 
-			gard_ids = rdas.GardNameExtractor(title, phr, abstract)
+			gard_ids = rdas.GardNameExtractor(title, phr, abstract, nlp)
 			if gard_ids:
 				for gard,add_data in gard_ids.items():
 					if add_data == 1:
@@ -165,6 +165,8 @@ def normmap_process (df):
 def run_normmap():
 	print('Running NormMap')
 
+	nlp = spacy.load("en_core_web_sm")
+
 	abs_files = glob.glob(data_raw('abstracts') + '/*.csv')
 	abs_files = sorted(abs_files)
 
@@ -209,7 +211,7 @@ def run_normmap():
 
 		# Create threads to process results
 		for thrnum, lst in enumerate(list_df):
-			thread = threading.Thread(target=batch_normmap, args=(lst, thrnum, year), daemon=True)
+			thread = threading.Thread(target=batch_normmap, args=(lst, thrnum, year, nlp), daemon=True)
 			thread_list.append(thread)
 
 		for thr in thread_list:

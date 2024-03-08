@@ -15,5 +15,3 @@ def main(restart_raw=False, restart_processed=False):
 
     db = AlertCypher(sysvars.gnt_db)
     rdas.start(db, restart_raw=restart_raw, restart_processed=restart_processed)
-
-main()

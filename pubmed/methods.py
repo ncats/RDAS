@@ -1874,7 +1874,8 @@ def gather_epi(db, today):
   """
 
   # Retrieve articles with non-empty titles and abstracts that havent already been processed by the API (epi_processed = FALSE)
-  res = db.run('MATCH (x:Article) WHERE NOT (x.abstractText = \"\" OR x.title = \"\") AND ((x.epi_processed = TRUE AND x.isEpi = TRUE) AND NOT exists((x)--(:EpidemiologyAnnotation))) OR NOT (x.abstractText = \"\" OR x.title = \"\") AND (x.epi_processed = FALSE AND x.isEpi = FALSE) RETURN x.abstractText AS abstract, x.title AS title, ID(x) AS id').data() #TEST DateCreatedRDAS needs to be removed after
+  res = db.run('MATCH (x:Article) WHERE NOT (x.abstractText = \"\" OR x.title = \"\") AND (x.epi_processed = FALSE AND x.isEpi = FALSE) RETURN x.abstractText AS abstract, x.title AS title, ID(x) AS id').data() #TEST DateCreatedRDAS needs to be removed after
+  # MATCH (x:Article) WHERE NOT (x.abstractText = \"\" OR x.title = \"\") AND ((x.epi_processed = TRUE AND x.isEpi = TRUE) AND NOT exists((x)--(:EpidemiologyAnnotation))) OR NOT (x.abstractText = \"\" OR x.title = \"\") AND (x.epi_processed = FALSE AND x.isEpi = FALSE) RETURN x.abstractText AS abstract, x.title AS title, ID(x) AS id
   print(len(res))  
 
   # Iterate over articles and create EpidemiologyAnnotation nodes
@@ -1961,24 +1962,57 @@ def retrieve_articles(db, last_update, today):
     None
   """
 
+  # Gets config update progress values
+  current_step = db.getConf('UPDATE_PROGRESS', 'pubmed_current_step')
+  in_progress = db.getConf('UPDATE_PROGRESS', 'pubmed_in_progress')
+
   # Retrieve articles related to GARD diseases from PubMed and update the database
-  print('Populating PubMed Articles')
-  #save_disease_articles(db, last_update, today) #TEST, remove comment keep code
+  if current_step == 'save_articles' or in_progress == 'False':
+    print('Populating PubMed Articles')
+
+    # Set the update progress to in progress
+    db.setConf('UPDATE_PROGRESS', 'pubmed_in_progress', 'True')
+    db.setConf('UPDATE_PROGRESS', 'pubmed_current_step', 'save_articles')
+
+    save_disease_articles(db, last_update, today) #TEST, remove comment keep code
+    db.setConf('UPDATE_PROGRESS', 'pubmed_current_step', 'save_omim')
+  else:
+    print('Update in progress... bypassing save_articles')
 
   # Save OMIM articles and update the database
-  print('Populating OMIM Articles and Information')
-  #save_omim_articles(db, today) #TEST, remove comment keep code
+  if current_step == 'save_omim': 
+    print('Populating OMIM Articles and Information')
+    save_omim_articles(db, today) #TEST, remove comment keep code
+    db.setConf('UPDATE_PROGRESS', 'pubmed_current_step', 'save_epi')
+  else:
+    print('Update in progress... bypassing save_omim')
   
   # Gather epidemiology annotations for articles with non-empty titles and abstracts
-  print('Populating Epidemiology Information')
-  gather_epi(db, today) #TEST, remove comment keep code
+  if current_step == 'save_epi':
+    print('Populating Epidemiology Information')
+    gather_epi(db, today) #TEST, remove comment keep code
+    db.setConf('UPDATE_PROGRESS', 'pubmed_current_step', 'save_pubtator')
+  else:
+    print('Update in progress... bypassing save_epi')
 
   # Gather Pubtator annotations for articles that do not have associated annotations
-  print('Populating Pubtator Information')
-  #gather_pubtator(db, today)
+  if current_step == 'save_pubtator': 
+    print('Populating Pubtator Information')
+    gather_pubtator(db, today)
+    db.setConf('UPDATE_PROGRESS', 'pubmed_current_step', 'save_gene')
+  else:
+    print('Update in progress... bypassing save_pubtator')
 
-  print('Labeling GeneReview Articles')
-  label_genereview(db)
+  # Label genereview articles
+  if current_step == 'save_gene':
+    print('Labeling GeneReview Articles')
+    label_genereview(db)
+
+    # End of the pipeline, resets the config in_progress values
+    db.setConf('UPDATE_PROGRESS', 'pubmed_current_step', '')
+    db.setConf('UPDATE_PROGRESS', 'pubmed_in_progress', 'False')
+  else:
+    print('Update in progress... bypassing save_gene')
 
   
 

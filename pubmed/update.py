@@ -3,6 +3,7 @@ import sys
 workspace = os.path.dirname(os.path.abspath(__file__))
 print(workspace)
 sys.path.append(workspace)
+sys.path.append('/home/leadmandj/RDAS/')
 import sysvars
 import pubmed.init
 from time import sleep
@@ -23,5 +24,5 @@ def main (update_from):
 
     pubmed.init.main(update_from=update_from)
 
-main(update_from=False) #TEST
+#main(update_from=False) #TEST
 #get_node_counts() #TEST

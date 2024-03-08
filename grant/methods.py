@@ -258,23 +258,39 @@ def GardNamePreprocessor(Gard):
 
 def download_gard_data_from_db ():
     db = AlertCypher(sysvars.gard_db)
-    response = db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.GardName as GardName, x.Synonyms as Synonyms').data()
+    in_progress = db.getConf('UPDATE_PROGRESS', 'grant_in_progress')
 
-    myFile = open(f'{sysvars.base_path}grant/src/raw/all_gards.csv', 'w')
-    writer = csv.writer(myFile)
-    writer.writerow(['GardId', 'GardName', 'Synonyms'])
-    for dictionary in response:
-        writer.writerow(dictionary.values())
-    myFile.close()
-    df = pd.read_csv(f'{sysvars.base_path}grant/src/raw/all_gards.csv')
+    if not in_progress == 'True':
+        return None
 
-    df = GardNamePreprocessor(df)
-    df.to_csv(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv')
+    if not os.path.exists(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv'):
+        response = db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.GardName as GardName, x.Synonyms as Synonyms').data()
+
+        myFile = open(f'{sysvars.base_path}grant/src/raw/all_gards.csv', 'w')
+        writer = csv.writer(myFile)
+        writer.writerow(['GardId', 'GardName', 'Synonyms'])
+        for dictionary in response:
+            writer.writerow(dictionary.values())
+        myFile.close()
+        df = pd.read_csv(f'{sysvars.base_path}grant/src/raw/all_gards.csv')
+
+        df = GardNamePreprocessor(df)
+        df.to_csv(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv')
+
+    else:
+        df = pd.read_csv(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv')
+        df['Synonyms_sw'] = df['Synonyms_sw'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
+        df['Synonyms_sw_bow'] = df['Synonyms_sw_bow'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
+        df['Synonyms_sw_stem'] = df['Synonyms_sw_stem'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
+        df['Synonyms_sw_stem_bow'] = df['Synonyms_sw_stem_bow'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
 
     return df
 
-
 # Global Objects for Processing
+
+Gard = download_gard_data_from_db()
+
+'''
 if not os.path.exists(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv'):
     pass
     Gard = download_gard_data_from_db()
@@ -284,10 +300,9 @@ else:
     Gard['Synonyms_sw_bow'] = Gard['Synonyms_sw_bow'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
     Gard['Synonyms_sw_stem'] = Gard['Synonyms_sw_stem'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
     Gard['Synonyms_sw_stem_bow'] = Gard['Synonyms_sw_stem_bow'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
-    
-
 
 nlp = spacy.load("en_core_web_sm")
+'''
 
 def is_about_term(input_text, target_term):
     # Load ClinicalBERT model and tokenizer
@@ -547,7 +562,7 @@ def combine_dictionaries_sent(dict1, dict2):
             combined_dict[key] = value
     return combined_dict
 
-def  modified_dict(combined_dict,combined_dict_sen):
+def modified_dict(combined_dict,combined_dict_sen):
     keys_to_remove = set()
     for key1 in combined_dict:
         for key2 in combined_dict:
@@ -602,14 +617,14 @@ def normalize_combined_dictionary(input_text,dict1, dict2, dict3, dict4,min_, ma
     return result_dict
 
 
-def gard_id(title_, Public_health_relevance_statement, abstract_):
+def gard_id(title_, Public_health_relevance_statement, abstract_, nlp):
     if not isinstance(title_, str) and not isinstance(Public_health_relevance_statement, str) and not isinstance(abstract_, str):
         return ''  # Return default values when no string input is provided
     if title_ and isinstance(title_, str):
         name = get_gard_title_stem_exact(title_)
         if name: return name
     if Public_health_relevance_statement and isinstance(Public_health_relevance_statement, str):
-        A, B, C,D = check_sen(Public_health_relevance_statement)
+        A, B, C,D = check_sen(Public_health_relevance_statement, nlp)
         name1 = get_gard_abstract_stem_exact(A)
         name2 = get_gard_abstract_stem_exact(B)
         name3 = get_gard_abstract_stem_exact(C)
@@ -617,7 +632,7 @@ def gard_id(title_, Public_health_relevance_statement, abstract_):
         name=normalize_combined_dictionary(Public_health_relevance_statement,name1,name2,name3,name4,0.7,0.9)
         if name and (name !={}): return name
     if abstract_ and isinstance(abstract_, str):
-        A, B, C , D = check_sen(abstract_)
+        A, B, C , D = check_sen(abstract_, nlp)
         name1 = get_gard_abstract_stem_exact(A)
         name2 = get_gard_abstract_stem_exact(B)
         name3 = get_gard_abstract_stem_exact(C)
@@ -625,9 +640,9 @@ def gard_id(title_, Public_health_relevance_statement, abstract_):
         name=normalize_combined_dictionary(abstract_,name1,name2,name3,name4,0,0.7)
         if name and (name !={}): return name
 
-def GardNameExtractor(project_title,phr_text,abstract_text):
+def GardNameExtractor(project_title,phr_text,abstract_text, nlp):
   #Abstract1['Gard_name']=Abstract1.apply(lambda x: gard_id(x['project_title'],x['phr_text'],x['abstract_text']), axis=1)
-  gard_ids = gard_id(project_title,phr_text,abstract_text)
+  gard_ids = gard_id(project_title,phr_text,abstract_text, nlp)
   if gard_ids:
     return update_dictionary(gard_ids)
   else:

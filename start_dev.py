@@ -86,10 +86,6 @@ while True:
             print('Updating Node Counts on GARD db')
             get_node_counts()
 
-            # Update last update date in the system database configuration
-            db = AlertCypher('system')
-            db.setConf('DATABASE', f'{full_db_name}_update', datetime.strftime(datetime.now(),"%m/%d/%y"))
-
             # Creates a backup file for the current state of the GARD database, puts that file in the transfer directory
             print('Dumping GARD db')
             p = Popen(['python3', 'generate_dump.py', '-dir', 'gard', '-t'], encoding='utf8')
