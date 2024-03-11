@@ -78,21 +78,22 @@ while True:
         if v == True:
             full_db_name = sysvars.db_abbrevs[k]
             print(f'{full_db_name} Update Initiated')
-            
+            '''
             p = Popen(['python3', 'driver_manual.py', '-db', f'{k}', '-m', 'update'], encoding='utf8')
             p.wait()
             
             # Update the node counts on the GARD Neo4j database (numbers used to display on the UI)
             print('Updating Node Counts on GARD db')
             get_node_counts()
-            
+            '''
+            target_address = sysvars.rdas_urls['dev']
             db.run(f'STOP DATABASE gard')
-            p = Popen(['sudo', 'ssh', f'{sysvars.current_user}@{sysvars.rdas_urls['dev']}', 'sudo', 'python3', f'{sysvars.base_path}/remote_dump_and_transfer.py' '-dir', 'gard'], encoding='utf8')
+            p = Popen(['sudo', 'ssh', f'{sysvars.current_user}@{target_address}', 'sudo', 'python3', f'{sysvars.base_path}/remote_dump_and_transfer.py' '-dir', 'gard'], encoding='utf8')
             p.wait()
             db.run(f'START DATABASE gard')
 
             db.run(f'STOP DATABASE {full_db_name}')
-            p = Popen(['sudo', 'ssh', f'{sysvars.current_user}@{sysvars.rdas_urls['dev']}', 'sudo', 'python3', f'{sysvars.base_path}/remote_dump_and_transfer.py' '-dir', f'{full_db_name}'], encoding='utf8')
+            p = Popen(['sudo', 'ssh', f'{sysvars.current_user}@{target_address}', 'sudo', 'python3', f'{sysvars.base_path}/remote_dump_and_transfer.py' '-dir', f'{full_db_name}'], encoding='utf8')
             p.wait()
             db.run(f'START DATABASE {full_db_name}')
 
