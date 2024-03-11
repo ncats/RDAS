@@ -22,6 +22,7 @@ import nltk
 from nltk.stem import PorterStemmer
 nltk.download("punkt")
 from spacy.matcher import Matcher
+import spacy
 from fuzzywuzzy import fuzz
 import string
 from transformers import AutoTokenizer, AutoModelForTokenClassification
@@ -855,22 +856,23 @@ def condition_map(db, update_metamap=True):
 
     print('RUNNING GARD POPULATION')
     # Fetch GARD entries from the database
-    gard_res = gard_db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.UMLS as gUMLS, x.UMLS_Source as usource') # x.GardName as GardName, x.Synonyms as Synonyms, 
+    gard_res = gard_db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.UMLS as gUMLS, x.GardName as GardName, x.Synonyms as Synonyms, x.UMLS_Source as usource')
     for gres in gard_res.data():
         gUMLS = gres['gUMLS']
-        #name = gres['GardName']
+        name = gres['GardName']
         gard_id = gres['GardId']
-        #syns = gres['Synonyms']
+        syns = gres['Synonyms']
+        usource = gres['usource']
 
         # Check if UMLS data is present and create GARD node accordingly
         if gUMLS:
-            db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns},UMLS:{gUMLS},UMLS_Source:\"{usource}\"}})'.format(name=gres['GardName'],gard_id=gres['GardId'],syns=gres['Synonyms'],gUMLS=gres['gUMLS'],usource=gres['usource']))
+            db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns},UMLS:{gUMLS},UMLS_Source:\"{usource}\"}})'.format(name=name,gard_id=gard_id,syns=syns,gUMLS=gUMLS,usource=usource))
         else:
-            db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns},UMLS_Source:\"{usource}\"}})'.format(name=gres['GardName'],gard_id=gres['GardId'],syns=gres['Synonyms'],usource=gres['usource']))
+            db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns},UMLS_Source:\"{usource}\"}})'.format(name=name,gard_id=gard_id,syns=syns,usource=usource))
 
     print('RUNNING METAMAP')
-    # Fetch conditions from the database
-    res = db.run('MATCH (c:Condition) RETURN c.Condition as condition, ID(c) as cond_id')
+    # Fetch conditions from the database that havent already been annotated and are not acronyms
+    res = db.run('MATCH (c:Condition) WHERE NOT EXISTS((c)--(:Annotation)) RETURN c.Condition as condition, ID(c) as cond_id')
     cond_strs = [f"{i['cond_id']}|{normalize(i['condition'])}\n" for i in res if not is_acronym(i['condition'])]
     
     # Write condition strings to a file for MetaMap processing
@@ -935,8 +937,8 @@ def condition_map(db, update_metamap=True):
             db.run(query)
             
     print('CREATING AND CONNECTING METAMAP ANNOTATIONS')
-    # Delete existing annotations
-    db.run('MATCH (x:Annotation) DETACH DELETE x')
+    # Delete existing annotations DONT NEED, REMOVE STEP
+    #db.run('MATCH (x:Annotation) DETACH DELETE x')
     # Fetch relevant data from Condition nodes
     res = db.run('MATCH (x:Condition) WHERE x.METAMAP_OUTPUT IS NOT NULL RETURN ID(x) AS cond_id, x.METAMAP_OUTPUT AS cumls, x.METAMAP_PREFERRED_TERM AS prefs, x.FUZZY_SCORE as fuzz, x.METAMAP_SCORE as meta').data()
 
@@ -1026,6 +1028,7 @@ def create_drug_connection(db,rxdata,drug_id,wspacy=False):
 
     # Create or merge Drug node with RxNormID
     db.run('MATCH (x:Intervention) WHERE ID(x)={drug_id} MERGE (y:Drug {{RxNormID:{rxnormid}}}) MERGE (y)<-[:mapped_to_rxnorm {{WITH_SPACY: {wspacy}}}]-(x)'.format(rxnormid=rxnormid, drug_id=drug_id, wspacy=wspacy))
+    print(f'MAPPED {rxnormid}')
 
     # Set additional properties on the Drug node
     for k,v in rxdata.items():
@@ -1110,7 +1113,7 @@ def nlp_to_drug(db,doc,matches,drug_name,drug_id):
 
 
 
-def rxnorm_map(db):
+def rxnorm_map(db, rxnorm_progress):
     """
     Map RxNorm data to Drug Interventions in the Neo4j database.
 
@@ -1129,11 +1132,18 @@ def rxnorm_map(db):
     matcher = Matcher(nlp.vocab)
     matcher.add('DRUG',[pattern])
 
-    # Retrieve drug interventions from the database
-    results = db.run('MATCH (x:Intervention) WHERE x.InterventionType = "Drug" RETURN x.InterventionName, ID(x)').data()
+    # Retrieve drug interventions from the database that do NOT already have a Drug node attached
+    results = db.run('MATCH (x:Intervention) WHERE x.InterventionType = "Drug" AND NOT EXISTS((x)--(:Drug)) RETURN x.InterventionName, ID(x)').data()
+    length = len(results)
 
     # Iterate over drug interventions and map RxNorm data
     for idx,res in enumerate(results):
+        if idx < rxnorm_progress:
+            continue
+        
+        print(f'{str(idx)}/{length}')
+        db.setConf('UPDATE_PROGRESS', 'clinical_rxnorm_progress', str(idx))
+
         drug_id = res['ID(x)']
         drug = res['x.InterventionName']
 

@@ -21,7 +21,7 @@ from firebase_admin import firestore
 
 
 
-def check_update(db_type):
+def check_update(db, db_type):
     """
     Checks if an update is needed for a specified database based on the configured update interval.
 
@@ -31,9 +31,6 @@ def check_update(db_type):
     Returns:
     - bool: True if an update is needed, False otherwise.
     """
-
-    # Connect to the system database
-    db = AlertCypher('system')
 
     # Get the current date and time
     today = datetime.now()
@@ -63,6 +60,9 @@ def check_update(db_type):
     else:
         return [False,last_update]
 
+# Connect to the system database
+db = AlertCypher('system')
+
 while True:
     # Initialize a dictionary to track update status for each database
     current_updates = {k:False for k,v in sysvars.db_abbrevs.items()}
@@ -70,7 +70,7 @@ while True:
     print('Checking for Updates')
     # Check update status for each database
     for db_abbrev in sysvars.db_abbrevs:
-        current_updates[db_abbrev] = check_update(db_abbrev)[0]
+        current_updates[db_abbrev] = check_update(db, db_abbrev)[0]
 
     print('Triggering Database Updates')
     for k,v in current_updates.items():
@@ -85,12 +85,23 @@ while True:
             # Update the node counts on the GARD Neo4j database (numbers used to display on the UI)
             print('Updating Node Counts on GARD db')
             get_node_counts()
+            
+            db.run(f'STOP DATABASE gard')
+            p = Popen(['sudo', 'ssh', f'{sysvars.current_user}@{sysvars.rdas_urls['dev']}', 'sudo', 'python3', f'{sysvars.base_path}/remote_dump_and_transfer.py' '-dir', 'gard'], encoding='utf8')
+            p.wait()
+            db.run(f'START DATABASE gard')
+
+            db.run(f'STOP DATABASE {full_db_name}')
+            p = Popen(['sudo', 'ssh', f'{sysvars.current_user}@{sysvars.rdas_urls['dev']}', 'sudo', 'python3', f'{sysvars.base_path}/remote_dump_and_transfer.py' '-dir', f'{full_db_name}'], encoding='utf8')
+            p.wait()
+            db.run(f'START DATABASE {full_db_name}')
 
             # Creates a backup file for the current state of the GARD database, puts that file in the transfer directory
+            '''
             print('Dumping GARD db')
             p = Popen(['python3', 'generate_dump.py', '-dir', 'gard', '-t'], encoding='utf8')
             p.wait()
-
+            
             # Creates a backup file for the current state of the database being updated in this iteration, puts that file in the transfer directory
             print(f'Dumping {full_db_name} db')
             p = Popen(['sudo', 'python3', 'generate_dump.py', f'-dir {full_db_name}', '-b', '-t', '-s dev'], encoding='utf8')
@@ -104,7 +115,7 @@ while True:
             print(f'Transfering {full_db_name} dump to TEST server')
             p = Popen(['sudo', 'python3', 'file_transfer.py', f'-dir {full_db_name}', '-s test'], encoding='utf8')
             p.wait()
-
+            '''
             print(f'Update of {full_db_name} Database Complete...')
             
     sleep(3600)

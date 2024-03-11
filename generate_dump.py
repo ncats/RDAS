@@ -23,18 +23,22 @@ args = parser.parse_args()
 def copy_to_backup(path, filename, dump_name):
     p = Popen(['sudo', 'cp', f'{path}{dump_name}.dump', f'{sysvars.backup_path}{dump_name}/{filename}'])
     p.wait()
+    print(f'DATABASE DUMP PUT INTO BACKUP FOLDER AT {path}{dump_name}.dump')
 
 def dump_file (path, db_name):
     db = AlertCypher('system')
     db.run(f'STOP DATABASE {db_name}')
+    print(f'DATABASE {db_name} STOPPED')
     
     #p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'stop'], encoding='utf8')
     #p.wait()
 
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'dump', f'{db_name}', f'--to-path={path}', '--overwrite-destination'], encoding='utf8')
     p.wait()
+    print(f'DATABASE {db_name} DUMPED AT {path}')
 
     db.run(f'START DATABASE {db_name}')
+    print(f'DATABASE {db_name} RESTARTED')
 
     #p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'start'], encoding='utf8')
     #p.wait()

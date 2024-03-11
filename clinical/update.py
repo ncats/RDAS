@@ -115,6 +115,9 @@ def main():
                 ids_to_update.append(k)
             print(str(idx) + '/' + str(length))
 
+        # There are duplicate trials because of the combined lists, remove duplicates
+        ids_to_update = list(set(ids_to_update))
+
         # Save lists of ids in case error occurs during update
         with open(f'{sysvars.ct_files_path}ids_to_add.csv', 'w') as f:
             wr = csv.writer(f,delimiter="\n")
@@ -147,10 +150,21 @@ def main():
             clinical_required_update_progress = int(clinical_required_update_progress)
         else:
             clinical_required_update_progress = 0
+
+        clinical_rxnorm_progress = db.getConf('UPDATE_PROGRESS', 'clinical_rxnorm_progress')
+        if not clinical_rxnorm_progress == '':
+            clinical_rxnorm_progress = int(clinical_rxnorm_progress)
+        else:
+            clinical_required_update_progress = 0
+
+        clinical_current_step = db.getConf('UPDATE_PROGRESS', 'clinical_current_step')
         
     else:
         clinical_add_progress = 0
         clinical_update_progress = 0
+        clinical_required_update_progress = 0
+        clinical_rxnorm_progress = 0
+        clinical_current_step = ''
 
     # Add brand new trials
     print('Adding non existent trials in database')
@@ -204,8 +218,12 @@ def main():
         print(idx, ID)
 
         trial_info = rdas.extract_fields(ID)
-        for node_type in dm.node_names:
-            data_string = rdas.format_node_data(db,today,trial_info,node_type,ID,update=True)
+        if trial_info:
+            for node_type in dm.node_names:
+                data_string = rdas.format_node_data(db,today,trial_info,node_type,ID,update=True)
+        else:
+            print('Error in add for finding full trial data for ' + ID)
+            
                 
             #BELOW CREATES HISTORY NODE, POSTPONED FOR NOW
             
@@ -213,14 +231,22 @@ def main():
             #db.run(create_history_query)
 
     # Perform condition mapping
-    rdas.condition_map(db, update_metamap=True)
+    if clinical_current_step == '':
+        rdas.condition_map(db)
+        db.setConf('UPDATE_PROGRESS', 'clinical_current_step', 'rxnorm_map')
 
     # Perform RxNorm mapping
-    rdas.rxnorm_map(db)
+    if clinical_current_step == 'rxnorm_map':
+        rdas.rxnorm_map(db, clinical_rxnorm_progress)
 
     # Update config values
     db.setConf('DATABASE', 'clinical_update', datetime.strftime(datetime.now(),"%m/%d/%y"))
     db.setConf('UPDATE_PROGRESS', 'clinical_in_progress', 'False')
+    db.setConf('UPDATE_PROGRESS', 'clinical_add_progress', '')
+    db.setConf('UPDATE_PROGRESS', 'clinical_current_step', '')
+    db.setConf('UPDATE_PROGRESS', 'clinical_update_progress', '')
+    db.setConf('UPDATE_PROGRESS', 'clinical_rxnorm_progress', '')
+    db.setConf('UPDATE_PROGRESS', 'clinical_required_update_progress', '')
 
 if __name__ == "__main__":
     main()
