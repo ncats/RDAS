@@ -11,8 +11,8 @@ from subprocess import *
 from time import sleep
 import argparse
 import detect_transfer
-import seed_cluster
-import file_transfer
+#import seed_cluster
+#import file_transfer
 
 while True:
     # Detects all new dump files in the transfer folder of the TEST server
@@ -35,4 +35,4 @@ while True:
 
     # Waits one hour before retrying process
     sleep(5)
-    print('Next check initiated')
+

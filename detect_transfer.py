@@ -32,12 +32,16 @@ def detect(server_name, path):
         raise Exception
 
     for db_name in sysvars.dump_dirs:
-        last_mod_date = db.getConf(f'{server}_{config_title}_DETECTION',f'{db_name}')
-        cur_mod_date = os.path.getmtime(f"{path}{db_name}.dump")
-        cur_mod_date = str(cur_mod_date)
+        try:
+            last_mod_date = db.getConf(f'{server}_{config_title}_DETECTION',f'{db_name}')
+            cur_mod_date = os.path.getmtime(f"{path}{db_name}.dump")
+            cur_mod_date = str(cur_mod_date)
 
-        if not cur_mod_date == last_mod_date:
-            transfer_detection[db_name] = True
-            db.setConf(f'{server}_{config_title}_DETECTION',f'{db_name}',cur_mod_date)
+            if not cur_mod_date == last_mod_date:
+                transfer_detection[db_name] = True
+                db.setConf(f'{server}_{config_title}_DETECTION',f'{db_name}',cur_mod_date)
+        except Exception as e:
+            transfer_detection[db_name] = False
 
     return transfer_detection
+
