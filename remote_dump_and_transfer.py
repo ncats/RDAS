@@ -18,7 +18,7 @@ parser.add_argument("-dir", "--dump_dir", dest = "dump_dir", help="directory nam
 args = parser.parse_args()
 
 print('DUMPING DATABASE ON REMOTE SERVER')
-p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'dump', f'{args.dump_dir}', f'--to-path={sysvars.transfer_path}', '--overwrite-destination'], encoding='utf8')
+p = Popen(['/opt/neo4j/bin/neo4j-admin', 'database', 'dump', f'{args.dump_dir}', f'--to-path={sysvars.transfer_path}', '--overwrite-destination'], encoding='utf8')
 p.wait()
 
 curdate = str(datetime.datetime.today().strftime('%m-%d-%y'))
@@ -30,5 +30,6 @@ p.wait()
 
 print('TRANSFERED REMOTE DUMP FILE TO NEO4J-TEST SERVER TRANSFER FOLDER')
 target_address = sysvars.rdas_urls['test']
-p = Popen(['scp', f'{sysvars.transfer_path}/{args.dump_dir}.dump', f'{sysvars.current_user}@{target_address}:{sysvars.transfer_path}/{args.dump_dir}.dump'], encoding='utf8')
+p = Popen(['scp', '-i', '~/.ssh/test_rsa', f'{sysvars.transfer_path}/{args.dump_dir}.dump', f'{sysvars.current_user}@{target_address}:{sysvars.transfer_path}/{args.dump_dir}.dump'], encoding='utf8')
 p.wait()
+~
