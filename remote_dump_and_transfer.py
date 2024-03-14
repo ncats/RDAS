@@ -32,4 +32,3 @@ print('TRANSFERED REMOTE DUMP FILE TO NEO4J-TEST SERVER TRANSFER FOLDER')
 target_address = sysvars.rdas_urls['test']
 p = Popen(['scp', '-i', '~/.ssh/test_rsa', f'{sysvars.transfer_path}/{args.dump_dir}.dump', f'{sysvars.current_user}@{target_address}:{sysvars.transfer_path}/{args.dump_dir}.dump'], encoding='utf8')
 p.wait()
-~
