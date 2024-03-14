@@ -88,12 +88,12 @@ while True:
             '''
             target_address = sysvars.rdas_urls['dev']
             db.run(f'STOP DATABASE gard')
-            p = Popen(['sudo', 'ssh', f'{sysvars.current_user}@{target_address}', 'sudo', 'python3', f'{sysvars.base_path}/remote_dump_and_transfer.py' '-dir', 'gard'], encoding='utf8')
+            p = Popen(['ssh', '-i', f'~/.ssh/id_rsa', f'{sysvars.current_user}@{target_address}', 'python3', '~/RDAS/remote_dump_and_transfer.py' ' -dir', 'gard'], encoding='utf8')
             p.wait()
             db.run(f'START DATABASE gard')
 
             db.run(f'STOP DATABASE {full_db_name}')
-            p = Popen(['sudo', 'ssh', f'{sysvars.current_user}@{target_address}', 'sudo', 'python3', f'{sysvars.base_path}/remote_dump_and_transfer.py' '-dir', f'{full_db_name}'], encoding='utf8')
+            p = Popen(['ssh', '-i', f'~/.ssh/id_rsa', f'{sysvars.current_user}@{target_address}', 'python3', '~/RDAS/remote_dump_and_transfer.py' ' -dir', f'{full_db_name}'], encoding='utf8')
             p.wait()
             db.run(f'START DATABASE {full_db_name}')
 
