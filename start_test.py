@@ -11,7 +11,7 @@ from subprocess import *
 from time import sleep
 import argparse
 import detect_transfer
-#import seed_cluster
+from seed_cluster import seed
 #import file_transfer
 
 while True:
@@ -22,7 +22,7 @@ while True:
     # Seeds all 3 clusters in the TEST server so that the databases will be visible
     for db_name in new_dumps:
         print(f'{db_name} cluster seeded')
-        #seed_cluster.seed(db_name,sysvars.transfer_path) # NEEDS TO BE FIXED
+        seed(db_name,sysvars.transfer_path,'test') # NEEDS TO BE FIXED
 
     # Detects all new dumps files in the approved folder (quality checked files) of the TEST server
     approved_detection = detect_transfer.detect('test', sysvars.approved_path)
