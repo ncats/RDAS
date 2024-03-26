@@ -11,7 +11,7 @@ from time import sleep
 
 today = datetime.now().strftime("%Y/%m/%d")
 
-def main(update_from=False):
+def main(update_from=False, update_to=False):
     """
     Main function for a script that interacts with a database, related to PubMed data.
 
@@ -33,12 +33,18 @@ def main(update_from=False):
         last_update = datetime.strptime(update_from, "%m/%d/%y")
         last_update = last_update.strftime("%Y/%m/%d")
         # If update_from is provided, call the update_missing_abstracts function
-        rdas.update_missing_abstracts(db,today)
     else:
         last_update = datetime.strptime(today, "%Y/%m/%d") - relativedelta(years=50)
         last_update = last_update.strftime("%Y/%m/%d")
 
-    print(last_update, today)
+    if update_to:
+        updating_to = datetime.strptime(update_to, "%m/%d/%y")
+        updating_to = updating_to.strftime("%Y/%m/%d")
+    else:
+        updating_to = today
+
+    print(last_update, updating_to)
 
     # Call the retrieve_articles function to gather and save articles in the database
-    rdas.retrieve_articles(db, last_update, today)
+    rdas.retrieve_articles(db, last_update, updating_to, today)
+    rdas.update_missing_abstracts(db,today)

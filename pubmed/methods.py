@@ -506,7 +506,7 @@ def save_omim_remaining_articles(gard_id, prefTitle, omim_id, sections, search_s
 
 
 
-def find_articles(keyword, mindate, maxdate):
+def find_articles(keyword, mindate, maxdate, batch=list(), cnt=0, recurse=False, finished=False):
   """
   NOTE: A maximum of 9999 articles are retrieved during an update, a batch of queries will need to be ran to get the full number of articles during an update
   """
@@ -530,6 +530,9 @@ def find_articles(keyword, mindate, maxdate):
   >> print(response)
   {'esearchresult': {'count': '123', 'idlist': ['123456', '789012'], ...}}
   """
+  if not recurse and not finished:
+    # Clears the ID list between new diseases searched
+    batch = list()
 
   # Initialize variables
   url = str()
@@ -537,7 +540,10 @@ def find_articles(keyword, mindate, maxdate):
   api_key = os.environ['NCBI_KEY']
   keyword = keyword.replace('-',' ').replace('\"','')
   tokens = keyword.split(';')
-  
+  tokens = [i.strip() for i in tokens]
+  mindate_obj = datetime.strptime(mindate,'%Y/%m/%d')
+  maxdate_obj = datetime.strptime(maxdate,'%Y/%m/%d')
+
   # Construct the search query
   if len(tokens) > 1:
     term_search_query += '('
@@ -558,18 +564,37 @@ def find_articles(keyword, mindate, maxdate):
     term_search_query = f'\"{keyword}\"[Title/Abstract:~1]'
   
   # Construct the API request URL
-  url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={term_search_query}[Title/Abstract:~1]&mindate={mindate}&maxdate={maxdate}&retmode=json&retmax=10000&api_key={api_key}" #retmax=10000
-  
+  url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={term_search_query}&mindate={mindate}&maxdate={maxdate}&retmode=json&retmax=10000&api_key={api_key}" #retmax=10000
+
   # Make the API request
   response = requests.post(url).json()
+  try:
+    articles_found = int(response['esearchresult']['count'])
+  except:
+    articles_found = 0
 
-  # Handle API rate limits
-  if not 'esearchresult' in response or not 'idlist' in response['esearchresult']:
-    print('API limit reached, retrying in 15 seconds...')
-    time.sleep(15)
-    response = requests.post(url).json()
+  if articles_found == 0:
+    return list()
 
-  return response
+  if articles_found > 9999:
+    maxdate_obj = maxdate_obj - relativedelta(years=1)
+    maxdate = maxdate_obj.strftime("%Y/%m/%d")
+    mindate = mindate_obj.strftime("%Y/%m/%d")
+    cnt+=1
+    
+    return find_articles(keyword, mindate, maxdate, batch=batch, cnt=cnt, recurse=True)
+  else:
+    mindate_obj = maxdate_obj
+    maxdate_obj = maxdate_obj + relativedelta(years=cnt)
+    maxdate = maxdate_obj.strftime("%Y/%m/%d")
+    mindate = mindate_obj.strftime("%Y/%m/%d")
+    batch.extend(response['esearchresult']['idlist'])
+    
+    # Stop condition for recursive calls
+    if mindate == maxdate:
+      return batch
+    else:
+      return find_articles(keyword, mindate, maxdate, batch=batch, cnt=0, recurse=True, finished=True)
 
 
 
@@ -844,7 +869,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
     "abstractText":abstractDataRel['abstractText'] if 'abstractText' in abstractDataRel else '',
     "affiliation":abstractDataRel['affiliation'] if 'affiliation' in abstractDataRel else '',
     "firstPublicationDate":abstractDataRel['firstPublicationDate'] if 'firstPublicationDate' in abstractDataRel else '',
-    "year":datetime.strptime(abstractDataRel['firstPublicationDate'], '%Y-%m-%d').year if 'firstPublicationDate' in abstractDataRel else '',
+    "year":str(datetime.strptime(abstractDataRel['firstPublicationDate'], '%Y-%m-%d').year) if 'firstPublicationDate' in abstractDataRel else '',
     "isOpenAccess": True if 'isOpenAccess' in abstractDataRel else False,
     "inEPMC": True if 'inEPMC' in abstractDataRel else False,
     "inPMC":True if 'inPMC' in abstractDataRel else False,
@@ -898,8 +923,7 @@ def create_authors(tx, abstractDataRel, article_node, omim=False):
   else:
     for author in abstractDataRel['authorList']['author']:
 
-      affiliation_data = author['authorAffiliationDetailsList']['authorAffiliation']
-      affiliation = [aff['affiliation'] for aff in affiliation_data]
+      
 
       affiliation = None
       auth_val = None
@@ -1566,7 +1590,7 @@ def save_articles(disease_node, pubmed_ids, search_source, session, maxdate):
             # Makes a connection to the GARD disease if the article already exists in the database
             if (record):
               session.run("MATCH (a:Article{pubmed_id:$pmid}) MATCH (g:GARD) WHERE ID(g) = $gard MERGE (g)-[:MENTIONED_IN]->(a)", args = {'pmid':pubmedID, 'gard':disease_node})
-              print('o', end="", flush=True)
+              print(f'o', end="", flush=True)
             else:
               try:
                 # Call the function to create/update nodes and relationships for the article
@@ -1605,7 +1629,7 @@ def filter_existing(db, gard_id, pmids):
   """
 
   # Check if there are any articles in the Neo4j database
-  check_query = f'MATCH (x:GARD)--(y:Article) WITH count(y) AS cnt RETURN cnt'
+  check_query = f'MATCH (x:GARD)--(y:Article) WHERE x.GardId = \"{gard_id}\" WITH count(y) AS cnt RETURN cnt'
   original_article_count = db.run(check_query).data()[0]['cnt']
 
   # If there are no existing articles, return the original list of PubMed IDs
@@ -1662,7 +1686,7 @@ def filter_synonyms(syns):
 
 
 
-def save_disease_articles(db, mindate, maxdate):
+def save_disease_articles(db, mindate, maxdate, today):
       """
       --The main function of the PubMed database pipeline--
 
@@ -1700,9 +1724,27 @@ def save_disease_articles(db, mindate, maxdate):
       results = get_gard_list()
       search_source = 'Pubmed'
       date_db_now = datetime.strptime(maxdate,"%Y/%m/%d").strftime("%m/%d/%y")
+
+      in_progress = db.getConf('UPDATE_PROGRESS', 'pubmed_in_progress')
+      if in_progress == 'True':
+        current_step = db.getConf('UPDATE_PROGRESS', 'pubmed_disease_article_progress')
+        print(current_step, type(current_step))
+        if not current_step == '':
+            current_step = int(current_step)
+        else:
+            current_step = 0
+      else:
+        current_step = 0
       
       # Iterate over GARD diseases
       for idx, gard_id in enumerate(results):
+        print('-------------------------------------------------------\n')
+        #if not gard_id == 'GARD:0002491':
+        #  continue
+        if idx < current_step:
+          continue
+        db.setConf('UPDATE_PROGRESS', 'pubmed_disease_article_progress', str(idx))
+
         # Step 2: Check the count of articles related to the current disease in the database
         check_query = f'MATCH (x:GARD)--(y:Article) WHERE x.GardId = \"{gard_id}\" WITH count(y) AS cnt RETURN cnt'
         db_article_count = int(db.run(check_query).data()[0]['cnt'])
@@ -1718,31 +1760,24 @@ def save_disease_articles(db, mindate, maxdate):
         searchterms.extend([rd['name']])
        
         for searchterm in searchterms:
+          #pubmedIDs = None
           try:
             pubmedIDs = find_articles(searchterm,mindate,maxdate)
+            article_count = len(pubmedIDs)
           except Exception as e:
+            print(pubmedIDs)
             logging.error(f'Exception when finding articles: {e}')
             continue
 
-          # Step 4: Check the count of articles retrieved from PubMed
-          try:
-            no = pubmedIDs['esearchresult']['count']
-          except:
-            no = 0
-          print(idx, gard_id, "Articles:", no, rd["name"]+'['+searchterm+']')
+          print(idx, gard_id, "Articles:", article_count, rd["name"]+'['+searchterm+']')
           disease_node = create_disease(db, gard_id, rd)
-        
-          
-          if not 'esearchresult' in pubmedIDs:
-            print('no esearchresult in pubmedIDs')
-            continue
 
           # Step 5: Filter existing articles in the database
           try:
-            pubmed_ids = filter_existing(db, gard_id, pubmedIDs['esearchresult']['idlist'])
+            pubmed_ids = filter_existing(db, gard_id, pubmedIDs)
             if pubmed_ids:
               print('ARTICLES TO BE ADDED IN UPDATE: ', len(pubmed_ids))
-              save_articles(disease_node, pubmed_ids, search_source, db, maxdate)
+              save_articles(disease_node, pubmed_ids, search_source, db, today)
               
               # Labels the article node with the term (name or synonym) of the selected GARD disease that was used to query the PubMed API for that article
               for article in pubmed_ids:
@@ -1937,7 +1972,7 @@ def label_genereview(db):
 
 
 
-def retrieve_articles(db, last_update, today):
+def retrieve_articles(db, last_update, updating_to, today):
   """
     Gets articles from multiple different sources (PubMed, NCATS databases, OMIM) within a 50-year rolling window or since
     the last script execution.
@@ -1974,7 +2009,7 @@ def retrieve_articles(db, last_update, today):
     db.setConf('UPDATE_PROGRESS', 'pubmed_in_progress', 'True')
     db.setConf('UPDATE_PROGRESS', 'pubmed_current_step', 'save_articles')
 
-    save_disease_articles(db, last_update, today) #TEST, remove comment keep code
+    save_disease_articles(db, last_update, updating_to, today) #TEST, remove comment keep code
     db.setConf('UPDATE_PROGRESS', 'pubmed_current_step', 'save_omim')
   else:
     print('Update in progress... bypassing save_articles')
@@ -2072,8 +2107,8 @@ def update_missing_abstracts(db, today):
 
   # Set the maximum search date as one year before the current date
   maxsearchdate = datetime.strptime(today,"%Y/%m/%d") - relativedelta(years=1)
-  today = today.strftime("%m/%d/%y")
-  
+  today = datetime.strptime(today,"%Y/%m/%d")
+
   # Query the Neo4j database to retrieve articles with missing abstracts
   query = 'MATCH (x:Article) WHERE x.abstractText = \"\" RETURN x.pubmed_id, x.firstPublicationDate, x.title, ID(x)'
   response = db.run(query).data()
@@ -2101,7 +2136,9 @@ def update_missing_abstracts(db, today):
 
         # Update Neo4j database with the new abstract
         new_abstract = article['abstractText'].replace("\"","")
-        query = f"MATCH (x:Article) WHERE ID(x) = {article_node} SET x.abstractText = \"{new_abstract}\" SET x.LastUpdatedRDAS = \"{today}\" RETURN true"
+
+        today_str = today.strftime("%m/%d/%y")
+        query = f"MATCH (x:Article) WHERE ID(x) = {article_node} SET x.abstractText = \"{new_abstract}\" SET x.LastUpdatedRDAS = \"{today_str}\" RETURN true"
         db.run(query)
 
         # Create epidemiology annotation for the new abstract

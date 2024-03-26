@@ -9,7 +9,7 @@ import pubmed.init
 from time import sleep
 from gard.methods import get_node_counts
 
-def main (update_from):
+def main (update_from=False, update_to=False):
     """
     Main function that initializes or updates a process related to PubMed data.
     Calls pubmed.init.py because the process to update is similar to creating from scratch.
@@ -22,7 +22,7 @@ def main (update_from):
     None
     """
 
-    pubmed.init.main(update_from=update_from)
+    pubmed.init.main(update_from=update_from, update_to=update_to)
 
-#main(update_from=False) #TEST
-#get_node_counts() #TEST
+main() #TEST
+get_node_counts()

@@ -78,13 +78,14 @@ while True:
         if v == True:
             full_db_name = sysvars.db_abbrevs[k]
             print(f'{full_db_name} Update Initiated')
-            '''
+            
             p = Popen(['python3', 'driver_manual.py', '-db', f'{k}', '-m', 'update'], encoding='utf8')
             p.wait()
             
             # Update the node counts on the GARD Neo4j database (numbers used to display on the UI)
             print('Updating Node Counts on GARD db')
             get_node_counts()
+            
             '''
             target_address = sysvars.rdas_urls['dev']
             db.run(f'STOP DATABASE gard')
@@ -98,7 +99,6 @@ while True:
             db.run(f'START DATABASE {full_db_name}')
 
             # Creates a backup file for the current state of the GARD database, puts that file in the transfer directory
-            '''
             print('Dumping GARD db')
             p = Popen(['python3', 'generate_dump.py', '-dir', 'gard', '-t'], encoding='utf8')
             p.wait()

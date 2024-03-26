@@ -90,3 +90,6 @@ clinical/src/ids_to_update_confirmed.csv
 GARD_disease_classification.csv
 gather_grant_funding_remove.py
 grant_funding_rdas.csv
+fixyear.py
+fixpubmedapi.py
+config.ini
