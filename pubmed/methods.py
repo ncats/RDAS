@@ -1743,7 +1743,6 @@ def save_disease_articles(db, mindate, maxdate, today):
         #  continue
         if idx < current_step:
           continue
-        db.setConf('UPDATE_PROGRESS', 'pubmed_disease_article_progress', str(idx))
 
         # Step 2: Check the count of articles related to the current disease in the database
         check_query = f'MATCH (x:GARD)--(y:Article) WHERE x.GardId = \"{gard_id}\" WITH count(y) AS cnt RETURN cnt'
@@ -1790,8 +1789,9 @@ def save_disease_articles(db, mindate, maxdate, today):
             logging.error(f'Exception when finding articles for disease {gard_id}, error1: {e}')
             continue
 
+        db.setConf('UPDATE_PROGRESS', 'pubmed_disease_article_progress', str(idx))
 
-          """
+        """
           # REPEAT WORK??
           # Step 6: Fetch abstracts for the articles and update the database
           try:
@@ -1822,7 +1822,7 @@ def save_disease_articles(db, mindate, maxdate, today):
           except Exception as e:
             logging.error(f'Exception when finding articles for disease {gard_id}, error2: {e}')
             continue
-          """
+        """
 
 
 
