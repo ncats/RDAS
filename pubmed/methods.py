@@ -339,10 +339,17 @@ def save_omim_articles(db, today):
   search_source = 'OMIM'
 
   # Iterate over GARD diseases
+  current_step = db.getConf('UPDATE_PROGRESS', 'pubmed_omim_article_progress')
+  print(current_step, type(current_step))
+  if not current_step == '':
+    current_step = int(current_step)
+  else:
+    current_step = 0
   for idx, gard_id in enumerate(results):
-    print(idx)
+    if idx < current_step:
+      continue
 
-    print('UPDATING OMIM: ' + gard_id)
+    print(idx, 'UPDATING OMIM: ' + gard_id)
     try:
       omim_ids = results[gard_id]["OMIM"]
     except Exception as e:
@@ -406,8 +413,11 @@ def save_omim_articles(db, today):
         last_entity = None
         for omim_data_index in omim_data['non-pubmed']:
           article_id = create_omim_article_no_pubmed(db, omim_data_index, gard_id, search_source, today)
-          create_authors(db, omim_data_index['authors'], article_id, omim=True)
-          save_omim_article_relation(article_id, prefTitle, omim, None, db, today)
+          if article_id:
+            create_authors(db, omim_data_index['authors'], article_id, omim=True)
+            save_omim_article_relation(article_id, prefTitle, omim, None, db, today)
+
+    db.setConf('UPDATE_PROGRESS', 'pubmed_omim_article_progress', str(idx))
 
            
 
@@ -908,12 +918,12 @@ def create_authors(tx, abstractDataRel, article_node, omim=False):
     >> create_authors(session.write_transaction, abstract_data, article_id)
   """
 
-  create_author_query = '''
-  MATCH (a:Article) WHERE id(a) = $article_id
-  MERGE (p:Author {fullName:$fullName, firstName:$firstName, lastName:$lastName, affiliation:$affiliation})
-  MERGE (p) - [r:WROTE] -> (a)
-  '''
   if omim:
+    create_author_query = '''
+      MATCH (a:Article) WHERE id(a) = $article_id
+      MERGE (p:Author {fullName:$fullName, firstName:$firstName, lastName:$lastName})
+      MERGE (p) - [r:WROTE] -> (a)
+      '''
     tx.run(create_author_query, args={
       "article_id":article_node,
       "fullName": abstractDataRel['fullName'] if 'fullName' in abstractDataRel else '',
@@ -921,13 +931,15 @@ def create_authors(tx, abstractDataRel, article_node, omim=False):
       "lastName": abstractDataRel['lastName'] if 'lastName' in abstractDataRel else ''
     })
   else:
+    create_author_query = '''
+      MATCH (a:Article) WHERE id(a) = $article_id
+      MERGE (p:Author {fullName:$fullName, firstName:$firstName, lastName:$lastName, affiliation:$affiliation, orc_id:$orc_id})
+      MERGE (p) - [r:WROTE] -> (a)
+      '''
+    
     for author in abstractDataRel['authorList']['author']:
-
-      
-
       affiliation = None
       auth_val = None
-      args = None
       if 'collectiveName' in author:
           continue
 
@@ -2015,6 +2027,7 @@ def retrieve_articles(db, last_update, updating_to, today):
     print('Update in progress... bypassing save_articles')
 
   # Save OMIM articles and update the database
+  current_step = db.getConf('UPDATE_PROGRESS', 'pubmed_current_step')
   if current_step == 'save_omim': 
     print('Populating OMIM Articles and Information')
     save_omim_articles(db, today) #TEST, remove comment keep code
@@ -2023,6 +2036,7 @@ def retrieve_articles(db, last_update, updating_to, today):
     print('Update in progress... bypassing save_omim')
   
   # Gather epidemiology annotations for articles with non-empty titles and abstracts
+  current_step = db.getConf('UPDATE_PROGRESS', 'pubmed_current_step')
   if current_step == 'save_epi':
     print('Populating Epidemiology Information')
     gather_epi(db, today) #TEST, remove comment keep code
@@ -2031,6 +2045,7 @@ def retrieve_articles(db, last_update, updating_to, today):
     print('Update in progress... bypassing save_epi')
 
   # Gather Pubtator annotations for articles that do not have associated annotations
+  current_step = db.getConf('UPDATE_PROGRESS', 'pubmed_current_step')
   if current_step == 'save_pubtator': 
     print('Populating Pubtator Information')
     gather_pubtator(db, today)
@@ -2039,6 +2054,7 @@ def retrieve_articles(db, last_update, updating_to, today):
     print('Update in progress... bypassing save_pubtator')
 
   # Label genereview articles
+  current_step = db.getConf('UPDATE_PROGRESS', 'pubmed_current_step')
   if current_step == 'save_gene':
     print('Labeling GeneReview Articles')
     label_genereview(db)
