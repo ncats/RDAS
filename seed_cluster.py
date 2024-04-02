@@ -24,21 +24,30 @@ def migrate(dump_folder, dump_name):
 def seed(dump_name, dump_folder, server):
     ac = AlertCypher('system')
 
-    #try:
-    res = ac.run(f'DROP DATABASE {dump_name}')
-    #except Exception:
-    #print(f'{dump_name} already dropped... loading instead')
+    try:
+        res = ac.run(f'DROP DATABASE {dump_name}')
+        print('Dropped database...')
+    except Exception as e:
+        print('Did not drop database...')
+        print(e)
 
-    p = Popen(['sudo', 'neo4j-admin', 'database', 'load', f'{dump_name}', f'--from-path={dump_folder}', '--overwrite-destination'], encoding='utf8')
+    p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'load', f'{dump_name}', f'--from-path={dump_folder}', '--overwrite-destination'], encoding='utf8')
     p.wait()
+    
     
     server_id = ac.run(f"SHOW servers YIELD * WHERE name = \'{server}01\' RETURN serverId").data()[0]['serverId']
     print(f'SERVER ID LOCATED:: {server_id}')
+    
+
 
     seed_query = f'CREATE DATABASE {dump_name} OPTIONS {{existingData: \'use\', existingDataSeedInstance: \'{server_id}\'}}'
     print(seed_query)
-    res = ac.run(seed_query)
-    p = Popen(['sudo', 'neo4j', 'restart'], encoding='utf-8')
+    try:
+        res = ac.run(seed_query)
+    except Exception as e:
+        print(e)
+
+    p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'restart'], encoding='utf-8')
     p.wait()
     
 dump_path = sysvars.migrated_path

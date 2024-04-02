@@ -9,8 +9,7 @@ base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=cu
 
 # RDAS Team contacts for emails
 contacts = [
-    "leadmandj@nih.gov",
-    "qian.zhu@nih.gov"
+    "leadmandj@nih.gov"
 ]
 
 # Folder paths
