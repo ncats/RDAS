@@ -24,20 +24,20 @@ firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz
 db_prefix=""
 
 # Conversions
-dump_dirs = ['clinical','pubmed','grant','gard']
-db_abbrevs = {'ct':'clinical', 'pm':'pubmed', 'gnt':'grant'}
+dump_dirs = ['RDAS.CTKG','RDAS.PAKG','RDAS.GFKG','RDAS.GARD']
+db_abbrevs = {'ct':'RDAS.CTKG', 'pm':'RDAS.PAKG', 'gnt':'RDAS.GFKG'}
 
 # Paths to database creation and update source files
-ct_files_path = '{base_path}clinical/src/'.format(base_path=base_path)
-pm_files_path = '{base_path}pubmed/src/'.format(base_path=base_path)
-gnt_files_path = '{base_path}grant/src/'.format(base_path=base_path)
-gard_files_path = '{base_path}gard/src/'.format(base_path=base_path)
+ct_files_path = '{base_path}RDAS.CTKG/src/'.format(base_path=base_path)
+pm_files_path = '{base_path}RDAS.PAKG/src/'.format(base_path=base_path)
+gnt_files_path = '{base_path}RDAS.GFKG/src/'.format(base_path=base_path)
+gard_files_path = '{base_path}RDAS.GARD/src/'.format(base_path=base_path)
 
 # Database names being used on the current server
-ct_db = 'test.clinical'
-pm_db = 'test.pubmed'
-gnt_db = 'test.grant'
-gard_db = 'test.gard'
+ct_db = 'test.RDAS.CTKG'
+pm_db = 'test.RDAS.PAKG'
+gnt_db = 'test.RDAS.GFKG'
+gard_db = 'test.RDAS.GARD'
 
 # Server URLS and addresses # Original epiapi_url is https://rdas.ncats.nih.gov/api/epi/
 epiapi_url = "https://rdas.ncats.nih.gov/api/epi/"

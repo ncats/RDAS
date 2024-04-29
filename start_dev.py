@@ -86,7 +86,6 @@ while True:
             print('Updating Node Counts on GARD db')
             get_node_counts()
             
-            '''
             target_address = sysvars.rdas_urls['dev']
             db.run(f'STOP DATABASE gard')
             p = Popen(['ssh', '-i', f'~/.ssh/id_rsa', f'{sysvars.current_user}@{target_address}', 'python3', '~/RDAS/remote_dump_and_transfer.py' ' -dir', 'gard'], encoding='utf8')
@@ -116,7 +115,7 @@ while True:
             print(f'Transfering {full_db_name} dump to TEST server')
             p = Popen(['sudo', 'python3', 'file_transfer.py', f'-dir {full_db_name}', '-s test'], encoding='utf8')
             p.wait()
-            '''
+            
             print(f'Update of {full_db_name} Database Complete...')
             
     sleep(3600)

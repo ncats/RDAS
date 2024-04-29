@@ -21,13 +21,13 @@ while True:
         
             if update == 'True':
                 print(f'Database dump approved for {db_name}')
+                db.run('MATCH (x:UserTesting) DETACH DELETE x')
+
                 p = Popen(['sudo', 'cp', f'{sysvars.transfer_path}{db_name}.dump', f'{sysvars.approved_path}{db_name}.dump'], encoding='utf8')
                 p.wait()
 
                 p = Popen(['sudo', 'chmod', '777', f'{sysvars.approved_path}{db_name}.dump'], encoding='utf8')
                 p.wait()
-
-                db.run('MATCH (x:UserTesting) SET x.Approved = \"False\"')
 
         except Exception:
             print(f'{db_name} read error')
