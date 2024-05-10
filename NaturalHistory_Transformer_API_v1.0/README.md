@@ -52,10 +52,10 @@ curl -X POST http://localhost:5000/predict -H "Content-Type: application/json" -
 
 **GET Request:**
 Open a browser and go to:
-http://localhost:5000/predict?texts=sample text
+http://localhost:5000/predict?texts=sample_text
 
 For multiple texts:
-http://localhost:5000/predict?texts=sample text1&texts=sample text2
+http://localhost:5000/predict?texts=sample_text1&texts=sample_text2
 
 **Accessing the Home Page**
 Navigate to http://localhost:5000/index in your web browser to see a welcome message.
