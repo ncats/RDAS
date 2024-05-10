@@ -46,10 +46,16 @@ docker-compose up
 Use a tool like Postman or curl to send a POST request:
 curl -X POST http://localhost:5000/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text\"]}"
 
+For multiple texts:
+curl -X POST http://localhost:5000/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text1\", \"sample text2\"]}"
+
 
 **GET Request:**
 Open a browser and go to:
 http://localhost:5000/predict?texts=sample text
+
+For multiple texts:
+http://localhost:5000/predict?texts=sample text1&texts=sample text2
 
 **Accessing the Home Page**
 Navigate to http://localhost:5000/index in your web browser to see a welcome message.
