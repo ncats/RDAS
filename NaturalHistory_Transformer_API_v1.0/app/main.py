@@ -89,7 +89,8 @@ def predict():
     except Exception as e:
         app.logger.error('Failed to predict', exc_info=True)
         app.logger.error(traceback.format_exc())  # Log the full traceback
-        return jsonify({'error': str(e)}), 500
+        # return jsonify({'error': str(e)}), 500
+        return jsonify({'error': "Unable to process due to error"}), 500
 
 
 
@@ -102,7 +103,8 @@ def home():
     except Exception as e:
         app.logger.error('Failed to visit homepage', exc_info=True)
         app.logger.error(traceback.format_exc())  # Log the full traceback
-        return jsonify({'error': str(e)}), 500
+        # return jsonify({'error': str(e)}), 500
+        return jsonify({'error': "Unable to process due to error"}), 500
 
 if __name__ == '__main__':
     host = os.getenv('HOST')
