@@ -19,8 +19,8 @@ This Flask application provides a simple prediction API that utilizes a machine 
 ### Local Setup
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/flask-prediction-api.git
-   cd flask-prediction-api
+   git clone https://github.com/..../NaturalHistory_Transformer_API_v1.0.git
+   cd NaturalHistory_Transformer_API_v1.0
 
 2. **Install dependencies:**
    pip install -r requirements.txt
