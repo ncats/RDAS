@@ -19,8 +19,8 @@ This Flask application provides a simple prediction API that utilizes a machine 
 ### Local Setup
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/flask-prediction-api.git
-   cd flask-prediction-api
+   git clone https://github.com/..../NaturalHistory_Transformer_API_v1.0.git
+   cd NaturalHistory_Transformer_API_v1.0
 
 2. **Install dependencies:**
    pip install -r requirements.txt
@@ -46,10 +46,16 @@ docker-compose up
 Use a tool like Postman or curl to send a POST request:
 curl -X POST http://localhost:5000/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text\"]}"
 
+For multiple texts:
+curl -X POST http://localhost:5000/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text1\", \"sample text2\"]}"
+
 
 **GET Request:**
 Open a browser and go to:
-http://localhost:5000/predict?texts=sample text
+http://localhost:5000/predict?texts=sample_text
+
+For multiple texts:
+http://localhost:5000/predict?texts=sample_text1&texts=sample_text2
 
 **Accessing the Home Page**
 Navigate to http://localhost:5000/index in your web browser to see a welcome message.
