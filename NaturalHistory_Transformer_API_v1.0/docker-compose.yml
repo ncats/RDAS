@@ -6,3 +6,7 @@ services:
       - "5000:5000"
     env_file:
       - .env
+    volumes:
+      - type: bind
+        source: ./app/saved_model
+        target: /app/saved_model
