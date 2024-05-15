@@ -49,6 +49,15 @@ curl -X POST http://localhost:5000/predict -H "Content-Type: application/json" -
 For multiple texts:
 curl -X POST http://localhost:5000/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text1\", \"sample text2\"]}"
 
+Python Script:
+
+new_abstracts = ["text1", "text2",....]
+data = {
+    "texts": new_abstracts
+}
+response = requests.post(url, json=data)
+
+
 
 **GET Request:**
 Open a browser and go to:
