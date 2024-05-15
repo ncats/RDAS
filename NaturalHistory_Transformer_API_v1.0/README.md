@@ -50,7 +50,7 @@ For multiple texts:
 curl -X POST http://localhost:5000/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text1\", \"sample text2\"]}"
 
 Python Script:
-
+```bash
 new_abstracts = ["text1", "text2",....]
 data = {
     "texts": new_abstracts
