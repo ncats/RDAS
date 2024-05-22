@@ -1,14 +1,10 @@
-
 from flask_restx import Api, Resource, fields
-
 from flask import Flask, request, jsonify
 import os
-
 import torch
 import logging
 from logging.handlers import RotatingFileHandler
 import sys
-
 from flask import render_template
 import traceback
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -28,31 +24,50 @@ app.logger.setLevel(logging.INFO)
 app.logger.info('Application startup')
 
 # Create API with Flask-Restx, specify custom endpoint for Swagger UI
+descriptions="""
+
+This API utilizes a transformer-based machine learning model to predict the relevance of articles for Natural History Studies. It is specifically designed to handle batches of article abstracts and assess their relevance to the study of rare diseases.
+
+Input:
+
+The API requires a JSON object with a key named "texts" that contains a list of article abstracts as strings. Each string should represent the abstract of a research article. The API evaluates each abstract individually to generate predictions.
+
+Output:
+
+The response is a JSON object with a key "predictions" that contains an array of integers. Each integer represents a category or outcome for each abstract provided in the input. Predictions are returned in the same order as the input texts.
+
+A prediction of '0' indicates that the article is either not primarily experimental or not focused on the natural history of a disease.
+A prediction of '1' indicates that the article's primary contribution is relevant to the study of the natural history of a rare disease.
+
+Error Handling:
+
+If the "texts" list is empty, improperly formatted, or not provided, the API will return a 400 Bad Request error, detailing the nature of the input error with an appropriate message.
+The API accepts empty strings within the list and provides a prediction result for each, including empty strings.
+
+For more information, please visit our Github repository at: https://github.com/ncats/RDAS/tree/minghui_development/NaturalHistory_Transformer_API_v1.0.
+"""
+
 api = Api(app, version='1.0', title='Natural History Study Article Prediction API',
-          description='This API leverages a transformer-based machine learning model for Natural History Study article prediction.', doc='/article_prediction_api')
+          description=descriptions, doc='/article_prediction_api')
 
 # Define namespace
 ns = api.namespace('article_prediction_api/v1', description='Prediction operations')
 
 # Model definition for input texts
-sample_text="""Historically, surgical correction has been the treatment of choice for benign biliary strictures (BBS). 
-Self-expandable metallic stents (MSs) have been useful for inoperable malignant biliary strictures; however, 
-their use for BBS is controversial and their natural history unknown. To test our hypothesis that MSs provide 
-only short-term benefit, we examined the long-term outcome of MSs for the treatment of BBS. Our goal was to 
-develop a rational approach for treating BBS. Between July 1990 and December 1995, 15 patients had MSs placed for 
-BBS and have been followed up for a mean of 86.3 months (range, 55-120 months). The mean age of the patients was 66.6 years 
-and 12 were women. Stents were placed for surgical injury in 5 patients and underlying disease in 10 patients (lithiasis, 7; 
-pancreatitis, 2; and primary sclerosing cholangitis, 1). One or more MSs (Gianturco-Rosch "Z" for 4 patients and Wallstents 
-for 11 patients) were placed by percutaneous, endoscopic, or combined approaches. We considered patients to have a good clinical 
-outcome if the stent remained patent, they required 2 or fewer invasive interventions, and they had no biliary dilation on subsequent 
-imaging. Metallic stents were successfully placed in all 15 patients, and the mean patency rate was 30.6 months (range, 7-120 months). 
-Five patients (33%) had a good clinical result with stent patency from 55 to 120 months. Ten patients (67%) required more than 2 radiologic 
-and/or endoscopic procedures for recurrent cholangitis and/or obstruction (range, 7-120 months). Five of the 10 patients developed complete 
-stent obstruction at 8, 9, 10, 15, and 120 months and underwent surgical removal of the stent and bilioenteric anastomosis. Four of these 
-5 patients had strictures from surgical injuries. The patient who had surgical removal 10 years after MS placement developed cholangiocarcinoma. 
-Surgical repair remains the treatment of choice for BBS. Metallic stents should only be considered for poor surgical candidates, intrahepatic 
-biliary strictures, or failed attempts at surgical repair. Most patients with MSs will develop recurrent cholangitis or stent obstruction and 
-require intervention. Chronic inflammation and obstruction may predispose the patient to cholangiocarcinoma."""
+sample_text="""The natural history, prognostication and optimal treatment of Richter transformation developed from chronic 
+lymphocytic leukemia (CLL) are not well defined. We report the clinical characteristics and outcomes of a large series of 
+biopsy-confirmed Richter transformation (diffuse large B-cell lymphoma or high grade B-cell lymphoma, n=204) cases diagnosed 
+from 1993 to 2018. After a median follow up of 67.0 months, the median overall survival (OS) was 12.0 months. Patients who 
+received no prior treatment for CLL had significantly better OS (median 46.3 vs. 7.8 months; P<0.001). Patients with elevated 
+lactate dehydrogenase (median 6.2 vs. 39.9 months; P<0.0001) or TP53 disruption (median 8.3 vs. 12.8 months; P=0.046) had worse
+ OS than those without. Immunoglobulin heavy chain variable region gene mutation, cell of origin, Myc/Bcl-2 double expression and
+  MYC/BCL2/BCL6 double-/triple-hit status were not associated with OS. In multivariable Cox regression, elevated lactate dehydrogenase
+   [Hazard ratio (HR) 2.3, 95% Confidence Interval (CI): 1.3-4.1; P=0.01], prior CLL treatment (HR 2.0, 95%CI: 1.2-3.5; P=0.01), 
+   and older age (HR 1.03, 95%CI: 1.01-1.05; P=0.01) were associated with worse OS. Twenty-four (12%) patients underwent stem cell 
+   transplant (20 autologous and 4 allogeneic), and had a median post-transplant survival of 55.4 months. In conclusion, the overall 
+   outcome of Richter transformation is poor. Richter transformation developed in patients with untreated CLL has significantly better 
+   survival. Stem cell transplant may benefit select patients.
+"""
 
 
 text_input = api.model('TextInput', {
@@ -75,8 +90,6 @@ class Predict(Resource):
             return {'error': 'Invalid input. "texts" must be a list.'}, 400
         # if not all(isinstance(text, str) and text.strip() for text in data['texts']):
         #     return {'error': 'Invalid input. All "texts" must be non-empty strings.'}, 400
-
-
         try:
             if not data['texts']:
                 return {'error': "Texts field cannot be empty."}, 400  # Right place to handle empty list
