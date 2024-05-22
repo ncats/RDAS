@@ -43,11 +43,21 @@ docker-compose up
 ### Making Predictions
 
 **POST Request:**
-Use a tool like Postman or curl to send a POST request:
+
+Use a tool like curl to send a POST request:
 curl -X POST http://localhost:5000/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text\"]}"
 
 For multiple texts:
 curl -X POST http://localhost:5000/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text1\", \"sample text2\"]}"
+
+Python Script:
+```bash
+new_abstracts = ["text1", "text2",....]
+data = {
+    "texts": new_abstracts
+}
+response = requests.post(url, json=data)
+```
 
 
 **GET Request:**
