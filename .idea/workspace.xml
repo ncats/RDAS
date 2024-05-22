@@ -5,6 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="20f689f7-6f56-4bfd-ac20-9636098390fe" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/RDAS.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/RDAS.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pubmed/epi4GARD" beforeDir="false" afterPath="$PROJECT_DIR$/pubmed/epi4GARD" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pubmed/epi4GARD/.gitignore" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/pubmed/epi4GARD/EpiClassifyRNN4GARD/Alert system proof of concept.ipynb" beforeDir="false" />
