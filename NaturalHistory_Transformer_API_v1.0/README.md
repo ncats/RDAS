@@ -41,6 +41,9 @@ docker-compose up
 
 ## Usage
 
+**Accessing the Home Page**
+Navigate to http://localhost:5000/article_prediction_api in your web browser for more information.
+
 ### Making Predictions
 
 **POST Request:**
@@ -60,8 +63,7 @@ data = {
 response = requests.post(url, json=data)
 ```
 
-**Accessing the Home Page**
-Navigate to http://localhost:5000/article_prediction_api in your web browser for more information.
+
 
 ## Contact
 For questions or support, please contact minghui.ao@nih.gov, qian.zhu@nih.gov
