@@ -4,7 +4,7 @@
 This Flask application provides a simple prediction API that utilizes a machine learning model to classify articles. It is designed to showcase how to set up a basic API for text classification tasks using Flask and the Transformers library.
 
 ## Features
-- **Predict Endpoint**: Accepts both GET and POST requests for flexibility in testing and integration.
+- **Predict Endpoint**: Accepts POST requests.
 - **Logging**: Includes basic logging setup to track operations and errors.
 - **Docker Integration**: Comes Docker-ready with a Dockerfile and docker-compose.yml for easy deployment and scaling.
 
@@ -13,6 +13,7 @@ This Flask application provides a simple prediction API that utilizes a machine 
 - Flask
 - Transformers
 - PyTorch
+- see requirements.txt for more information
 
 ## Setup Instructions
 
@@ -40,15 +41,18 @@ docker-compose up
 
 ## Usage
 
+**Accessing the Home Page**
+Navigate to http://localhost:5000/article_prediction_api in your web browser for more information.
+
 ### Making Predictions
 
 **POST Request:**
 
 Use a tool like curl to send a POST request:
-curl -X POST http://localhost:5000/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text\"]}"
+curl -X POST http://localhost:5000/article_prediction_api/v1/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text\"]}"
 
 For multiple texts:
-curl -X POST http://localhost:5000/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text1\", \"sample text2\"]}"
+curl -X POST http://localhost:5000/article_prediction_api/v1/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text1\", \"sample text2\"]}"
 
 Python Script:
 ```bash
@@ -60,15 +64,6 @@ response = requests.post(url, json=data)
 ```
 
 
-**GET Request:**
-Open a browser and go to:
-http://localhost:5000/predict?texts=sample_text
-
-For multiple texts:
-http://localhost:5000/predict?texts=sample_text1&texts=sample_text2
-
-**Accessing the Home Page**
-Navigate to http://localhost:5000/index in your web browser to see a welcome message.
 
 ## Contact
 For questions or support, please contact minghui.ao@nih.gov, qian.zhu@nih.gov
