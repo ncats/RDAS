@@ -1,0 +1,84 @@
+<!-- email_template.html -->
+<html>
+<head>
+    <style>
+        body { background-color: white; font-family: Arial, sans-serif; }
+        /* Add more styling as needed */
+    </style>
+</head>
+<!-- <body style="text-align: center;">
+    <h1 style="font-size:50px; color:purple;">Rare Disease Alert System</h1>
+    <h2>{{ data['name'] }}</h2>
+    <h3>You have {{ data['total'] }} new entries for your subscribed rare diseases in the database</h3>
+    <table border="1" style="margin: auto;">
+        <tr>
+            <th>Name</th>
+            <th>GARD ID</th>
+            <th>New Articles Number</th>
+            <th>New Clinical Trials Number</th>
+            <th>New Funding Project Number</th>
+        </tr>
+        {% for gard_id, gard_name in data['subscriptions'].items() %}
+            {% set articles = data[gard_id].get('articles', 0) %}
+            {% set trials = data[gard_id].get('trials', 0) %}
+            {% set grants = data[gard_id].get('grants', 0) %}
+            {% if articles > 0 or trials > 0 or grants > 0 %}
+                <tr>
+                    <td><a href="https://rdas.ncats.nih.gov/disease?id={{ gard_id }}"> {{ gard_name }} </a></td>
+                    <td>{{ gard_id }}</td>
+                    <td>{{ articles }}</td>
+                    <td>{{ trials }}</td>
+                    <td>{{ grants }}</td>
+                </tr>
+            {% endif %}
+        {% endfor %}
+    </table>
+    <h4>Results gathered within the time period of {{ data['update_date_start'] }} - {{ data['update_date_end'] }}</h4>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6e/National_Center_for_Advancing_Translational_Sciences_logo.png" alt="Rare Disease Alert System" width="300">
+</body>
+</html> -->
+
+<body style="text-align: center;">
+    <h1 style="font-size:50px; color:purple;">Rare Disease Alert System</h1>
+    <!-- <h2>{{ data['name'] }}</h2> -->
+    <h3>You have {{ data['total'] }} new entries for your subscribed rare diseases in the database</h3>
+    <table border="1" style="margin: auto;">
+        <tr>
+            <th>Disease Name</th>
+            <th>GARD ID</th>
+            {% for dataset in data['datasets'] %}
+                {% if dataset == 'articles' %}
+                    <th>New Articles</th>
+                {% elif dataset == 'trials' %}
+                    <th>New Clinical Trials</th>
+                {% elif dataset == 'grants' %}
+                    <th>New Fundings</th>
+                {% endif %}
+            {% endfor %}
+        </tr>
+        {% for gard_id, gard_name in data['subscriptions'].items() %}
+            {% set articles = data[gard_id].get('articles', 0) %}
+            {% set trials = data[gard_id].get('trials', 0) %}
+            {% set grants = data[gard_id].get('grants', 0) %}
+            {% if articles > 0 or trials > 0 or grants > 0 %}
+                <tr>
+                    <td><a href="https://rdas.ncats.nih.gov/disease?id={{ gard_id }}"> {{ gard_name }} </a></td>
+                    <td>{{ gard_id }}</td>
+                    {% for dataset in data['datasets'] %}
+                        {% if dataset == 'articles' %}
+                            <td>{{ articles }}</td>
+                        {% elif dataset == 'trials' %}
+                            <td>{{ trials }}</td>
+                        {% elif dataset == 'grants' %}
+                            <td>{{ grants }}</td>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+            {% endif %}
+        {% endfor %}
+    </table>
+    <h4>Results gathered within the time period of {{ data['update_date_start'] }} - {{ data['update_date_end'] }}</h4>
+    
+    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6e/National_Center_for_Advancing_Translational_Sciences_logo.png" alt="Rare Disease Alert System" width="300">
+</body>
+</html>

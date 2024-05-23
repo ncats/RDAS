@@ -14,8 +14,8 @@ import argparse
 from datetime import date,datetime
 from AlertCypher import AlertCypher
 from gard.methods import get_node_counts
-sys.path.append('/home/aom2/RDAS')
-sys.path.append('/home/aom2/RDAS/emails')
+sys.path.append('/home/aom2/RDAS_master/RDAS')
+sys.path.append('/home/aom2/RDAS_master/RDAS/emails')
 import ses_firebase
 import firebase_admin
 from firebase_admin import auth
@@ -41,7 +41,8 @@ def check_update(db_type):
     # Get the current date and time
     today = datetime.now()
 
-    config_selection = {'ct':['clinical_update', 'ct_interval'], 'pm':['pubmed_update', 'pm_interval'], 'gnt':['grant_update', 'gnt_interval']}
+    # config_selection = {'ct':['clinical_update', 'ct_interval'], 'pm':['pubmed_update', 'pm_interval'], 'gnt':['grant_update', 'gnt_interval']}
+    config_selection = {'ct':['minghui.rdas.ctkg_update', 'ct_interval'], 'pm':['minghui.rdas.pakg_update', 'pm_interval'], 'gnt':['minghui.rdas.gfkg_update', 'gnt_interval']}
     selection = config_selection[db_type]
     print("selection::",selection)
 
@@ -80,46 +81,48 @@ while True:
         current_updates[db_abbrev] = check_update(db_abbrev)[0]
 
     print('Triggering Database Updates')
+    has_updates={}
     for k,v in current_updates.items():
         print("updates:::",k,v)
         if v == True:
             full_db_name = sysvars.db_abbrevs[k]
             print(f'{full_db_name} Update Initiated')
-           
-            p = Popen(['python3', 'driver_manual.py', '-db', f'{k}', '-m', 'update'], encoding='utf8')
-            p.wait()
+            has_updates[full_db_name]=True
+            # p = Popen(['python3', 'driver_manual.py', '-db', f'{k}', '-m', 'update'], encoding='utf8')
+            # p.wait()
             
-            # Update the node counts on the GARD Neo4j database (numbers used to display on the UI)
-            print('Updating Node Counts on GARD db')
-            get_node_counts()
+            # # Update the node counts on the GARD Neo4j database (numbers used to display on the UI)
+            # print('Updating Node Counts on GARD db')
+            # get_node_counts()
 
-            # Update last update date in the system database configuration
-            db = AlertCypher('system')
-            db.setConf('DATABASE', f'{full_db_name}_update', datetime.strftime(datetime.now(),"%m/%d/%y"))
+            # # Update last update date in the system database configuration
+            # db = AlertCypher('system')
+            # db.setConf('DATABASE', f'{full_db_name}_update', datetime.strftime(datetime.now(),"%m/%d/%y"))
 
-            # Creates a backup file for the current state of the GARD database, puts that file in the transfer directory
-            print('Dumping GARD db')
-            p = Popen(['python3', 'generate_dump.py', '-dir', 'gard', '-t'], encoding='utf8')
-            p.wait()
+            # # Creates a backup file for the current state of the GARD database, puts that file in the transfer directory
+            # print('Dumping GARD db')
+            # p = Popen(['python3', 'generate_dump.py', '-dir', 'gard', '-t'], encoding='utf8')
+            # p.wait()
 
-            # Creates a backup file for the current state of the database being updated in this iteration, puts that file in the transfer directory
-            print(f'Dumping {full_db_name} db')
-            p = Popen(['sudo', 'python3', 'generate_dump.py', f'-dir {full_db_name}', '-b', '-t', '-s dev'], encoding='utf8')
-            p.wait()
+            # # Creates a backup file for the current state of the database being updated in this iteration, puts that file in the transfer directory
+            # print(f'Dumping {full_db_name} db')
+            # p = Popen(['sudo', 'python3', 'generate_dump.py', f'-dir {full_db_name}', '-b', '-t', '-s dev'], encoding='utf8')
+            # p.wait()
 
-            print(f'Transfering GARD dump to TEST server')
-            p = Popen(['sudo', 'python3', 'file_transfer.py', f'-dir {full_db_name}', '-s test'], encoding='utf8')
-            p.wait()
+            # print(f'Transfering GARD dump to TEST server')
+            # p = Popen(['sudo', 'python3', 'file_transfer.py', f'-dir {full_db_name}', '-s test'], encoding='utf8')
+            # p.wait()
 
-            # Transfers the current databases of this iteration's backup file to the Testing Server's transfer folder
-            print(f'Transfering {full_db_name} dump to TEST server')
-            p = Popen(['sudo', 'python3', 'file_transfer.py', f'-dir {full_db_name}', '-s test'], encoding='utf8')
-            p.wait()
+            # # Transfers the current databases of this iteration's backup file to the Testing Server's transfer folder
+            # print(f'Transfering {full_db_name} dump to TEST server')
+            # p = Popen(['sudo', 'python3', 'file_transfer.py', f'-dir {full_db_name}', '-s test'], encoding='utf8')
+            # p.wait()
 
             print(f'Update of {full_db_name} Database Complete...')
-
-            ses_firebase.trigger_email(firestore_db,sysvars.ct_db, date_start='12/07/22') 
-
+    if True in has_updates.values():
+        ses_firebase.trigger_email(firestore_db,has_updates, date_start='03/23/22',date_end='03/30/24') 
+    
+    print('database update and email sending has finished')
             
     sleep(3600)
 
