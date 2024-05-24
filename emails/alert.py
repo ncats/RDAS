@@ -1,7 +1,7 @@
 import boto3
 import sys
-sys.path.append('/home/aom2/RDAS')
-sys.path.append('/home/aom2/RDAS/emails')
+sys.path.append('/home/aom2/RDAS_master/RDAS')
+sys.path.append('/home/aom2/RDAS_master/RDAS/emails')
 from botocore.exceptions import ClientError
 
 sender_email = 'ncatsrdas@mail.nih.gov'

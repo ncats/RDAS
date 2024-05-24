@@ -5,8 +5,9 @@ current_version = 2.5
 # Basic user information
 current_user = 'aom2'
 base_directory_name = 'RDAS'
-base_path = '/home/{current_user}/RDAS_master/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
+# base_path = '/home/{current_user}/RDAS_master/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 
+base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 # Folder paths
 backup_path = '{base_path}backup/'.format(base_path=base_path)
 transfer_path = '{base_path}transfer/'.format(base_path=base_path)
@@ -15,13 +16,17 @@ approved_path = '{base_path}approved/'.format(base_path=base_path)
 images_path = '{base_path}img/'.format(base_path=base_path)
 firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz-a4e783d24c.json'.format(base_path=base_path) # May have to set this in new enviroment
 
-# if you are not using minghui's test dataset, make db_prefix=""
-db_prefix="minghui.rdas."
+# if you are not using minghui's test dataset, make db_prefix=""; now you only need to change the neo4j database names here:
+db_prefix=""
+ct_db_name="test.rdas.ctkg" 
+gf_db_name='rdas.gfkg'
+pa_db_name="rdas.pakg"
+
 
 # Conversions
 dump_dirs = ['clinical','pubmed','grant','gard']
-db_abbrevs = {'ct':db_prefix+'ctkg', 'pm':db_prefix+'pakg', 'gnt':db_prefix+'gfkg'}
-db_abbrevs2 = {db_prefix+'ctkg':'ct', db_prefix+'pakg':'pm', db_prefix+'gfkg':'gnt'}
+db_abbrevs = {'ct':db_prefix+ct_db_name, 'pm':db_prefix+pa_db_name, 'gnt':db_prefix+gf_db_name}
+db_abbrevs2 = {db_prefix+ct_db_name:'ct', db_prefix+pa_db_name:'pm', db_prefix+gf_db_name:'gnt'}
 
 # Paths to database creation and update source files
 ct_files_path = '{base_path}clinical/src/'.format(base_path=base_path)
@@ -31,10 +36,10 @@ gard_files_path = '{base_path}gard/src/'.format(base_path=base_path)
 
 # Database names being used on the current server
 
-ct_db = db_prefix+'ctkg'
-pm_db = db_prefix+'pakg'
-gnt_db = db_prefix+'gfkg'
-gard_db = db_prefix+'gard'
+ct_db = db_prefix+ct_db_name
+pm_db = db_prefix+pa_db_name
+gnt_db = db_prefix+gf_db_name
+gard_db = db_prefix+'rdas.gard'
 convert = {ct_db:'trials', pm_db:'articles', gnt_db:'grants'}
 
 # Server URLS and addresses # Original epiapi_url is https://rdas.ncats.nih.gov/api/epi/

@@ -13,7 +13,7 @@
 
 # End of https://www.gitignore.io/api/visualstudiocode
 personal-config.ini
-
+environment_setup.py
 clinical/src/full_trial_data/
 clinical/src/chromedriver
 clinical/src/ctgov_nctids.json

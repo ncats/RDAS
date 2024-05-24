@@ -5,8 +5,8 @@ import json
 workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
 # sys.path.append(os.getcwd())
-sys.path.append('/home/aom2/RDAS')
-sys.path.append('/home/aom2/RDAS/emails')
+sys.path.append('/home/aom2/RDAS_master')
+sys.path.append('/home/aom2/RDAS_master/emails')
 import sysvars
 from AlertCypher import AlertCypher
 from datetime import date,datetime
@@ -53,8 +53,8 @@ def get_stats(type, gard, date_start,date_end):
     date_list = pd.date_range(date_start_obj, date_end_obj, freq='D').strftime('%m/%d/%y').to_list()
     # print("date_list::",date_list)
 
-    convert = {prefix+'ctkg':['ClinicalTrial','GARD','GardId'], prefix+'pakg':['Article','GARD','GardId'], prefix+'gfkg':['Project','GARD','GardId']}
-    connect_to_gard = {prefix+'ctkg':'--(:Condition)--(:Annotation)--',prefix+'pakg':'--',prefix+'gfkg':'--'}
+    convert = {prefix+sysvars.ct_db_name:['ClinicalTrial','GARD','GardId'], prefix+sysvars.pa_db_name:['Article','GARD','GardId'], prefix+sysvars.gf_db_name:['Project','GARD','GardId']}
+    connect_to_gard = {prefix+sysvars.ct_db_name:'--(:Condition)--(:Annotation)--',prefix+sysvars.pa_db_name:'--',prefix+sysvars.gf_db_name:'--'}
 
     # query = 'MATCH (x:{node}){connection}(y:{gardnode}) WHERE x.DateCreatedRDAS IN {date_list} AND y.{property} IN {list} RETURN COUNT(x)'.format(node=convert[type][0], gardnode=convert[type][1], property=convert[type][2], list=list(gards.keys()), date_list=date_list, connection=connect_to_gard[type])
     query = 'MATCH (x:{node}){connection}(y:{gardnode}) WHERE x.DateCreatedRDAS IN {date_list} AND y.{property} = \"{gard}\" RETURN COUNT(x)'.format(node=convert[type][0], gardnode=convert[type][1], property=convert[type][2], gard=gard, date_list=date_list, connection=connect_to_gard[type])
@@ -68,8 +68,8 @@ def get_stats(type, gard, date_start,date_end):
 def trigger_email(firestore_db,has_updates,date_start=datetime.today().strftime('%m/%d/%y'), date_end=datetime.today().strftime('%m/%d/%y')):
     print("start_date",date_start, " end date:: ",date_end)
     #obtain users contact information
-    txt_tabs_1 = {'trials':prefix +'ctkg', 'grants':prefix +'gfkg', 'articles':prefix +'pakg'}
-    tabs = {prefix +'ctkg': 'trials', prefix +'gfkg': 'grants', prefix +'pakg': 'articles'}
+    txt_tabs_1 = {'trials':prefix +sysvars.ct_db_name, 'grants':prefix +sysvars.gf_db_name, 'articles':prefix +sysvars.pa_db_name}
+    tabs = {prefix +sysvars.ct_db_name: 'trials', prefix +sysvars.gf_db_name: 'grants', prefix +sysvars.pa_db_name: 'articles'}
     users = auth.list_users()
     user_info={}   
     if users:
@@ -97,10 +97,7 @@ def trigger_email(firestore_db,has_updates,date_start=datetime.today().strftime(
             subscript_gard={}
             query_results={}
             total=0
-            # uniques = set()
-            total = 0
             query_results = {}
-
             uniques=set()
             for subs in subscript["subscriptions"]:# for each gard id
                 # print("subs::",subs)
