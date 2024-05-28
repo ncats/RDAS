@@ -17,16 +17,21 @@ images_path = '{base_path}img/'.format(base_path=base_path)
 firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz-a4e783d24c.json'.format(base_path=base_path) # May have to set this in new enviroment
 
 # if you are not using minghui's test dataset, make db_prefix=""; now you only need to change the neo4j database names here:
-db_prefix=""
-ct_db_name="test.rdas.ctkg" 
+db_prefix="test."
+ct_db_name="rdas.ctkg" 
 gf_db_name='rdas.gfkg'
 pa_db_name="rdas.pakg"
+gard_db_name='rdas.gard'
 
+ct_db = db_prefix+ct_db_name
+pm_db = db_prefix+pa_db_name
+gnt_db = db_prefix+gf_db_name
+gard_db = db_prefix+gard_db_name
 
 # Conversions
 dump_dirs = ['clinical','pubmed','grant','gard']
-db_abbrevs = {'ct':db_prefix+ct_db_name, 'pm':db_prefix+pa_db_name, 'gnt':db_prefix+gf_db_name}
-db_abbrevs2 = {db_prefix+ct_db_name:'ct', db_prefix+pa_db_name:'pm', db_prefix+gf_db_name:'gnt'}
+db_abbrevs = {'ct':ct_db, 'pm':pm_db, 'gnt':gnt_db}
+db_abbrevs2 = {ct_db:'ct', pm_db:'pm', gnt_db:'gnt'}
 
 # Paths to database creation and update source files
 ct_files_path = '{base_path}clinical/src/'.format(base_path=base_path)
@@ -35,11 +40,6 @@ gnt_files_path = '{base_path}grant/src/'.format(base_path=base_path)
 gard_files_path = '{base_path}gard/src/'.format(base_path=base_path)
 
 # Database names being used on the current server
-
-ct_db = db_prefix+ct_db_name
-pm_db = db_prefix+pa_db_name
-gnt_db = db_prefix+gf_db_name
-gard_db = db_prefix+'rdas.gard'
 convert = {ct_db:'trials', pm_db:'articles', gnt_db:'grants'}
 
 # Server URLS and addresses # Original epiapi_url is https://rdas.ncats.nih.gov/api/epi/

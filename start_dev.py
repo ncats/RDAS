@@ -14,8 +14,6 @@ import argparse
 from datetime import date,datetime
 from AlertCypher import AlertCypher
 from gard.methods import get_node_counts
-sys.path.append('/home/aom2/RDAS_master/RDAS')
-sys.path.append('/home/aom2/RDAS_master/RDAS/emails')
 import ses_firebase
 import firebase_admin
 from firebase_admin import auth
@@ -95,6 +93,7 @@ while True:
             print("check_last_updates::", last_update)
             full_db_name = sysvars.db_abbrevs[k]
             print(f'{full_db_name} Update Initiated')
+            
             has_updates[full_db_name]=True
             
             p = Popen(['python3', 'driver_manual.py', '-db', f'{config_selection[k]}', '-m', 'update'], encoding='utf8')
@@ -128,11 +127,11 @@ while True:
             p.wait()
 
             print(f'Update of {full_db_name} Database Complete...')
+
     if True in has_updates.values():
         ses_firebase.trigger_email(firestore_db,has_updates, date_start=last_update,date_end=datetime.strftime(today,"%m/%d/%y")) 
     
     print('database update and email sending has finished')
-            
     sleep(3600)
 
 
