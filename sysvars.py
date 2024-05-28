@@ -5,8 +5,9 @@ current_version = 2.5
 # Basic user information
 current_user = 'aom2'
 base_directory_name = 'RDAS'
-base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
+# base_path = '/home/{current_user}/RDAS_master/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 
+base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 # Folder paths
 backup_path = '{base_path}backup/'.format(base_path=base_path)
 transfer_path = '{base_path}transfer/'.format(base_path=base_path)
@@ -15,13 +16,22 @@ approved_path = '{base_path}approved/'.format(base_path=base_path)
 images_path = '{base_path}img/'.format(base_path=base_path)
 firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz-a4e783d24c.json'.format(base_path=base_path) # May have to set this in new enviroment
 
-# if you are not using minghui's test dataset, make db_prefix=""
-db_prefix="minghui."
+# if you are not using minghui's test dataset, make db_prefix=""; now you only need to change the neo4j database names here:
+db_prefix="test."
+ct_db_name="rdas.ctkg" 
+gf_db_name='rdas.gfkg'
+pa_db_name="rdas.pakg"
+gard_db_name='rdas.gard'
+
+ct_db = db_prefix+ct_db_name
+pm_db = db_prefix+pa_db_name
+gnt_db = db_prefix+gf_db_name
+gard_db = db_prefix+gard_db_name
 
 # Conversions
 dump_dirs = ['clinical','pubmed','grant','gard']
-db_abbrevs = {'ct':db_prefix+'clinical', 'pm':db_prefix+'pubmed', 'gnt':db_prefix+'grant'}
-db_abbrevs2 = {db_prefix+'clinical':'ct', db_prefix+'pubmed':'pm', db_prefix+'grant':'gnt'}
+db_abbrevs = {'ct':ct_db, 'pm':pm_db, 'gnt':gnt_db}
+db_abbrevs2 = {ct_db:'ct', pm_db:'pm', gnt_db:'gnt'}
 
 # Paths to database creation and update source files
 ct_files_path = '{base_path}clinical/src/'.format(base_path=base_path)
@@ -30,16 +40,11 @@ gnt_files_path = '{base_path}grant/src/'.format(base_path=base_path)
 gard_files_path = '{base_path}gard/src/'.format(base_path=base_path)
 
 # Database names being used on the current server
-
-ct_db = db_prefix+'clinical'
-pm_db = db_prefix+'pubmed'
-gnt_db = db_prefix+'grant'
-gard_db = db_prefix+'gard'
 convert = {ct_db:'trials', pm_db:'articles', gnt_db:'grants'}
 
 # Server URLS and addresses # Original epiapi_url is https://rdas.ncats.nih.gov/api/epi/
 epiapi_url = "https://rdas.ncats.nih.gov/api/epi/"
-rdas_urls = {'dev':'rdas-dev.ncats.nih.gov','test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}
+rdas_urls = {'dev':"rdas-dev.ncats.nih.gov",'test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}
 
 # UMLS code blacklist exclusively used for the clinical trial database
 umls_blacklist = [
