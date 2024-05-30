@@ -1,6 +1,6 @@
 boto3==1.26.77
 botocore==1.29.154
-fastapi==0.109.0
+fastapi==0.109.1
 filelock==3.13.1
 firebase_admin==6.1.0
 fuzzywuzzy==0.18.0
