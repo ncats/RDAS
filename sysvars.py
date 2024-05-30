@@ -41,10 +41,10 @@ db_abbrevs = {'ct':'RDAS.CTKG', 'pm':'RDAS.PAKG', 'gnt':'RDAS.GFKG'}
 db_abbrevs2 = {ct_db:'ct', pm_db:'pm', gnt_db:'gnt'}
 
 # Paths to database creation and update source files
-ct_files_path = '{base_path}RDAS.CTKG/src/'.format(base_path=base_path)
-pm_files_path = '{base_path}RDAS.PAKG/src/'.format(base_path=base_path)
-gnt_files_path = '{base_path}RDAS.GFKG/src/'.format(base_path=base_path)
-gard_files_path = '{base_path}RDAS.GARD/src/'.format(base_path=base_path)
+ct_files_path = '{base_path}RDAS_CTKG/src/'.format(base_path=base_path)
+pm_files_path = '{base_path}RDAS_PAKG/src/'.format(base_path=base_path)
+gnt_files_path = '{base_path}RDAS_GFKG/src/'.format(base_path=base_path)
+gard_files_path = '{base_path}RDAS_GARD/src/'.format(base_path=base_path)
 
 # Database names being used on the current server
 convert = {ct_db:'trials', pm_db:'articles', gnt_db:'grants'}
