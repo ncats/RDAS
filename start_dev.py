@@ -14,11 +14,17 @@ import argparse
 from datetime import date,datetime
 from AlertCypher import AlertCypher
 from gard.methods import get_node_counts
+import ses_firebase
 import firebase_admin
 from firebase_admin import auth
 from firebase_admin import credentials
 from firebase_admin import firestore
 
+prefix=sysvars.db_prefix
+config_selection = {'ct':[prefix+'rdas.ctkg_update', 'ct_interval'], 'pm':[prefix+'rdas.pakg_update', 'pm_interval'], 'gnt':[prefix+'rdas.gfkg_update', 'gnt_interval']}
+
+# this line below no longer needed because the neo4j databases has change their names.
+# config_selection = {'ct':['clinical_update', 'ct_interval'], 'pm':['pubmed_update', 'pm_interval'], 'gnt':['grant_update', 'gnt_interval']}
 
 
 def check_update(db, db_type):
@@ -35,7 +41,6 @@ def check_update(db, db_type):
     # Get the current date and time
     today = datetime.now()
 
-    config_selection = {'ct':['clinical_update', 'ct_interval'], 'pm':['pubmed_update', 'pm_interval'], 'gnt':['grant_update', 'gnt_interval']}
     selection = config_selection[db_type]
     print("selection::",selection)
 
@@ -62,24 +67,34 @@ def check_update(db, db_type):
 
 # Connect to the system database
 db = AlertCypher('system')
+cred = credentials.Certificate(sysvars.firebase_key_path)
+firebase_admin.initialize_app(cred)
+firestore_db = firestore.client()
+
 
 while True:
     # Initialize a dictionary to track update status for each database
     current_updates = {k:False for k,v in sysvars.db_abbrevs.items()}
-    print("\n","current_updates::", current_updates)
+    # print("\n","current_updates::", current_updates)
     print('Checking for Updates')
     # Check update status for each database
     for db_abbrev in sysvars.db_abbrevs:
         current_updates[db_abbrev] = check_update(db, db_abbrev)[0]
 
     print('Triggering Database Updates')
+    today = datetime.now()
+    has_updates={}
     for k,v in current_updates.items():
         print("updates:::",k,v)
-        if v == True:
+        if v[0] == True:
+            last_update=v[1]
+            print("check_last_updates::", last_update)
             full_db_name = sysvars.db_abbrevs[k]
             print(f'{full_db_name} Update Initiated')
             
-            p = Popen(['python3', 'driver_manual.py', '-db', f'{k}', '-m', 'update'], encoding='utf8')
+            has_updates[full_db_name]=True
+            
+            p = Popen(['python3', 'driver_manual.py', '-db', f'{config_selection[k]}', '-m', 'update'], encoding='utf8')
             p.wait()
             
             # Update the node counts on the GARD Neo4j database (numbers used to display on the UI)
@@ -117,7 +132,11 @@ while True:
             p.wait()
             
             print(f'Update of {full_db_name} Database Complete...')
-            
+
+    if True in has_updates.values():
+        ses_firebase.trigger_email(firestore_db,has_updates, date_start=last_update,date_end=datetime.strftime(today,"%m/%d/%y")) 
+    
+    print('database update and email sending has finished')
     sleep(3600)
 
 

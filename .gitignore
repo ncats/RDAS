@@ -13,7 +13,6 @@
 
 # End of https://www.gitignore.io/api/visualstudiocode
 personal-config.ini
-
 RDAS.CTKG/src/full_trial_data/
 RDAS.CTKG/src/chromedriver
 RDAS.CTKG/src/ctgov_nctids.json

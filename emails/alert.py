@@ -1,4 +1,5 @@
 import boto3
+import sys
 from botocore.exceptions import ClientError
 
 sender_email = 'ncatsrdas@mail.nih.gov'
@@ -10,31 +11,54 @@ def setup_email_client():
     )
     return client
 
-def send_email(sub,msg,recip,html=None,client=setup_email_client()):
-    if not client:
-        return
-    
-    response = client.send_email(
-        Source=sender_email,
-        Destination={
-            'ToAddresses': [
-                f'{recip}',
-            ],
-        },
-        Message={
+def send_email(subject, html, recipient, client=setup_email_client()):
+    print("Sending emails to:", recipient)
+    # sender_email = client  # Replace with your email
+    # Set up the email
+    message={
             'Subject': {
-                'Data': f'{sub}',
+                'Data': f'{subject}',
             },
             'Body': {
-                'Text': {
-                    'Data': f'{msg}',
-                },
+                
                 'Html': {
                     'Data': f'{html}'
                 },
             }
         }
+
+    
+    # Send the email
+    response = client.send_email(
+        Source=sender_email,
+        Destination={'ToAddresses': [recipient]},
+        Message=message
     )
+    print("Email sent successfully.")
+
+
+# def send_email(sub,html,recip,client=setup_email_client()):
+#     if not client:
+#         return
+    
+#     response = client.send_email(
+#         Source=sender_email,
+#         Destination={
+#             'ToAddresses': [
+#                 f'{recip}',
+#             ],
+#         },
+#         Message={
+#             'Subject': {
+#                 'Data': f'{sub}',
+#             },
+#             'Body': {
+#                 'Html': {
+#                     'Data': f'{html}'
+#                 },
+#             }
+#         }
+#     )
 
 def send_raw_email(sub,msg,recip,client=None):
     if not client:
