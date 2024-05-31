@@ -108,3 +108,4 @@ genereviews_epi_processed.csv
 fix_pubtator_type.py
 etc
 RDAS_GFKG/src/FineTunned_Bert_2.pt
+RDAS_GFKG/src/Finetunned_Bert_2.pt
