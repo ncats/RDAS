@@ -1,69 +1,77 @@
-# Article Prediction API
+# Natural History Study Article Prediction API
 
-## Overview
-This Flask application provides a simple prediction API that utilizes a machine learning model to classify articles. It is designed to showcase how to set up a basic API for text classification tasks using Flask and the Transformers library.
+This API utilizes a transformer-based machine learning model to predict the relevance of articles for Natural History Studies. It is specifically designed to handle batches of article abstracts and assess their relevance to the study of rare diseases.
+
+## Table of Contents
+- [Features](#features)
+- [Getting Started](#getting-started)
+- [Running the Application](#running-the-application)
+- [API Documentation](#api-documentation)
+- [Feedback](#feedback)
 
 ## Features
-- **Predict Endpoint**: Accepts POST requests.
-- **Logging**: Includes basic logging setup to track operations and errors.
-- **Docker Integration**: Comes Docker-ready with a Dockerfile and docker-compose.yml for easy deployment and scaling.
 
-## Requirements
-- Python 3.8+
-- Flask
-- Transformers
-- PyTorch
-- see requirements.txt for more information
+- Predict the relevance of article abstracts to the study of rare diseases.
+- Batch processing of multiple article abstracts.
+- Robust error handling and logging.
 
-## Setup Instructions
+## Getting Started
 
-### Local Setup
+### Prerequisites
+
+- Docker and Docker Compose installed on your machine.
+- Python 3.8 if you prefer running locally without Docker.
+
+### Installation
+
 1. **Clone the repository:**
+
    ```bash
-   git clone https://github.com/..../NaturalHistory_Transformer_API_v1.0.git
-   cd NaturalHistory_Transformer_API_v1.0
+   git clone https://github.com/yourusername/yourrepository.git
+   cd yourrepository
+   ```
+2. **Create a .env file:**
+   ```bash
+   cp .env.example .env
+   ```
+   Update the .env file with the appropriate configuration values.
+### Running the Application
 
-2. **Install dependencies:**
+#### Using Docker
+1. **Build the Docker images:**
+   ```bash
+   docker-compose build
+   ```
+2. **Start the FastAPI application:**
+   ```bash
+   docker-compose up web
+   ```
+   The application will be accessible at http://localhost:5000. Go to http://localhost:5000/docs for usage information.
+#### Running Locally
+1. **Create and activate a virtual environment:**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+   ```
+   
+2. **Install the dependencies:**
+   ```bash
    pip install -r requirements.txt
-
+   ```
 3. **Run the application:**
-   python app/main.py
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port 5000
+   ```
+   The application will be accessible at http://localhost:5000. Go to http://localhost:5000/docs for usage information.
 
-This will start the Flask server on localhost:5000.
+### API Documentation
 
-## Docker Setup
-
-1. **Build the Docker image:**
-docker-compose build
-
-2.**Run the container:**
-docker-compose up
-
-## Usage
-
-**Accessing the Home Page**
-Navigate to http://localhost:5000/article_prediction_api in your web browser for more information.
-
-### Making Predictions
-
-**POST Request:**
-
-Use a tool like curl to send a POST request:
-curl -X POST http://localhost:5000/article_prediction_api/v1/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text\"]}"
-
-For multiple texts:
-curl -X POST http://localhost:5000/article_prediction_api/v1/predict -H "Content-Type: application/json" -d "{\"texts\": [\"sample text1\", \"sample text2\"]}"
-
-Python Script:
-```bash
-new_abstracts = ["text1", "text2",....]
-data = {
-    "texts": new_abstracts
-}
-response = requests.post(url, json=data)
-```
+The API documentation is available via Swagger UI and can be accessed at:
+   ```bash
+      http://localhost:5000/docs
+   ```   
+ You can use the interactive documentation to test the endpoints and understand the API.
 
 
-
-## Contact
-For questions or support, please contact minghui.ao@nih.gov, qian.zhu@nih.gov
+### Feedback:
+   If you have any feedback or questions, please contact minghui.ao@nih.gov, qian.zhu@nih.gov.
