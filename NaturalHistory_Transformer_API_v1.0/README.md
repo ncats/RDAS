@@ -7,7 +7,7 @@ This API utilizes a transformer-based machine learning model to predict the rele
 - [Getting Started](#getting-started)
 - [Running the Application](#running-the-application)
 - [API Documentation](#api-documentation)
-- [Feedback](#feedback)
+
 
 ## Features
 
@@ -73,5 +73,3 @@ The API documentation is available via Swagger UI and can be accessed at:
  You can use the interactive documentation to test the endpoints and understand the API.
 
 
-### Feedback:
-   If you have any feedback or questions, please contact minghui.ao@nih.gov, qian.zhu@nih.gov.
