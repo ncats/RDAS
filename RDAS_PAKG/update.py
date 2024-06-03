@@ -22,11 +22,8 @@ def main (update_from=False, update_to=False):
     None
     """
 
-<<<<<<<< HEAD:RDAS.PAKG/update.py
-    pubmed.init.main(update_from=update_from, update_to=update_to)
-========
     RDAS_PAKG.init.main(update_from=update_from, update_to=update_to)
->>>>>>>> devon_dev:RDAS_PAKG/update.py
+
 
 main() #TEST
 #get_node_counts()

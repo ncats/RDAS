@@ -24,10 +24,7 @@ from nltk.stem import PorterStemmer
 nltk.download("punkt")
 from spacy.matcher import Matcher
 import spacy
-<<<<<<<< HEAD:RDAS.CTKG/methods.py
-========
 import pandas as pd
->>>>>>>> devon_dev:RDAS_CTKG/methods.py
 from fuzzywuzzy import fuzz
 import ijson
 import string
@@ -971,11 +968,7 @@ def condition_map(db, update_metamap=True):
 
     print('RUNNING METAMAP')
     # Fetch conditions from the database that havent already been annotated and are not acronyms
-<<<<<<<< HEAD:RDAS.CTKG/methods.py
-    res = db.run('MATCH (c:Condition) WHERE NOT EXISTS((c)--(:Annotation)) RETURN c.Condition as condition, ID(c) as cond_id')
-========
     res = db.run('MATCH (c:Condition) WHERE NOT EXISTS((c)--(:Condition_Annotation)) RETURN c.Condition as condition, ID(c) as cond_id')
->>>>>>>> devon_dev:RDAS_CTKG/methods.py
     cond_strs = [f"{i['cond_id']}|{normalize(i['condition'])}\n" for i in res if not is_acronym(i['condition'])]
     
     # Write condition strings to a file for MetaMap processing
@@ -1040,11 +1033,6 @@ def condition_map(db, update_metamap=True):
             db.run(query)
             
     print('CREATING AND CONNECTING METAMAP ANNOTATIONS')
-<<<<<<<< HEAD:RDAS.CTKG/methods.py
-    # Delete existing annotations DONT NEED, REMOVE STEP
-    #db.run('MATCH (x:Annotation) DETACH DELETE x')
-========
->>>>>>>> devon_dev:RDAS_CTKG/methods.py
     # Fetch relevant data from Condition nodes
     res = db.run('MATCH (x:Condition) WHERE x.METAMAP_OUTPUT IS NOT NULL RETURN ID(x) AS cond_id, x.METAMAP_OUTPUT AS cumls, x.METAMAP_PREFERRED_TERM AS prefs, x.FUZZY_SCORE as fuzz, x.METAMAP_SCORE as meta').data()
 
@@ -1069,17 +1057,11 @@ def condition_map(db, update_metamap=True):
                 gard_ids = gard_ids['gard_id']
                 for gard_id in gard_ids:
                     # Create Annotation nodes and connect to Condition and GARD nodes
-<<<<<<<< HEAD:RDAS.CTKG/methods.py
-                    db.run('MATCH (z:GARD) WHERE z.GardId = \"{gard_id}\" MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:Annotation {{UMLS_CUI: \"{umls}\", UMLSPreferredName: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y) MERGE (z)<-[:mapped_to_gard]-(x)'.format(gard_id=gard_id,cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
-            else:
-                # Create Annotation nodes and connect to Condition nodes
-                db.run('MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:Annotation {{UMLS_CUI: \"{umls}\", UMLSPreferredName: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y)'.format(cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
-========
+
                     db.run('MATCH (z:GARD) WHERE z.GardId = \"{gard_id}\" MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:Condition_Annotation {{UMLS_CUI: \"{umls}\", UMLSPreferredName: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y) MERGE (z)<-[:mapped_to_gard]-(x)'.format(gard_id=gard_id,cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
             else:
                 # Create Annotation nodes and connect to Condition nodes
                 db.run('MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:Condition_Annotation {{UMLS_CUI: \"{umls}\", UMLSPreferredName: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y)'.format(cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
->>>>>>>> devon_dev:RDAS_CTKG/methods.py
 
     print('REMOVING UNNEEDED PROPERTIES')
     # Remove unnecessary properties from Condition nodes that were used during processing
@@ -1093,12 +1075,7 @@ def condition_map(db, update_metamap=True):
     for entry in res:
         cond_id = entry['cond_id']
         cond = entry['cond']
-<<<<<<<< HEAD:RDAS.CTKG/methods.py
-        db.run('MATCH (x:GARD) WHERE toLower(x.GardName) = toLower(\"{cond}\") MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (z:Annotation {{UMLSPreferredName: \"{cond}\", MATCH_TYPE: \"STRING\"}}) MERGE (z)<-[:has_annotation]-(y) MERGE (x)<-[:mapped_to_gard]-(z)'.format(cond=cond,cond_id=cond_id))
-========
         db.run('MATCH (x:GARD) WHERE toLower(x.GardName) = toLower(\"{cond}\") MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (z:Condition_Annotation {{UMLSPreferredName: \"{cond}\", MATCH_TYPE: \"STRING\"}}) MERGE (z)<-[:has_annotation]-(y) MERGE (x)<-[:mapped_to_gard]-(z)'.format(cond=cond,cond_id=cond_id))
->>>>>>>> devon_dev:RDAS_CTKG/methods.py
-
 
 
 
