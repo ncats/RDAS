@@ -1,0 +1,32 @@
+<!-- email_template.html -->
+<html>
+<head>
+    <style>
+        body { background-color: white; font-family: Arial, sans-serif; }
+        /* Add more styling as needed */
+    </style>
+</head>
+<body style="text-align: center;">
+    <h1 style="font-size:50;color:purple">Rare Disease Alert System</h1>
+    <h2>{{ name }}</h2>
+    <h3>You have {{ data['total'] }} new entries for your subscribed rare diseases in the {{ data['db_title'] }} database</h3>
+    <table border="1" style="margin: auto;">
+        <tr>
+            <th>Name</th>
+            <th>GARD ID</th>
+            <th>Nodes Modified</th>
+        </tr>
+        {% for gard_id in data['subscriptions'] %}
+            {% if data[gard_id]["num"]>0 %}
+                <tr>
+                    <td><a href="https://rdas.ncats.nih.gov/disease?id={{ gard_id }}"> {{ data[gard_id]['name'] }} </a></td>
+                    <td>{{ gard_id }}</td>
+                    <td>{{ data[gard_id]['num'] }}</td>
+                </tr>
+           {% endif %}
+        {% endfor %}
+    </table>
+    <h4>Results gathered within the time period of {{ data['update_date_start'] }} - {{ data['update_date_end'] }}</h4>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6e/National_Center_for_Advancing_Translational_Sciences_logo.png" alt="Rare Disease Alert System" width="300">
+</body>
+</html>

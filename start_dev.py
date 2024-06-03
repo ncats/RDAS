@@ -3,6 +3,7 @@ import os
 import sys
 workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
+sys.path.append('/home/leadmandj/RDAS/')
 sys.path.append(os.getcwd())
 print(sys.path)
 import sysvars
@@ -13,8 +14,7 @@ print(os.getcwd())
 import argparse
 from datetime import date,datetime
 from AlertCypher import AlertCypher
-from gard.methods import get_node_counts
-import ses_firebase
+from RDAS_GARD.methods import get_node_counts
 import firebase_admin
 from firebase_admin import auth
 from firebase_admin import credentials

@@ -1,6 +1,6 @@
-[submodule "/home/leadmandj/RDAS/pubmed/NaturalHistory4GARD"]
-	path = pubmed/NaturalHistory4GARD
+[submodule "RDAS_PAKG/epi4GARD"]
+	path = RDAS_PAKG/epi4GARD
+	url = git@github.com:ncats/epi4GARD.git
+[submodule "RDAS_PAKG/NaturalHistory4GARD"]
+	path = RDAS_PAKG/NaturalHistory4GARD
 	url = git@github.com:ncats/NaturalHistory4GARD.git
-[submodule "pubmed/epi4GARD"]
-	path = pubmed/epi4GARD
-	url = https://github.com/ncats/epi4GARD.git
