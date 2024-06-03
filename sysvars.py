@@ -14,6 +14,11 @@ contacts = [
 
 base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 
+# RDAS Team contacts for emails
+contacts = [
+    "leadmandj@nih.gov"
+]
+
 # Folder paths
 backup_path = '{base_path}backup/'.format(base_path=base_path)
 transfer_path = '{base_path}transfer/'.format(base_path=base_path)

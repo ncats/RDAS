@@ -174,6 +174,12 @@ def run_normmap():
 	prj_files = sorted(prj_files)
 
 	for idx, abs_file in enumerate(abs_files):
+		year = re.findall(r'\d+', abs_file)[0]
+
+		if os.path.exists(data_raw(f'normmap/RePORTER_NORMMAP_{year}.csv')):
+			print(data_raw(f'normmap/RePORTER_NORMMAP_{year}.csv') + ' already exists... bypassing')
+			continue
+
 		prj_file = prj_files[idx]
 
 		print(abs_file, ' -merged- ',prj_file)
@@ -183,8 +189,6 @@ def run_normmap():
 
 		merged_df = pd.merge(tmp, tmp2, on=['APPLICATION_ID'])
 		merged_df['APPLICATION_ID'] = merged_df['APPLICATION_ID'].astype(int)
-
-		year = re.findall(r'\d+', abs_file)[0]
 
 		merged_df.to_csv(data_raw(f'normmap/RePORTER_NORMMAP_{year}.csv'), index=False)
 
