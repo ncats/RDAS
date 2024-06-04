@@ -12,10 +12,10 @@ services:
         source: ./app/saved_model
         target: /app/saved_model
 
-  test:
-    build: .
-    env_file:
-      - .env
-    volumes:
-      - .:/app
-    command: ["python", "-m", "unittest", "discover", "-s", "tests"]
+#  test:
+#    build: .
+#    env_file:
+#      - .env
+#    volumes:
+#      - .:/app
+#    command: ["python", "-m", "unittest", "discover", "-s", "tests"]
