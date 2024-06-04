@@ -9,5 +9,6 @@ class Config:
     MODEL_PATH = os.getenv('MODEL_PATH')
     HOST = os.getenv('HOST', '0.0.0.0')  # Default value '0.0.0.0' if HOST is not defined
     PORT = int(os.getenv('PORT', 5000))  # Default value 5000 if PORT is not defined
+    API_ROOT_PATH = os.getenv('API_ROOT_PATH', '')
     DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'  # Default value True if DEBUG is not defined or not 'False'
 
