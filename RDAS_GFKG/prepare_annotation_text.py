@@ -23,11 +23,11 @@ SEARCH_AIM1 = ['aim1', 'aim 1', 'Aim1', 'Aim 1', 'AIM1', 'AIM 1', 'first aim', '
 
 
 # Load scispaCy model and add the abbreviation detector to the pipeline
-nlp = spacy.load("en_core_sci_lg", exclude=["parser", "ner"])
-nlp.add_pipe("abbreviation_detector")
+#nlp = spacy.load("en_core_sci_lg", exclude=["parser", "ner"])
+#nlp.add_pipe("abbreviation_detector")
 
 
-def prepare_phr_aim(projects_file, abstracts_file):
+def prepare_phr_aim(projects_file, abstracts_file, nlp):
     '''
     Select the Public Health Relevance (PHR) or 
     the aim section of the abstract for annotation.

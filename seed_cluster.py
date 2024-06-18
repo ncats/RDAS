@@ -34,7 +34,9 @@ def seed(dump_name, dump_folder, server):
     p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'load', f'{dump_name}', f'--from-path={dump_folder}', '--overwrite-destination'], encoding='utf8')
     p.wait()
     
-    
+    p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'restart'], encoding='utf-8')
+    p.wait()
+
     server_id = ac.run(f"SHOW servers YIELD * WHERE name = \'{server}01\' RETURN serverId").data()[0]['serverId']
     print(f'SERVER ID LOCATED:: {server_id}')
     

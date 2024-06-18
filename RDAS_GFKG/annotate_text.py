@@ -26,9 +26,7 @@ def load_model(model_name):
 
             nlp.add_pipe('remove_duplicate_entities')
             nlp.add_pipe('abbreviation_detector')
-            nlp.add_pipe('scispacy_linker', config={'linker_name':'umls',
-                                                    'resolve_abbreviations':True,
-                                                    'threshold':0.8})
+            nlp.add_pipe('scispacy_linker', config={'linker_name':'umls','resolve_abbreviations':True,'threshold':0.8})
             break
         except:
             pass
@@ -39,7 +37,7 @@ def get_umls_concepts(nlp, text):
     text.sort_values(by=['APPLICATION_ID'], inplace=True)
     text.reset_index(drop=True, inplace=True)
     
-    docs = list(nlp.pipe(text['ABSTRACT_TEXT']))
+    docs = list(nlp.pipe(text['ABSTRACT_TEXT'], batch_size=100))
     linker = nlp.get_pipe('scispacy_linker')
 
     meta_df_lst = []
@@ -50,8 +48,8 @@ def get_umls_concepts(nlp, text):
             all_umls_data = []
         
             for ent in doc.ents:
-                if len(ent._.umls_ents) > 0:
-                    highest_umls_ent = ent._.umls_ents[0]
+                if len(ent._.kb_ents) > 0:
+                    highest_umls_ent = ent._.kb_ents[0]
                     concept_entity.append((highest_umls_ent[0], str(ent)))
                     umls_data = linker.kb.cui_to_entity[highest_umls_ent[0]]
                     all_umls_data.append(umls_data)

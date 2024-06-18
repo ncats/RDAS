@@ -851,7 +851,7 @@ def add_metamap_annotation(db, trial_info):
         score = v['score']
         types = v['types']
         nctid = v['nctid']
-        db.run(f'MATCH (y:ClinicalTrial) WHERE y.NCTId = \'{nctid}\' MERGE (x:Trial_Annotation {{umls_cui:\'{k}\', umls_concept:\'{concept}\', umls_types:{types}}}) MERGE (y)-[:has_metamap_annotation {{umls_score:{score}}}]->(x)')
+        db.run(f'MATCH (y:ClinicalTrial) WHERE y.NCTId = \'{nctid}\' MERGE (x:TrialAnnotation {{umls_cui:\'{k}\', umls_concept:\'{concept}\', umls_types:{types}}}) MERGE (y)-[:has_metamap_annotation {{umls_score:{score}}}]->(x)')
 
 def metamap_trial_annotation(db, trial_info, update_metamap=True):
     INSTANCE = Submission(os.environ['METAMAP_EMAIL'],os.environ['METAMAP_KEY'])
@@ -943,7 +943,7 @@ def condition_map(db, update_metamap=True):
     """
 
     print('RUNNING SETUP')
-    gard_db = AlertCypher('gard')
+    gard_db = AlertCypher(f'{sysvars.gard_db}')
     
     # # Initialize MetaMap instance
     INSTANCE = Submission(os.environ['METAMAP_EMAIL'],os.environ['METAMAP_KEY'])
@@ -966,9 +966,30 @@ def condition_map(db, update_metamap=True):
         else:
             db.run('MERGE (x:GARD {{GardId:\"{gard_id}\",GardName:\"{name}\",Synonyms:{syns},UMLS_Source:\"{usource}\"}})'.format(name=name,gard_id=gard_id,syns=syns,usource=usource))
 
+
+
+    print('ADDING GARD-CONDITION MAPPINGS BASED ON EXACT STRING MATCH')
+    # Fetch Condition nodes without existing annotations
+    res = db.run('MATCH (x:Condition) RETURN ID(x) as cond_id, x.Condition as cond').data()
+    
+    # Create annotations based on exact string match and connect to GARD nodes
+    loweredList = db.run(f'MATCH (x:GARD) WITH [x IN x.GardName+x.Synonyms | toLower(x)] AS loweredList,x RETURN loweredList, ID(x) as gard_node_id').data()
+    for entry in res:
+        cond_id = entry['cond_id']
+        cond = normalize(entry['cond'])
+        cond_lower = cond.lower()
+
+        for idx,lowered in enumerate(loweredList):
+            lst = lowered['loweredList']
+            lst = [normalize(x).lower() for x in lst]
+            if cond_lower in lst:
+                gard_node_id = lowered['gard_node_id']
+                db.run('MATCH (x:GARD) WHERE ID(x) = {gard_node_id} MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (z:ConditionAnnotation {{UMLSPreferredName: \"{cond}\", MATCH_TYPE: \"STRING\"}}) MERGE (z)<-[:has_annotation]-(y) MERGE (x)<-[:mapped_to_gard]-(z)'.format(cond=cond,cond_id=cond_id,gard_node_id=gard_node_id))
+
+
     print('RUNNING METAMAP')
     # Fetch conditions from the database that havent already been annotated and are not acronyms
-    res = db.run('MATCH (c:Condition) WHERE NOT EXISTS((c)--(:Condition_Annotation)) RETURN c.Condition as condition, ID(c) as cond_id')
+    res = db.run('MATCH (c:Condition) RETURN c.Condition as condition, ID(c) as cond_id')
     cond_strs = [f"{i['cond_id']}|{normalize(i['condition'])}\n" for i in res if not is_acronym(i['condition'])]
     
     # Write condition strings to a file for MetaMap processing
@@ -1034,7 +1055,7 @@ def condition_map(db, update_metamap=True):
             
     print('CREATING AND CONNECTING METAMAP ANNOTATIONS')
     # Fetch relevant data from Condition nodes
-    res = db.run('MATCH (x:Condition) WHERE x.METAMAP_OUTPUT IS NOT NULL RETURN ID(x) AS cond_id, x.METAMAP_OUTPUT AS cumls, x.METAMAP_PREFERRED_TERM AS prefs, x.FUZZY_SCORE as fuzz, x.METAMAP_SCORE as meta').data()
+    res = db.run('MATCH (x:Condition) WHERE x.METAMAP_OUTPUT IS NOT NULL RETURN ID(x) AS cond_id, x.Condition as condition, x.METAMAP_OUTPUT AS cumls, x.METAMAP_PREFERRED_TERM AS prefs, x.FUZZY_SCORE as fuzz, x.METAMAP_SCORE as meta').data()
 
     exclude_umls = sysvars.umls_blacklist
 
@@ -1057,25 +1078,14 @@ def condition_map(db, update_metamap=True):
                 gard_ids = gard_ids['gard_id']
                 for gard_id in gard_ids:
                     # Create Annotation nodes and connect to Condition and GARD nodes
-                    db.run('MATCH (z:GARD) WHERE z.GardId = \"{gard_id}\" MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:Condition_Annotation {{UMLS_CUI: \"{umls}\", UMLSPreferredName: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y) MERGE (z)<-[:mapped_to_gard]-(x)'.format(gard_id=gard_id,cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
+                    db.run('MATCH (z:GARD) WHERE z.GardId = \"{gard_id}\" MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:ConditionAnnotation {{UMLS_CUI: \"{umls}\", UMLSPreferredName: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y) MERGE (z)<-[:mapped_to_gard]-(x)'.format(gard_id=gard_id,cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
             else:
                 # Create Annotation nodes and connect to Condition nodes
-                db.run('MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:Condition_Annotation {{UMLS_CUI: \"{umls}\", UMLSPreferredName: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y)'.format(cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
+                db.run('MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:ConditionAnnotation {{UMLS_CUI: \"{umls}\", UMLSPreferredName: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y)'.format(cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
 
     print('REMOVING UNNEEDED PROPERTIES')
     # Remove unnecessary properties from Condition nodes that were used during processing
     db.run('MATCH (x:Condition) SET x.METAMAP_PREFERRED_TERM = NULL SET x.METAMAP_OUTPUT = NULL SET x.FUZZY_SCORE = NULL SET x.METAMAP_SCORE = NULL')
-    
-    print('ADDING GARD-CONDITION MAPPINGS BASED ON EXACT STRING MATCH')
-    # Fetch Condition nodes without existing annotations
-    res = db.run('MATCH (x:Condition) WHERE NOT (x)-[:has_annotation]-() RETURN ID(x) as cond_id, x.Condition as cond').data()
-    
-    # Create annotations based on exact string match and connect to GARD nodes
-    for entry in res:
-        cond_id = entry['cond_id']
-        cond = entry['cond']
-        db.run('MATCH (x:GARD) WHERE toLower(x.GardName) = toLower(\"{cond}\") MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (z:Condition_Annotation {{UMLSPreferredName: \"{cond}\", MATCH_TYPE: \"STRING\"}}) MERGE (z)<-[:has_annotation]-(y) MERGE (x)<-[:mapped_to_gard]-(z)'.format(cond=cond,cond_id=cond_id))
-
 
 
 
