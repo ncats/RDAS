@@ -110,7 +110,7 @@ steps: list = [
 			""",
 		"query":
 			"""
-			MERGE (:Journal {title: data.JOURNAL_TITLE})
+			MERGE (:Journal {title: coalesce(data.JOURNAL_TITLE,"")})
 			"""
 	},
 
@@ -130,7 +130,7 @@ steps: list = [
 		"query":
 			"""
 			MERGE (n:Publication {
-				language: data.LANG,
+				language: coalesce(data.LANG, ""),
 				pmid: toInteger(data.PMID),
 				date: data.PUB_DATE})
 				ON CREATE SET
@@ -157,7 +157,7 @@ steps: list = [
 			MATCH (n:Publication {pmid: toInteger(data.PMID), date: data.PUB_DATE})
 			MERGE (n)-[p:PUBLISHED_IN]->(j)
 				ON CREATE SET
-					p.issue = data.JOURNAL_ISSUE,
+					p.issue = coalesce(data.JOURNAL_ISSUE,""),
 					p.volume = data.JOURNAL_VOLUME,
 					p.page = data.PAGE_NUMBER
 				ON MATCH SET
@@ -317,7 +317,7 @@ steps: list = [
 			] as pi_data
 			MERGE (p:PrincipalInvestigator {
 				pi_id: pi_data[0],
-				pi_name: pi_data[1],
+				pi_name: coalesce(pi_data[1], ""),
 				org_state: coalesce(data.ORG_STATE, ""),
 				org_name: coalesce(data.ORG_NAME, "")})
 			WITH p, data

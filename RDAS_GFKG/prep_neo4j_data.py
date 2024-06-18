@@ -23,6 +23,7 @@ from typing import TypedDict
 import pandas as pd
 from prepare_annotation_text import prepare_phr_aim
 from annotate_text import *
+from subprocess import *
 from remove_general_umls_concepts import clean_annotation_output
 from AlertCypher import AlertCypher
 import RDAS_GFKG.methods as rdas
@@ -72,13 +73,23 @@ def years_to_files(subdir: str):
 def aggregate_disease_data():
 	# Rename GARD-Project mapping results columns to match the names listed in the GARD data
 	normmap_df = pd.read_csv(data_neo4j('normmap_results.csv'),index_col=False,usecols=['ID','GARD_id','CONF_SCORE','SEM_SIM'])
-	normmap_df = normmap_df.rename(columns={'ID':'APPLICATION_ID', 'GARD_id': 'GARD_ID'})
+	normmap_df = normmap_df.rename(columns={'ID':'APPLICATION_ID'})
+
+	# Split tuple normmap result into 2 seperate columns
+	normmap_df[['GARD_NAME', 'GARD_ID']] = normmap_df['GARD_id'].str.extract(r'\(\'(.*?)\', \'(.*?)\'\)')
+	# drop the original column
+	normmap_df.drop('GARD_id', axis=1, inplace=True)
 
 	disease_df = pd.read_json(data_raw('all_gards.json'))
 	disease_df = disease_df.rename(columns={'GARD id':'GARD_ID', 'Name':'NAME', 'Synonyms':'SYNONYMS'})
 
+	normmap_df.reset_index(drop=True)
+	disease_df.reset_index(drop=True)
+
 	# Merge the GARD-Project mapping results with the GARD data
-	merged_df = pd.merge(normmap_df, disease_df, on=['GARD_ID'])
+	merged_df = pd.merge(normmap_df, disease_df, on=['GARD_ID'], how='left')
+	merged_df = merged_df.dropna(subset=['GARD_ID'])
+	#merged_df = normmap_df.merge(disease_df[['GARD_ID']])
 	merged_df.to_csv(data_neo4j('disease/disease_to_application.csv'),index=False)
 
 def combine_normmap_results():
@@ -89,7 +100,7 @@ def combine_normmap_results():
 
 	for filename in files:
 		print(f'Combining abstract file {filename} into the last')
-		tmp = pd.read_csv(('{filename}'.format(filename=filename)),index_col=False, encoding = "ISO-8859-1")
+		tmp = pd.read_csv(('{filename}'.format(filename=filename)),index_col=False,sep='|')
 		combine_df = pd.concat([combine_df,tmp], axis=0)
 
 	combine_df['APPLICATION_ID'] = combine_df['ID'].astype(int)
@@ -181,7 +192,7 @@ def batch_normmap(df, thr, year):
 				with lock:
 					print({'ID': appl_id, 'GARD_id': gard, 'CONF_SCORE': add_data[0], 'SEM_SIM': add_data[1]})
 					with open(data_neo4j(f'normmap/normmap_results_{year}.csv'), "a") as f:
-						f.writelines([f'{appl_id},{gard},{add_data[0]},{add_data[1]}\n'])
+						f.writelines([f'{appl_id}|{gard}|{add_data[0]}|{add_data[1]}\n'])
 
 		#except Exception as e:
 			#print(e)
@@ -286,7 +297,7 @@ def run_normmap():
 
 		# Create CSV files headers
 		with open(data_neo4j(f'normmap/normmap_results_{year}.csv'), "w") as f:
-			f.writelines(['ID,GARD_id,CONF_SCORE,SEM_SIM\n'])
+			f.writelines(['ID|GARD_id|CONF_SCORE|SEM_SIM\n'])
 
 		df = pd.read_csv(norm_file, index_col=False, low_memory=False)
 		chunk_size = int(len(df)/5)
@@ -643,8 +654,8 @@ def cleanup_pub_country():
 
 def fix_escaped_endings():
 	def tf(val):
-		if type(val) == str and val[-1] == '\\':
-			return val[:-1]
+		if type(val) == str:
+			return val.encode('unicode_escape').decode('utf-8')
 		else:
 			return val
 
@@ -700,6 +711,10 @@ def select_RD_abstracts():
 
 
 def annotation_preprocess_grant():
+	# Load scispaCy model and add the abbreviation detector to the pipeline
+	nlp = spacy.load("en_core_sci_lg", exclude=["parser", "ner"])
+	nlp.add_pipe("abbreviation_detector")
+
 	# Get CSV files lists from projects and abstracts folders
 	projects_files = sorted(years_to_files("projects"))
 	abstracts_files = sorted(years_to_files("abstracts"))
@@ -711,7 +726,7 @@ def annotation_preprocess_grant():
 			continue
 
 		# Preprocesses information related to PHR and AIM (May not be needed due to Jaber's code)
-		annotate_text = prepare_phr_aim(projects_file, abstracts_file)
+		annotate_text = prepare_phr_aim(projects_file, abstracts_file, nlp)
 
 		year = projects_file[-8:-4]
 
@@ -755,10 +770,14 @@ def annotate_grant_abstracts():
 					umls.to_csv(output_file, index=False, mode='a', header=False)
 
 				print("Added annotations to", output_file)
+				text = None
+				umls = None
 
 			except Exception as e:
 				print(e)
 				continue
+			
+		nlp = None
 
 	print("***** ALL DONE *****")
 
@@ -879,35 +898,6 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 			"publications",
 			"normmap"
 	]
-
-	
-
-	# Clear out old files, or initialize new repo for them if the given data_neo4j path does
-	# not already exist.
-	repo = None
-	is_new_repo = False
-	'''
-	try:
-		files = os.listdir(neo4j_path)
-		files.remove(".git")
-		print("Found existing git repo at neo4j_path, clearing out old files")
-		repo = pygit2.Repository(data_neo4j(".git"))
-		is_new_repo = False
-		for f in files:
-			# skip annotation-related files because we may not want to reannotate some files
-			if f in ["annotation_files", "annotation_source", "annotation_umls", "grants_umls"]:
-				folders_to_create.remove(f)
-				continue
-			fpath = data_neo4j(f)
-			shutil.rmtree(fpath) if os.path.isdir(fpath) else os.remove(fpath)
-	except (NotADirectoryError, FileNotFoundError, ValueError):
-		print("Not existing repo at given data_neo4j path, initializing")
-		repo = pygit2.init_repository(neo4j_path)
-		is_new_repo = True
-
-	print("Creating empty output directories")
-	'''
-
 	
 	# add empty folders for the generated files
 	add_folder = lambda folder_name: os.mkdir(data_neo4j(folder_name))
@@ -919,7 +909,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	##############################################
 	# Run preprocessing stages one after another.#
 	##############################################
-	
+	"""
 	print('Running get_disease_data')
 	get_disease_data()
 	print("Running get_RD_project_ids")
@@ -958,6 +948,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	
 	print("Running annotation_preprocess_grant")
 	annotation_preprocess_grant()
+	
 	print("Running annotate_grant_abstracts")
 	annotate_grant_abstracts()
 	print("Running clean_umls_concepts")
@@ -966,49 +957,27 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	clean_annotation_source()
 	print("Running map_semantic_types")
 	map_semantic_types()
-	
 	print("Running fix_escaped_endings")
 	fix_escaped_endings()
+
 	
 	
 	################################################
-
-	# Finished running stages, now we figure out which files have changed
-	# (and store them in a FilesToAdd object to be returned) and commit the changes
-	'''
-	print("Getting current repo status")
-	status = repo.status().items()
-	fta = {}
-	for subdir in FilesToAdd.__required_keys__:
-		fta[subdir] = [data_neo4j(k) for k,v in status
-									 if k.startswith(subdir)
-									 and v in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_WT_NEW]]
-
-	print("adding all changes to commit")
-	if is_new_repo:
-		ref = "HEAD"
-		parents = []
-	else:
-		ref = repo.head.name
-		parents = [repo.head.target]
-	index = repo.index
-	index.add_all()
-	index.write()
-	print("Committing")
-	author = pygit2.Signature('script authored', 'no@email.given')
-	committer = pygit2.Signature('script committed', 'no@email.given')
-	message = "regular update commit"
-	tree = index.write_tree()
-	repo.create_commit(ref, author, committer, message, tree, parents)
-	'''
-
+	
+	# Transfers all processed files to neo4j-dev server so that the code can find them and populate the databases
+	print('Transfering grant database files to the neo4j-dev server')
+	target_url = sysvars.rdas_urls['neo4j-dev']
+	p = Popen(['scp', '-r', '-i', f'~/.ssh/id_rsa', f'{sysvars.gnt_files_path}/processed/', f'{sysvars.current_user}@{target_url}:{sysvars.gnt_files_path}'], encoding='utf8')
+	p.wait()
+	print('Transfer done...')
+	"""
 	# Gets the names of every processed file added for the rest of the code to add to the neo4j
 	fta = {}
 	for subdir in FilesToAdd.__dict__['__annotations__'].keys():
-		fta[subdir] = ['file:///' + data_neo4j(subdir)+'/'+d for d in os.listdir(data_neo4j(subdir))] #'file:/'
+		fta[subdir] = sorted(['file:///' + data_neo4j(subdir)+'/'+d for d in os.listdir(data_neo4j(subdir)) if not d == 'README.md']) #'file:/'
 		print(fta)
 	return fta
-
+	
 
 # For testing purposes; this file is typically not run directly, but instead called
 # by update_grant.py with an appropriate raw and output path

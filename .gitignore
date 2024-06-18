@@ -109,3 +109,7 @@ fix_pubtator_type.py
 etc
 RDAS_GFKG/src/FineTunned_Bert_2.pt
 RDAS_GFKG/src/Finetunned_Bert_2.pt
+RDAS_CTKG/eligibility_extraction/
+RDAS_CTKG/metamap_cond_out.json
+RDAS_CTKG/metamap_cond.txt
+RDAS_GFKG/convert_csv_fields.py
