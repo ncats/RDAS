@@ -1079,6 +1079,7 @@ def condition_map(db, update_metamap=True):
                 for gard_id in gard_ids:
                     # Create Annotation nodes and connect to Condition and GARD nodes
                     db.run('MATCH (z:GARD) WHERE z.GardId = \"{gard_id}\" MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:ConditionAnnotation {{UMLS_CUI: \"{umls}\", UMLSPreferredName: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y) MERGE (z)<-[:mapped_to_gard]-(x)'.format(gard_id=gard_id,cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
+
             else:
                 # Create Annotation nodes and connect to Condition nodes
                 db.run('MATCH (y:Condition) WHERE ID(y) = {cond_id} MERGE (x:ConditionAnnotation {{UMLS_CUI: \"{umls}\", UMLSPreferredName: \"{pref}\", SEMANTIC_TYPE: {sems}, MATCH_TYPE: \"METAMAP\"}}) MERGE (x)<-[:has_annotation {{FUZZY_SCORE: {fuzz}, METAMAP_SCORE: {meta}}}]-(y)'.format(cond_id=cond_id,umls=umls,pref=prefs[idx],sems=sems[idx],fuzz=fuzzy_scores[idx],meta=meta_scores[idx]))
@@ -1086,7 +1087,6 @@ def condition_map(db, update_metamap=True):
     print('REMOVING UNNEEDED PROPERTIES')
     # Remove unnecessary properties from Condition nodes that were used during processing
     db.run('MATCH (x:Condition) SET x.METAMAP_PREFERRED_TERM = NULL SET x.METAMAP_OUTPUT = NULL SET x.FUZZY_SCORE = NULL SET x.METAMAP_SCORE = NULL')
-
 
 
 def drug_normalize(drug):
