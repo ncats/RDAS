@@ -92,6 +92,8 @@ def aggregate_disease_data():
 	#merged_df = normmap_df.merge(disease_df[['GARD_ID']])
 	merged_df.to_csv(data_neo4j('disease/disease_to_application.csv'),index=False)
 
+
+
 def combine_normmap_results():
 	combine_df = pd.DataFrame()
 
@@ -108,54 +110,8 @@ def combine_normmap_results():
 	combine_df.to_csv(data_neo4j('normmap_results.csv'), index=False)
 
 
+
 lock = threading.Lock()
-<<<<<<<< HEAD:RDAS.GFKG/prep_neo4j_data.py
-def batch_normmap(df, thr, year, nlp):
-	r,c = df.shape
-	for idx in range(r):
-		try:
-			with lock:
-				print(f'{idx}/{r} [{thr}]')
-				 
-			row = df.iloc[idx]
-			appl_id = row['APPLICATION_ID']
-			abstract = row['ABSTRACT_TEXT']
-			phr = row['PHR']
-			title = row['PROJECT_TITLE']
-
-			gard_ids = rdas.GardNameExtractor(title, phr, abstract, nlp)
-			if gard_ids:
-				for gard,add_data in gard_ids.items():
-					if add_data == 1:
-						add_data = [1,1]
-
-					with lock:
-						print({'ID': appl_id, 'GARD_id': gard, 'CONF_SCORE': add_data[0], 'SEM_SIM': add_data[1]})
-						with open(data_neo4j(f'normmap/normmap_results_{year}.csv'), "a") as f:
-							f.writelines([f'{appl_id},{gard},{add_data[0]},{add_data[1]}\n'])
-
-		except Exception as e:
-			print(e)
-			continue
-
-"""
-def normmap_process (df):
-	r,c = df.shape
-	for idx in range(r):
-		try:
-			print(f'{idx}/{r}') 
-			row = df.iloc[idx]
-			appl_id = row['APPLICATION_ID']
-			abstract = row['ABSTRACT_TEXT']
-			phr = row['PHR']
-			title = row['PROJECT_TITLE']
-
-			#project_data = rdas.get_project_data(appl_id).get('results')[0]
-
-			#title = project_data.get('project_title')
-			#phr = project_data.get('phr_text')
-
-========
 def batch_normmap(df, thr, year):
 	r,c = df.shape
 	for idx in range(r):
@@ -168,129 +124,42 @@ def batch_normmap(df, thr, year):
 		abstract = row['ABSTRACT_TEXT']
 		phr = row['PHR']
 		title = row['PROJECT_TITLE']
->>>>>>>> devon_dev:RDAS_GFKG/prep_neo4j_data.py
-
-			gard_ids = rdas.GardNameExtractor(title, phr, abstract)
-			if gard_ids:
-				for gard,add_data in gard_ids.items():
-					if add_data == 1:
-						add_data = [1,1]
-
-					with lock:
-						print({'ID': appl_id, 'GARD_id': gard, 'CONF_SCORE': add_data[0], 'SEM_SIM': add_data[1]})
-						with open(data_raw('normmap_results.csv'), "a") as f:
-							f.writelines([f'{appl_id},{gard},{add_data[0]},{add_data[1]}\n'])
-
-		except Exception as e:
-			print(e)
-			continue
-"""
-
-
-<<<<<<<< HEAD:RDAS.GFKG/prep_neo4j_data.py
-========
+		gard_ids = rdas.GardNameExtractor(title, phr, abstract)
+		if gard_ids:
+			for gard,add_data in gard_ids.items():
+				if add_data == 1:
+					add_data = [1,1]
 				with lock:
 					print({'ID': appl_id, 'GARD_id': gard, 'CONF_SCORE': add_data[0], 'SEM_SIM': add_data[1]})
 					with open(data_neo4j(f'normmap/normmap_results_{year}.csv'), "a") as f:
 						f.writelines([f'{appl_id}|{gard}|{add_data[0]}|{add_data[1]}\n'])
 
-		#except Exception as e:
-			#print(e)
-			#continue
 
-"""
-def normmap_process (df):
-	r,c = df.shape
-	for idx in range(r):
-		try:
-			print(f'{idx}/{r}') 
-			row = df.iloc[idx]
-			appl_id = row['APPLICATION_ID']
-			abstract = row['ABSTRACT_TEXT']
-			phr = row['PHR']
-			title = row['PROJECT_TITLE']
-
-			#project_data = rdas.get_project_data(appl_id).get('results')[0]
-
-			#title = project_data.get('project_title')
-			#phr = project_data.get('phr_text')
-
-
-			gard_ids = rdas.GardNameExtractor(title, phr, abstract)
-			if gard_ids:
-				for gard,add_data in gard_ids.items():
-					if add_data == 1:
-						add_data = [1,1]
-
-					with lock:
-						print({'ID': appl_id, 'GARD_id': gard, 'CONF_SCORE': add_data[0], 'SEM_SIM': add_data[1]})
-						with open(data_raw('normmap_results.csv'), "a") as f:
-							f.writelines([f'{appl_id},{gard},{add_data[0]},{add_data[1]}\n'])
-
-		except Exception as e:
-			print(e)
-			continue
-"""
-
-
->>>>>>>> devon_dev:RDAS_GFKG/prep_neo4j_data.py
 
 def run_normmap():
 	print('Running NormMap')
-
-<<<<<<<< HEAD:RDAS.GFKG/prep_neo4j_data.py
-	nlp = spacy.load("en_core_web_sm")
-========
-	#nlp = spacy.load("en_core_web_sm")
->>>>>>>> devon_dev:RDAS_GFKG/prep_neo4j_data.py
-
 	abs_files = glob.glob(data_raw('abstracts') + '/*.csv')
 	abs_files = sorted(abs_files)
-
 	prj_files = glob.glob(data_raw('projects') + '/RePORTER_PRJ_C_FY*.csv')
 	prj_files = sorted(prj_files)
 
 	for idx, abs_file in enumerate(abs_files):
-<<<<<<<< HEAD:RDAS.GFKG/prep_neo4j_data.py
-		prj_file = prj_files[idx]
-
-		print(abs_file, ' -merged- ',prj_file)
-
-		tmp = pd.read_csv(('{filename}'.format(filename=abs_file)),index_col=False, encoding = "ISO-8859-1")
-		tmp2 = pd.read_csv(('{filename}'.format(filename=prj_file)),index_col=False, usecols=['APPLICATION_ID','PHR', 'PROJECT_TITLE'], encoding = "ISO-8859-1", low_memory=False)
-
-		merged_df = pd.merge(tmp, tmp2, on=['APPLICATION_ID'])
-		merged_df['APPLICATION_ID'] = merged_df['APPLICATION_ID'].astype(int)
-
 		year = re.findall(r'\d+', abs_file)[0]
-
-========
-		year = re.findall(r'\d+', abs_file)[0]
-
 		if os.path.exists(data_raw(f'normmap/RePORTER_NORMMAP_{year}.csv')):
 			print(data_raw(f'normmap/RePORTER_NORMMAP_{year}.csv') + ' already exists... bypassing')
 			continue
-
 		prj_file = prj_files[idx]
-
 		print(abs_file, ' -merged- ',prj_file)
-
 		tmp = pd.read_csv(('{filename}'.format(filename=abs_file)),index_col=False, encoding = "ISO-8859-1")
 		tmp2 = pd.read_csv(('{filename}'.format(filename=prj_file)),index_col=False, usecols=['APPLICATION_ID','PHR', 'PROJECT_TITLE'], encoding = "ISO-8859-1", low_memory=False)
-
 		merged_df = pd.merge(tmp, tmp2, on=['APPLICATION_ID'])
 		merged_df['APPLICATION_ID'] = merged_df['APPLICATION_ID'].astype(int)
-
->>>>>>>> devon_dev:RDAS_GFKG/prep_neo4j_data.py
 		merged_df.to_csv(data_raw(f'normmap/RePORTER_NORMMAP_{year}.csv'), index=False)
-
 
 	norm_files = glob.glob(data_raw('normmap') + '/*.csv')
 	norm_files = sorted(norm_files)
-
 	for norm_file in norm_files:
 		year = re.findall(r'\d+', norm_file)[0]
-
 		if os.path.exists(data_neo4j(f'normmap/normmap_results_{year}.csv')):
 			print(f'{year} Gard-Project mapping file already exists... bypassing')
 			continue
@@ -302,26 +171,18 @@ def run_normmap():
 		df = pd.read_csv(norm_file, index_col=False, low_memory=False)
 		chunk_size = int(len(df)/5)
 		thread_list = list()
-
 		list_df = [df[i:i+chunk_size] for i in range(0,len(df),chunk_size)]
 
 		# Create threads to process results
 		for thrnum, lst in enumerate(list_df):
-<<<<<<<< HEAD:RDAS.GFKG/prep_neo4j_data.py
-			thread = threading.Thread(target=batch_normmap, args=(lst, thrnum, year, nlp), daemon=True)
-========
 			thread = threading.Thread(target=batch_normmap, args=(lst, thrnum, year), daemon=True)
->>>>>>>> devon_dev:RDAS_GFKG/prep_neo4j_data.py
 			thread_list.append(thread)
-
 		for thr in thread_list:
 			thr.start()
-
 		for thr in thread_list:
 			thr.join()
 
 	combine_normmap_results()
-
 	print('GARD to Project connections made')
 
 def get_RD_project_ids():
