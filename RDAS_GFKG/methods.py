@@ -27,12 +27,6 @@ from sentence_transformers import SentenceTransformer, util
 from transformers import AutoTokenizer, AutoModel
 import torch
 import glob
-<<<<<<<< HEAD:RDAS.GFKG/methods.py
-
-def start(db, restart_raw=False, restart_processed=False):
-    update_grant.main(db, restart_raw=restart_raw, restart_processed=restart_processed)
-
-========
 from datasets import load_dataset
 from sentence_transformers import SentenceTransformer, models
 from transformers import BertTokenizer
@@ -52,7 +46,6 @@ def start(db, restart_raw=False, restart_processed=False):
     update_grant.main(db, restart_raw=restart_raw, restart_processed=restart_processed)
     db.setConf('UPDATE_PROGRESS','grant_in_progress','False')
 
->>>>>>>> devon_dev:RDAS_GFKG/methods.py
 def download_nih_data(restart_raw=False):
     current_year = int(datetime.today().year)
 
@@ -91,11 +84,7 @@ def download_nih_data(restart_raw=False):
 
         if len(os.listdir(f'{sysvars.gnt_files_path}raw/{file_dir}/')) == 1:
             for i in range(1985,current_year+1):
-<<<<<<<< HEAD:RDAS.GFKG/methods.py
-                command = f'curl -L -X GET https://reporter.nih.gov/exporter/{type}/download/{i} -o {sysvars.base_path}grant/src/raw/{file_dir}/{type}{i}.zip'
-========
                 command = f'curl -L -X GET https://reporter.nih.gov/exporter/{type}/download/{i} -o {sysvars.gnt_files_path}raw/{file_dir}/{type}{i}.zip'
->>>>>>>> devon_dev:RDAS_GFKG/methods.py
                 os.system(command)
                 command = f'unzip {sysvars.gnt_files_path}raw/{file_dir}/{type}{i}.zip -d {sysvars.gnt_files_path}raw/{file_dir}'
                 os.system(command)
@@ -262,33 +251,6 @@ def get_def(a):
 
 source_dict = {}
 def GardNamePreprocessor(Gard):
-<<<<<<<< HEAD:RDAS.GFKG/methods.py
-   Gard['GardName'] = Gard['GardName'].apply(lambda x: str(x).replace('"', '').lower())
-   Gard['Synonyms'] = Gard['Synonyms'].apply(lambda x: extract_words_from_json_string(str(x).lower()))
-   Gard = remove_similar_strings(Gard)
-   Gard['Synonyms'] = Gard['Synonyms'].apply(lambda x: extract_words_from_json_string(str(x)))
-   Gard['Synonyms'] =Gard['GardName'].apply(lambda x: [x])+Gard['Synonyms']
-   #Gard['Synonyms_bow']=Gard['Synonyms'].apply(lambda x: generate_term_orders_list_of_sords(x) )
-   Gard['Synonyms_sw'] = Gard['Synonyms'].apply(lambda x: process_row_list(x)) #.apply(lambda x: process_row_list(x))
-   Gard['Synonyms_sw_bow']=Gard['Synonyms_sw'].apply(lambda x: generate_term_orders_list_of_sords(x) )
-   Gard['Synonyms_sw_bow']=Gard['Synonyms_sw_bow'].apply(lambda x: list(set(len_chcek(x))) )
-   #Gard['Synonyms_sw_nltk'] = Gard['Synonyms_sw'].apply(lambda x: process_row_list_2(x))
-   #Gard['Synonyms_sw_nltk']=Gard['Synonyms_sw_nltk']+Gard['Synonyms_sw']
-   #Gard['Synonyms_sw_nltk'] = Gard['Synonyms_sw_nltk'].apply(lambda x: list(set(x)))
-   #Gard['Synonyms_stem'] = Gard['Synonyms'].apply(lambda x: stem_text_list(x))
-   #Gard['Synonyms_stem_bow']=Gard['Synonyms_stem'].apply(lambda x: generate_term_orders_list_of_sords(x) )
-   Gard['Synonyms_sw_stem'] = Gard['Synonyms_sw'].apply(lambda x: stem_text_list(x))
-   Gard['Synonyms_sw_stem_bow']=Gard['Synonyms_sw_stem'].apply(lambda x: generate_term_orders_list_of_sords(x) )
-   Gard['Synonyms_sw_stem'] = Gard['Synonyms_sw_stem'].apply(lambda x:list(set(len_chcek(x))) )
-   Gard['Synonyms_sw_stem_bow']=Gard['Synonyms_sw_stem_bow'].apply(lambda x: list(set(len_chcek(x))) )
-   Gard['Synonyms_sw'] = Gard['Synonyms_sw_stem'].apply(lambda x: list(set(len_chcek(x))) )
-
-   Excluding_list = ['GARD:{:07d}'.format(int(gard_id.split(':')[1])) for gard_id in sysvars.gard_preprocessor_exclude]
-   Gard['GardId'] = Gard['GardId'].str.strip('"')
-   Gard = Gard[~Gard['GardId'].isin(Excluding_list)]
-
-   return Gard
-========
     print(Gard)
     Gard['GardName'] = Gard['GardName'].apply(lambda x: str(x).replace('"', '').lower())
     Gard['Synonyms'] = Gard['Synonyms'].apply(lambda x: extract_words_from_json_string(str(x).lower()))
@@ -318,21 +280,11 @@ def GardNamePreprocessor(Gard):
     Gard['GardNamedef']=Gard.apply(lambda x: get_def(x['GardName']), axis=1)
 
     return Gard
->>>>>>>> devon_dev:RDAS_GFKG/methods.py
 
 def download_gard_data_from_db ():
     db = AlertCypher(sysvars.gard_db)
     in_progress = db.getConf('UPDATE_PROGRESS', 'grant_in_progress')
 
-<<<<<<<< HEAD:RDAS.GFKG/methods.py
-    if not in_progress == 'True':
-        return None
-
-    if not os.path.exists(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv'):
-        response = db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.GardName as GardName, x.Synonyms as Synonyms').data()
-
-        myFile = open(f'{sysvars.base_path}grant/src/raw/all_gards.csv', 'w')
-========
     #if not in_progress == 'True':
         #return None
 
@@ -340,21 +292,11 @@ def download_gard_data_from_db ():
         response = db.run('MATCH (x:GARD) RETURN x.GardId as GardId, x.GardName as GardName, x.Synonyms as Synonyms').data()
 
         myFile = open(f'{sysvars.gnt_files_path}raw/all_gards.csv', 'w')
->>>>>>>> devon_dev:RDAS_GFKG/methods.py
         writer = csv.writer(myFile)
         writer.writerow(['GardId', 'GardName', 'Synonyms'])
         for dictionary in response:
             writer.writerow(dictionary.values())
         myFile.close()
-<<<<<<<< HEAD:RDAS.GFKG/methods.py
-        df = pd.read_csv(f'{sysvars.base_path}grant/src/raw/all_gards.csv')
-
-        df = GardNamePreprocessor(df)
-        df.to_csv(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv')
-
-    else:
-        df = pd.read_csv(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv')
-========
         df = pd.read_csv(f'{sysvars.gnt_files_path}raw/all_gards.csv')
 
         df = GardNamePreprocessor(df)
@@ -362,13 +304,10 @@ def download_gard_data_from_db ():
 
     else:
         df = pd.read_csv(f'{sysvars.gnt_files_path}processed/all_gards_processed.csv')
->>>>>>>> devon_dev:RDAS_GFKG/methods.py
         df['Synonyms_sw'] = df['Synonyms_sw'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
         df['Synonyms_sw_bow'] = df['Synonyms_sw_bow'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
         df['Synonyms_sw_stem'] = df['Synonyms_sw_stem'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
         df['Synonyms_sw_stem_bow'] = df['Synonyms_sw_stem_bow'].apply(lambda x: extract_words_from_json_string2(str(x).lower()))
-<<<<<<<< HEAD:RDAS.GFKG/methods.py
-========
 
         help=pd.read_csv(f'{sysvars.gnt_files_path}J_GARD_master.csv')
         for index, row in help.iterrows():
@@ -376,23 +315,16 @@ def download_gard_data_from_db ():
             source_description = row['SourceDescription']
             if type(source_name) ==str:
                 source_dict[source_name.lower()] = source_description
->>>>>>>> devon_dev:RDAS_GFKG/methods.py
 
     return df
 
 # Global Objects for Processing
 
 Gard = download_gard_data_from_db()
-<<<<<<<< HEAD:RDAS.GFKG/methods.py
-
-'''
-if not os.path.exists(f'{sysvars.base_path}grant/src/processed/all_gards_processed.csv'):
-========
 print(Gard)
 
 '''
 if not os.path.exists(f'{sysvars.gnt_files_path}processed/all_gards_processed.csv'):
->>>>>>>> devon_dev:RDAS_GFKG/methods.py
     pass
     Gard = download_gard_data_from_db()
 else:
@@ -657,11 +589,8 @@ def combine_dictionaries_sent(dict1, dict2):
             combined_dict[key] = value
     return combined_dict
 
-<<<<<<<< HEAD:RDAS.GFKG/methods.py
-def modified_dict(combined_dict,combined_dict_sen):
-========
+
 def modified_dict(combined_dict):#,combined_dict_sen):
->>>>>>>> devon_dev:RDAS_GFKG/methods.py
     keys_to_remove = set()
     for key1 in combined_dict:
         for key2 in combined_dict:
@@ -801,14 +730,6 @@ def normalize_combined_dictionary(input_text,title_,dict1, dict2, dict3, dict4,m
     normalized_dict = {key: value   for key, value in combined_dict.items()}
     result_dict = {}
     for key, value in normalized_dict.items():
-<<<<<<<< HEAD:RDAS.GFKG/methods.py
-    #if  is_about_term(input_text.lower(), key) >=0.7:
-        result_dict[key] = [value, is_about_term(input_text.lower(), key)]
-    return result_dict
-
-
-def gard_id(title_, Public_health_relevance_statement, abstract_, nlp):
-========
         #if  is_about_term(input_text.lower(), key) >=0.5:
         #sen_has_gard=get_sen(input_text.lower(), key,title_)
         defin=get_def(key)
@@ -833,7 +754,6 @@ def gard_id(title_, Public_health_relevance_statement, abstract_, nlp):
 
 
 def grad_id(title_, Public_health_relevance_statement, abstract_):
->>>>>>>> devon_dev:RDAS_GFKG/methods.py
     if not isinstance(title_, str) and not isinstance(Public_health_relevance_statement, str) and not isinstance(abstract_, str):
         return ''  # Return default values when no string input is provided
     if title_ and isinstance(title_, str):
@@ -863,11 +783,7 @@ def grad_id(title_, Public_health_relevance_statement, abstract_):
 
 def GardNameExtractor(project_title,phr_text,abstract_text, nlp):
   #Abstract1['Gard_name']=Abstract1.apply(lambda x: gard_id(x['project_title'],x['phr_text'],x['abstract_text']), axis=1)
-<<<<<<<< HEAD:RDAS.GFKG/methods.py
-  gard_ids = gard_id(project_title,phr_text,abstract_text, nlp)
-========
   gard_ids = grad_id(project_title,phr_text,abstract_text)
->>>>>>>> devon_dev:RDAS_GFKG/methods.py
   if gard_ids:
     return update_dictionary(gard_ids)
   else:
