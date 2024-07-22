@@ -152,25 +152,32 @@ def run_normmap():
 		print(abs_file, ' -merged- ',prj_file)
 		tmp = pd.read_csv(('{filename}'.format(filename=abs_file)),index_col=False, encoding = "ISO-8859-1")
 		tmp2 = pd.read_csv(('{filename}'.format(filename=prj_file)),index_col=False, usecols=['APPLICATION_ID','PHR', 'PROJECT_TITLE'], encoding = "ISO-8859-1", low_memory=False)
-		merged_df = pd.merge(tmp, tmp2, on=['APPLICATION_ID'])
+		merged_df = pd.merge(tmp, tmp2, on=['APPLICATION_ID'], how='outer', indicator='EXISTS_IN_ABSTRACT_FILE')
+		#merged_df.fillna('', inplace=True)
 		merged_df['APPLICATION_ID'] = merged_df['APPLICATION_ID'].astype(int)
 		merged_df.to_csv(data_raw(f'normmap/RePORTER_NORMMAP_{year}.csv'), index=False)
-
+	
 	norm_files = glob.glob(data_raw('normmap') + '/*.csv')
 	norm_files = sorted(norm_files)
 	for norm_file in norm_files:
 		year = re.findall(r'\d+', norm_file)[0]
-		if os.path.exists(data_neo4j(f'normmap/normmap_results_{year}.csv')):
+		
+		if os.path.exists(data_neo4j(f'normmap/normmap_results_{year}.csv')): #COMMENTED OUT FOR TESTING
 			print(f'{year} Gard-Project mapping file already exists... bypassing')
 			continue
 
 		# Create CSV files headers
-		with open(data_neo4j(f'normmap/normmap_results_{year}.csv'), "w") as f:
+		with open(data_neo4j(f'normmap/normmap_results_{year}.csv'), "w") as f: #COMMENTED OUT FOR TESTING
 			f.writelines(['ID|GARD_id|CONF_SCORE|SEM_SIM\n'])
 
 		df = pd.read_csv(norm_file, index_col=False, low_memory=False)
-		chunk_size = int(len(df)/5)
 		thread_list = list()
+
+		#df = df[df['EXISTS_IN_ABSTRACT_FILE']=='right_only'] #TEST
+		#df = df[['APPLICATION_ID', 'ABSTRACT_TEXT', 'PHR', 'PROJECT_TITLE']] #TEST
+
+		chunk_size = int(len(df)/5)
+		
 		list_df = [df[i:i+chunk_size] for i in range(0,len(df),chunk_size)]
 
 		# Create threads to process results
@@ -185,10 +192,13 @@ def run_normmap():
 	combine_normmap_results()
 	print('GARD to Project connections made')
 
+
+
 def get_RD_project_ids():
     # Get GARD to Project mappings
 	run_normmap()
 	aggregate_disease_data()
+	
 	apps = pd.read_csv(data_neo4j("normmap_results.csv"), usecols=["ID"])
 
 	# Drop duplicate results and sort by Application ID
@@ -275,7 +285,7 @@ def select_RD_projects():
 		print('Finished ', output_file)
 
 def clean_pi (pi_info):
-	pi_info = pi_info[:len(pi_info)-1]
+	pi_info = pi_info.replace(";","")
 	return pi_info
 
 def cleanup_project_IC_NAME_totalcost():
@@ -608,13 +618,14 @@ def annotate_grant_abstracts():
 
 
 	# Annotate text with four scispaCy models
-	for model in MODELS:
+	for model in MODELS[2:]:
 		print(f'*** Annotate with {model} model ***')
 
 		nlp = load_model(model)
 		for file in input_files:
 			year = file[-8:-4]
-			
+			if int(year) < 2006 and model == 'en_ner_bc5cdr_md':
+				continue
 			try:
 				text = pd.read_csv(file, encoding=ENCODING, dtype={'APPLICATION_ID':int, 'ABSTRACT_TEXT':str})
 
@@ -779,10 +790,8 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	merge_project_funding()
 	print("Running select_RD_projects")
 	select_RD_projects()
-	
 	print("Running cleanup_project_IC_NAME_totalcost")
 	cleanup_project_IC_NAME_totalcost()
-	
 	print("Running find_RD_core_projects")
 	find_RD_core_projects()
 	print("Running select_RD_patents")
@@ -797,7 +806,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	cleanup_pub_country()
 	print("Running select_RD_abstracts")
 	select_RD_abstracts()
-	
+	"""
 	# The below stages are extremely slow, so we will only run them for
 	# years that have changed data.
 	
@@ -807,6 +816,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 											 and v in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_WT_NEW]}
 	'''	
 	
+	"""
 	print("Running annotation_preprocess_grant")
 	annotation_preprocess_grant()
 	
@@ -818,6 +828,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	clean_annotation_source()
 	print("Running map_semantic_types")
 	map_semantic_types()
+	
 	print("Running fix_escaped_endings")
 	fix_escaped_endings()
 

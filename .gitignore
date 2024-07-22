@@ -113,3 +113,8 @@ RDAS_CTKG/eligibility_extraction/
 RDAS_CTKG/metamap_cond_out.json
 RDAS_CTKG/metamap_cond.txt
 RDAS_GFKG/convert_csv_fields.py
+fix_normmap_file_sep.py
+project_check.py
+project_check_missing.csv
+project_check_new.csv
+project_check_old.csv

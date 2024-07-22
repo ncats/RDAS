@@ -118,7 +118,7 @@ def create_disease_node(db, data, xrefs): # Include xrefs into GARD node instead
     "syns":data[6],
     "orpha":results['Orphanet'] if 'Orphanet' in results else None,
     "icd10":results['ICD-10'] if 'ICD-10' in results else None,
-    "umls":results['UMLS'] if 'UMLS' in results else None,
+    "umls":list(set(results['UMLS'])) if 'UMLS' in results else None,
     "omim":results['OMIM'] if 'OMIM' in results else None,
     "snomed":results['SNOMED-CT'] if 'SNOMED-CT' in results else None,
     "diseaseontology":results['DiseaseOntology'] if 'DiseaseOntology' in results else None,
@@ -315,7 +315,7 @@ def get_remaining_umls(db, umls_update=True):
     INSTANCE.form['SingLinePMID'] = True
 
     print('GATHERING GARD UMLS DATA')
-    db.run('MATCH (x:GARD) WHERE x.UMLS IS NOT NULL SET x.UMLS_Source = "DATALAKE"')
+    db.run('MATCH (x:GARD) WHERE x.UMLS IS NOT NULL SET x.UMLS_Source = "GARD"')
     res = db.run('MATCH (x:GARD) WHERE x.UMLS IS NULL SET x.UMLS_Source = "METAMAP" RETURN x.GardId AS gard_id, x.GardName as gard_name').data()
     
     gard_strs = [f"{i['gard_id'].replace('GARD:','')}|{normalize(i['gard_name'])}\n" for i in res if i['gard_name']]
