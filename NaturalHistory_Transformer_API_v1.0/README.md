@@ -71,7 +71,3 @@ The API documentation is available via Swagger UI and can be accessed at:
       http://localhost:5000/docs
    ```   
  You can use the interactive documentation to test the endpoints and understand the API.
-
-
-### Feedback:
-   If you have any feedback or questions, please contact minghui.ao@nih.gov, qian.zhu@nih.gov.
