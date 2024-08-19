@@ -1,3 +1,5 @@
+import sys
+# sys.path.append('/home/aom2/.conda/envs/rdas/lib/python3.8/site-packages')
 from neo4j import GraphDatabase,Auth
 from neo4j.debug import watch
 import configparser
@@ -15,6 +17,14 @@ class AlertCypher ():
         Parameters:
         - db (str): The name of the Neo4j database to connect to.
         """
+        
+        # Initializes the object with the config.ini file
+        """
+        Initializes the AlertCypher class.
+
+        Parameters:
+        - db (str): The name of the Neo4j database to connect to.
+        """
 
         # Initializes the object with the config.ini file
         workspace = os.path.dirname(os.path.abspath(__file__))
@@ -22,10 +32,12 @@ class AlertCypher ():
         self.configuration = configparser.ConfigParser()
         self.configuration.read(self.init)
         
-        # Connects to Neo4j database
+        # Connects to neo4j databasej
         server_uri = os.environ['NEO4J_URI']
         user = os.environ['NEO4J_USERNAME']
         password = os.environ['NEO4J_PASSWORD']
+
+        #watch("neo4j")
 
         neo4j_auth = Auth(scheme='basic',principal=user,credentials=password)
         connection = GraphDatabase.driver(uri=server_uri, auth=neo4j_auth) 

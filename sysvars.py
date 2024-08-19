@@ -1,11 +1,23 @@
 import os
 
-current_version = 2.5
+current_version = 2.6
 
 # Basic user information
 current_user = 'leadmandj'
 base_directory_name = 'RDAS'
+# base_path = '/home/{current_user}/RDAS_master/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
+
+# RDAS Team contacts for emails
+contacts = [
+    "leadmandj@nih.gov"
+]
+
 base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
+
+# RDAS Team contacts for emails
+contacts = [
+    "leadmandj@nih.gov"
+]
 
 # Folder paths
 backup_path = '{base_path}backup/'.format(base_path=base_path)
@@ -15,26 +27,68 @@ approved_path = '{base_path}approved/'.format(base_path=base_path)
 images_path = '{base_path}img/'.format(base_path=base_path)
 firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz-a4e783d24c.json'.format(base_path=base_path) # May have to set this in new enviroment
 
+
+# if you are not using minghui's test dataset, make db_prefix=""; now you only need to change the neo4j database names here:
+db_prefix="test."
+ct_db_name="rdas.ctkg" 
+gf_db_name='rdas.gfkg'
+pa_db_name="rdas.pakg"
+gard_db_name='rdas.gard'
+
+ct_db = db_prefix+ct_db_name
+pm_db = db_prefix+pa_db_name
+gnt_db = db_prefix+gf_db_name
+gard_db = db_prefix+gard_db_name
+
 # Conversions
-dump_dirs = ['clinical','pubmed','grant','gard']
-db_abbrevs = {'ct':'clinical', 'pm':'pubmed', 'gnt':'grant'}
-db_abbrevs2 = {'clinical':'ct', 'pubmed':'pm', 'grant':'gnt'}
+dump_dirs = ['RDAS.CTKG','RDAS.PAKG','RDAS.GFKG','RDAS.GARD']
+db_abbrevs = {'ct':'RDAS.CTKG', 'pm':'RDAS.PAKG', 'gnt':'RDAS.GFKG'}
+db_abbrevs2 = {ct_db:'ct', pm_db:'pm', gnt_db:'gnt'}
 
 # Paths to database creation and update source files
-ct_files_path = '{base_path}/clinical/src/'.format(base_path=base_path)
-pm_files_path = '{base_path}/pubmed/src/'.format(base_path=base_path)
-gnt_files_path = '{base_path}/grant/src/'.format(base_path=base_path)
-gard_files_path = '{base_path}/gard/src/'.format(base_path=base_path)
+ct_files_path = '{base_path}RDAS_CTKG/src/'.format(base_path=base_path)
+pm_files_path = '{base_path}RDAS_PAKG/src/'.format(base_path=base_path)
+gnt_files_path = '{base_path}RDAS_GFKG/src/'.format(base_path=base_path)
+gard_files_path = '{base_path}RDAS_GARD/src/'.format(base_path=base_path)
 
 # Database names being used on the current server
-ct_db = 'test.clinical'
-pm_db = 'test.pubmed'
-gnt_db = 'test.grant'
-gard_db = 'test.gard'
+convert = {ct_db:'trials', pm_db:'articles', gnt_db:'grants'}
 
 # Server URLS and addresses # Original epiapi_url is https://rdas.ncats.nih.gov/api/epi/
 epiapi_url = "https://rdas.ncats.nih.gov/api/epi/"
-rdas_urls = {'dev':'rdas-dev.ncats.nih.gov','test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}
+rdas_urls = {'neo4j-dev':"ncats-neo4j-lnx-dev.ncats.nih.gov",'dev':"rdas-dev.ncats.nih.gov",'test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}
+
+# GARD exclusion list for when GARD-Project mappings are made in the grant code
+gard_preprocessor_exclude = [
+'GARD:10311', 'GARD:10984', 'GARD:12351', 'GARD:12352', 'GARD:12638',
+'GARD:12915', 'GARD:12976', 'GARD:12977', 'GARD:15010', 'GARD:15042',
+'GARD:15066', 'GARD:15076', 'GARD:15080', 'GARD:15092', 'GARD:15112',
+'GARD:15119', 'GARD:15191', 'GARD:15192', 'GARD:15211', 'GARD:15300',
+'GARD:15315', 'GARD:15316', 'GARD:15357', 'GARD:15388', 'GARD:15394',
+'GARD:15395', 'GARD:15401', 'GARD:15402', 'GARD:15403', 'GARD:15415',
+'GARD:15422', 'GARD:15432', 'GARD:15443', 'GARD:15467', 'GARD:15483',
+'GARD:15504', 'GARD:15513', 'GARD:15525', 'GARD:15555', 'GARD:15564',
+'GARD:15565', 'GARD:15566', 'GARD:15567', 'GARD:15587', 'GARD:15600',
+'GARD:15603', 'GARD:15604', 'GARD:15605', 'GARD:15606', 'GARD:15607',
+'GARD:15608', 'GARD:15632', 'GARD:15637', 'GARD:15650', 'GARD:15651',
+'GARD:15657', 'GARD:15659', 'GARD:15696', 'GARD:15697', 'GARD:15752',
+'GARD:15779', 'GARD:15784', 'GARD:15785', 'GARD:15788', 'GARD:15848',
+'GARD:15853', 'GARD:15854', 'GARD:15986', 'GARD:15992', 'GARD:16059',
+'GARD:16131', 'GARD:16161', 'GARD:16184', 'GARD:16265', 'GARD:16267',
+'GARD:16269', 'GARD:16334', 'GARD:16337', 'GARD:16823', 'GARD:17047',
+'GARD:17343', 'GARD:17457', 'GARD:17458', 'GARD:17459', 'GARD:17460',
+'GARD:17461', 'GARD:17462', 'GARD:17463', 'GARD:17464', 'GARD:17465',
+'GARD:17514', 'GARD:17612', 'GARD:17795', 'GARD:17861', 'GARD:18046',
+'GARD:18057', 'GARD:18059', 'GARD:18060', 'GARD:18061', 'GARD:18259',
+'GARD:18285', 'GARD:18304', 'GARD:18384', 'GARD:18385', 'GARD:18472',
+'GARD:18477', 'GARD:18479', 'GARD:18485', 'GARD:18486', 'GARD:18512',
+'GARD:18550', 'GARD:18575', 'GARD:18577', 'GARD:18578', 'GARD:18579',
+'GARD:18580', 'GARD:18581', 'GARD:18582', 'GARD:18594', 'GARD:18595',
+'GARD:18596', 'GARD:18608', 'GARD:18609', 'GARD:18613', 'GARD:20322',
+'GARD:21425', 'GARD:2162', 'GARD:21865', 'GARD:22318', 'GARD:22319',
+'GARD:2456', 'GARD:3363', 'GARD:3364', 'GARD:3365', 'GARD:3366',
+'GARD:3367', 'GARD:3368', 'GARD:9185'
+]
 
 # UMLS code blacklist exclusively used for the clinical trial database
 umls_blacklist = [
