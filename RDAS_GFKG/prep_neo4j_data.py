@@ -132,6 +132,7 @@ def batch_normmap(df, thr, year):
 				pat = re.sub(r"\"\"|(\")(\'')",'\'', gard).replace('\'', '').replace('(', '').replace(')', '')
 				quoted_text = "'{}', '{}'".format(pat.split(",")[0].strip(), pat.split(",")[1].strip())
 				gard = "({})".format(quoted_text)
+
 				if add_data == 1:
 					add_data = [1,1]
 				with lock:
@@ -166,7 +167,7 @@ def run_normmap():
 	norm_files = sorted(norm_files)
 	for norm_file in norm_files:
 		year = re.findall(r'\d+', norm_file)[0]
-		
+
 		if os.path.exists(data_neo4j(f'normmap/normmap_results_{year}.csv')): #COMMENTED OUT FOR TESTING
 			print(f'{year} Gard-Project mapping file already exists... bypassing')
 			continue
@@ -177,12 +178,12 @@ def run_normmap():
 
 		df = pd.read_csv(norm_file, index_col=False, low_memory=False)
 		thread_list = list()
-
+    
 		#df = df[df['EXISTS_IN_ABSTRACT_FILE']=='right_only'] #TEST
 		#df = df[['APPLICATION_ID', 'ABSTRACT_TEXT', 'PHR', 'PROJECT_TITLE']] #TEST
 
 		chunk_size = int(len(df)/5)
-		
+
 		list_df = [df[i:i+chunk_size] for i in range(0,len(df),chunk_size)]
 
 		# Create threads to process results
