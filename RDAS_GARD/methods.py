@@ -1,13 +1,14 @@
 import os
+import sys
+workspace = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(workspace)
+sys.path.append('/home/leadmandj/RDAS')
 import json
-from skr_web_api import Submission, METAMAP_INTERACTIVE_URL
+#from skr_web_api import Submission, METAMAP_INTERACTIVE_URL
 from unidecode import unidecode
 from AlertCypher import AlertCypher
 import re
 import requests
-import sys
-workspace = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(workspace)
 import sysvars
 from datetime import datetime, date
 from http import client

@@ -51,6 +51,108 @@ def process_trial_update(thr, db, today, current_nctids, ids_to_update):
 
 def main():
     """
+    NEW CT API WITH DATA PIPELINE PROCESS:
+    for each diseases and their terms x
+    filter our acronyms in disease terms x
+    then get all full trials data from the date of last update to today x
+    https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Concept]{name} OR AREA[DetailedDescription]EXPANSION[Concept]{name} OR AREA[BriefSummary]EXPANSION[Concept]{name}) AND AREA[LastUpdatePostDate]RANGE[05/01/1975,MAX]&fields=NCTId&pageSize=1000&countTotal=true
+    do a check to see if trial already exists
+    """
+    print(f"[CT] Database Selected: {sysvars.ct_db}\nContinuing with script in 5 seconds...")
+    sleep(5)
+
+
+    # Connect to the Neo4j database
+    db = AlertCypher(sysvars.ct_db)
+    gard_db = AlertCypher(sysvars.gard_db)
+
+
+    # Get last updated date and current date
+    today = date.today().strftime('%m/%d/%y')
+    lastupdate_str = db.getConf('UPDATE_PROGRESS','rdas.ctkg_update')
+    lastupdate = datetime.strptime(lastupdate_str, "%m/%d/%y")
+    lastupdate = lastupdate.strftime('%m/%d/%Y')
+
+
+    in_progress = db.getConf('UPDATE_PROGRESS', 'clinical_in_progress')
+    print(f'in_progress:: {in_progress}')
+    if in_progress == 'True':
+        clinical_disease_progress = db.getConf('UPDATE_PROGRESS', 'clinical_disease_progress')
+        if not clinical_disease_progress == '':
+            clinical_disease_progress = int(clinical_disease_progress)
+        else:
+            clinical_disease_progress = 0
+
+        clinical_rxnorm_progress = db.getConf('UPDATE_PROGRESS', 'clinical_rxnorm_progress')
+        if not clinical_rxnorm_progress == '':
+            clinical_rxnorm_progress = int(clinical_rxnorm_progress)
+        else:
+            clinical_required_update_progress = 0
+        clinical_current_step = db.getConf('UPDATE_PROGRESS', 'clinical_current_step')
+    else:
+        clinical_disease_progress = 0
+        clinical_rxnorm_progress = 0
+        clinical_current_step = ''
+        db.setConf('UPDATE_PROGRESS', 'clinical_in_progress', 'True')
+
+
+    if clinical_current_step == '':
+        gard_response = gard_db.run('MATCH (x:GARD) RETURN x.GardId as gid, x.GardName as gname, x.Synonyms as syns LIMIT 50').data()
+        for idx,response in enumerate(gard_response):
+            name = response['gname']
+            gid = response['gid']
+            syns = response['syns']
+            syns = [syn for syn in syns if not rdas.is_acronym(syn)]
+            names = [name] + syns
+
+            print('CURRENT DISEASE IN API QUERY::', str(idx), name, gid)
+
+            nctids = rdas.get_nctids(names, lastupdate)
+            new_trials, trials_to_check = rdas.check_neo4j_trial_updates(db, nctids)
+            
+            # iterates through all trials that where already found in the database
+            for idx,nctid_check in enumerate(trials_to_check):
+                trial_info = rdas.extract_fields(nctid_check)
+                ID = trial_info['nctId']
+                if trial_info:
+                    for node_type in dm.node_names:
+                        # parse and convert data into a neo4j query, updates an existing trial
+                        rdas.format_node_data(db,today,trial_info,node_type,ID,update=True)
+                else:
+                    print('Error in add for finding full trial data for ' + nctid_check)
+
+            # iterates through all trials that were NOT found in the database
+            for idx,nctid_add in enumerate(new_trials):
+                trial_info = rdas.extract_fields(nctid_add)
+                ID = trial_info['nctId']
+                if trial_info:
+                    for node_type in dm.node_names:
+                        # parse and convert data into a neo4j query, adds a new trial
+                        rdas.format_node_data(db,today,trial_info,node_type,ID)
+                else:
+                    print('Error in add for finding full trial data for ' + nctid_add)
+
+            db.getConf('UPDATE_PROGRESS', 'clinical_disease_progress', str(idx))
+
+        db.setConf('UPDATE_PROGRESS', 'clinical_current_step', 'rxnorm_map')
+
+
+    if clinical_current_step == 'rxnorm_map':
+        rdas.rxnorm_map(db, clinical_rxnorm_progress)
+
+    if clinical_current_step == 'clear_progress':
+        # Update config values
+        db.setConf('UPDATE_PROGRESS', 'clinical_update', datetime.strftime(datetime.now(),"%m/%d/%y"))
+        db.setConf('UPDATE_PROGRESS', 'clinical_in_progress', 'False')
+        db.setConf('UPDATE_PROGRESS', 'clinical_current_step', '')
+        db.setConf('UPDATE_PROGRESS', 'clinical_disease_progress', '')
+        db.setConf('UPDATE_PROGRESS', 'clinical_rxnorm_progress', '')
+
+
+
+
+
+    """
     Main function for the data processing and updating of the Clinical Trial Neo4j Database.
 
     Parameters:
@@ -69,6 +171,7 @@ def main():
     # Initialize variables containing NCTIDs to add and update
     ids_to_update = list()
     ids_to_add = list()
+
     # Retrieve NCT IDs and last update dates from the database
     response = db.run('MATCH (x:ClinicalTrial) RETURN x.NCTId,x.LastUpdatePostDate').data()
     current_nctids = {i['x.NCTId']:i['x.LastUpdatePostDate'] for i in response}

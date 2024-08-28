@@ -668,7 +668,7 @@ def fetch_abstracts(pubmedIDs):
 
 
   
-def fetch_pubtator_annotations(pubmedIDs):
+def fetch_pubtator_annotations(pubmedIDs,retry=0):
   """
     Fetch annotations from PubTator for a given PubMed ID.
 
@@ -687,8 +687,9 @@ def fetch_pubtator_annotations(pubmedIDs):
   """
   # Splits pubmedIDs into batches of < 100 due to API limit
   batches = [pubmedIDs[i * 99:(i + 1) * 99] for i in range((len(pubmedIDs) + 99 - 1) // 99 )]
-  try:
-    for batch_num, batch in enumerate(batches):
+  
+  for batch_num, batch in enumerate(batches):
+    try:
       print('BATCH NUM::', str(batch_num))
 
       str_batch = ",".join(batch)
@@ -697,24 +698,31 @@ def fetch_pubtator_annotations(pubmedIDs):
       
       # Make a GET request to fetch PubTator annotations
       r = requests.get(pubtatorUrl)
-      #time.sleep(0.4)
+      time.sleep(0.34) #limits to 3 queries a second aka API limit
 
       # Check if the response is sucessful and not empty
       if (not r or r is None or r ==''):
-        logging.error(f'fetch_pubtator_annotations: api response empty or not successful')
+        print(f'fetch_pubtator_annotations: api response empty or not successful')
+        retry += 1
+        print('RETRY QUERY:', retry)
+        if retry < 6:
+          time.sleep(1) #wait 1 second
+          fetch_pubtator_annotations(pubmedIDs,retry=retry)
+        else:
+          yield None
+          
       else:
         yield r.json()
 
-  except TimeoutError as e:
-    #Retry after a short delay if a timeout error occurs
-    print(e)
-    exit()
+    except TimeoutError as e:
+      #Retry after a short delay if a timeout error occurs
+      print(e)
+      continue
 
-  except ValueError as e:
-    # Return None if theres an issue parsing the response as JSON
-    print(e)
-    exit()
-    #return None
+    except ValueError as e:
+      # Return None if theres an issue parsing the response as JSON
+      print(e)
+      continue
 
 
 
@@ -1948,7 +1956,7 @@ def gather_pubtator(db, today):
   #res = db.run('MATCH (x:Article) WHERE NOT (x)--(:PubtatorAnnotation) AND x.pubmed_id IS NOT NULL AND x.hasPubtatorAnnotation IS NULL RETURN x.pubmed_id AS pmid, ID(x) AS id').data()
   #print(len(res))
 
-  res = db.run('MATCH (x:Article) WHERE x.pubmed_id IS NOT NULL RETURN x.pubmed_id AS pmid, ID(x) AS id').data()
+  res = db.run('MATCH (x:Article) WHERE x.pubmed_id IS NOT NULL AND x.hasPubtatorAnnotation IS NULL RETURN x.pubmed_id AS pmid, ID(x) AS id').data()
   print(len(res))
 
   # Set OMIM only articles to hasPubtatorAnnotation = False since they dont have pubmed_id's
@@ -1962,6 +1970,9 @@ def gather_pubtator(db, today):
   try:
     # Fetch Pubtator annotations for the article
     for batch in fetch_pubtator_annotations(pmids):
+      if not batch:
+        continue
+      
       annos = batch['PubTator3']
 
       for anno in annos:
@@ -2032,7 +2043,7 @@ def gather_epi(db, today):
 
 def download_genereview_articles():
   if not os.path.exists(f'{sysvars.base_path}pubmed/src/genereviews_pmid.txt'):
-    command = f'curl -L -X GET https://ftp.ncbi.nih.gov/pub/GeneReviews/GRtitle_shortname_NBKid.txt -o {sysvars.base_path}pubmed/src/genereviews_pmid.txt'
+    command = f'curl -L -X GET https://ftp.ncbi.nih.gov/pub/GeneReviews/GRtitle_shortname_NBKid.txt -o {sysvars.pm_files_path}genereviews_pmid.txt'
     os.system(command)
 
 
@@ -2045,7 +2056,7 @@ def generate_missing_genereviews(response, review_list, df):
   missing = [int(i) for i in missing]
   df = df[df['PMID'].isin(missing)]
 
-  df.to_csv(f'{sysvars.base_path}pubmed/src/genereviews_pmid_missing.csv')
+  df.to_csv(f'{sysvars.pm_files_path}genereviews_pmid_missing.csv')
 
 
 
@@ -2053,7 +2064,7 @@ def generate_missing_genereviews(response, review_list, df):
 def label_genereview(db):
   download_genereview_articles()
 
-  df = pd.read_csv(f'{sysvars.base_path}pubmed/src/genereviews_pmid.txt', encoding='ISO-8859-1', sep='\t')
+  df = pd.read_csv(f'{sysvars.pm_files_path}genereviews_pmid.txt', encoding='ISO-8859-1', sep='\t')
   review_list = df['PMID'].tolist()
   review_list = [str(i) for i in review_list]
   
@@ -2224,6 +2235,7 @@ def update_missing_abstracts(db, today):
   response = db.run(query).data()
 
   length = len(response)
+  print(length)
 
   # Iterate over articles with missing abstracts
   for idx,res in enumerate(response):
@@ -2238,6 +2250,7 @@ def update_missing_abstracts(db, today):
 
     # Fetch abstract from PubMed
     article = fetch_abstracts([pmid])
+    time.sleep(0.34)
 
     try:
       article = article[0]['resultList']['result'][0]
@@ -2255,7 +2268,7 @@ def update_missing_abstracts(db, today):
         abstractDataRel = {'abstractText': new_abstract,'title': title}
         create_epidemiology(db, abstractDataRel, article_node, today)
 
-    except IndexError as e:
+    except Exception as e:
       continue
 
     print(str(idx) + '/' + str(length))

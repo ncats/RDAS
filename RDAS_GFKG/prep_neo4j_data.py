@@ -74,9 +74,10 @@ def aggregate_disease_data():
 	# Rename GARD-Project mapping results columns to match the names listed in the GARD data
 	normmap_df = pd.read_csv(data_neo4j('normmap_results.csv'),index_col=False,usecols=['ID','GARD_id','CONF_SCORE','SEM_SIM'])
 	normmap_df = normmap_df.rename(columns={'ID':'APPLICATION_ID'})
-
+	
 	# Split tuple normmap result into 2 seperate columns
 	normmap_df[['GARD_NAME', 'GARD_ID']] = normmap_df['GARD_id'].str.extract(r'\(\'(.*?)\', \'(.*?)\'\)')
+	
 	# drop the original column
 	normmap_df.drop('GARD_id', axis=1, inplace=True)
 
@@ -127,6 +128,10 @@ def batch_normmap(df, thr, year):
 		gard_ids = rdas.GardNameExtractor(title, phr, abstract)
 		if gard_ids:
 			for gard,add_data in gard_ids.items():
+				# Cleans up instances where gard name has an apostrophe in the name and has 2 sets of double quotes around it rather than one set of single quotes
+				pat = re.sub(r"\"\"|(\")(\'')",'\'', gard).replace('\'', '').replace('(', '').replace(')', '')
+				quoted_text = "'{}', '{}'".format(pat.split(",")[0].strip(), pat.split(",")[1].strip())
+				gard = "({})".format(quoted_text)
 				if add_data == 1:
 					add_data = [1,1]
 				with lock:
@@ -196,8 +201,9 @@ def run_normmap():
 
 def get_RD_project_ids():
     # Get GARD to Project mappings
-	run_normmap()
+	#run_normmap()
 	aggregate_disease_data()
+	exit() #TEST
 	
 	apps = pd.read_csv(data_neo4j("normmap_results.csv"), usecols=["ID"])
 
@@ -286,6 +292,7 @@ def select_RD_projects():
 
 def clean_pi (pi_info):
 	pi_info = pi_info.replace(";","")
+	if pi_info == "\", \"": pi_info = "\"\""
 	return pi_info
 
 def cleanup_project_IC_NAME_totalcost():
@@ -317,7 +324,6 @@ def cleanup_project_IC_NAME_totalcost():
 		# Results are listed as a string seperated by semi-colons, this removes the last semi-colon in the string because it causes issues when converting to a list
 		app['PI_IDS'] = app['PI_IDS'].astype(str)
 		app['PI_NAMEs'] = app['PI_NAMEs'].astype(str)
-
 		app['PI_IDS'] = app['PI_IDS'].apply(clean_pi)
 		app['PI_NAMEs'] = app['PI_NAMEs'].apply(clean_pi)
 
@@ -781,7 +787,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	##############################################
 	# Run preprocessing stages one after another.#
 	##############################################
-	"""
+	
 	print('Running get_disease_data')
 	get_disease_data()
 	print("Running get_RD_project_ids")
@@ -806,7 +812,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	cleanup_pub_country()
 	print("Running select_RD_abstracts")
 	select_RD_abstracts()
-	"""
+	
 	# The below stages are extremely slow, so we will only run them for
 	# years that have changed data.
 	
@@ -816,7 +822,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 											 and v in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_WT_NEW]}
 	'''	
 	
-	"""
+	
 	print("Running annotation_preprocess_grant")
 	annotation_preprocess_grant()
 	
@@ -842,7 +848,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	p = Popen(['scp', '-r', '-i', f'~/.ssh/id_rsa', f'{sysvars.gnt_files_path}/processed/', f'{sysvars.current_user}@{target_url}:{sysvars.gnt_files_path}'], encoding='utf8')
 	p.wait()
 	print('Transfer done...')
-	"""
+	
 	# Gets the names of every processed file added for the rest of the code to add to the neo4j
 	fta = {}
 	for subdir in FilesToAdd.__dict__['__annotations__'].keys():
