@@ -74,9 +74,10 @@ def aggregate_disease_data():
 	# Rename GARD-Project mapping results columns to match the names listed in the GARD data
 	normmap_df = pd.read_csv(data_neo4j('normmap_results.csv'),index_col=False,usecols=['ID','GARD_id','CONF_SCORE','SEM_SIM'])
 	normmap_df = normmap_df.rename(columns={'ID':'APPLICATION_ID'})
-
+	
 	# Split tuple normmap result into 2 seperate columns
 	normmap_df[['GARD_NAME', 'GARD_ID']] = normmap_df['GARD_id'].str.extract(r'\(\'(.*?)\', \'(.*?)\'\)')
+	
 	# drop the original column
 	normmap_df.drop('GARD_id', axis=1, inplace=True)
 
@@ -127,6 +128,11 @@ def batch_normmap(df, thr, year):
 		gard_ids = rdas.GardNameExtractor(title, phr, abstract)
 		if gard_ids:
 			for gard,add_data in gard_ids.items():
+				# Cleans up instances where gard name has an apostrophe in the name and has 2 sets of double quotes around it rather than one set of single quotes
+				pat = re.sub(r"\"\"|(\")(\'')",'\'', gard).replace('\'', '').replace('(', '').replace(')', '')
+				quoted_text = "'{}', '{}'".format(pat.split(",")[0].strip(), pat.split(",")[1].strip())
+				gard = "({})".format(quoted_text)
+
 				if add_data == 1:
 					add_data = [1,1]
 				with lock:
@@ -152,25 +158,32 @@ def run_normmap():
 		print(abs_file, ' -merged- ',prj_file)
 		tmp = pd.read_csv(('{filename}'.format(filename=abs_file)),index_col=False, encoding = "ISO-8859-1")
 		tmp2 = pd.read_csv(('{filename}'.format(filename=prj_file)),index_col=False, usecols=['APPLICATION_ID','PHR', 'PROJECT_TITLE'], encoding = "ISO-8859-1", low_memory=False)
-		merged_df = pd.merge(tmp, tmp2, on=['APPLICATION_ID'])
+		merged_df = pd.merge(tmp, tmp2, on=['APPLICATION_ID'], how='outer', indicator='EXISTS_IN_ABSTRACT_FILE')
+		#merged_df.fillna('', inplace=True)
 		merged_df['APPLICATION_ID'] = merged_df['APPLICATION_ID'].astype(int)
 		merged_df.to_csv(data_raw(f'normmap/RePORTER_NORMMAP_{year}.csv'), index=False)
-
+	
 	norm_files = glob.glob(data_raw('normmap') + '/*.csv')
 	norm_files = sorted(norm_files)
 	for norm_file in norm_files:
 		year = re.findall(r'\d+', norm_file)[0]
-		if os.path.exists(data_neo4j(f'normmap/normmap_results_{year}.csv')):
+
+		if os.path.exists(data_neo4j(f'normmap/normmap_results_{year}.csv')): #COMMENTED OUT FOR TESTING
 			print(f'{year} Gard-Project mapping file already exists... bypassing')
 			continue
 
 		# Create CSV files headers
-		with open(data_neo4j(f'normmap/normmap_results_{year}.csv'), "w") as f:
+		with open(data_neo4j(f'normmap/normmap_results_{year}.csv'), "w") as f: #COMMENTED OUT FOR TESTING
 			f.writelines(['ID|GARD_id|CONF_SCORE|SEM_SIM\n'])
 
 		df = pd.read_csv(norm_file, index_col=False, low_memory=False)
-		chunk_size = int(len(df)/5)
 		thread_list = list()
+    
+		#df = df[df['EXISTS_IN_ABSTRACT_FILE']=='right_only'] #TEST
+		#df = df[['APPLICATION_ID', 'ABSTRACT_TEXT', 'PHR', 'PROJECT_TITLE']] #TEST
+
+		chunk_size = int(len(df)/5)
+
 		list_df = [df[i:i+chunk_size] for i in range(0,len(df),chunk_size)]
 
 		# Create threads to process results
@@ -185,10 +198,14 @@ def run_normmap():
 	combine_normmap_results()
 	print('GARD to Project connections made')
 
+
+
 def get_RD_project_ids():
     # Get GARD to Project mappings
-	run_normmap()
+	#run_normmap()
 	aggregate_disease_data()
+	exit() #TEST
+	
 	apps = pd.read_csv(data_neo4j("normmap_results.csv"), usecols=["ID"])
 
 	# Drop duplicate results and sort by Application ID
@@ -275,7 +292,8 @@ def select_RD_projects():
 		print('Finished ', output_file)
 
 def clean_pi (pi_info):
-	pi_info = pi_info[:len(pi_info)-1]
+	pi_info = pi_info.replace(";","")
+	if pi_info == "\", \"": pi_info = "\"\""
 	return pi_info
 
 def cleanup_project_IC_NAME_totalcost():
@@ -307,7 +325,6 @@ def cleanup_project_IC_NAME_totalcost():
 		# Results are listed as a string seperated by semi-colons, this removes the last semi-colon in the string because it causes issues when converting to a list
 		app['PI_IDS'] = app['PI_IDS'].astype(str)
 		app['PI_NAMEs'] = app['PI_NAMEs'].astype(str)
-
 		app['PI_IDS'] = app['PI_IDS'].apply(clean_pi)
 		app['PI_NAMEs'] = app['PI_NAMEs'].apply(clean_pi)
 
@@ -608,13 +625,14 @@ def annotate_grant_abstracts():
 
 
 	# Annotate text with four scispaCy models
-	for model in MODELS:
+	for model in MODELS[2:]:
 		print(f'*** Annotate with {model} model ***')
 
 		nlp = load_model(model)
 		for file in input_files:
 			year = file[-8:-4]
-			
+			if int(year) < 2006 and model == 'en_ner_bc5cdr_md':
+				continue
 			try:
 				text = pd.read_csv(file, encoding=ENCODING, dtype={'APPLICATION_ID':int, 'ABSTRACT_TEXT':str})
 
@@ -770,7 +788,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	##############################################
 	# Run preprocessing stages one after another.#
 	##############################################
-	"""
+	
 	print('Running get_disease_data')
 	get_disease_data()
 	print("Running get_RD_project_ids")
@@ -779,10 +797,8 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	merge_project_funding()
 	print("Running select_RD_projects")
 	select_RD_projects()
-	
 	print("Running cleanup_project_IC_NAME_totalcost")
 	cleanup_project_IC_NAME_totalcost()
-	
 	print("Running find_RD_core_projects")
 	find_RD_core_projects()
 	print("Running select_RD_patents")
@@ -807,6 +823,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 											 and v in [pygit2.GIT_STATUS_WT_MODIFIED, pygit2.GIT_STATUS_WT_NEW]}
 	'''	
 	
+	
 	print("Running annotation_preprocess_grant")
 	annotation_preprocess_grant()
 	
@@ -818,6 +835,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	clean_annotation_source()
 	print("Running map_semantic_types")
 	map_semantic_types()
+	
 	print("Running fix_escaped_endings")
 	fix_escaped_endings()
 
@@ -831,7 +849,7 @@ def prep_data(data_raw_path: str, data_neo4j_path: str) -> FilesToAdd:
 	p = Popen(['scp', '-r', '-i', f'~/.ssh/id_rsa', f'{sysvars.gnt_files_path}/processed/', f'{sysvars.current_user}@{target_url}:{sysvars.gnt_files_path}'], encoding='utf8')
 	p.wait()
 	print('Transfer done...')
-	"""
+	
 	# Gets the names of every processed file added for the rest of the code to add to the neo4j
 	fta = {}
 	for subdir in FilesToAdd.__dict__['__annotations__'].keys():

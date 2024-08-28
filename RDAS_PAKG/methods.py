@@ -668,7 +668,7 @@ def fetch_abstracts(pubmedIDs):
 
 
   
-def fetch_pubtator_annotations(pubmedId):
+def fetch_pubtator_annotations(pubmedIDs,retry=0):
   """
     Fetch annotations from PubTator for a given PubMed ID.
 
@@ -685,29 +685,44 @@ def fetch_pubtator_annotations(pubmedId):
     >> print(annotations)
     {'documents': [{'infons': {}, 'passages': [...], 'annotations': [...], ...}]}
   """
+  # Splits pubmedIDs into batches of < 100 due to API limit
+  batches = [pubmedIDs[i * 99:(i + 1) * 99] for i in range((len(pubmedIDs) + 99 - 1) // 99 )]
+  
+  for batch_num, batch in enumerate(batches):
+    try:
+      print('BATCH NUM::', str(batch_num))
 
-  try:
+      str_batch = ",".join(batch)
     # Construct the PubTator API URL for the given PubMed ID
-    pubtatorUrl = "https://www.ncbi.nlm.nih.gov/research/pubtator-api/publications/export/biocjson?pmids=" + pubmedId
-    
-    # Make a GET request to fetch PubTator annotations
-    r = requests.get(pubtatorUrl)
+      pubtatorUrl = "https://www.ncbi.nlm.nih.gov/research/pubtator-api/publications/export/biocjson?pmids=" + str_batch
+      
+      # Make a GET request to fetch PubTator annotations
+      r = requests.get(pubtatorUrl)
+      time.sleep(0.34) #limits to 3 queries a second aka API limit
 
-    # Check if the response is sucessful and not empty
-    if (not r or r is None or r ==''):
-      logging.error(f'Can not find PubTator for: {pubmedId}')
-      return None
-    else:
-      return r.json()
+      # Check if the response is sucessful and not empty
+      if (not r or r is None or r ==''):
+        print(f'fetch_pubtator_annotations: api response empty or not successful')
+        retry += 1
+        print('RETRY QUERY:', retry)
+        if retry < 6:
+          time.sleep(1) #wait 1 second
+          fetch_pubtator_annotations(pubmedIDs,retry=retry)
+        else:
+          yield None
+          
+      else:
+        yield r.json()
 
-  except TimeoutError as e:
-    #Retry after a short delay if a timeout error occurs
-    time.sleep(1)
-    fetch_pubtator_annotations(pubmedId)
+    except TimeoutError as e:
+      #Retry after a short delay if a timeout error occurs
+      print(e)
+      continue
 
-  except ValueError as e:
-    # Return None if theres an issue parsing the response as JSON
-    return None
+    except ValueError as e:
+      # Return None if theres an issue parsing the response as JSON
+      print(e)
+      continue
 
 
 
@@ -1049,13 +1064,16 @@ def create_keywords(tx, abstractDataRel, article_node):
   MERGE (k:Keyword {keyword:$keyword}) 
   MERGE (k)- [r:KEYWORD_FOR] -> (a)
   '''
-  
-  for keyword in abstractDataRel:
-    if keyword:
-      tx.run(create_keyword_query, args={
-        "article_id":article_node,      
-        "keyword": keyword
-      })
+  # Some articles have all the keywords in one field, therefore we must convert the text to a list if needed
+  for keyword_field in abstractDataRel:
+    if keyword_field:
+      #keyword_field_list = [x.strip() for x in keyword_field.split(', ')]
+      for keyword in keyword_field:
+        keyword = keyword.lower()
+        tx.run(create_keyword_query, args={
+          "article_id":article_node,      
+          "keyword": keyword
+        })
 
 
 
@@ -1349,13 +1367,13 @@ def create_chemicals(tx, abstractDataRel, article_node):
 
   create_chemicals_query = '''
   MATCH (a:Article) WHERE id(a) = $article_id
-  MERGE (u:Substance {name:$name, registryNumber:$registryNumber}) - [r:SUBSTANCE_ANNOTATED_BY_PUBMED] -> (a)
+  MERGE (u:Substance {name:$name, registryNumber:$registryNumber}) MERGE (u)-[r:SUBSTANCE_ANNOTATED_BY_PUBMED]->(a)
   '''
 
   for chemical in abstractDataRel:
     tx.run(create_chemicals_query, args={
       "article_id":article_node,
-      "name": chemical['name'] if 'name' in chemical else '',
+      "name": chemical['name'].lower() if 'name' in chemical else '',
       "registryNumber": chemical['registryNumber'] if 'registryNumber' in chemical else '',
     })
 
@@ -1384,21 +1402,6 @@ def create_annotations(tx, pubtatorData, article_node, today):
   """
 
   if pubtatorData:
-    create_annotations_query = '''
-    MATCH(a:Article) WHERE id(a) = $article_id
-    MERGE (pa:PubtatorAnnotation {
-      text = $text
-    })
-    ON MATCH
-      SET LastUpdatedRDAS = $rdasupdated
-    ON CREATE
-      SET infons_identifier:$infons_identifier
-      SET DateCreatedRDAS = $rdascreated
-      SET LastUpdatedRDAS = $rdasupdated
-      SET infons_type = $infons_type
-    MERGE (pa)- [r:ANNOTATION_FOR { type: $type }] -> (a)
-    '''
-
     for passage in pubtatorData['passages']:
       type = passage['infons']['type'] if 'type' in passage['infons'] else ''
 
@@ -1420,10 +1423,72 @@ def create_annotations(tx, pubtatorData, article_node, today):
             temp = temp.split(",")
           except:
             pass
-        parameters['text'] = temp
+        parameters['text'] = [x.lower() for x in temp] #lowercases all elements in list
+
+        # Check for other connected pubtator annotation relationships and identify the type sources ('title', 'abstract', or 'title and abstract')
+        # Ex. List of Values; if value is 'title and abstract' then it will be ['title','abstract']
+        check = tx.run('MATCH (pa:PubtatorAnnotation {{ text: {text}, infons_type: \'{infons_type}\', infons_identifier: \'{infons_identifier}\' }})-[r:ANNOTATION_FOR]->(a:Article) WHERE ID(a) = {article_id} RETURN DISTINCT r.type as rel_type, ID(r) as rel_id'
+                      .format(text=parameters['text'],
+                      article_id=parameters['article_id'],
+                      infons_type=parameters['infons_type'],
+                      infons_identifier=parameters['infons_identifier'],
+                      type=parameters['type'])).data()
+        
+        if len(check) > 0:
+          existing_type = check[0]['rel_type'] # is a list
+          incoming_type = parameters['type']
+          existing_id = check[0]['rel_id']
+          
+          if existing_type == ['Abstract'] and incoming_type == 'abstract':
+            continue
+          if existing_type == ['Title'] and incoming_type == 'title':
+            continue
+          if existing_type == ['Title', 'Abstract'] and incoming_type == 'title and abstract':
+            continue
+          if existing_type == ['Title', 'Abstract'] and incoming_type == 'title':
+            continue
+          if existing_type == ['Title', 'Abstract'] and incoming_type == 'abstract':
+            continue
+
+          if existing_type == ['Title'] and incoming_type == 'abstract':
+            parameters['type'] = ['Title', 'Abstract']
+          elif existing_type == ['Abstract'] and incoming_type == 'title':
+            parameters['type'] = ['Title', 'Abstract']
+
+          tx.run('MATCH ()-[r:ANNOTATION_FOR]->() WHERE ID(r) = {existing_id} SET r.type = {new_type}'.format(existing_id=existing_id, new_type=parameters['type']))
+          continue
+
+        else:
+          type_temp = parameters['type']
+          if type_temp == 'title and abstract':
+            parameters['type'] = ['Title', 'Abstract']
+          elif type_temp == 'title':
+            parameters['type'] = ['Title']
+          elif type_temp == 'abstract':
+            parameters['type'] = ['Abstract']
+          
+
+        # Develop Neo4j Query to Populate Annotations (New Node Only)
+        create_annotations_query = '''
+          MATCH (a:Article) WHERE id(a) = {article_id}
+          MERGE (pa:PubtatorAnnotation {{ text: {text}, infons_type: \'{infons_type}\', infons_identifier: \'{infons_identifier}\' }})
+          ON CREATE
+            SET pa.infons_identifier = \'{infons_identifier}\'
+            SET pa.DateCreatedRDAS = \'{rdascreated}\'
+            SET pa.LastUpdatedRDAS = \'{rdasupdated}\'
+            SET pa.text = {text}
+            SET pa.infons_type = \'{infons_type}\'
+          MERGE (pa)-[r:ANNOTATION_FOR {{ type: {type} }} ]-> (a)
+          '''.format(text=parameters['text'],
+                    article_id=parameters['article_id'],
+                    infons_type=parameters['infons_type'],
+                    rdasupdated=parameters['rdasupdated'],
+                    rdascreated=parameters['rdascreated'],
+                    infons_identifier=parameters['infons_identifier'],
+                    type=parameters['type'])
         
         # Execute the Cypher query to create PubtatorAnnotation nodes and associate them with the Article node
-        txout = tx.run(create_annotations_query, args=parameters)
+        txout = tx.run(create_annotations_query)
 
 
 
@@ -1877,37 +1942,59 @@ def gather_pubtator(db, today):
     Returns:
     None
   """
+  in_progress = db.getConf('UPDATE_PROGRESS', 'pubmed_in_progress')
+  if in_progress == 'True':
+    current_step = db.getConf('UPDATE_PROGRESS', 'pubmed_pubtator_article_progress')
+    if not current_step == '':
+      current_step = int(current_step)
+    else:
+      current_step = 0
+  else:
+    current_step = 0
 
   # Retrieve articles without Pubtator annotations
-  res = db.run('MATCH (x:Article) WHERE NOT (x)--(:PubtatorAnnotation) AND x.pubmed_id IS NOT NULL AND x.hasPubtatorAnnotation IS NULL RETURN x.pubmed_id AS pmid, ID(x) AS id').data()
+  #res = db.run('MATCH (x:Article) WHERE NOT (x)--(:PubtatorAnnotation) AND x.pubmed_id IS NOT NULL AND x.hasPubtatorAnnotation IS NULL RETURN x.pubmed_id AS pmid, ID(x) AS id').data()
+  #print(len(res))
+
+  res = db.run('MATCH (x:Article) WHERE x.pubmed_id IS NOT NULL AND x.hasPubtatorAnnotation IS NULL RETURN x.pubmed_id AS pmid, ID(x) AS id').data()
   print(len(res))
 
   # Set OMIM only articles to hasPubtatorAnnotation = False since they dont have pubmed_id's
   db.run('MATCH (x:Article) WHERE x.pubmed_id IS NULL AND x.hasPubtatorAnnotation IS NULL SET x.hasPubtatorAnnotation = FALSE')
-
+  
   # Iterate over the articles and fetch Pubtator annotations
-  for idx,r in enumerate(res):
-    print(idx)
+  res = res[current_step:]
+  pmids = [r['pmid'] for r in res]
+  pmid_to_id = {r['pmid']:r['id'] for r in res}
 
-    pmid = r['pmid']
-    ID = r['id']
-    try:
-      # Fetch Pubtator annotations for the article
-      print(ID)
-      annos = fetch_pubtator_annotations(pmid)
+  try:
+    # Fetch Pubtator annotations for the article
+    for batch in fetch_pubtator_annotations(pmids):
+      if not batch:
+        continue
+      
+      annos = batch['PubTator3']
 
-      if annos:
-        # Create PubtatorAnnotation nodes in the database
-        create_annotations(db, annos, ID, today)
-        db.run(f'MATCH (a:Article) WHERE ID(a) = {ID} SET a.hasPubtatorAnnotation = TRUE')
-        print('annotations created') #TEST
-      else:
-        db.run(f'MATCH (a:Article) WHERE ID(a) = {ID} SET a.hasPubtatorAnnotation = FALSE')
-        print('annotation not created') #TEST
+      for anno in annos:
+        cur_pmid = str(anno['pmid'])
+        article_id = pmid_to_id[cur_pmid]
 
+        if anno:
+          # Create PubtatorAnnotation nodes in the database
+          print('ARTICLE_ID::', article_id, 'CURRENT_STEP::', current_step)
+          
+          create_annotations(db, anno, article_id, today)
+          db.run(f'MATCH (a:Article) WHERE ID(a) = {article_id} SET a.hasPubtatorAnnotation = TRUE')
+        else:
+          db.run(f'MATCH (a:Article) WHERE ID(a) = {article_id} SET a.hasPubtatorAnnotation = FALSE')
 
-    except Exception as e:
-      logging.warning(f'\nException creating annotations for article {pmid}:  {e}')
+        current_step += 1
+        db.setConf('UPDATE_PROGRESS', 'pubmed_pubtator_article_progress', str(current_step))
+      
+
+  except Exception as e:
+    #logging.warning(f'\nException creating annotations for article {pmid}:  {e}')
+    print('error in gather_pubtator')
 
 
 
@@ -1956,7 +2043,7 @@ def gather_epi(db, today):
 
 def download_genereview_articles():
   if not os.path.exists(f'{sysvars.base_path}pubmed/src/genereviews_pmid.txt'):
-    command = f'curl -L -X GET https://ftp.ncbi.nih.gov/pub/GeneReviews/GRtitle_shortname_NBKid.txt -o {sysvars.base_path}pubmed/src/genereviews_pmid.txt'
+    command = f'curl -L -X GET https://ftp.ncbi.nih.gov/pub/GeneReviews/GRtitle_shortname_NBKid.txt -o {sysvars.pm_files_path}genereviews_pmid.txt'
     os.system(command)
 
 
@@ -1969,7 +2056,7 @@ def generate_missing_genereviews(response, review_list, df):
   missing = [int(i) for i in missing]
   df = df[df['PMID'].isin(missing)]
 
-  df.to_csv(f'{sysvars.base_path}pubmed/src/genereviews_pmid_missing.csv')
+  df.to_csv(f'{sysvars.pm_files_path}genereviews_pmid_missing.csv')
 
 
 
@@ -1977,7 +2064,7 @@ def generate_missing_genereviews(response, review_list, df):
 def label_genereview(db):
   download_genereview_articles()
 
-  df = pd.read_csv(f'{sysvars.base_path}pubmed/src/genereviews_pmid.txt', encoding='ISO-8859-1', sep='\t')
+  df = pd.read_csv(f'{sysvars.pm_files_path}genereviews_pmid.txt', encoding='ISO-8859-1', sep='\t')
   review_list = df['PMID'].tolist()
   review_list = [str(i) for i in review_list]
   
@@ -2075,7 +2162,11 @@ def retrieve_articles(db, last_update, updating_to, today):
 
     # End of the pipeline, resets the config in_progress values
     db.setConf('UPDATE_PROGRESS', 'pubmed_current_step', '')
+    db.setConf('UPDATE_PROGRESS', 'pubmed_disease_article_progress', '')
+    db.setConf('UPDATE_PROGRESS', 'pubmed_omim_article_progress', '')
+    db.setConf('UPDATE_PROGRESS', 'pubmed_pubtator_article_progress', '')
     db.setConf('UPDATE_PROGRESS', 'pubmed_in_progress', 'False')
+
   else:
     print('Update in progress... bypassing save_gene')
 
@@ -2144,6 +2235,7 @@ def update_missing_abstracts(db, today):
   response = db.run(query).data()
 
   length = len(response)
+  print(length)
 
   # Iterate over articles with missing abstracts
   for idx,res in enumerate(response):
@@ -2158,6 +2250,7 @@ def update_missing_abstracts(db, today):
 
     # Fetch abstract from PubMed
     article = fetch_abstracts([pmid])
+    time.sleep(0.34)
 
     try:
       article = article[0]['resultList']['result'][0]
@@ -2175,7 +2268,7 @@ def update_missing_abstracts(db, today):
         abstractDataRel = {'abstractText': new_abstract,'title': title}
         create_epidemiology(db, abstractDataRel, article_node, today)
 
-    except IndexError as e:
+    except Exception as e:
       continue
 
     print(str(idx) + '/' + str(length))

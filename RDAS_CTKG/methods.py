@@ -91,74 +91,46 @@ def webscrape_ctgov_diseases():
 
 
 
+def call_get_nctids (query, pageToken=None):
+    try:
+        if pageToken: query += f'&pageToken={pageToken}'
+        response = requests.get(query)
+        response_txt = response.json()
+    except Exception as e:
+        print('Unable to Process Query')
+        response_txt = None
+    return response_txt
 
-def get_nctids(name_list):
-    """
-    Retrieves ClinicalTrials.gov Identifiers (NCTIDs) for a list of rare disease names.
-
-    Args:
-        name_list (list): List of rare disease names.
-
-    Returns:
-        list: List of ClinicalTrials.gov Identifiers (NCTIDs) associated with the provided rare disease names.
-
-    Example:
-        disease_names = ["Disease1", "Disease2", ...]
-        nct_ids = get_nctids(disease_names)
-        print(nct_ids)
-        # Output: ["NCT123", "NCT456", ...]
-    """
-
-    # Initialize a list to store all retrieved NCTIDs
+def get_nctids(names,lastupdate):
+    # Date format: 05/01/1975
     all_trials = list()
-
-    # Iterate through each rare disease name
-    for name in name_list:
-        # Replace double quotes to prevent issues with the URL
+    for name in names:
+        trials = list()
         name = name.replace('"','\"')
 
-        # Construct the initial API query to get the total number of trials
-        initial_query = 'https://clinicaltrials.gov/api/query/study_fields?expr=AREA[ConditionBrowseBranchAbbrev] Rare AND \"' + name + '\"&fields=NCTId&'
-        query_end1 = 'min_rnk=1&max_rnk=1000&fmt=csv'
+        initial_query = f'https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Concept]{name} OR AREA[DetailedDescription]EXPANSION[Concept]{name} OR AREA[BriefSummary]EXPANSION[Concept]{name}) AND AREA[LastUpdatePostDate]RANGE[{lastupdate},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
+        try:
+            pageToken = None
+            while True:
+                response_txt = call_get_nctids(initial_query, pageToken=pageToken)
+                if response_txt:
+                    trials_list = response_txt['studies']
+                    
+                    for trial in trials_list:
+                        nctid = trial['protocolSection']['identificationModule']['nctId']
+                        trials.append(nctid)
+                    all_trials += trials
+                    if not 'nextPageToken' in response_txt:
+                        break
+                    else:
+                        pageToken = response_txt['nextPageToken']
+                else:
+                    break
         
-        try:
-            # Make the API request to get the total number of trials
-            response = requests.get(initial_query + query_end1).text.splitlines()
-            total_trials = int(response[4][16:-1])
-        except Exception as e:
-            # Retry in case of an error
-            print('ERROR in retrieving NCTIDS, retrying...')
-            print(response)
-            response = requests.get(initial_query + query_end1).text.splitlines()
-            total_trials = int(response[4][16:-1])
-
-        try:
-            # Add trials to a temporary list
-            trials = list()
-            for trial in response[11:]:
-                trials.append(trial.split(',')[1][1:-1])
-
-            # Break into extra queries of 1000 trials if necessary
-            for rank in range(1, total_trials//1000 + 1):
-                # Get next 1000 trials
-                query_end2 = 'min_rnk=' + str(rank*1000+1) + '&max_rnk=' + str((rank+1)*1000) + '&fmt=csv'
-                response = requests.get(initial_query + query_end2).text.splitlines()
-
-                # Add trials to the temporary list
-                for trial in response[11:]:
-                    trials.append(trial.split(',')[1][1:-1])
-
-            # Add the trials from the temporary list to the overall list
-            all_trials += trials
-
         except Exception as e:
             print(e)
-            print(initial_query + query_end2)
-            print(trial)
 
-    # Return the list of all retrived NCTIDs
-    return all_trials
-
+    return [list(set(all_trials))]
 
 
 
@@ -247,17 +219,14 @@ def extract_fields(nctid):
         print(trial_fields)
         # Output: {"field1": "value1", "field2": {"nested_field": "nested_value"}}
     """
-
-    # Contruct the API query to retrieve full study information
-    full_trial_query = 'https://clinicaltrials.gov/api/query/full_studies?expr=' + nctid + '&min_rnk=1&max_rnk=1&fmt=json'
-    sleep(0.5)
-    
     try:
         # Make the API request and parse the JSON response
-        full_trial_response = requests.get(full_trial_query).json()
-
+        query = f'https://clinicaltrials.gov/api/v2/studies/{nctid}'
+        response = requests.get(query)
+        response_txt = response.json()
+        sleep(0.34)
         # Use the parse_trial_fields function to flatten the nested structure
-        full_trial = parse_trial_fields(full_trial_response)
+        full_trial = parse_trial_fields(response_txt)
     except ValueError:
         # Return None if there is an issue with the JSON response
         return None
@@ -279,6 +248,17 @@ def get_lastupdated_postdate (ID):
         # Return None if there is an issue with the JSON response
         return None
 
+def check_neo4j_trial_updates(db, nctids):
+    new_trials = list()
+    trials_to_check = list()
+    for nctid in nctids:
+        response = db.run(f'MATCH (x:ClinicalTrial) WHERE x.NCTId = \"{nctid}\" RETURN x.NCTId').data()
+        if len(response) > 0:
+            new_trials.append(nctid)
+        else:
+            trials_to_check.append(nctid)
+            
+    return [new_trials, trials_to_check]
 
 
 def cypher_generate(db,now,NCTID,data,node_type,update=None,return_single=None):
@@ -675,7 +655,7 @@ def mask_name(nlp, name):
 
 
 
-def is_acronym(word):
+def is_acronym(words):
     """
     Checks if a word is an acronym.
 
@@ -691,13 +671,14 @@ def is_acronym(word):
     """
 
     # Check if the word contains spaces
-    if len(word.split(' ')) > 1:
-        return False
-    # Check if the word follows the pattern of an acronym
-    elif bool(re.match(r'\w*[A-Z]\w*', word[:len(word)-1])) and (word[len(word)-1].isupper() or word[len(word)-1].isnumeric()):
-        return True
-    else:
-        return False
+    if len(words.split()) > 1: return False
+
+    for word in words.split():
+        # Check if the word follows the pattern of an acronym
+        if bool(re.match(r'\w*[A-Z]\w*', word[:len(word)-1])) and (word[len(word)-1].isupper() or word[len(word)-1].isnumeric()): # aGG2
+            print('ACRONYM REMOVED::', words)
+            return True
+    return False
 
 
 
@@ -1237,7 +1218,7 @@ def rxnorm_map(db, rxnorm_progress):
     matcher.add('DRUG',[pattern])
 
     # Retrieve drug interventions from the database that do NOT already have a Drug node attached
-    results = db.run('MATCH (x:Intervention) WHERE x.InterventionType = "Drug" AND NOT EXISTS((x)--(:Drug)) RETURN x.InterventionName, ID(x)').data()
+    results = db.run('MATCH (x:Intervention) WHERE x.InterventionType = "DRUG" AND NOT EXISTS((x)--(:Drug)) RETURN x.InterventionName, ID(x)').data()
     length = len(results)
 
     # Iterate over drug interventions and map RxNorm data

@@ -310,13 +310,10 @@ steps: list = [
 			""",
 		"query":
 			"""
-			WITH split(data.PI_IDS, ';') as ids,
-			     split(data.PI_NAMEs, ';') as names, data
-			UNWIND [x in range(0, coalesce(size(ids) - 1, -1)) |
-				[trim(split(ids[x], '(')[0]), trim(split(names[x], '(')[0])]
-			] as pi_data
+            WITH [data.PI_IDS] as ids, [data.PI_NAMEs] as names, data
+            UNWIND [x in range(0, coalesce(size(ids) - 1, -1)) | [trim(split(ids[x], '(')[0]), trim(split(names[x], '(')[0])]] as pi_data
 			MERGE (p:PrincipalInvestigator {
-				pi_id: pi_data[0],
+				pi_id: coalesce(pi_data[0], ""),
 				pi_name: coalesce(pi_data[1], ""),
 				org_state: coalesce(data.ORG_STATE, ""),
 				org_name: coalesce(data.ORG_NAME, "")})

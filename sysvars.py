@@ -29,11 +29,11 @@ firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz
 
 
 # if you are not using minghui's test dataset, make db_prefix=""; now you only need to change the neo4j database names here:
-db_prefix="test."
-ct_db_name="rdas.ctkg" 
+db_prefix=""
+ct_db_name="new.rdas.ctkg" 
 gf_db_name='rdas.gfkg'
 pa_db_name="rdas.pakg"
-gard_db_name='rdas.gard'
+gard_db_name='test.rdas.gard'
 
 ct_db = db_prefix+ct_db_name
 pm_db = db_prefix+pa_db_name
