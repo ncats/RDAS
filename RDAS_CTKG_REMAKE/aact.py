@@ -75,6 +75,40 @@ def get_nctids(names, lastupdate):
         name = name.replace('"','\"')
 
         initial_query = f'https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Concept]{name} OR AREA[DetailedDescription]EXPANSION[Concept]{name} OR AREA[BriefSummary]EXPANSION[Concept]{name}) AND AREA[LastUpdatePostDate]RANGE[{lastupdate},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
+        #https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Concept]{name} OR AREA[DetailedDescription]EXPANSION[Concept]{name} OR AREA[BriefSummary]EXPANSION[Concept]{name}) AND AREA[LastUpdatePostDate]RANGE[{lastupdate},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
+        print(initial_query)
+        try:
+            pageToken = None
+            while True:
+                response_txt = call_get_nctids(initial_query, pageToken=pageToken)
+                if response_txt:
+                    trials_list = response_txt['studies']
+                    
+                    for trial in trials_list:
+                        nctid = trial['protocolSection']['identificationModule']['nctId']
+                        trials.append(nctid)
+                    all_trials += trials
+                    if not 'nextPageToken' in response_txt:
+                        break
+                    else:
+                        pageToken = response_txt['nextPageToken']
+                else:
+                    break
+        
+        except Exception as e:
+            print(e)
+
+    return list(set(all_trials))
+
+
+def get_nctids2(names, lastupdate):
+    all_trials = list()
+    for name in names:
+        trials = list()
+        name = name.replace('"','\"')
+
+        initial_query = f'https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Term]{name} OR AREA[DetailedDescription]EXPANSION[Term]{name} OR AREA[BriefSummary]EXPANSION[Term]{name}) AND AREA[LastUpdatePostDate]RANGE[{lastupdate},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
+        #https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Concept]{name} OR AREA[DetailedDescription]EXPANSION[Concept]{name} OR AREA[BriefSummary]EXPANSION[Concept]{name}) AND AREA[LastUpdatePostDate]RANGE[{lastupdate},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
         print(initial_query)
         try:
             pageToken = None
@@ -987,6 +1021,19 @@ else:
     db.setConf('UPDATE_PROGRESS', 'clinical_in_progress', 'True')
     cypher_GARD_populate()
 
+### TEST ###
+tst_cnt = 0
+all_lst = dict()
+id_lst = list()
+name_lst = list()
+nctid_concept_lst = list()
+num_concept_lst = list()
+nctid_term_lst = list()
+num_term_lst = list()
+term_overlap_lst = list()
+concept_overlap_lst = list()
+num_concept_overlap_lst = list()
+num_term_overlap_lst = list()
 
 if clinical_current_step == '':
     gard_names_dict = get_GARD_names_syns(gard_db)
@@ -1007,7 +1054,49 @@ if clinical_current_step == '':
         syns = [syn for syn in syns if not is_acronym(syn)]
         names = [name] + syns
 
-        nctids = get_nctids(names, lastupdate)
+        nctids_concept = get_nctids(names, lastupdate)
+        ### TEST ###
+        nctids_term = get_nctids2(names, lastupdate)
+
+        tst_cnt += 1
+
+        num_concept_lst.append(len(nctids_concept))
+        nctid_concept_lst.append(nctids_concept)
+        concept_similar_values = [value for value in nctids_concept if not value in nctids_term]
+        concept_overlap_lst.append(concept_similar_values)
+        num_concept_overlap_lst.append(len(concept_similar_values))
+
+        num_term_lst.append(len(nctids_term))
+        nctid_term_lst.append(nctids_term)
+        term_similar_values = [value for value in nctids_term if not value in nctids_concept]
+        term_overlap_lst.append(term_similar_values)
+        num_term_overlap_lst.append(len(term_similar_values))
+
+        id_lst.append(gid)
+        name_lst.append(name)
+
+
+        if tst_cnt > 100:
+            all_lst['GARD ID'] = id_lst
+            all_lst['GARD NAME'] = name_lst
+
+            all_lst['NUMBER CONCEPT TRIALS'] = num_concept_lst
+            all_lst['CONCEPT NCTIDS'] = nctid_concept_lst
+            all_lst['NUMBER CONCEPT NCTIDS MISSING FROM TERM'] = num_concept_overlap_lst
+            all_lst['CONCEPT NCTIDS MISSING FROM TERM'] = concept_overlap_lst
+
+            all_lst['NUMBER TERM TRIALS'] = num_term_lst
+            all_lst['TERM NCTIDS'] = nctid_term_lst
+            all_lst['NUMBER TERM NCTIDS MISSING FROM CONCEPT'] = num_term_overlap_lst
+            all_lst['TERM NCTIDS MISSING FROM CONCEPT'] = term_overlap_lst
+            
+            df = pd.DataFrame(all_lst)
+            df.to_csv('/home/leadmandj/RDAS/RDAS_CTKG_REMAKE/query_compare_overlap.csv', index=False)
+
+            exit()
+        continue
+        ### TEST ###
+
         print(str(idx) + f' -------- {name} -------- {gid} --- {len(nctids)} Trials')
 
         if len(nctids) > 0:
