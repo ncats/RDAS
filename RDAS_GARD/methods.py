@@ -389,8 +389,6 @@ def get_node_counts():
     res4 = pm_db.run('MATCH (x:GARD)--(y:Article) WITH COUNT(DISTINCT y) AS cnt,x RETURN cnt AS cnt, x.GardId AS gard_id').data()
     res5 = gnt_db.run('MATCH (x:GARD)--(y:Project)--(z:CoreProject) WITH COUNT(DISTINCT z) AS cnt,x RETURN cnt AS cnt, x.GardId as gard_id').data()
 
-    #populate_node_counts(db,res1,'COUNT_PHENOTYPES')
-    #populate_node_counts(db,res2,'COUNT_GENES')
     populate_node_counts(db,res3,'COUNT_TRIALS')
     populate_node_counts(db,res4,'COUNT_ARTICLES')
     populate_node_counts(db,res5,'COUNT_PROJECTS')

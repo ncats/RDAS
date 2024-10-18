@@ -22,7 +22,9 @@ import pandas as pd
 import string
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import pipeline
-
+from nltk.corpus import words as nltk_words
+# Setup NLTK for english word parsing for synonym filtering
+wordset = set(nltk_words.words())
 
 
 
@@ -222,7 +224,7 @@ def get_article_id(pubmed_id, driver):
   article_id = None
 
   # Execute a Cypher query to find the Neo4j database ID of the article
-  result = driver.run("MATCH(a:Article {pubmed_id:$pmid}) return id(a) as id", args = {'pmid':pubmed_id})
+  result = driver.run("MATCH(a:Article {pubmed_id:$pmid}) return ID(a) as id", args = {'pmid':pubmed_id})
   record = result.single()
   
   # Check if a record was found and retrieve the article ID
@@ -253,7 +255,7 @@ def get_disease_id(gard_id, driver):
   id = None
 
   # Execute a Cypher query to find the Neo4j database ID of the GARD disease
-  result = driver.run("MATCH(a:GARD {GardId:$gard_id}) return id(a) as id", args = {'gard_id':gard_id})
+  result = driver.run("MATCH(a:GARD {GardId:$gard_id}) return ID(a) as id", args = {'gard_id':gard_id})
   record = result.single()
 
   # Check if a record was found and retrieve the disease ID
@@ -282,7 +284,7 @@ def create_omim_article_no_pubmed(db, omim_data, gard_id, search_source, maxdate
       n.LastUpdatedRDAS = $now,
       n.ReferenceOrigin = [\'''' + search_source + '''\']
     MERGE (d)-[r:MENTIONED_IN]->(n)
-    RETURN id(n)
+    RETURN ID(n)
     '''
 
     params={
@@ -396,7 +398,7 @@ def save_omim_articles(db, today):
         # Iterate over the PubMed IDs in sections
         for pubmed_id in sections:
           # Get the Neo4j database ID of the article
-          article_id = get_article_id(pubmed_id, db)
+          article_id = get_article_ID(pubmed_id, db)
 
           # Check if the article already exists in the database
           if (article_id):
@@ -450,13 +452,13 @@ def save_omim_article_relation(article_id, prefTitle, omim_id, sections, driver,
   rdasupdated = datetime.strptime(today,"%Y/%m/%d").strftime("%m/%d/%y")
 
   # Check if reference source already in ReferenceOrigin
-  ref_check = driver.run(f'MATCH (a:Article) WHERE id(a) = {article_id} RETURN a.ReferenceOrigin as ref').data()[0]['ref']
+  ref_check = driver.run(f'MATCH (a:Article) WHERE ID(a) = {article_id} RETURN a.ReferenceOrigin as ref').data()[0]['ref']
   
   if sections:
     if 'OMIM' in ref_check:
       print(f'omim if::: {sections}')
       query = f'''
-      MATCH (a:Article) WHERE id(a) = {article_id}
+      MATCH (a:Article) WHERE ID(a) = {article_id}
       MERGE (p:OMIMRef {{omimId: {omim_id}, omimName: \"{prefTitle}\", omimSections: {sections}}}) SET p.DateCreatedRDAS = \"{rdascreated}\" SET p.LastUpdatedRDAS = \"{rdasupdated}\"
       MERGE (a) - [r:HAS_OMIM_REF] -> (p)
       '''
@@ -464,7 +466,7 @@ def save_omim_article_relation(article_id, prefTitle, omim_id, sections, driver,
       print(f'omim else::: {sections}')
     # Define the Cypher query for creating the relationship
       query = f'''
-      MATCH (a:Article) WHERE id(a) = {article_id}
+      MATCH (a:Article) WHERE ID(a) = {article_id}
       SET a.ReferenceOrigin = ['OMIM'] + a.ReferenceOrigin
       MERGE (p:OMIMRef {{omimId: {omim_id}, omimName: \"{prefTitle}\", omimSections: {sections}}}) SET p.DateCreatedRDAS = \"{rdascreated}\" SET p.LastUpdatedRDAS = \"{rdasupdated}\"
       MERGE (a) - [r:HAS_OMIM_REF] -> (p)
@@ -472,7 +474,7 @@ def save_omim_article_relation(article_id, prefTitle, omim_id, sections, driver,
   else:
     print(f'sections else::: {sections}')
     query = f'''
-      MATCH (a:Article) WHERE id(a) = {article_id}
+      MATCH (a:Article) WHERE ID(a) = {article_id}
       MERGE (p:OMIMRef {{omimId: {omim_id}, omimName: \"{prefTitle}\", omimSections: {sections}}}) SET p.DateCreatedRDAS = \"{rdascreated}\" SET p.LastUpdatedRDAS = \"{rdasupdated}\"
       MERGE (a) - [r:HAS_OMIM_REF] -> (p)
       '''
@@ -505,7 +507,7 @@ def save_omim_remaining_articles(gard_id, prefTitle, omim_id, sections, search_s
   pubmed_ids = list(sections.keys())
 
   # Get the Neo4j database ID of the disease
-  disease_id = get_disease_id(gard_id, driver)
+  disease_id = get_disease_ID(gard_id, driver)
   logging.info(f'pubmed_ids: {pubmed_ids}')
   
   # Save articles and related information
@@ -514,7 +516,7 @@ def save_omim_remaining_articles(gard_id, prefTitle, omim_id, sections, search_s
   # Iterate over PubMed IDs in sections
   for pubmed_id in sections:
     # Get the Neo4j database ID of the article
-    article_id = get_article_id(pubmed_id, driver)
+    article_id = get_article_ID(pubmed_id, driver)
 
     # Check if the article ID is available
     if (article_id):
@@ -584,6 +586,7 @@ def find_articles(keyword, mindate, maxdate, batch=list(), cnt=0, recurse=False,
     term_search_query = f'\"{keyword}\"[Title/Abstract:~1]'
   
   # Construct the API request URL
+  print(term_search_query)
   url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={term_search_query}&mindate={mindate}&maxdate={maxdate}&retmode=json&retmax=10000&api_key={api_key}" #retmax=10000
 
   # Make the API request
@@ -824,7 +827,7 @@ def create_disease(session, gard_id, rd):
     d.Classification = $classification, 
     d.Synonyms = $synonyms,
     d.Type = $type
-  RETURN id(d)
+  RETURN ID(d)
   '''
   params = {
     "gard_id":gard_id,
@@ -837,6 +840,17 @@ def create_disease(session, gard_id, rd):
 
   # Execute the Cypher query and retrieve the ID of the created or updated node
   return session.run(query, args=params).single().value()
+
+
+def get_nhsExtract(texts, url=f"{sysvars.nhsapi_url}v1/predict"):
+  try:
+    nhs_info = dict(requests.post(url, json={'texts': texts}, verify=False).json())
+    return nhs_info['predictions'][0]
+
+  except Exception as e:
+    logging.error(f'Exception during get_nhsExtract. texts: {texts}, error: {e}')
+    return 0
+
 
 def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
   """
@@ -866,7 +880,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
 
   # Creating an article with search_source as 'OMIM' implies that there is no pubmed source available therefore ReferenceOrigin would just be ['OMIM']
   create_article_query = '''
-  MATCH (d:GARD) WHERE id(d)=$id
+  MATCH (d:GARD) WHERE ID(d)=$id
   MERGE (n:Article {pubmed_id:$pubmed_id})
   ON CREATE SET
     n.pubmed_id = $pubmed_id,
@@ -887,13 +901,43 @@ def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
     n.epi_processed = $epi_proc,
     n.DateCreatedRDAS = $now,
     n.LastUpdatedRDAS = $now,
+    n.isNHS = $isNHS,
     n.ReferenceOrigin = [\'''' + search_source + '''\']
   MERGE (d)-[r:MENTIONED_IN]->(n)
-  RETURN id(n)
+  RETURN ID(n)
   '''
 
-  # TEST May have to add: ON MERGE SET n.search_source = true
-  # TEST i removed the line n.isEpi = $isEpi, in the query since the default is Null now
+  # Gather NHS API data
+  title = abstractDataRel['title']
+  abstract = abstractDataRel['abstractText']
+  isNHS = False
+
+  if title and abstract:
+      results = get_nhsExtract([title + abstract])
+
+      if results == 1:
+        print('isNHS')
+        isNHS = True
+      else:
+        isNHS = False
+
+  elif title and not abstract:
+      results = get_nhsExtract([title])
+
+      if results == 1:
+        print('isNHS')
+        isNHS = True
+      else:
+        isNHS = False
+
+  elif abstract and not title:
+      results = get_nhsExtract([abstract])
+
+      if results == 1:
+        print('isNHS')
+        isNHS = True
+      else:
+        isNHS = False
 
   params={
     "id":disease_node,
@@ -914,6 +958,7 @@ def create_article(tx, abstractDataRel, disease_node, search_source, maxdate):
     "pubtype":abstractDataRel['pubTypeList']['pubType'] if 'pubTypeList' in abstractDataRel else '',
     "now": datetime.strptime(maxdate,"%Y/%m/%d").strftime("%m/%d/%y"), #"isEpi": False
     "citedByCount":int(abstractDataRel['citedByCount']) if 'citedByCount' in abstractDataRel else 0,
+    "isNHS":isNHS
     }
   
   # Execute the Cypher query and retrieve the ID of the created Article node
@@ -945,7 +990,7 @@ def create_authors(tx, abstractDataRel, article_node, omim=False):
 
   if omim:
     create_author_query = '''
-      MATCH (a:Article) WHERE id(a) = $article_id
+      MATCH (a:Article) WHERE ID(a) = $article_id
       MERGE (p:Author {fullName:$fullName, firstName:$firstName, lastName:$lastName})
       MERGE (p) - [r:WROTE] -> (a)
       '''
@@ -957,7 +1002,7 @@ def create_authors(tx, abstractDataRel, article_node, omim=False):
     })
   else:
     create_author_query = '''
-      MATCH (a:Article) WHERE id(a) = $article_id
+      MATCH (a:Article) WHERE ID(a) = $article_id
       MERGE (p:Author {fullName:$fullName, firstName:$firstName, lastName:$lastName, affiliation:$affiliation, orc_id:$orc_id})
       MERGE (p) - [r:WROTE] -> (a)
       '''
@@ -980,15 +1025,17 @@ def create_authors(tx, abstractDataRel, article_node, omim=False):
           auth_type = author_id_info['type']
           if auth_type == 'ORCID':
               auth_val = author_id_info['value']
-
-      tx.run(create_author_query, args={
-        "article_id":article_node,
-        "fullName": author['fullName'] if 'fullName' in author else '',
-        "firstName": author['firstName'] if 'firstName' in author else '',
-        "lastName": author['lastName'] if 'lastName' in author else '',
-        "affiliation": affiliation if affiliation else '',
-        "orc_id": auth_val if auth_val else ''
-      })
+      try:
+        tx.run(create_author_query, args={
+          "article_id":article_node,
+          "fullName": author['fullName'] if 'fullName' in author else '',
+          "firstName": author['firstName'] if 'firstName' in author else '',
+          "lastName": author['lastName'] if 'lastName' in author else '',
+          "affiliation": affiliation if affiliation else '',
+          "orc_id": auth_val if auth_val else ''
+        })
+      except Exception as e:
+        print(e)
 
 
 
@@ -1013,7 +1060,7 @@ def create_journal(tx, abstractDataRel, article_node):
   """
 
   create_journal_query = '''
-  MATCH (a:Article) WHERE id(a) = $article_id
+  MATCH (a:Article) WHERE ID(a) = $article_id
   MERGE (j:Journal{title:$title,medlineAbbreviation:$medlineAbbreviation,essn:$essn,issn:$issn,nlmid:$nlmid})
   MERGE (ji:JournalVolume{issue:$issue, volume:$volume, journalIssueId:$journalIssueId,
     dateOfPublication:$dateOfPublication, monthOfPublication:$monthOfPublication,yearOfPublication:$yearOfPublication,
@@ -1060,7 +1107,7 @@ def create_keywords(tx, abstractDataRel, article_node):
   """
 
   create_keyword_query = '''
-  MATCH (a:Article) WHERE id(a) = $article_id
+  MATCH (a:Article) WHERE ID(a) = $article_id
   MERGE (k:Keyword {keyword:$keyword}) 
   MERGE (k)- [r:KEYWORD_FOR] -> (a)
   '''
@@ -1179,7 +1226,7 @@ def create_epidemiology(tx, abstractDataRel, article_node, today):
   if not epi_data:
     return
 
-  if True: #epi_data['isEpi']
+  if epi_data['isEpi']:
     print(epi_data['isEpi'])
     epi_info = get_epiExtract(text)
     print('getEpi Info: ', str(epi_info), article_node)
@@ -1188,7 +1235,7 @@ def create_epidemiology(tx, abstractDataRel, article_node, today):
     if epi_info and sum([1 for x in epi_info.values() if x]) > 0:
       try:
         create_epidemiology_query = '''
-          MATCH (a:Article) WHERE id(a) = $article_id
+          MATCH (a:Article) WHERE ID(a) = $article_id
           SET a.isEpi = $isEpi
           SET a.epi_processed = TRUE
           MERGE (n:EpidemiologyAnnotation {isEpi:$isEpi, epidemiology_type:$epidemiology_type, epidemiology_rate:$epidemiology_rate, date:$date, location:$location, sex:$sex, ethnicity:$ethnicity, DateCreatedRDAS:$rdascreated, LastUpdatedRDAS:$rdasupdated})
@@ -1215,7 +1262,7 @@ def create_epidemiology(tx, abstractDataRel, article_node, today):
     else:
       try:
         create_epidemiology_query = '''
-            MATCH (a:Article) WHERE id(a) = $article_id
+            MATCH (a:Article) WHERE ID(a) = $article_id
             SET a.isEpi = $isEpi
             SET a.epi_processed = TRUE
             '''
@@ -1231,7 +1278,7 @@ def create_epidemiology(tx, abstractDataRel, article_node, today):
   # Update the Article node with isEpi information
   else:
     create_epidemiology_query = '''
-        MATCH (a:Article) WHERE id(a) = $article_id
+        MATCH (a:Article) WHERE ID(a) = $article_id
         SET a.isEpi = $isEpi
         SET a.epi_processed = TRUE
         '''
@@ -1264,7 +1311,7 @@ def create_fullTextUrls(tx, abstractDataRel, article_node):
   """
 
   create_fullTextUrls_query = '''
-  MATCH (a:Article) WHERE id(a) = $article_id
+  MATCH (a:Article) WHERE ID(a) = $article_id
   MERGE (u:FullTextUrl {availability:$availability, availabilityCode:$availabilityCode, documentStyle:$documentStyle,site:$site,url:$url})
   MERGE (u) - [r:CONTENT_FOR] -> (a)
   '''
@@ -1301,14 +1348,14 @@ def create_meshHeadings(tx, abstractDataRel, article_node):
   """
 
   create_meshHeadings_query = '''
-  MATCH (a:Article) WHERE id(a) = $article_id
+  MATCH (a:Article) WHERE ID(a) = $article_id
   MERGE (m:MeshTerm {isMajorTopic:$isMajorTopic, descriptorName:$descriptorName}) 
   MERGE (m) - [r:MESH_TERM_FOR] -> (a)
-  RETURN id(m)
+  RETURN ID(m)
   '''
 
   create_meshQualifiers_query = '''
-  MATCH (m:MeshTerm) WHERE id(m) = $meshHeading_id
+  MATCH (m:MeshTerm) WHERE ID(m) = $meshHeading_id
   MERGE (mq:MeshQualifier {abbreviation:$abbreviation, qualifierName:$qualifierName, isMajorTopic:$isMajorTopic}) 
   MERGE (mq) - [r:MESH_QUALIFIER_FOR] -> (m)
   '''
@@ -1366,7 +1413,7 @@ def create_chemicals(tx, abstractDataRel, article_node):
   """
 
   create_chemicals_query = '''
-  MATCH (a:Article) WHERE id(a) = $article_id
+  MATCH (a:Article) WHERE ID(a) = $article_id
   MERGE (u:Substance {name:$name, registryNumber:$registryNumber}) MERGE (u)-[r:SUBSTANCE_ANNOTATED_BY_PUBMED]->(a)
   '''
 
@@ -1470,7 +1517,7 @@ def create_annotations(tx, pubtatorData, article_node, today):
 
         # Develop Neo4j Query to Populate Annotations (New Node Only)
         create_annotations_query = '''
-          MATCH (a:Article) WHERE id(a) = {article_id}
+          MATCH (a:Article) WHERE ID(a) = {article_id}
           MERGE (pa:PubtatorAnnotation {{ text: {text}, infons_type: \'{infons_type}\', infons_identifier: \'{infons_identifier}\' }})
           ON CREATE
             SET pa.infons_identifier = \'{infons_identifier}\'
@@ -1514,8 +1561,8 @@ def create_disease_article_relation(tx, disease_node, article_node):
 
   # Cypher query to create the relationship
   query = '''
-  MATCH (a: Article) WHERE id(a) = $article_id
-  MATCH (d: GARD) WHERE id(d) = $disease_id
+  MATCH (a: Article) WHERE ID(a) = $article_id
+  MATCH (d: GARD) WHERE ID(d) = $disease_id
   MERGE (d)-[:MENTIONED_IN]->(a)
   '''
 
@@ -1558,40 +1605,8 @@ def save_disease_article_relation(disease_node, article_node, session):
   tx.commit()
 
 
-
-      
-def save_all(abstract, disease_node, pubmedID, search_source, session, maxdate):
-    """
-    Save various components of an article, including creating Article, MeshHeadings, Authors, Journal, Keywords,
-    FullTextUrls, and Chemicals nodes and relationships in the Neo4j database.
-
-    Parameters:
-    - abstract (dict): The abstract data containing information about the article.
-    - disease_node (int): The unique identifier of the Disease (GARD) node.
-    - pubmedID (str): The PubMed ID of the article.
-    - search_source (str): The source used for searching the article.
-    - session (neo4j.Session): The Neo4j database session.
-    - maxdate (str): The maximum date for the article.
-
-    Returns:
-    None
-
-    Example:
-    >> neo4j_session = neo4j_driver.session()
-    >> abstract_data = {...}  # Replace with actual abstract data
-    >> disease_id = 456
-    >> pubmed_id = "12345678"
-    >> source = "PubMed"
-    >> max_date = "2023-11-20"
-    >> save_all(abstract_data, disease_id, pubmed_id, source, neo4j_session, max_date)
-    """
-
-    logging.info(f'Invoking create_article')
-
-    # Create an Article node and get its identifier
-    article_node = create_article(session, abstract, disease_node, search_source, maxdate)
-
-    # Create MeshHeadings nodes and relationships
+def save_all_additional_nodes(session, abstract, article_node):
+  # Create MeshHeadings nodes and relationships
     if ('meshHeadingList' in abstract and 
     'meshHeading' in abstract['meshHeadingList']):
       logging.info(f'Invoking create_meshHeading')
@@ -1625,6 +1640,40 @@ def save_all(abstract, disease_node, pubmedID, search_source, session, maxdate):
     'chemical' in abstract['chemicalList']):
       logging.info(f'Invoking create_chemical')
       create_chemicals(session, abstract['chemicalList']['chemical'], article_node)
+
+      
+def save_all(abstract, disease_node, pubmedID, search_source, session, maxdate):
+    """
+    Save various components of an article, including creating Article, MeshHeadings, Authors, Journal, Keywords,
+    FullTextUrls, and Chemicals nodes and relationships in the Neo4j database.
+
+    Parameters:
+    - abstract (dict): The abstract data containing information about the article.
+    - disease_node (int): The unique identifier of the Disease (GARD) node.
+    - pubmedID (str): The PubMed ID of the article.
+    - search_source (str): The source used for searching the article.
+    - session (neo4j.Session): The Neo4j database session.
+    - maxdate (str): The maximum date for the article.
+
+    Returns:
+    None
+
+    Example:
+    >> neo4j_session = neo4j_driver.session()
+    >> abstract_data = {...}  # Replace with actual abstract data
+    >> disease_id = 456
+    >> pubmed_id = "12345678"
+    >> source = "PubMed"
+    >> max_date = "2023-11-20"
+    >> save_all(abstract_data, disease_id, pubmed_id, source, neo4j_session, max_date)
+    """
+
+    logging.info(f'Invoking create_article')
+
+    # Create an Article node and get its identifier
+    article_node = create_article(session, abstract, disease_node, search_source, maxdate)
+    save_all_additional_nodes(session, abstract, article_node)
+
 
 
 
@@ -1675,7 +1724,7 @@ def save_articles(disease_node, pubmed_ids, search_source, session, maxdate):
             continue
           else:
             # Check if the article already exists in the database
-            res = session.run("match(a:Article{pubmed_id:$pmid}) return id(a) as id", args = {'pmid':pubmedID})
+            res = session.run("match(a:Article{pubmed_id:$pmid}) return ID(a) as id", args = {'pmid':pubmedID})
             record = res.single()
 
             # Makes a connection to the GARD disease if the article already exists in the database
@@ -1741,8 +1790,49 @@ def filter_existing(db, gard_id, pmids):
       pmids = None   
   return pmids
 
+def is_under_char_threshold(syn):
+    if len(syn.split()) == 1:
+        if len(syn) < 5:
+            print('WORD UNDER CHAR LIMIT::', syn)
+            return True
+        else:
+            return False
+    else:
+        return False
 
+def is_english(syn):
+    tokens = syn.lower().split()
+    if len(tokens) == 1:
+        if tokens[0] in wordset:
+            print('ENGLISH WORD FOUND::', syn)
+            return True
+        else:
+            return False
+    else:
+        return False
 
+def is_acronym(words):
+    """
+    Checks if a word is an acronym.
+
+    Args:
+        word (str): The word to be checked.
+
+    Returns:
+        bool: True if the word is an acronym, False otherwise.
+
+    Example:
+        result = is_acronym("NASA")
+        print(result)  # Output: True
+    """
+    if len(words.split()) > 1: return False
+
+    for word in words.split():
+        # Check if the word follows the pattern of an acronym
+        if bool(re.match(r'\w*[A-Z]\w*', word[:len(word)-1])) and (word[len(word)-1].isupper() or word[len(word)-1].isnumeric()): # aGG2
+            print('ACRONYM REMOVED::', words)
+            return True
+    return False
 
 def filter_synonyms(syns):
     """
@@ -1760,19 +1850,15 @@ def filter_synonyms(syns):
     >> print(filtered_synonyms)
     ['apple', 'orange', 'grape']
     """
-
-    # Initialize an empty list to store filtered synonyms
-    filtered = list()
-
-    # Iterate through each synonym
-    for syn in syns:
-        # Check if the synonym contains a space
-        if ' ' in syn:
-            # Append the synonym to the filtered list if it does not contain a aspace
-            filtered.append(syn)
+    gardsyns_eng = [syn for syn in syns if is_english(syn)]
+    gardsyns_acro = [syn for syn in syns if is_acronym(syn)]
+    gardsyns_char_threshold = [syn for syn in syns if is_under_char_threshold(syn)]
+    filtered_syns = [x for x in syns if not x in gardsyns_eng]
+    filtered_syns = [x for x in filtered_syns if not x in gardsyns_acro]
+    filtered_syns = [x for x in filtered_syns if not x in gardsyns_char_threshold]
 
     # Return the filtered list of synonyms
-    return filtered
+    return filtered_syns
 
 
 
@@ -1900,7 +1986,7 @@ def save_disease_articles(db, mindate, maxdate, today):
                     continue
 
                   # Step 7: Check if the article already exists in the database
-                  res = db.run("match(a:Article{pubmed_id:$pmid}) set a.pubmed_evidence=TRUE return id(a)", args={"pmid":pubmedID})
+                  res = db.run("match(a:Article{pubmed_id:$pmid}) set a.pubmed_evidence=TRUE return ID(a)", args={"pmid":pubmedID})
                   alist = list(res)
                   matching_articles = len(alist)
 

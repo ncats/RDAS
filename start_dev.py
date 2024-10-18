@@ -67,9 +67,9 @@ def check_update(db, db_type):
 
 # Connect to the system database
 db = AlertCypher('system')
-cred = credentials.Certificate(sysvars.firebase_key_path)
-firebase_admin.initialize_app(cred)
-firestore_db = firestore.client()
+#cred = credentials.Certificate(sysvars.firebase_key_path)
+#firebase_admin.initialize_app(cred)
+#firestore_db = firestore.client()
 
 
 while True:
