@@ -16,6 +16,7 @@ def detect(server_name, path):
     server = None
     config_title = None
     transfer_detection = {k:False for k in sysvars.dump_dirs}
+    last_updates = {k:str() for k in sysvars.dump_dirs}
 
     if server_name == 'test':
         server = 'TEST'
@@ -33,7 +34,8 @@ def detect(server_name, path):
 
     for db_name in sysvars.dump_dirs:
         try:
-            last_mod_date = db.getConf(f'{server}_{config_title}_DETECTION',f'{db_name}')
+            last_mod_date = db.getConf(f'{server}_{config_title}_DETECTION', db_name)
+            last_updates[db_name] = last_mod_date
             print(f'{db_name} last mod:: {last_mod_date}')
             cur_mod_date = os.path.getmtime(f"{path}{db_name}.dump")
             print(f'{db_name} cur mod:: {cur_mod_date}')
@@ -41,10 +43,10 @@ def detect(server_name, path):
 
             if not cur_mod_date == last_mod_date:
                 transfer_detection[db_name] = True
-                db.setConf(f'{server}_{config_title}_DETECTION',f'{db_name}',cur_mod_date)
+                db.setConf(f'{server}_{config_title}_DETECTION', db_name, cur_mod_date)
         except Exception as e:
             print(e)
             transfer_detection[db_name] = False
 
-    return transfer_detection
+    return [transfer_detection,last_updates]
 

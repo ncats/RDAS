@@ -19,6 +19,7 @@ import nltk
 import pandas as pd
 from time import sleep
 from spacy.matcher import Matcher
+from nltk.corpus import words as nltk_words
 import spacy
 import string
 from transformers import AutoTokenizer, AutoModelForTokenClassification
@@ -53,7 +54,11 @@ def get_full_studies(nctids):
     for nctid in nctids:
         query = f'https://clinicaltrials.gov/api/v2/studies/{nctid}'
         response = requests.get(query)
-        response_txt = response.json()
+
+        try:
+            response_txt = response.json()
+        except Exception:
+            response_txt = None
         #response_txt = parse_trial_fields(response_txt)
         yield response_txt
 
@@ -74,7 +79,41 @@ def get_nctids(names, lastupdate):
         trials = list()
         name = name.replace('"','\"')
 
-        initial_query = f'https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Concept]{name} OR AREA[DetailedDescription]EXPANSION[Concept]{name} OR AREA[BriefSummary]EXPANSION[Concept]{name}) AND AREA[LastUpdatePostDate]RANGE[{lastupdate},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
+        initial_query = f'https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Term]{name} OR AREA[DetailedDescription]EXPANSION[Term]{name} OR AREA[BriefSummary]EXPANSION[Term]{name}) AND AREA[LastUpdatePostDate]RANGE[{lastupdate},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
+        #https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Concept]{name} OR AREA[DetailedDescription]EXPANSION[Concept]{name} OR AREA[BriefSummary]EXPANSION[Concept]{name}) AND AREA[LastUpdatePostDate]RANGE[{lastupdate},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
+        print(initial_query)
+        try:
+            pageToken = None
+            while True:
+                response_txt = call_get_nctids(initial_query, pageToken=pageToken)
+                if response_txt:
+                    trials_list = response_txt['studies']
+                    
+                    for trial in trials_list:
+                        nctid = trial['protocolSection']['identificationModule']['nctId']
+                        trials.append(nctid)
+                    all_trials += trials
+                    if not 'nextPageToken' in response_txt:
+                        break
+                    else:
+                        pageToken = response_txt['nextPageToken']
+                else:
+                    break
+        
+        except Exception as e:
+            print(e)
+
+    return list(set(all_trials))
+
+
+def get_nctids2(names, lastupdate):
+    all_trials = list()
+    for name in names:
+        trials = list()
+        name = name.replace('"','\"')
+
+        initial_query = f'https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Term]{name} OR AREA[DetailedDescription]EXPANSION[Term]{name} OR AREA[BriefSummary]EXPANSION[Term]{name}) AND AREA[LastUpdatePostDate]RANGE[{lastupdate},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
+        #https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Concept]{name} OR AREA[DetailedDescription]EXPANSION[Concept]{name} OR AREA[BriefSummary]EXPANSION[Concept]{name}) AND AREA[LastUpdatePostDate]RANGE[{lastupdate},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
         print(initial_query)
         try:
             pageToken = None
@@ -491,8 +530,8 @@ def cypher_Investigator(study):
 
 
 def cypher_Condition(db, study, gard_names_dict):
-    identification_module = study.get('protocolSection','').get('identificationModule','')
-    conditions_module = study.get('protocolSection','').get('conditionsModule','')
+    identification_module = study.get('protocolSection',dict()).get('identificationModule',dict())
+    conditions_module = study.get('protocolSection',dict()).get('conditionsModule',dict())
     
     nctid = identification_module.get('nctId', '')
 
@@ -502,6 +541,7 @@ def cypher_Condition(db, study, gard_names_dict):
         return None
 
     for condition in conditions:
+        condition_normalized = gard_text_normalize(condition)
         query = """
         MATCH (x:ClinicalTrial) WHERE x.NCTId = \"{nctid}\"
         MERGE (y:Condition {{Condition: \"{cond}\"}})
@@ -509,12 +549,12 @@ def cypher_Condition(db, study, gard_names_dict):
         RETURN ID(y) AS cond_id
         """.format(
         nctid=nctid,
-        cond=condition,
+        cond=condition_normalized,
         )
         cond_id = db.run(query).data()[0]['cond_id']
 
         # Exact match with GARD node
-        condition_normalized = gard_text_normalize(condition)
+        #condition_normalized = gard_text_normalize(condition)
         for k,v in gard_names_dict.items():
             for term in v:
                 if condition_normalized == term:
@@ -896,6 +936,26 @@ def gard_text_normalize(text):
 
     return text
 
+def is_under_char_threshold(syn):
+    if len(syn.split()) == 1:
+        if len(syn) < 5:
+            print('WORD UNDER CHAR LIMIT::', syn)
+            return True
+        else:
+            return False
+    else:
+        return False
+
+def is_english(syn):
+    tokens = syn.lower().split()
+    if len(tokens) == 1:
+        if tokens[0] in wordset:
+            print('ENGLISH WORD FOUND::', syn)
+            return True
+        else:
+            return False
+    else:
+        return False
 
 def get_GARD_names_syns(db):
     temp = dict()
@@ -905,8 +965,20 @@ def get_GARD_names_syns(db):
         gardname = res['gname']
         gardsyns = res['syns']
 
-        gardsyns_no_acro = [syn for syn in gardsyns if not is_acronym(syn)]
-        termlist = [gardname] + gardsyns_no_acro
+        #faconi anemia, face, FACE
+        # [face]
+        # [FACE]
+        # [faconia anemia, face, FACE] - [face]
+        # [faconia anemia, face, FACE] - [FACE]
+
+        gardsyns_eng = [syn for syn in gardsyns if is_english(syn)]
+        gardsyns_acro = [syn for syn in gardsyns if is_acronym(syn)]
+        gardsyns_char_threshold = [syn for syn in gardsyns if is_under_char_threshold(syn)]
+        filtered_syns = [x for x in gardsyns if not x in gardsyns_eng]
+        filtered_syns = [x for x in filtered_syns if not x in gardsyns_acro]
+        filtered_syns = [x for x in filtered_syns if not x in gardsyns_char_threshold]
+
+        termlist = [gardname] + filtered_syns
 
         termlist = [gard_text_normalize(term) for term in termlist]
 
@@ -958,6 +1030,9 @@ pattern = [{'ENT_TYPE':'CHEMICAL'}]
 matcher = Matcher(nlp.vocab)
 matcher.add('DRUG',[pattern])
 
+# Setup NLTK for english word parsing for synonym filtering
+wordset = set(nltk_words.words())
+
 # Get last updated date and current date
 today = date.today().strftime('%m/%d/%y')
 lastupdate_str = db.getConf('UPDATE_PROGRESS','rdas.ctkg_update')
@@ -987,9 +1062,25 @@ else:
     db.setConf('UPDATE_PROGRESS', 'clinical_in_progress', 'True')
     cypher_GARD_populate()
 
+### TEST ###
+tst_cnt = 0
+all_lst = dict()
+id_lst = list()
+name_lst = list()
+nctid_concept_lst = list()
+num_concept_lst = list()
+nctid_term_lst = list()
+num_term_lst = list()
+term_overlap_lst = list()
+concept_overlap_lst = list()
+num_concept_overlap_lst = list()
+num_term_overlap_lst = list()
 
 if clinical_current_step == '':
+    # Gets list used to exact map Conditions to GARD, normalized and acros and single english words removed
     gard_names_dict = get_GARD_names_syns(gard_db)
+    # Gets list used for gettings trials and making nodes, not normalized but acros and single english words removed
+
     gard_response = gard_db.run('MATCH (x:GARD) RETURN x.GardId as gid, x.GardName as gname, x.Synonyms as syns').data()
     for idx,response in enumerate(gard_response):
         if idx < clinical_disease_progress:
@@ -1003,11 +1094,33 @@ if clinical_current_step == '':
         gard_query = cypher_GARD(gard_node)
         db.run(gard_query)
 
-        names_no_filter = [name] + syns
-        syns = [syn for syn in syns if not is_acronym(syn)]
-        names = [name] + syns
+        #names_no_filter = [name] + syns
+        gardsyns_eng = [syn for syn in syns if is_english(syn)]
+        gardsyns_acro = [syn for syn in syns if is_acronym(syn)]
+        gardsyns_char_threshold = [syn for syn in syns if is_under_char_threshold(syn)]
+        filtered_syns = [x for x in syns if not x in gardsyns_eng]
+        filtered_syns = [x for x in filtered_syns if not x in gardsyns_acro]
+        filtered_syns = [x for x in filtered_syns if not x in gardsyns_char_threshold]
+
+        # TEST
+        if len(gardsyns_eng) > 0 or len(gardsyns_char_threshold) > 0:
+            print('English Words Found::', gardsyns_eng)
+            print('Word Found Lower Than Threshold::', gardsyns_char_threshold)
+            ct_count = db.run(f'MATCH (x:GARD)--(y:ClinicalTrial) WHERE x.GardId = \"{gid}\" RETURN COUNT(y) as node_count').data()[0]['node_count']
+            cond_count = db.run(f'MATCH (x:GARD)--(y:Condition) WHERE x.GardId = \"{gid}\" RETURN COUNT(y) as node_count').data()[0]['node_count']
+            print('PREV CONNECT CT::', ct_count)
+            print('PREV CONNECT COND::', cond_count)
+            db.run(f'MATCH (x:GARD)-[r]-(y:ClinicalTrial) WHERE x.GardId = \"{gid}\" DELETE r')
+            db.run(f'MATCH (x:GARD)-[r]-(y:Condition) WHERE x.GardId = \"{gid}\" DELETE r')
+        
+        else:
+            continue
+        # TEST
+
+        names = [name] + filtered_syns
 
         nctids = get_nctids(names, lastupdate)
+
         print(str(idx) + f' -------- {name} -------- {gid} --- {len(nctids)} Trials')
 
         if len(nctids) > 0:
@@ -1030,7 +1143,7 @@ if clinical_current_step == '':
                         if query: db.run(query)
                     print('created')
                 else:
-                    print('Error in add for finding full trial data for ' + full_study['nctId'])
+                    print('Error in add for finding full trial data')
 
-        db.setConf('UPDATE_PROGRESS', 'clinical_disease_progress', str(idx))
+        #db.setConf('UPDATE_PROGRESS', 'clinical_disease_progress', str(idx))
     

@@ -97,7 +97,8 @@ def main():
 
 
     if clinical_current_step == '':
-        gard_response = gard_db.run('MATCH (x:GARD) RETURN x.GardId as gid, x.GardName as gname, x.Synonyms as syns LIMIT 50').data()
+        gard_response = gard_db.run('MATCH (x:GARD) RETURN x.GardId as gid, x.GardName as gname, x.Synonyms as syns').data()
+
         for idx,response in enumerate(gard_response):
             name = response['gname']
             gid = response['gid']

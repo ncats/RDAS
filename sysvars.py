@@ -30,10 +30,10 @@ firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz
 
 # if you are not using minghui's test dataset, make db_prefix=""; now you only need to change the neo4j database names here:
 db_prefix=""
-ct_db_name="new.rdas.ctkg" 
+ct_db_name="rdas.ctkg" 
 gf_db_name='rdas.gfkg'
 pa_db_name="rdas.pakg"
-gard_db_name='test.rdas.gard'
+gard_db_name='rdas.gard'
 
 ct_db = db_prefix+ct_db_name
 pm_db = db_prefix+pa_db_name
@@ -56,6 +56,7 @@ convert = {ct_db:'trials', pm_db:'articles', gnt_db:'grants'}
 
 # Server URLS and addresses # Original epiapi_url is https://rdas.ncats.nih.gov/api/epi/
 epiapi_url = "https://rdas.ncats.nih.gov/api/epi/"
+nhsapi_url = "https://rdas.ncats.nih.gov/api/article_prediction/"
 rdas_urls = {'neo4j-dev':"ncats-neo4j-lnx-dev.ncats.nih.gov",'dev':"rdas-dev.ncats.nih.gov",'test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}
 
 # GARD exclusion list for when GARD-Project mappings are made in the grant code
