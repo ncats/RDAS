@@ -54,6 +54,7 @@ def get_full_studies(nctids):
     for nctid in nctids:
         query = f'https://clinicaltrials.gov/api/v2/studies/{nctid}'
         response = requests.get(query)
+
         try:
             response_txt = response.json()
         except Exception:
@@ -1079,6 +1080,7 @@ if clinical_current_step == '':
     # Gets list used to exact map Conditions to GARD, normalized and acros and single english words removed
     gard_names_dict = get_GARD_names_syns(gard_db)
     # Gets list used for gettings trials and making nodes, not normalized but acros and single english words removed
+
     gard_response = gard_db.run('MATCH (x:GARD) RETURN x.GardId as gid, x.GardName as gname, x.Synonyms as syns').data()
     for idx,response in enumerate(gard_response):
         if idx < clinical_disease_progress:
