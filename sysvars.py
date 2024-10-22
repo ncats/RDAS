@@ -10,7 +10,7 @@ base_directory_name = 'RDAS'
 # RDAS Team contacts for emails
 contacts = {
     "dev": ["leadmandj@nih.gov"],
-    "test": ["leadmandj@nih.gov","qian.zhu@nih.gov"]
+    "test": ["leadmandj@nih.gov"]
 }
 
 base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)

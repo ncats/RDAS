@@ -18,12 +18,14 @@ while True:
         db = AlertCypher(db_name)
         
         try:
-            update = db.run('MATCH (x:UserTesting) RETURN x.Approved as update').data()[0]['update']
-            print(f'{db_name}:: {update}')
-        
-            if update == 'True':
+            try:
+                update = db.run('MATCH (x:UserTesting) RETURN x.Approved as update').data()[0]['update']
+            except Exception:
+                print(f'{db_name}:: False [Non-existent UserTesting Node]')
+                continue
+
+            if update == True:
                 print(f'Database dump approved for {db_name}')
-                db.run('MATCH (x:UserTesting) DETACH DELETE x')
 
                 dump_module.dump_file(sysvars.approved_path, db_name)
 

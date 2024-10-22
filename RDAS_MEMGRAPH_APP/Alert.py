@@ -41,7 +41,7 @@ class Alert:
         rendered_content = template.render(data=data)
         return rendered_content
     
-    def send_email(self,subject, html, recipient):
+    def send_email(self,subject,html,recipient):
         print("Sending emails to:", recipient)
         # sender_email = client  # Replace with your email
         # Set up the email
