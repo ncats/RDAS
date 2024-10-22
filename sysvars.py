@@ -10,7 +10,7 @@ base_directory_name = 'RDAS'
 # RDAS Team contacts for emails
 contacts = {
     "dev": ["leadmandj@nih.gov"],
-    "test": ["leadmandj@nih.gov","qian.zhu@nih.gov"]
+    "test": ["leadmandj@nih.gov"]
 }
 
 base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
@@ -37,6 +37,8 @@ gnt_db = db_prefix+gf_db_name
 gard_db = db_prefix+gard_db_name
 
 # Conversions
+dump_dirs = ['rdas.ctkg','rdas.pakg','rdas.gfkg','rdas.gard']
+db_abbrevs = {'ct':'rdas.ctkg', 'pm':'rdas.pakg', 'gnt':'rdas.gfkg'}
 dump_dirs = ['rdas.ctkg','rdas.pakg','rdas.gfkg','rdas.gard']
 db_abbrevs = {'ct':'rdas.ctkg', 'pm':'rdas.pakg', 'gnt':'rdas.gfkg'}
 db_abbrevs2 = {ct_db:'ct', pm_db:'pm', gnt_db:'gnt'}

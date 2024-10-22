@@ -30,6 +30,9 @@ class Dump ():
         self.db.run(f'START DATABASE {db_name}')
         print(f'DATABASE {db_name} RESTARTED')
 
+        print('Waiting 10 seconds for database to update changes')
+        sleep(10)
+
     def generate_backup_name (self, dump_name):
         cur_date = datetime.now().strftime("%m-%d-%y")
         return f'{self.mode}-{dump_name}-{cur_date}'
