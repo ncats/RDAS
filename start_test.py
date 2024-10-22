@@ -32,6 +32,7 @@ while True:
     new_dumps = transfer_detection[0]
     for db_name in new_dumps:
         transfer_module.seed(db_name,sysvars.transfer_path)
+        transfer_module.seed(db_name,sysvars.transfer_path)
         print('database seeded within cluster')
         
         sub = '[RDAS] ACTION REQUIRED - New Dump Uploaded to Test Server'

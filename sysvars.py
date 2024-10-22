@@ -39,6 +39,8 @@ gard_db = db_prefix+gard_db_name
 # Conversions
 dump_dirs = ['rdas.ctkg','rdas.pakg','rdas.gfkg','rdas.gard']
 db_abbrevs = {'ct':'rdas.ctkg', 'pm':'rdas.pakg', 'gnt':'rdas.gfkg'}
+dump_dirs = ['rdas.ctkg','rdas.pakg','rdas.gfkg','rdas.gard']
+db_abbrevs = {'ct':'rdas.ctkg', 'pm':'rdas.pakg', 'gnt':'rdas.gfkg'}
 db_abbrevs2 = {ct_db:'ct', pm_db:'pm', gnt_db:'gnt'}
 
 # Paths to database creation and update source files
