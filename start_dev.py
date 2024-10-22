@@ -15,10 +15,6 @@ import argparse
 from datetime import date,datetime
 from AlertCypher import AlertCypher
 from RDAS_GARD.methods import get_node_counts
-import firebase_admin
-from firebase_admin import auth
-from firebase_admin import credentials
-from firebase_admin import firestore
 
 prefix=sysvars.db_prefix
 config_selection = {'ct':[prefix+'rdas.ctkg_update', 'ct_interval'], 'pm':[prefix+'rdas.pakg_update', 'pm_interval'], 'gnt':[prefix+'rdas.gfkg_update', 'gnt_interval']}
