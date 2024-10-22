@@ -9,8 +9,10 @@ import datetime
 from AlertCypher import AlertCypher
 from subprocess import *
 from time import sleep
-import argparse
+from RDAS_MEMGRAPH_APP.Dump import Dump
 
+
+dump_module = Dump('test')
 while True:
     for db_name in sysvars.dump_dirs:
         db = AlertCypher(db_name)
@@ -23,11 +25,12 @@ while True:
                 print(f'Database dump approved for {db_name}')
                 db.run('MATCH (x:UserTesting) DETACH DELETE x')
 
-                p = Popen(['sudo', 'cp', f'{sysvars.transfer_path}{db_name}.dump', f'{sysvars.approved_path}{db_name}.dump'], encoding='utf8')
-                p.wait()
+                dump_module.dump_file(sysvars.approved_path, db_name)
 
                 p = Popen(['sudo', 'chmod', '777', f'{sysvars.approved_path}{db_name}.dump'], encoding='utf8')
                 p.wait()
+
+                
 
         except Exception:
             print(f'{db_name} read error')

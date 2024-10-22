@@ -10,12 +10,7 @@ import sysvars
 import datetime
 from subprocess import *
 from time import sleep
-print(os.getcwd())
-import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-dir", "--dump_dir", dest = "dump_dir", help="directory name within the directory that stores the dump files")
-args = parser.parse_args()
 
 print('DUMPING DATABASE ON REMOTE SERVER')
 p = Popen(['/opt/neo4j/bin/neo4j-admin', 'database', 'dump', f'{args.dump_dir}', f'--to-path={sysvars.transfer_path}', '--overwrite-destination'], encoding='utf8')

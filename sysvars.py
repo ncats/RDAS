@@ -8,16 +8,12 @@ base_directory_name = 'RDAS'
 # base_path = '/home/{current_user}/RDAS_master/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 
 # RDAS Team contacts for emails
-contacts = [
-    "leadmandj@nih.gov"
-]
+contacts = {
+    "dev": ["leadmandj@nih.gov"],
+    "test": ["leadmandj@nih.gov","qian.zhu@nih.gov"]
+}
 
 base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
-
-# RDAS Team contacts for emails
-contacts = [
-    "leadmandj@nih.gov"
-]
 
 # Folder paths
 backup_path = '{base_path}backup/'.format(base_path=base_path)
@@ -41,8 +37,8 @@ gnt_db = db_prefix+gf_db_name
 gard_db = db_prefix+gard_db_name
 
 # Conversions
-dump_dirs = ['RDAS.CTKG','RDAS.PAKG','RDAS.GFKG','RDAS.GARD']
-db_abbrevs = {'ct':'RDAS.CTKG', 'pm':'RDAS.PAKG', 'gnt':'RDAS.GFKG'}
+dump_dirs = ['rdas.ctkg','rdas.pakg','rdas.gfkg','rdas.gard']
+db_abbrevs = {'ct':'rdas.ctkg', 'pm':'rdas.pakg', 'gnt':'rdas.gfkg'}
 db_abbrevs2 = {ct_db:'ct', pm_db:'pm', gnt_db:'gnt'}
 
 # Paths to database creation and update source files
