@@ -63,7 +63,7 @@ class Alert:
             Destination={'ToAddresses': recipient},
             Message=message
         )
-        print("Email sent successfully.")
+        print(f"Email sent successfully to {recipient}.")
 
     def send_mail(self,data):
         # Add tabs and type to the data dictionary
@@ -82,34 +82,25 @@ class Alert:
     def get_stats(self, type, gard, date_start, date_end):
         # print("master get_stats----start::",date_start, "end::",date_end)
         db = AlertCypher(type)
-        return_data = dict()
-        # date_start_string = date_start
-        # date_end_string = date_end
-        #date_start_obj = datetime.strptime(date_start, '%m/%d/%y')
-        #date_end_obj = datetime.strptime(date_end, '%m/%d/%y')
-
         date_list = pd.date_range(date_start, date_end, freq='D').strftime('%m/%d/%y').to_list()
-        # print("date_list::",date_list)
 
         convert = {sysvars.ct_db:['ClinicalTrial','GARD','GardId'], sysvars.pm_db:['Article','GARD','GardId'], sysvars.gnt_db:['Project','GARD','GardId']}
         connect_to_gard = {sysvars.ct_db:'--',sysvars.pm_db:'--',sysvars.gnt_db:'--'}
 
-        # query = 'MATCH (x:{node}){connection}(y:{gardnode}) WHERE x.DateCreatedRDAS IN {date_list} AND y.{property} IN {list} RETURN COUNT(x)'.format(node=convert[type][0], gardnode=convert[type][1], property=convert[type][2], list=list(gards.keys()), date_list=date_list, connection=connect_to_gard[type])
         query = 'MATCH (x:{node}){connection}(y:{gardnode}) WHERE x.DateCreatedRDAS IN {date_list} AND y.{property} = \"{gard}\" RETURN COUNT(x)'.format(node=convert[type][0], gardnode=convert[type][1], property=convert[type][2], gard=gard, date_list=date_list, connection=connect_to_gard[type])
-        # print("query::",query)
         response = db.run(query)
         result = response.single()
-        # print("total_query count::",result['COUNT(x)'])
 
         return result['COUNT(x)']
 
     def trigger_email(self,has_updates,date_start=datetime.today().strftime('%m/%d/%y'), date_end=datetime.today().strftime('%m/%d/%y')):
         print("start_date",date_start, " end date:: ",date_end)
+        print(has_updates)
         #obtain users contact information
         txt_tabs_1 = {'trials':sysvars.ct_db, 'grants':sysvars.gnt_db, 'articles':sysvars.pm_db}
-        #tabs = {prefix +sysvars.ct_db_name: 'trials', prefix +sysvars.gf_db_name: 'grants', prefix +sysvars.pa_db_name: 'articles'}
         users = auth.list_users()
         user_info={}   
+        
         if users:
             users = users.iterate_all()
             for user in users:
@@ -127,38 +118,32 @@ class Alert:
                 print('Document Doesnt Exist')
 
         for uid, subscript in user_data.items():
-            # print(uid,subscript,"\n")
             user=user_info.get(uid,None)
+
             if user:
-                # print("user contact info: ",user.email)
                 subscript_gard={}
                 query_results={}
                 total=0
                 query_results = {}
                 uniques=set()
+
                 for subs in subscript["subscriptions"]:# for each gard id
-                    # print("subs::",subs)
                     if "gardID" in subs and len(subs["alerts"])>0 and subs["alerts"][0] and "diseaseName" in subs:
-                        
                         subscript_gard[subs["gardID"]]=subs["diseaseName"]
                         # query databases
                         query_results[subs["gardID"]]={}
                         
-                        
                         for dtype in subs["alerts"]:
-                            print(dtype,txt_tabs_1 [dtype],has_updates)
                             uniques.add(dtype)
                             if txt_tabs_1 [dtype] in has_updates and txt_tabs_1[dtype] in has_updates:
-                            
-                                # print("dtype::",dtype)
                                 update_count = self.get_stats(txt_tabs_1 [dtype], subs["gardID"], date_start, date_end)
                                 query_results[subs["gardID"]][dtype]=update_count
                                 total+=update_count
+
                             else:
                                 query_results[subs["gardID"]][dtype]=0
+
                 uniques=list(uniques)
-                # if len(uniques)<3:
-                #     print("len < 3")
                 query_results["datasets"]=uniques
                 query_results['email'] = [user.email]
                 query_results['name'] =  user_data[uid].get('displayName',"")
@@ -167,7 +152,7 @@ class Alert:
                 query_results["update_date_start"]=date_start
                 query_results["update_date_end"]=date_end
                 print("total updates::",total)
-                # print("query_results::",query_results,"\n")
+
                 if total>0:
                     self.send_mail( query_results)
             print("\n")

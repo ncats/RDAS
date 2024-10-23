@@ -31,6 +31,7 @@ transfer_detection,lastupdates = transfer_module.detect(sysvars.transfer_path)
 transfer_detection,lastupdates = transfer_module.detect(sysvars.approved_path)
 
 while True:
+    print('[RDAS] Checking for new database files in the transfer folder')
     # Detects all new dump files in the transfer folder of the TEST server
     transfer_detection,lastupdates = transfer_module.detect(sysvars.transfer_path)
     new_dumps = transfer_detection
@@ -48,10 +49,11 @@ while True:
                 <p>Run the following Cypher Query:</p>
                 <p>MATCH (x:UserTesting) SET x.Approved = \"True\"</p>'''
         email_client.send_email(sub,html,recip)
-        print(f'Notification email sent to {recip}')
+        print(f'Notification emails sent to {recip}')
 
-    print('Waiting for 1 minute before checking for approval...')
-    sleep(60)
+    print('[RDAS] Waiting for 15 seconds before checking for approval...')
+    sleep(15)
+    print('[RDAS] Checking Neo4j for recently approved databases')
 
     for db_name in sysvars.dump_dirs:
         db = AlertCypher(db_name)
@@ -72,7 +74,9 @@ while True:
         except Exception as e:
             print(e)
 
-    sleep(60)
+    print('[RDAS] Waiting for 15 seconds before checking if new database files are in the approved folder')
+    sleep(15)
+    print('[RDAS] Checking approved folder for recently approved dump files')
 
     # Detects if a new dump file was loaded into the approved folder
     transfer_detection,lastupdates = transfer_module.detect(sysvars.approved_path)
@@ -95,8 +99,9 @@ while True:
                     <p>Database effected: {db_name}</p>
                     <p>There are no other actions required on your end</p>'''
         email_client.send_email(sub,html,recip)
-        print(f'Notification email sent to {recip}')
+        print(f'Notification emails sent to {recip}')
 
     # Waits one minute before restarting checks
-    sleep(60)
+    print('[RDAS] Waiting 15 seconds before restarting all checks')
+    sleep(15)
 

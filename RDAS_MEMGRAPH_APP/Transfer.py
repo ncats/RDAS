@@ -50,7 +50,6 @@ class Transfer:
     def detect(self, path):
         server = None
         config_title = None
-        #transfer_detection = {k:False for k in sysvars.dump_dirs}
         transfer_detection = list()
         last_updates = {k:str() for k in sysvars.dump_dirs}
 
@@ -75,10 +74,8 @@ class Transfer:
                 last_mod_date = self.db.getConf(f'{server}_{config_title}_DETECTION', db_name)
                 # stores value to return later
                 last_updates[db_name] = last_mod_date
-                print(f'{db_name} last mod:: {last_mod_date}')
                 # Gets current modification timestamp of the targeted database dump file
                 cur_mod_date = os.path.getmtime(f"{path}{db_name}.dump")
-                print(f'{db_name} cur mod:: {cur_mod_date}')
                 cur_mod_date = str(cur_mod_date)
 
                 # If the config file last update and the current last modification date is different, detect as new transfer and update the config
@@ -87,6 +84,5 @@ class Transfer:
                     self.db.setConf(f'{server}_{config_title}_DETECTION', db_name, cur_mod_date)
             except Exception as e:
                 print(e)
-                #transfer_detection[db_name] = False
 
         return [transfer_detection,last_updates]
