@@ -10,8 +10,6 @@ from AlertCypher import AlertCypher
 from subprocess import *
 from time import sleep
 import argparse
-import detect_transfer
-import seed_cluster
 from RDAS_MEMGRAPH_APP.Alert import Alert
 from RDAS_MEMGRAPH_APP.Transfer import Transfer
 from datetime import datetime
@@ -30,9 +28,7 @@ while True:
         print('checking for update...')
         # Detect new dumps in the production server
         transfer_detection,last_updates = transfer_module.detect(sysvars.transfer_path)
-        approval_detection,last_updates_approval = transfer_module.detect(sysvars.approved_path)
-        new_dumps = [k for (k,v) in transfer_detection.items() if v]
-        new_dumps_approval = [k for (k,v) in approval_detection.items() if v]
+        new_dumps = transfer_detection
 
         # Sets the current db files last transfer date to today so it doesnt load and send emails upon script starting
         if init:
