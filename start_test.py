@@ -26,10 +26,15 @@ dump_module = Dump('test')
 recip = sysvars.contacts['test']
 today_str = datetime.today().strftime('%m/%d/%y')
 
+# INIT
+transfer_detection,lastupdates = transfer_module.detect(sysvars.transfer_path)
+transfer_detection,lastupdates = transfer_module.detect(sysvars.approved_path)
+
 while True:
     # Detects all new dump files in the transfer folder of the TEST server
     transfer_detection,lastupdates = transfer_module.detect(sysvars.transfer_path)
-    new_dumps = transfer_detection[0]
+    new_dumps = transfer_detection
+
     for db_name in new_dumps:
         transfer_module.seed(db_name,sysvars.transfer_path)
         transfer_module.seed(db_name,sysvars.transfer_path)
@@ -71,7 +76,8 @@ while True:
 
     # Detects if a new dump file was loaded into the approved folder
     transfer_detection,lastupdates = transfer_module.detect(sysvars.approved_path)
-    new_dumps = transfer_detection[0]
+    new_dumps = transfer_detection
+
     print(new_dumps)
 
     for db_name in new_dumps:
