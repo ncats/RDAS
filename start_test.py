@@ -58,7 +58,6 @@ while True:
         except Exception as e:
             print(e)
 
-    print('[RDAS] Waiting for 15 seconds before checking for approval...')
     sleep(15)
     print('[RDAS] Checking Neo4j for recently approved databases')
 
@@ -81,7 +80,6 @@ while True:
         except Exception as e:
             print(e)
 
-    print('[RDAS] Waiting for 15 seconds before checking if new database files are in the approved folder')
     sleep(15)
     print('[RDAS] Checking approved folder for recently approved dump files')
 
@@ -109,6 +107,5 @@ while True:
         print(f'Notification emails sent to {recip}')
 
     # Waits one minute before restarting checks
-    print('[RDAS] Waiting 15 seconds before restarting all checks')
     sleep(15)
 

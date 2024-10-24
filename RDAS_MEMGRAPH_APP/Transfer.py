@@ -34,8 +34,7 @@ class Transfer:
 
             p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'load', f'{dump_name}', f'--from-path={dump_folder}', '--overwrite-destination'], encoding='utf8')
             p.wait()
-            print('Waiting 20 seconds for database load')
-            sleep(20)
+            sleep(10)
 
             server_id = self.db.run(f"SHOW servers YIELD * WHERE name = \'{self.mode}1\' RETURN serverId").data()[0]['serverId']
             print(f'SERVER ID LOCATED:: {server_id}')
@@ -43,6 +42,8 @@ class Transfer:
             seed_query = f'CREATE DATABASE {dump_name} OPTIONS {{existingData: \'use\', existingDataSeedInstance: \'{server_id}\'}}'
             print(seed_query)
             self.db.run(seed_query)
+            print('Waiting 20 seconds for database load')
+            sleep(20)
             
             p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'restart'], encoding='utf-8')
             p.wait()

@@ -21,8 +21,6 @@ transfer_module = Transfer('prod')
 db = AlertCypher('system')
 init = True
 
-email_client = Alert()
-db = AlertCypher('system')
 while True:
     try:
         print('checking for update...')
