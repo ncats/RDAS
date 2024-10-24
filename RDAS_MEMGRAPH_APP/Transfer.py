@@ -44,11 +44,6 @@ class Transfer:
             self.db.run(seed_query)
             print('Waiting 20 seconds for database load')
             sleep(20)
-            
-            p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'restart'], encoding='utf-8')
-            p.wait()
-            print('Waiting 20 seconds for database restart')
-            sleep(20)
 
             self.set_isSeeded(True)
 
