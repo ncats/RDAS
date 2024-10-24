@@ -20,18 +20,23 @@ class Dump ():
         self.db = AlertCypher('system')
 
     def dump_file (self, path, db_name):
-        self.db.run(f'STOP DATABASE {db_name}')
-        print(f'DATABASE {db_name} STOPPED')
+        try:
+            self.db.run(f'STOP DATABASE {db_name}')
+            print(f'DATABASE {db_name} STOPPED')
+            sleep(10)
 
-        p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'dump', f'{db_name}', f'--to-path={path}', '--overwrite-destination'], encoding='utf8')
-        p.wait()
-        print(f'DATABASE {db_name} DUMPED AT {path}')
+            p = Popen(['sudo', '/opt/neo4j/bin/neo4j-admin', 'database', 'dump', f'{db_name}', f'--to-path={path}', '--overwrite-destination'], encoding='utf8')
+            p.wait()
+            print(f'DATABASE {db_name} DUMPED AT {path}')
 
-        self.db.run(f'START DATABASE {db_name}')
-        print(f'DATABASE {db_name} RESTARTED')
+            self.db.run(f'START DATABASE {db_name}')
+            print(f'DATABASE {db_name} RESTARTED')
 
-        print('Waiting 10 seconds for database to update changes')
-        sleep(10)
+            print('Waiting 10 seconds for database to update changes')
+            sleep(10)
+
+        except Exception as e:
+            print(e)
 
     def generate_backup_name (self, dump_name):
         cur_date = datetime.now().strftime("%m-%d-%y")

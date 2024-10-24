@@ -151,9 +151,8 @@ class Alert:
                 query_results["total"]=total
                 query_results["update_date_start"]=date_start
                 query_results["update_date_end"]=date_end
-                print("total updates::",total)
+                print(user.email,"total updates::",total)
 
                 if total>0:
                     self.send_mail( query_results)
-            print("\n")
     
