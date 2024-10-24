@@ -37,19 +37,26 @@ while True:
     new_dumps = transfer_detection
 
     for db_name in new_dumps:
-        transfer_module.seed(db_name,sysvars.transfer_path)
-        transfer_module.seed(db_name,sysvars.transfer_path)
-        print('database seeded within cluster')
-        
-        sub = '[RDAS] ACTION REQUIRED - New Dump Uploaded to Test Server'
-        msg = f'New dump uploaded to test for database {db_name}'
-        html = f'''<p>A new dump file has been uploaded to the test databases</p>
-                <p>database effected: {db_name}</p>
-                <p>To approve the database to be transfered to production, log in to the databases browser and select the effected database</p>
-                <p>Run the following Cypher Query:</p>
-                <p>MATCH (x:UserTesting) SET x.Approved = \"True\"</p>'''
-        email_client.send_email(sub,html,recip)
-        print(f'Notification emails sent to {recip}')
+        try:
+            transfer_module.seed(db_name,sysvars.transfer_path)
+
+            if transfer_module.get_isSeeded():
+                print('database seeded within cluster')
+            
+                sub = '[RDAS] ACTION REQUIRED - New Dump Uploaded to Test Server'
+                msg = f'New dump uploaded to test for database {db_name}'
+                html = f'''<p>A new dump file has been uploaded to the test databases</p>
+                    <p>database effected: {db_name}</p>
+                    <p>To approve the database to be transfered to production, log in to the databases browser and select the effected database</p>
+                    <p>Run the following Cypher Query:</p>
+                    <p>MATCH (x:UserTesting) SET x.Approved = \"True\"</p>'''
+                email_client.send_email(sub,html,recip)
+                print(f'Notification emails sent to {recip}')
+
+                transfer_module.set_isSeeded(False)
+
+        except Exception as e:
+            print(e)
 
     print('[RDAS] Waiting for 15 seconds before checking for approval...')
     sleep(15)

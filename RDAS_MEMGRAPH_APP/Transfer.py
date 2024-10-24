@@ -17,6 +17,13 @@ class Transfer:
             raise Exception
         
         self.db = AlertCypher('system')
+        self.isSeeded = False
+
+    def get_isSeeded(self):
+        return self.isSeeded
+
+    def set_isSeeded(self,boolean):
+        self.isSeeded = boolean
 
     def seed(self, dump_name, dump_folder):
         # dump_name = name of database (rdas.ctkg)
@@ -29,19 +36,20 @@ class Transfer:
             p.wait()
             print('Waiting 20 seconds for database load')
             sleep(20)
-            
-            p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'restart'], encoding='utf-8')
-            p.wait()
-            print('Waiting 20 seconds for database restart')
-            sleep(20)
 
             server_id = self.db.run(f"SHOW servers YIELD * WHERE name = \'{self.mode}1\' RETURN serverId").data()[0]['serverId']
             print(f'SERVER ID LOCATED:: {server_id}')
 
             seed_query = f'CREATE DATABASE {dump_name} OPTIONS {{existingData: \'use\', existingDataSeedInstance: \'{server_id}\'}}'
             print(seed_query)
-            print('Waiting 20 seconds for database seeding')
+            self.db.run(seed_query)
+            
+            p = Popen(['sudo', '/opt/neo4j/bin/neo4j', 'restart'], encoding='utf-8')
+            p.wait()
+            print('Waiting 20 seconds for database restart')
             sleep(20)
+
+            self.set_isSeeded(True)
 
         except Exception as e:
             print('Did not drop or load database...')
