@@ -32,11 +32,8 @@ while True:
                 p = Popen(['sudo', 'chmod', '777', f'{sysvars.approved_path}{db_name}.dump'], encoding='utf8')
                 p.wait()
 
-                
-
-        except Exception:
-            print(f'{db_name} read error')
-
+        except Exception as e:
+            print(e)
 
     sleep(5)
 

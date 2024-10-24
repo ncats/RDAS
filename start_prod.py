@@ -41,8 +41,12 @@ while True:
             last_update_obj = datetime.fromtimestamp(float(last_updates[db_name]))
             print('starting database loading')
             transfer_module.seed(db_name, sysvars.transfer_path)
-            print('starting email service')
-            email_client.trigger_email([db_name], date_start=datetime.strftime(last_update_obj, "%m/%d/%y"))
+
+            if transfer_module.get_isSeeded():
+                print('starting email service')
+                email_client.trigger_email([db_name], date_start=datetime.strftime(last_update_obj, "%m/%d/%y"))
+
+                transfer_module.set_isSeeded(False)
 
         # Sleep for a minute before checking for new dumps again
         sleep(60)
