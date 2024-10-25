@@ -35,12 +35,16 @@ while True:
 
         # Seed the seed cluster with the new dumps
         for db_name in new_dumps:
+            db_single = AlertCypher(db_name)
+
             print('update found::', db_name)
             last_update_obj = datetime.fromtimestamp(float(last_updates[db_name]))
             print('starting database loading')
             transfer_module.seed(db_name, sysvars.transfer_path)
 
             if transfer_module.get_isSeeded():
+                db_single.run('MATCH (x:UserTesting) DETACH DELETE x') # Removes UserTesting Node
+                
                 print('starting email service')
                 email_client.trigger_email([db_name], date_start=datetime.strftime(last_update_obj, "%m/%d/%y"))
 
