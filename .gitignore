@@ -138,3 +138,4 @@ RDAS_GFKG/src/J_GARD_master.csv
 RDAS_PAKG/src/orphanet_product9_epidemiology.csv
 RDAS_PAKG/src/genereviews_pmid.txt
 RDAS_PAKG/src/genereviews_pmid_missing.csv
+RDAS_PAKG/src/article_to_gard_mappings.csv
