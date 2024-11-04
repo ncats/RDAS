@@ -24,7 +24,7 @@ To map relationships between orphan drugs and rare diseases, we gathered orphan 
 ## Data Model Design
 Based on our analysis, we defined a data model to represent the relationships among these datasets semantically. The model, depicted in Figure 1, is structured around ten primary classes (shown as nodes) with associated data properties specific to drug safety and adverse events (ADE). Each node represents a unique concept, with edges capturing the semantic relationships between these nodes. 
 
-![Data Model](RDAS_FAERS/data_model)
+![Data Model](data_model.png)
 
 Table 2 lists the primary classes and their associated data properties.
 
