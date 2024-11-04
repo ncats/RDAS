@@ -22,7 +22,6 @@ RDAS_CTKG/src/all_queries/
 RDAS_CTKG/src/metamap_cond.txt
 RDAS_CTKG/src/metamap_gard.txt
 RDAS_CTKG/src/metamap_cond_out.json
-RDAS_PAKG/src/
 RDAS_CTKG/src/*.csv
 RDAS_CTKG/src/*.json
 RDAS_CTKG/src/*.txt
@@ -41,9 +40,14 @@ transfer/*.dump
 backup/*/*.dump
 migrated/*.dump
 approved/*.dump
-RDAS_GFKG/src/**/**/*.csv
-RDAS_GFKG/src/**/**/*.json
-RDAS_GFKG/src/**/**/*.zip
+RDAS_GFKG/src/processed/**/*.csv
+RDAS_GFKG/src/processed/**/*.json
+RDAS_GFKG/src/processed/**/*.zip
+RDAS_GFKG/src/raw/**/*.csv
+RDAS_GFKG/src/raw/**/*.json
+RDAS_GFKG/src/raw/**/*.zip
+RDAS_GFKG/J_GARD_master.csv
+RDAS_GFKG/FineTunned_Bert_2.pt
 grant_2024/src/**/**/*.csv
 grant_2024/src/**/**/*.json
 crt/*.json
@@ -130,3 +134,8 @@ RDAS_PAKG/medgen_pubmed_lnk.txt
 RDAS_PAKG/ICD10_SNOMED_CT_codes_total_GARD_IDs_unique_list.csv
 RDAS_PAKG/ICD10_SNOMED_CT_PUBTYPES.csv
 RDAS_PAKG/fill_missing_pubmed.py
+RDAS_GFKG/src/J_GARD_master.csv
+RDAS_PAKG/src/orphanet_product9_epidemiology.csv
+RDAS_PAKG/src/genereviews_pmid.txt
+RDAS_PAKG/src/genereviews_pmid_missing.csv
+RDAS_PAKG/src/article_to_gard_mappings.csv

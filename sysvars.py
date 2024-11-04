@@ -34,10 +34,10 @@ firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz
 
 # if you are not using minghui's test dataset, make db_prefix=""; now you only need to change the neo4j database names here:
 db_prefix=""
-ct_db_name="rdas.ctkg" 
-gf_db_name='rdas.gfkg'
-pa_db_name="rdas.pakg"
-gard_db_name='rdas.gard'
+ct_db_name="term.rdas.ctkg" 
+gf_db_name='test.rdas.gfkg'
+pa_db_name="test.rdas.pakg"
+gard_db_name='test.rdas.gard'
 
 ct_db = db_prefix+ct_db_name
 pm_db = db_prefix+pa_db_name
@@ -45,11 +45,9 @@ gnt_db = db_prefix+gf_db_name
 gard_db = db_prefix+gard_db_name
 
 # Conversions
-dump_dirs = ['rdas.ctkg','rdas.pakg','rdas.gfkg','rdas.gard']
-db_abbrevs = {'ct':'rdas.ctkg', 'pm':'rdas.pakg', 'gnt':'rdas.gfkg'}
-dump_dirs = ['rdas.ctkg','rdas.pakg','rdas.gfkg','rdas.gard']
-db_abbrevs = {'ct':'rdas.ctkg', 'pm':'rdas.pakg', 'gnt':'rdas.gfkg'}
-db_abbrevs2 = {ct_db:'ct', pm_db:'pm', gnt_db:'gnt'}
+dump_dirs = [ct_db, pm_db, gnt_db, gard_db]
+db_abbrevs = {'ct': ct_db, 'pm': pm_db, 'gnt': gnt_db, 'gard':gard_db}
+db_abbrevs2 = {ct_db:'ct', pm_db:'pm', gnt_db:'gnt', gard_db:'gard'}
 
 # Paths to database creation and update source files
 ct_files_path = '{base_path}RDAS_CTKG/src/'.format(base_path=base_path)

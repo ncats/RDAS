@@ -50,17 +50,18 @@ def is_acronym(words):
     return False
 
 
-def get_full_studies(nctids):
-    for nctid in nctids:
-        query = f'https://clinicaltrials.gov/api/v2/studies/{nctid}'
-        response = requests.get(query)
+def get_full_studies(nctid_dict):
+    for term,nctids in nctid_dict.items():
+        for nctid in nctids:
+            query = f'https://clinicaltrials.gov/api/v2/studies/{nctid}'
+            response = requests.get(query)
 
-        try:
-            response_txt = response.json()
-        except Exception:
-            response_txt = None
-        #response_txt = parse_trial_fields(response_txt)
-        yield response_txt
+            try:
+                response_txt = response.json()
+            except Exception:
+                response_txt = None
+            #response_txt = parse_trial_fields(response_txt)
+            yield [term, response_txt]
 
 
 def call_get_nctids (query, pageToken=None):
@@ -74,7 +75,7 @@ def call_get_nctids (query, pageToken=None):
     return response_txt
 
 def get_nctids(names, lastupdate):
-    all_trials = list()
+    all_trials = dict()
     for name in names:
         trials = list()
         name = name.replace('"','\"')
@@ -92,7 +93,7 @@ def get_nctids(names, lastupdate):
                     for trial in trials_list:
                         nctid = trial['protocolSection']['identificationModule']['nctId']
                         trials.append(nctid)
-                    all_trials += trials
+                    all_trials[name] = trials
                     if not 'nextPageToken' in response_txt:
                         break
                     else:
@@ -103,7 +104,8 @@ def get_nctids(names, lastupdate):
         except Exception as e:
             print(e)
 
-    return list(set(all_trials))
+    all_trials = {k:list(set(v)) for k,v in all_trials.items()}
+    return all_trials
 
 
 def get_nctids2(names, lastupdate):
@@ -261,7 +263,7 @@ def cypher_GARD(gard_node):
 
     return query
 
-def cypher_ClinicalTrial(db, study, gard_node, today, update=False):
+def cypher_ClinicalTrial(db, study, gard_node, today, term_matched, update=False):
     data_extract = dict()
     #gardid = gard_node['GardId']
     identification_module = study.get('protocolSection',dict()).get('identificationModule',dict())
@@ -380,7 +382,7 @@ def cypher_ClinicalTrial(db, study, gard_node, today, update=False):
     y.IPDSharingAccessCriteria = {criteria},
     y.PatientRegistry = {register},
     y.StartDateType = {startdatetype}
-    MERGE (x)<-[:mapped_to_gard]-(y)
+    MERGE (x)<-[:mapped_to_gard {{MatchedTermRDAS: \"{tmatched}\"}}]-(y)
     RETURN ID(y) AS ct_id
     """.format(
     studyType = data_extract['StudyType'],
@@ -389,6 +391,7 @@ def cypher_ClinicalTrial(db, study, gard_node, today, update=False):
     acro=data_extract['Acronym'],
     gardid=gard_node['GardId'], 
     nctid=nctid,
+    tmatched = term_matched,
     btitle=data_extract['BriefTitle'],
     bsummary=data_extract['BriefSummary'],
     phases=data_extract['Phase'],
@@ -972,10 +975,8 @@ def get_GARD_names_syns(db):
         # [faconia anemia, face, FACE] - [FACE]
 
         gardsyns_eng = [syn for syn in gardsyns if is_english(syn)]
-        gardsyns_acro = [syn for syn in gardsyns if is_acronym(syn)]
         gardsyns_char_threshold = [syn for syn in gardsyns if is_under_char_threshold(syn)]
         filtered_syns = [x for x in gardsyns if not x in gardsyns_eng]
-        filtered_syns = [x for x in filtered_syns if not x in gardsyns_acro]
         filtered_syns = [x for x in filtered_syns if not x in gardsyns_char_threshold]
 
         termlist = [gardname] + filtered_syns
@@ -987,13 +988,13 @@ def get_GARD_names_syns(db):
     return temp
 
 
-def generate_queries(db, nlp, study, gard_node, gard_names_dict, today, update=False):
+def generate_queries(db, nlp, study, gard_node, gard_names_dict, today, term_matched, update=False):
     # IF update=True it will remove all relationships from the CT node and recreate the connected nodes
     # IF update=False it assumes the CT node doesnt exist and will create connected nodes normally
     # Extract and populate GARD info
     ###yield cypher_GARD(gard_node)
     # Extract and populate ClinicalTrial info
-    for query in cypher_ClinicalTrial(db, study, gard_node, today, update=update): yield query
+    for query in cypher_ClinicalTrial(db, study, gard_node, today, term_matched, update=update): yield query
     # Extract AssociatedEntity info
     for query in cypher_AssociatedEntity(study): yield query
     # Extract and populate Location info
@@ -1081,6 +1082,7 @@ if clinical_current_step == '':
     gard_names_dict = get_GARD_names_syns(gard_db)
     # Gets list used for gettings trials and making nodes, not normalized but acros and single english words removed
 
+    clinical_disease_progress = 2242
     gard_response = gard_db.run('MATCH (x:GARD) RETURN x.GardId as gid, x.GardName as gname, x.Synonyms as syns').data()
     for idx,response in enumerate(gard_response):
         if idx < clinical_disease_progress:
@@ -1096,10 +1098,8 @@ if clinical_current_step == '':
 
         #names_no_filter = [name] + syns
         gardsyns_eng = [syn for syn in syns if is_english(syn)]
-        gardsyns_acro = [syn for syn in syns if is_acronym(syn)]
         gardsyns_char_threshold = [syn for syn in syns if is_under_char_threshold(syn)]
         filtered_syns = [x for x in syns if not x in gardsyns_eng]
-        filtered_syns = [x for x in filtered_syns if not x in gardsyns_acro]
         filtered_syns = [x for x in filtered_syns if not x in gardsyns_char_threshold]
 
         # TEST
@@ -1124,7 +1124,7 @@ if clinical_current_step == '':
         print(str(idx) + f' -------- {name} -------- {gid} --- {len(nctids)} Trials')
 
         if len(nctids) > 0:
-            for full_study in get_full_studies(nctids):
+            for term_matched, full_study in get_full_studies(nctids):
                 if full_study:
 
                     api_nctid = full_study.get('protocolSection',dict()).get('identificationModule',dict()).get('nctId',None)
@@ -1139,7 +1139,7 @@ if clinical_current_step == '':
                         node_update = False
                         print('CREATE TRUE::', api_nctid)
 
-                    for query in generate_queries(db, nlp, full_study, gard_node, gard_names_dict, today, update=node_update):
+                    for query in generate_queries(db, nlp, full_study, gard_node, gard_names_dict, today, term_matched, update=node_update):
                         if query: db.run(query)
                     print('created')
                 else:
