@@ -764,7 +764,7 @@ def grad_id(title_, Public_health_relevance_statement, abstract_):
           else: return normalize_combined_dictionary(title_,title_,name,{},{},{},1,1,'title')
 
     if Public_health_relevance_statement and isinstance(Public_health_relevance_statement, str):
-        A, B, C,D = check_sen(Public_health_relevance_statement, nlp)
+        A, B, C,D = check_sen(Public_health_relevance_statement)
         name1 = get_gard_abstract_stem_exact(A)
         name2 = get_gard_abstract_stem_exact(B)
         name3 = get_gard_abstract_stem_exact(C)
@@ -773,7 +773,7 @@ def grad_id(title_, Public_health_relevance_statement, abstract_):
         if name and (name !={}): return name
 
     if abstract_ and isinstance(abstract_, str):
-        A, B, C , D = check_sen(abstract_, nlp)
+        A, B, C , D = check_sen(abstract_)
         name1 = get_gard_abstract_stem_exact(A)
         name2 = get_gard_abstract_stem_exact(B)
         name3 = get_gard_abstract_stem_exact(C)
@@ -781,7 +781,7 @@ def grad_id(title_, Public_health_relevance_statement, abstract_):
         name=normalize_combined_dictionary(abstract_,title_,name1,name2,name3,name4,0,0.7,'abstract')
         if name and (name !={}): return name
 
-def GardNameExtractor(project_title,phr_text,abstract_text, nlp):
+def GardNameExtractor(project_title,phr_text,abstract_text):
   #Abstract1['Gard_name']=Abstract1.apply(lambda x: gard_id(x['project_title'],x['phr_text'],x['abstract_text']), axis=1)
   gard_ids = grad_id(project_title,phr_text,abstract_text)
   if gard_ids:

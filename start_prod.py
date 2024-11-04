@@ -10,20 +10,49 @@ from AlertCypher import AlertCypher
 from subprocess import *
 from time import sleep
 import argparse
-import detect_transfer
-import seed_cluster
+from RDAS_MEMGRAPH_APP.Alert import Alert
+from RDAS_MEMGRAPH_APP.Transfer import Transfer
+from datetime import datetime
+
+#!!! Script has to be ran with SUDO !!!
+
+email_client = Alert()
+transfer_module = Transfer('prod')
+db = AlertCypher('system')
+init = True
 
 while True:
-    # Detect new dumps in the production server
-    transfer_detection = detect_transfer.detect('prod')
-    new_dumps = [k for (k,v) in transfer_detection.items() if v]
+    try:
+        print('checking for update...')
+        # Detect new dumps in the production server
+        transfer_detection,last_updates = transfer_module.detect(sysvars.transfer_path)
+        new_dumps = transfer_detection
 
-    # Seed the seed cluster with the new dumps
-    for db_name in new_dumps:
-        seed_cluster.seed(db_name,sysvars.transfer_path,'prod')
+        # Sets the current db files last transfer date to today so it doesnt load and send emails upon script starting
+        if init:
+            init = False
+            continue
 
-    # TODO: Add code to initiate email service
+        # Seed the seed cluster with the new dumps
+        for db_name in new_dumps:
+            db_single = AlertCypher(db_name)
 
-    # Sleep for an hour before checking for new dumps again
-    sleep(3600)
+            print('update found::', db_name)
+            last_update_obj = datetime.fromtimestamp(float(last_updates[db_name]))
+            print('starting database loading')
+            transfer_module.seed(db_name, sysvars.transfer_path)
+
+            if transfer_module.get_isSeeded():
+                db_single.run('MATCH (x:UserTesting) DETACH DELETE x') # Removes UserTesting Node
+                
+                print('starting email service')
+                email_client.trigger_email([db_name], date_start=datetime.strftime(last_update_obj, "%m/%d/%y"))
+
+                transfer_module.set_isSeeded(False)
+
+        # Sleep for a minute before checking for new dumps again
+        sleep(60)
+    except Exception as e:
+        print(e)
+
 

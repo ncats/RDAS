@@ -9,29 +9,31 @@ import datetime
 from AlertCypher import AlertCypher
 from subprocess import *
 from time import sleep
-import argparse
+from RDAS_MEMGRAPH_APP.Dump import Dump
 
+
+dump_module = Dump('test')
 while True:
     for db_name in sysvars.dump_dirs:
         db = AlertCypher(db_name)
         
         try:
-            update = db.run('MATCH (x:UserTesting) RETURN x.Approved as update').data()[0]['update']
-            print(f'{db_name}:: {update}')
-        
-            if update == 'True':
-                print(f'Database dump approved for {db_name}')
-                db.run('MATCH (x:UserTesting) DETACH DELETE x')
+            try:
+                update = db.run('MATCH (x:UserTesting) RETURN x.Approved as update').data()[0]['update']
+            except Exception:
+                print(f'{db_name}:: False [Non-existent UserTesting Node]')
+                continue
 
-                p = Popen(['sudo', 'cp', f'{sysvars.transfer_path}{db_name}.dump', f'{sysvars.approved_path}{db_name}.dump'], encoding='utf8')
-                p.wait()
+            if update == True:
+                print(f'Database dump approved for {db_name}')
+
+                dump_module.dump_file(sysvars.approved_path, db_name)
 
                 p = Popen(['sudo', 'chmod', '777', f'{sysvars.approved_path}{db_name}.dump'], encoding='utf8')
                 p.wait()
 
-        except Exception:
-            print(f'{db_name} read error')
-
+        except Exception as e:
+            print(e)
 
     sleep(5)
 

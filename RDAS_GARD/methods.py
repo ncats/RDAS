@@ -1,13 +1,14 @@
 import os
+import sys
+workspace = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(workspace)
+sys.path.append('/home/leadmandj/RDAS')
 import json
-from skr_web_api import Submission, METAMAP_INTERACTIVE_URL
+#from skr_web_api import Submission, METAMAP_INTERACTIVE_URL
 from unidecode import unidecode
 from AlertCypher import AlertCypher
 import re
 import requests
-import sys
-workspace = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(workspace)
 import sysvars
 from datetime import datetime, date
 from http import client
@@ -118,7 +119,7 @@ def create_disease_node(db, data, xrefs): # Include xrefs into GARD node instead
     "syns":data[6],
     "orpha":results['Orphanet'] if 'Orphanet' in results else None,
     "icd10":results['ICD-10'] if 'ICD-10' in results else None,
-    "umls":results['UMLS'] if 'UMLS' in results else None,
+    "umls":list(set(results['UMLS'])) if 'UMLS' in results else None,
     "omim":results['OMIM'] if 'OMIM' in results else None,
     "snomed":results['SNOMED-CT'] if 'SNOMED-CT' in results else None,
     "diseaseontology":results['DiseaseOntology'] if 'DiseaseOntology' in results else None,
@@ -315,7 +316,7 @@ def get_remaining_umls(db, umls_update=True):
     INSTANCE.form['SingLinePMID'] = True
 
     print('GATHERING GARD UMLS DATA')
-    db.run('MATCH (x:GARD) WHERE x.UMLS IS NOT NULL SET x.UMLS_Source = "DATALAKE"')
+    db.run('MATCH (x:GARD) WHERE x.UMLS IS NOT NULL SET x.UMLS_Source = "GARD"')
     res = db.run('MATCH (x:GARD) WHERE x.UMLS IS NULL SET x.UMLS_Source = "METAMAP" RETURN x.GardId AS gard_id, x.GardName as gard_name').data()
     
     gard_strs = [f"{i['gard_id'].replace('GARD:','')}|{normalize(i['gard_name'])}\n" for i in res if i['gard_name']]
@@ -388,8 +389,6 @@ def get_node_counts():
     res4 = pm_db.run('MATCH (x:GARD)--(y:Article) WITH COUNT(DISTINCT y) AS cnt,x RETURN cnt AS cnt, x.GardId AS gard_id').data()
     res5 = gnt_db.run('MATCH (x:GARD)--(y:Project)--(z:CoreProject) WITH COUNT(DISTINCT z) AS cnt,x RETURN cnt AS cnt, x.GardId as gard_id').data()
 
-    #populate_node_counts(db,res1,'COUNT_PHENOTYPES')
-    #populate_node_counts(db,res2,'COUNT_GENES')
     populate_node_counts(db,res3,'COUNT_TRIALS')
     populate_node_counts(db,res4,'COUNT_ARTICLES')
     populate_node_counts(db,res5,'COUNT_PROJECTS')

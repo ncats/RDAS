@@ -5,63 +5,107 @@ workspace = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(workspace)
 sys.path.append(os.getcwd())
 import sysvars
-import datetime
+from datetime import datetime
 from AlertCypher import AlertCypher
 from subprocess import *
 from time import sleep
 import argparse
-import detect_transfer
-from seed_cluster import seed
-from emails.alert import send_email,setup_email_client
-#import file_transfer
+from RDAS_MEMGRAPH_APP.Alert import Alert
+from RDAS_MEMGRAPH_APP.Transfer import Transfer
+from RDAS_MEMGRAPH_APP.Dump import Dump
+
+"""
+This script constantly checks the test server for 2 things: whether a dump file was sent to the test server,
+or if a dump file was sent to the approved folder.
+The file sent TO the test server will be sent manually while the approval file will be sent automatically via a script (start_approval.py)
+"""
+
+email_client = Alert('test')
+transfer_module = Transfer('test')
+dump_module = Dump('test')
+recip = sysvars.contacts['test']
+today_str = datetime.today().strftime('%m/%d/%y')
+
+# INIT
+transfer_detection,lastupdates = transfer_module.detect(sysvars.transfer_path)
+transfer_detection,lastupdates = transfer_module.detect(sysvars.approved_path)
 
 while True:
+    print('[RDAS] Checking for new database files in the transfer folder')
     # Detects all new dump files in the transfer folder of the TEST server
-    transfer_detection = detect_transfer.detect('test', sysvars.transfer_path)
-    new_dumps = [k for (k,v) in transfer_detection.items() if v]
-    #new_dumps = ['gard']
-    # Seeds all 3 clusters in the TEST server so that the databases will be visible
-    
-    for db_name in new_dumps:
-        seed(db_name,sysvars.transfer_path,'test')
-        print('database seeded within cluster')
+    transfer_detection,lastupdates = transfer_module.detect(sysvars.transfer_path)
+    new_dumps = transfer_detection
 
-        for recip in sysvars.contacts:
-            sub = '[RDAS] ACTION REQUIRED - New Dump Uploaded to Test Server'
-            msg = f'New dump uploaded to test for database {db_name}'
-            html = f'''<p>A new dump file has been uploaded to the test databases</p>
+    for db_name in new_dumps:
+        try:
+            transfer_module.seed(db_name,sysvars.transfer_path)
+
+            if transfer_module.get_isSeeded():
+                print('database seeded within cluster')
+            
+                sub = '[RDAS] ACTION REQUIRED - New Dump Uploaded to Test Server'
+                msg = f'New dump uploaded to test for database {db_name}'
+                html = f'''<p>A new dump file has been uploaded to the test databases</p>
                     <p>database effected: {db_name}</p>
                     <p>To approve the database to be transfered to production, log in to the databases browser and select the effected database</p>
                     <p>Run the following Cypher Query:</p>
                     <p>MATCH (x:UserTesting) SET x.Approved = \"True\"</p>'''
-            send_email(sub,msg,recip,html=html,client=setup_email_client())
-            print(f'Notification email sent to {recip}')
+                email_client.send_email(sub,html,recip)
+                print(f'Notification emails sent to {recip}')
 
-    print('Waiting for 1 minute before checking for approval...')
-    sleep(60)
+                transfer_module.set_isSeeded(False)
 
-    transfer_detection = detect_transfer.detect('test', sysvars.approved_path)
-    new_dumps = [k for (k,v) in transfer_detection.items() if v]
+        except Exception as e:
+            print(e)
+
+    sleep(15)
+    print('[RDAS] Checking Neo4j for recently approved databases')
+
+    for db_name in sysvars.dump_dirs:
+        db = AlertCypher(db_name)
+        try:
+            try:
+                update = db.run('MATCH (x:UserTesting) RETURN x.Approved as update').data()[0]['update']
+            except Exception:
+                print(f'{db_name}:: False [Non-existent UserTesting Node]')
+                continue
+
+            if update == True:
+                print(f'Detected Approved Database for {db_name}... sending to approved folder')
+                dump_module.dump_file(sysvars.approved_path, db_name)
+                db.run(f'MATCH (x:UserTesting) SET x.Approved = False, x.LastApprovedRDAS = \"{today_str}\"')
+                p = Popen(['sudo', 'chmod', '777', f'{sysvars.approved_path}{db_name}.dump'], encoding='utf8')
+                p.wait()
+
+        except Exception as e:
+            print(e)
+
+    sleep(15)
+    print('[RDAS] Checking approved folder for recently approved dump files')
+
+    # Detects if a new dump file was loaded into the approved folder
+    transfer_detection,lastupdates = transfer_module.detect(sysvars.approved_path)
+    new_dumps = transfer_detection
+
     print(new_dumps)
 
     for db_name in new_dumps:
+        print(f'Update approved for {db_name}... Sending to PROD')
         db = AlertCypher(db_name)
         
-        print(f'Update approved for {db_name}')
-
+        # Sends to PROD
         send_url = sysvars.rdas_urls['prod']
         p = Popen(['scp', f'{sysvars.approved_path}{db_name}.dump', f'{sysvars.current_user}@{send_url}:{sysvars.transfer_path}{db_name}.dump'], encoding='utf8')
         p.wait()
 
-        for recip in sysvars.contacts:
-            sub = '[RDAS] NOTICE - Test Database Approved'
-            msg = f'{db_name} database was approved to move to production'
-            html = f'''<p>A dump file on the test server has been approved to move to production</p>
-                        <p>Database effected: {db_name}</p>
-                        <p>There are no other actions required on your end</p>'''
-            send_email(sub,msg,recip,html=html,client=setup_email_client())
-            print(f'Notification email sent to {recip}')
+        sub = '[RDAS] NOTICE - Test Database Approved'
+        msg = f'{db_name} database was approved to move to production'
+        html = f'''<p>A dump file on the test server has been approved to move to production</p>
+                    <p>Database effected: {db_name}</p>
+                    <p>There are no other actions required on your end</p>'''
+        email_client.send_email(sub,html,recip)
+        print(f'Notification emails sent to {recip}')
 
-    # Waits one hour before retrying process
-    sleep(3600)
+    # Waits one minute before restarting checks
+    sleep(15)
 

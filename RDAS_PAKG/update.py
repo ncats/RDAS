@@ -25,5 +25,5 @@ def main (update_from=False, update_to=False):
     RDAS_PAKG.init.main(update_from=update_from, update_to=update_to)
 
 
-#main() #TEST
+main() #TEST
 #get_node_counts()

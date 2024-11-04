@@ -8,16 +8,20 @@ base_directory_name = 'RDAS'
 # base_path = '/home/{current_user}/RDAS_master/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 
 # RDAS Team contacts for emails
-contacts = [
-    "leadmandj@nih.gov"
-]
+contacts = {
+    "dev": ["leadmandj@nih.gov"],
+    "test": ["leadmandj@nih.gov",
+             "qian.zhu@nih.gov",
+             "sungrim.moon@nih.gov",
+             "shixue.sun@nih.gov",
+             "minghui.ao@nih.gov",
+             "timothy.sheils@nih.gov",
+             "jaber.valinejad@nih.gov",
+             "isabella.wang@nih.gov",
+            ]
+}
 
 base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
-
-# RDAS Team contacts for emails
-contacts = [
-    "leadmandj@nih.gov"
-]
 
 # Folder paths
 backup_path = '{base_path}backup/'.format(base_path=base_path)
@@ -29,7 +33,7 @@ firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz
 
 
 # if you are not using minghui's test dataset, make db_prefix=""; now you only need to change the neo4j database names here:
-db_prefix="test."
+db_prefix=""
 ct_db_name="rdas.ctkg" 
 gf_db_name='rdas.gfkg'
 pa_db_name="rdas.pakg"
@@ -41,8 +45,10 @@ gnt_db = db_prefix+gf_db_name
 gard_db = db_prefix+gard_db_name
 
 # Conversions
-dump_dirs = ['RDAS.CTKG','RDAS.PAKG','RDAS.GFKG','RDAS.GARD']
-db_abbrevs = {'ct':'RDAS.CTKG', 'pm':'RDAS.PAKG', 'gnt':'RDAS.GFKG'}
+dump_dirs = ['rdas.ctkg','rdas.pakg','rdas.gfkg','rdas.gard']
+db_abbrevs = {'ct':'rdas.ctkg', 'pm':'rdas.pakg', 'gnt':'rdas.gfkg'}
+dump_dirs = ['rdas.ctkg','rdas.pakg','rdas.gfkg','rdas.gard']
+db_abbrevs = {'ct':'rdas.ctkg', 'pm':'rdas.pakg', 'gnt':'rdas.gfkg'}
 db_abbrevs2 = {ct_db:'ct', pm_db:'pm', gnt_db:'gnt'}
 
 # Paths to database creation and update source files
@@ -56,6 +62,7 @@ convert = {ct_db:'trials', pm_db:'articles', gnt_db:'grants'}
 
 # Server URLS and addresses # Original epiapi_url is https://rdas.ncats.nih.gov/api/epi/
 epiapi_url = "https://rdas.ncats.nih.gov/api/epi/"
+nhsapi_url = "https://rdas.ncats.nih.gov/api/article_prediction/"
 rdas_urls = {'neo4j-dev':"ncats-neo4j-lnx-dev.ncats.nih.gov",'dev':"rdas-dev.ncats.nih.gov",'test':"ncats-neo4j-lnx-test1.ncats.nih.gov",'prod':"ncats-neo4j-lnx-prod1.ncats.nih.gov"}
 
 # GARD exclusion list for when GARD-Project mappings are made in the grant code
