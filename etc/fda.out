@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "map_fda_new.py", line 1, in <module>
-    from clinical import methods as rdas
-ModuleNotFoundError: No module named 'clinical'

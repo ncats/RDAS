@@ -6,11 +6,11 @@ sys.path.append(workspace)
 sys.path.append('/home/aom2/RDAS')
 import pandas as pd
 import sysvars
-from gard import methods as rdas
+from RDAS_GARD import methods as rdas
 from AlertCypher import AlertCypher
 from time import sleep
 
-def main():
+def start_update():
     print(f"[CT] Database Selected: {sysvars.gard_db}\nContinuing with script in 5 seconds...")
     sleep(5)
 
@@ -23,6 +23,3 @@ def main():
     phenotypes = pd.read_csv(f'{sysvars.gard_files_path}GARD_phenotypes.csv', index_col=False)
     data = {'gard':gard, 'classification':classification, 'xrefs':xrefs, 'genes': genes, 'phenotypes': phenotypes}
     rdas.generate(db, data)
-
-if __name__ == '__main__':
-    main()

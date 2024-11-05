@@ -179,7 +179,3 @@ class Mapping:
         if sysvars.db_abbrevs2[mode] == 'gard':
             p = Popen(['scp', f'{sysvars.gard_files_path}gard_to_gard_mappings.csv', f'{sysvars.current_user}@{sysvars.rdas_urls["neo4j-dev"]}:{sysvars.gard_files_path}gard_to_gard_mappings.csv'], encoding='utf8')
             p.wait()
-
-mapping_module = Mapping(mode=sysvars.gard_db)
-mapping_module.generate_mapping_file()
-mapping_module.load_mapping_file()

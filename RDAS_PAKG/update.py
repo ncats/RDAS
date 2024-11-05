@@ -6,10 +6,8 @@ sys.path.append(workspace)
 sys.path.append('/home/leadmandj/RDAS/')
 import sysvars
 import RDAS_PAKG.init
-from time import sleep
-from RDAS_GARD.methods import get_node_counts
 
-def main (update_from=False, update_to=False):
+def start_update (update_from=False, update_to=False):
     """
     Main function that initializes or updates a process related to PubMed data.
     Calls pubmed.init.py because the process to update is similar to creating from scratch.
@@ -23,7 +21,3 @@ def main (update_from=False, update_to=False):
     """
 
     RDAS_PAKG.init.main(update_from=update_from, update_to=update_to)
-
-
-main() #TEST
-#get_node_counts()

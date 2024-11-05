@@ -48,6 +48,7 @@ gard_db = db_prefix+gard_db_name
 dump_dirs = [ct_db, pm_db, gnt_db, gard_db]
 db_abbrevs = {'ct': ct_db, 'pm': pm_db, 'gnt': gnt_db, 'gard':gard_db}
 db_abbrevs2 = {ct_db:'ct', pm_db:'pm', gnt_db:'gnt', gard_db:'gard'}
+update_check_fields = {ct_db:['rdas.ctkg_update', 'ct_interval'], pm_db:['rdas.pakg_update', 'pm_interval'], gnt_db:['rdas.gfkg_update', 'gnt_interval'], gard_db:['rdas.gard_update', 'gard_interval']}
 
 # Paths to database creation and update source files
 ct_files_path = '{base_path}RDAS_CTKG/src/'.format(base_path=base_path)

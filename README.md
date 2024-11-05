@@ -1,5 +1,5 @@
 
-![Logo](https://rdas.ncats.nih.gov/assets/rdas_final_gradient.webp)
+![Logo](https://rdas.ncats.nih.gov/assets/rdas_final_gradient_no_logo_small.webp)
 
 
 The Rare Disease Alert System (RDAS) is a system designed for annotating and managing information related to rare diseases. Users may subscribe to specific rare diseases and get email alerts when new information becomes available.

@@ -1851,10 +1851,8 @@ def filter_synonyms(syns):
     ['apple', 'orange', 'grape']
     """
     gardsyns_eng = [syn for syn in syns if is_english(syn)]
-    gardsyns_acro = [syn for syn in syns if is_acronym(syn)]
     gardsyns_char_threshold = [syn for syn in syns if is_under_char_threshold(syn)]
     filtered_syns = [x for x in syns if not x in gardsyns_eng]
-    filtered_syns = [x for x in filtered_syns if not x in gardsyns_acro]
     filtered_syns = [x for x in filtered_syns if not x in gardsyns_char_threshold]
 
     # Return the filtered list of synonyms
