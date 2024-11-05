@@ -1,0 +1,1 @@
+Location of Firebase database private key

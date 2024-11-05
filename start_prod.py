@@ -12,12 +12,14 @@ from time import sleep
 import argparse
 from RDAS_MEMGRAPH_APP.Alert import Alert
 from RDAS_MEMGRAPH_APP.Transfer import Transfer
+from RDAS_MEMGRAPH_APP.Update import Update
 from datetime import datetime
 
 #!!! Script has to be ran with SUDO !!!
 
 email_client = Alert()
 transfer_module = Transfer('prod')
+update_module = Update(mode=sysvars.gard_db)
 db = AlertCypher('system')
 init = True
 
@@ -49,6 +51,8 @@ while True:
                 email_client.trigger_email([db_name], date_start=datetime.strftime(last_update_obj, "%m/%d/%y"))
 
                 transfer_module.set_isSeeded(False)
+
+                update_module.refresh_node_counts()
 
         # Sleep for a minute before checking for new dumps again
         sleep(60)

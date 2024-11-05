@@ -7,6 +7,6 @@ import sysvars
 import RDAS_GFKG.init
 from time import sleep
 
-def main ():
+def start_update ():
     RDAS_GFKG.init.main()
 

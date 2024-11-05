@@ -13,7 +13,7 @@
 
 # End of https://www.gitignore.io/api/visualstudiocode
 personal-config.ini
-
+archive/*
 RDAS_CTKG/src/full_trial_data/
 RDAS_CTKG/src/chromedriver
 RDAS_CTKG/src/ctgov_nctids.json
@@ -25,6 +25,7 @@ RDAS_CTKG/src/metamap_cond_out.json
 RDAS_CTKG/src/*.csv
 RDAS_CTKG/src/*.json
 RDAS_CTKG/src/*.txt
+RDAS_CTKG/archive/
 __pycache__/
 RDAS_CTKG/__pycache__/
 RDAS_GFKG/__pycache__/
