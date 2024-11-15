@@ -13,12 +13,24 @@ import pandas as pd
 
 class Mapping:
     def __init__ (self, mode=None):
+        """
+        Initialize the Mapping class with the specified mode.
+
+        :param mode: The environment or database mode ('ct', 'pm', 'gnt', 'gard').
+        :raises Exception: If the mode is not in sysvars.dump_dirs.
+        """
         if mode in sysvars.dump_dirs:
             self.mode = mode
         else:
             raise Exception('Not in sysvars')
         
     def load_mapping_file (self, mode=None):
+        """
+        Load a mapping file into the specified database.
+
+        :param mode: The database mode. Defaults to the class's mode attribute.
+        :raises Exception: If the mode is invalid.
+        """
         mode = self.mode
         if not mode: raise Exception ('Note a valid mode')
 
@@ -26,6 +38,7 @@ class Mapping:
         print(f'Deleting {mode} previous connections after 10 seconds...')
         sleep(10)
 
+        # Handle mode-specific operations
         if sysvars.db_abbrevs2[mode] == 'ct':
             print('Deleting previous connections... may take up to 30 minutes')
             db.run('MATCH (x:ClinicalTrial)-[r]-(y:GARD) WHERE NOT x.NCTId IS NULL CALL {WITH r DELETE r} IN TRANSACTIONS OF 10000 ROWS')
@@ -69,6 +82,12 @@ class Mapping:
                         }} IN TRANSACTIONS OF 10000 ROWS''')
 
     def generate_mapping_file (self, mode=None):
+        """
+        Generate mapping files by extracting data from the database.
+
+        :param mode: The database mode. Defaults to the class's mode attribute.
+        :raises Exception: If the mode is invalid.
+        """
         mode = self.mode
         if not mode: raise Exception ('Note a valid mode')
 
@@ -161,6 +180,12 @@ class Mapping:
         self.copy_to_dev_neo4j(mode=self.mode)
 
     def copy_to_dev_neo4j(self, mode=None):
+        """
+        Copy the generated mapping file to the development Neo4j server. This is because the mapping file needs to be on the same server to be able to load the CSV file into Neo4j
+
+        :param mode: The database mode. Defaults to the class's mode attribute.
+        :raises Exception: If the mode is invalid.
+        """
         mode = self.mode
         if not mode: raise Exception ('Note a valid mode')
 

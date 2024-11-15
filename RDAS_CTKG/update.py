@@ -1068,8 +1068,6 @@ def start_update():
         # Gets list used to exact map Conditions to GARD, normalized and acros and single english words removed
         gard_names_dict = get_GARD_names_syns(gard_db)
         # Gets list used for gettings trials and making nodes, not normalized but acros and single english words removed
-
-        clinical_disease_progress = 2242
         gard_response = gard_db.run('MATCH (x:GARD) RETURN x.GardId as gid, x.GardName as gname, x.Synonyms as syns').data()
         for idx,response in enumerate(gard_response):
             if idx < clinical_disease_progress:
@@ -1088,22 +1086,6 @@ def start_update():
             gardsyns_char_threshold = [syn for syn in syns if is_under_char_threshold(syn)]
             filtered_syns = [x for x in syns if not x in gardsyns_eng]
             filtered_syns = [x for x in filtered_syns if not x in gardsyns_char_threshold]
-
-            # TEST
-            if len(gardsyns_eng) > 0 or len(gardsyns_char_threshold) > 0:
-                print('English Words Found::', gardsyns_eng)
-                print('Word Found Lower Than Threshold::', gardsyns_char_threshold)
-                ct_count = db.run(f'MATCH (x:GARD)--(y:ClinicalTrial) WHERE x.GardId = \"{gid}\" RETURN COUNT(y) as node_count').data()[0]['node_count']
-                cond_count = db.run(f'MATCH (x:GARD)--(y:Condition) WHERE x.GardId = \"{gid}\" RETURN COUNT(y) as node_count').data()[0]['node_count']
-                print('PREV CONNECT CT::', ct_count)
-                print('PREV CONNECT COND::', cond_count)
-                db.run(f'MATCH (x:GARD)-[r]-(y:ClinicalTrial) WHERE x.GardId = \"{gid}\" DELETE r')
-                db.run(f'MATCH (x:GARD)-[r]-(y:Condition) WHERE x.GardId = \"{gid}\" DELETE r')
-            
-            else:
-                continue
-            # TEST
-
             names = [name] + filtered_syns
 
             nctids = get_nctids(names, lastupdate)
@@ -1133,4 +1115,6 @@ def start_update():
                         print('Error in add for finding full trial data')
 
             db.setConf('UPDATE_PROGRESS', 'clinical_disease_progress', str(idx))
+
+start_update()
     
