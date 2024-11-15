@@ -30,7 +30,6 @@ nltk.download('averaged_perceptron_tagger')
 def is_acronym(words):
     """
     Checks if a word is an acronym.
-
     Args:
         word (str): The word to be checked.
 
@@ -156,7 +155,6 @@ def rxnorm_map(nlp, intervention):
             query = ('MATCH (y:Drug {{RxNormID: {rxnormid} }}) SET y.{key} = {value}'.format(rxnormid=rxnormid, key=key, value=v))
             yield query
 
-
     def nlp_to_drug(doc,matches,drug_name):
         for match_id, start, end in matches:
             span = doc[start:end].text
@@ -203,7 +201,6 @@ def rxnorm_map(nlp, intervention):
         updated_str = re.sub('\W+',' ', updated_str)
         return updated_str
 
-
     drug = drug_normalize(intervention)
     drug_url = drug.replace(' ','+')
 
@@ -218,8 +215,6 @@ def rxnorm_map(nlp, intervention):
         doc = nlp(drug)
         matches = matcher(doc)
         for query in nlp_to_drug(doc,matches,drug): yield query
-
-
 
 def clean_data_extract(data):
     temp = data
@@ -950,6 +945,7 @@ def is_under_char_threshold(syn):
     else:
         return False
 
+
 def is_english(syn):
     tokens = syn.lower().split()
     if len(tokens) == 1:
@@ -1063,7 +1059,6 @@ def start_update():
         db.setConf('UPDATE_PROGRESS', 'clinical_in_progress', 'True')
         cypher_GARD_populate()
 
-
     if clinical_current_step == '':
         # Gets list used to exact map Conditions to GARD, normalized and acros and single english words removed
         gard_names_dict = get_GARD_names_syns(gard_db)
@@ -1115,6 +1110,4 @@ def start_update():
                         print('Error in add for finding full trial data')
 
             db.setConf('UPDATE_PROGRESS', 'clinical_disease_progress', str(idx))
-
-start_update()
     

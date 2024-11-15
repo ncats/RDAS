@@ -73,6 +73,7 @@ class Update:
         :return: A list containing:
                  - A boolean indicating if an update is needed.
                  - The last update date as a string.
+
         """
         # Get the current date and time
         today = datetime.now()
