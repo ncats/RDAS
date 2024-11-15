@@ -11,6 +11,12 @@ from time import sleep
 
 class Transfer:
     def __init__ (self, mode=None):
+        """
+        Initialize the Transfer class with the specified mode.
+
+        :param mode: Environment mode ('test' or 'prod').
+        :raises Exception: If the mode is invalid.
+        """
         if mode in ['test','prod']:
             self.mode = mode
         else:
@@ -20,14 +26,28 @@ class Transfer:
         self.isSeeded = False
 
     def get_isSeeded(self):
+        """
+        Getter for the isSeeded property.
+        
+        :return: Boolean indicating if the database is seeded.
+        """
         return self.isSeeded
 
     def set_isSeeded(self,boolean):
+        """
+        Setter for the isSeeded property.
+
+        :param boolean: Boolean value to set the seeding state.
+        """
         self.isSeeded = boolean
 
     def seed(self, dump_name, dump_folder):
-        # dump_name = name of database (rdas.ctkg)
-        # dump_folder = path to database files directory (RDAS/transfer/)
+        """
+        Load a database dump into Neo4j and seed it.
+
+        :param dump_name: Name of the database to seed.
+        :param dump_folder: Path to the directory containing the database dump files.
+        """
         try:
             self.db.run(f'DROP DATABASE {dump_name}')
             print('Dropped database...')
@@ -52,6 +72,14 @@ class Transfer:
             print(e)
 
     def detect(self, path):
+        """
+        Detect changes in database dump files based on modification timestamps.
+
+        :param path: Path to the directory containing the dump files.
+        :return: A tuple with two elements:
+                 - A list of databases with detected changes.
+                 - A dictionary of last modification dates for each database.
+        """
         server = None
         config_title = None
         transfer_detection = list()

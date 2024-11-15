@@ -1,3 +1,5 @@
+# USE start_{db}_update.py files instead to start database updates
+'''
 import glob
 import os
 import sys
@@ -134,5 +136,5 @@ while True:
     
     print('database update and email sending has finished')
     sleep(3600)
-
+'''
 

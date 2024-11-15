@@ -30,7 +30,6 @@ nltk.download('averaged_perceptron_tagger')
 def is_acronym(words):
     """
     Checks if a word is an acronym.
-
     Args:
         word (str): The word to be checked.
 
@@ -156,7 +155,6 @@ def rxnorm_map(nlp, intervention):
             query = ('MATCH (y:Drug {{RxNormID: {rxnormid} }}) SET y.{key} = {value}'.format(rxnormid=rxnormid, key=key, value=v))
             yield query
 
-
     def nlp_to_drug(doc,matches,drug_name):
         for match_id, start, end in matches:
             span = doc[start:end].text
@@ -203,7 +201,6 @@ def rxnorm_map(nlp, intervention):
         updated_str = re.sub('\W+',' ', updated_str)
         return updated_str
 
-
     drug = drug_normalize(intervention)
     drug_url = drug.replace(' ','+')
 
@@ -218,8 +215,6 @@ def rxnorm_map(nlp, intervention):
         doc = nlp(drug)
         matches = matcher(doc)
         for query in nlp_to_drug(doc,matches,drug): yield query
-
-
 
 def clean_data_extract(data):
     temp = data
@@ -950,6 +945,7 @@ def is_under_char_threshold(syn):
     else:
         return False
 
+
 def is_english(syn):
     tokens = syn.lower().split()
     if len(tokens) == 1:
@@ -1063,13 +1059,10 @@ def start_update():
         db.setConf('UPDATE_PROGRESS', 'clinical_in_progress', 'True')
         cypher_GARD_populate()
 
-
     if clinical_current_step == '':
         # Gets list used to exact map Conditions to GARD, normalized and acros and single english words removed
         gard_names_dict = get_GARD_names_syns(gard_db)
         # Gets list used for gettings trials and making nodes, not normalized but acros and single english words removed
-
-        clinical_disease_progress = 2242
         gard_response = gard_db.run('MATCH (x:GARD) RETURN x.GardId as gid, x.GardName as gname, x.Synonyms as syns').data()
         for idx,response in enumerate(gard_response):
             if idx < clinical_disease_progress:
@@ -1088,22 +1081,6 @@ def start_update():
             gardsyns_char_threshold = [syn for syn in syns if is_under_char_threshold(syn)]
             filtered_syns = [x for x in syns if not x in gardsyns_eng]
             filtered_syns = [x for x in filtered_syns if not x in gardsyns_char_threshold]
-
-            # TEST
-            if len(gardsyns_eng) > 0 or len(gardsyns_char_threshold) > 0:
-                print('English Words Found::', gardsyns_eng)
-                print('Word Found Lower Than Threshold::', gardsyns_char_threshold)
-                ct_count = db.run(f'MATCH (x:GARD)--(y:ClinicalTrial) WHERE x.GardId = \"{gid}\" RETURN COUNT(y) as node_count').data()[0]['node_count']
-                cond_count = db.run(f'MATCH (x:GARD)--(y:Condition) WHERE x.GardId = \"{gid}\" RETURN COUNT(y) as node_count').data()[0]['node_count']
-                print('PREV CONNECT CT::', ct_count)
-                print('PREV CONNECT COND::', cond_count)
-                db.run(f'MATCH (x:GARD)-[r]-(y:ClinicalTrial) WHERE x.GardId = \"{gid}\" DELETE r')
-                db.run(f'MATCH (x:GARD)-[r]-(y:Condition) WHERE x.GardId = \"{gid}\" DELETE r')
-            
-            else:
-                continue
-            # TEST
-
             names = [name] + filtered_syns
 
             nctids = get_nctids(names, lastupdate)
