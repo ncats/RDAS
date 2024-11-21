@@ -301,7 +301,13 @@ def cypher_ClinicalTrial(db, study, gard_node, today, term_matched, update=False
     data_extract['BriefSummary'] = description_module.get('briefSummary', '')
 
     # Design Module
-    data_extract['Phase'] = design_module.get('phases', list())
+    phase_parse = design_module.get('phases', list())
+    if not phase_parse or phase_parse == "":
+        phase_parse = "NA"
+    else:
+        phase_parse = ",".join(phase_parse)
+
+    data_extract['Phase'] = phase_parse
     data_extract['StudyType'] = design_module.get('studyType','')
     data_extract['PatientRegistry'] = design_module.get('patientRegistry',False)
 
