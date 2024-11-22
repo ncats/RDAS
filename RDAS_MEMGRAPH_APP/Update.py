@@ -24,7 +24,7 @@ class Update:
         else:
             raise Exception('Not in sysvars')
         
-    def refresh_node_counts():
+    def refresh_node_counts(self):
         """
         Refresh node counts for various relationships (e.g., trials, articles, projects) in the GARD database.
 
@@ -57,7 +57,7 @@ class Update:
         # Update counts for each relationship type
         db.run('MATCH (x:GARD)--(y:Phenotype) WITH COUNT(DISTINCT y) AS cnt,x SET x.COUNT_PHENOTYPES = cnt').data()
         db.run('MATCH (x:GARD)--(y:Gene) WITH COUNT(DISTINCT y) AS cnt,x SET x.COUNT_GENES = cnt').data()
-        res3 = ct_db.run('MATCH (x:GARD)--(y:ConditionAnnotation)--(z:Condition)--(ct:ClinicalTrial) WITH COUNT(DISTINCT ct) AS cnt,x RETURN cnt AS cnt,x.GardId AS gard_id').data()
+        res3 = ct_db.run('MATCH (x:GARD)--(ct:ClinicalTrial) WITH COUNT(DISTINCT ct) AS cnt,x RETURN cnt AS cnt,x.GardId AS gard_id').data()
         res4 = pm_db.run('MATCH (x:GARD)--(y:Article) WITH COUNT(DISTINCT y) AS cnt,x RETURN cnt AS cnt, x.GardId AS gard_id').data()
         res5 = gnt_db.run('MATCH (x:GARD)--(y:Project)--(z:CoreProject) WITH COUNT(DISTINCT z) AS cnt,x RETURN cnt AS cnt, x.GardId as gard_id').data()
 
