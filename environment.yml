@@ -1,4 +1,4 @@
-name: rdasv2
+name: rdas
 channels:
   - defaults
   - https://repo.anaconda.com/pkgs/main
@@ -8,5 +8,4 @@ dependencies:
   - pip: 
       
 variables:
-  NEO4J_USERNAME: neo4j
-prefix: /Users/zhaot3/anaconda3/envs/radsv2
+prefix: /Users/zhaot3/anaconda3/envs/rads
