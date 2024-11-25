@@ -1,11 +1,12 @@
 import os
+import dotenv
+dotenv.load_dotenv() 
 
 current_version = 2.6
 
 # Basic user information
-current_user = 'zhaot3'
-base_directory_name = 'RDAS'
-# base_path = '/home/{current_user}/RDAS_master/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
+current_user = os.getenv('USER_NAME')
+base_directory_name = os.getenv('PORJECT_BASE') 
 
 # RDAS Team contacts for emails
 contacts = {
@@ -20,17 +21,16 @@ contacts = {
              "isabella.wang@nih.gov",
             ]
 }
-
-#base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
-base_path = '/Users/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
+ 
+base_path = base_directory_name
 
 # Folder paths
-backup_path = '{base_path}backup/'.format(base_path=base_path)
-transfer_path = '{base_path}transfer/'.format(base_path=base_path)
-migrated_path = '{base_path}migrated/'.format(base_path=base_path)
-approved_path = '{base_path}approved/'.format(base_path=base_path)
-images_path = '{base_path}img/'.format(base_path=base_path)
-firebase_key_path = '/Users/zhaot3/Workspaces/RDASWorkspace/RDAS/crt/ncats-summer-interns-firebase-adminsdk-9g7zz-a4e783d24c.json'# May have to set this in new enviroment
+backup_path = f'{base_path}/backup/'
+transfer_path = f'{base_path}/transfer/'
+migrated_path = f'{base_path}/migrated/'
+approved_path = f'{base_path}/approved/'
+images_path = f'{base_path}/img/'
+firebase_key_path = f'{base_path}/crt/ncats-summer-interns-firebase-adminsdk-9g7zz-a4e783d24c.json'# May have to set this in new enviroment
 
 
 # if you are not using minghui's test dataset, make db_prefix=""; now you only need to change the neo4j database names here:
@@ -52,10 +52,10 @@ db_abbrevs2 = {ct_db:'ct', pm_db:'pm', gnt_db:'gnt', gard_db:'gard'}
 update_check_fields = {ct_db:['rdas.ctkg_update', 'ct_interval'], pm_db:['rdas.pakg_update', 'pm_interval'], gnt_db:['rdas.gfkg_update', 'gnt_interval'], gard_db:['rdas.gard_update', 'gard_interval']}
 
 # Paths to database creation and update source files
-ct_files_path = '{base_path}RDAS_CTKG/src/'.format(base_path=base_path)
-pm_files_path = '{base_path}RDAS_PAKG/src/'.format(base_path=base_path)
-gnt_files_path = '{base_path}RDAS_GFKG/src/'.format(base_path=base_path)
-gard_files_path = '{base_path}RDAS_GARD/src/'.format(base_path=base_path)
+ct_files_path = f'{base_path}RDAS_CTKG/src/'
+pm_files_path = f'{base_path}RDAS_PAKG/src/'
+gnt_files_path = f'{base_path}RDAS_GFKG/src/'
+gard_files_path = f'{base_path}RDAS_GARD/src/'
 
 # Database names being used on the current server
 convert = {ct_db:'trials', pm_db:'articles', gnt_db:'grants'}
