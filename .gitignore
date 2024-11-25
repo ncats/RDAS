@@ -10,6 +10,7 @@
 ### VisualStudioCode Patch ###
 # Ignore all local history of files
 **/.history
+setup.txt
 
 # End of https://www.gitignore.io/api/visualstudiocode
 personal-config.ini

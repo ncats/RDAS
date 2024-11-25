@@ -3,14 +3,14 @@ import os
 current_version = 2.6
 
 # Basic user information
-current_user = 'leadmandj'
+current_user = 'zhaot3'
 base_directory_name = 'RDAS'
 # base_path = '/home/{current_user}/RDAS_master/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 
 # RDAS Team contacts for emails
 contacts = {
-    "dev": ["leadmandj@nih.gov"],
-    "test": ["leadmandj@nih.gov",
+    "dev": ["tongan.zhao@nih.gov"],
+    "test": ["tongan.zhao@nih.gov",
              "qian.zhu@nih.gov",
              "sungrim.moon@nih.gov",
              "shixue.sun@nih.gov",
@@ -21,7 +21,8 @@ contacts = {
             ]
 }
 
-base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
+#base_path = '/home/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
+base_path = '/Users/{current_user}/{base_directory_name}/'.format(current_user=current_user, base_directory_name=base_directory_name)
 
 # Folder paths
 backup_path = '{base_path}backup/'.format(base_path=base_path)
@@ -29,7 +30,7 @@ transfer_path = '{base_path}transfer/'.format(base_path=base_path)
 migrated_path = '{base_path}migrated/'.format(base_path=base_path)
 approved_path = '{base_path}approved/'.format(base_path=base_path)
 images_path = '{base_path}img/'.format(base_path=base_path)
-firebase_key_path = '{base_path}crt/ncats-summer-interns-firebase-adminsdk-9g7zz-a4e783d24c.json'.format(base_path=base_path) # May have to set this in new enviroment
+firebase_key_path = '/Users/zhaot3/Workspaces/RDASWorkspace/RDAS/crt/ncats-summer-interns-firebase-adminsdk-9g7zz-a4e783d24c.json'# May have to set this in new enviroment
 
 
 # if you are not using minghui's test dataset, make db_prefix=""; now you only need to change the neo4j database names here:
