@@ -1,0 +1,123 @@
+Target Name,ChEMBL-ID,UniProt ID,PDB Visualization,TTD ID,Probability,Model accuracy
+Transcription intermediary factor 1-alpha,CHEMBL3108638,O15164,4YBM,Not Available,98.17%,95.56%
+Cathepsin D,CHEMBL2581,P07339,4OD9,T67102,97.69%,98.95%
+Acyl coenzyme A:cholesterol acyltransferase,CHEMBL2265,P23141,5A7G,T76369,97.16%,85.94%
+Kruppel-like factor 5,CHEMBL1293249,Q13887,Not Available,Not Available,95.42%,86.33%
+Pregnane X receptor,CHEMBL3401,O75469,6TFI,T82702,95.21%,94.73%
+Dual specificity protein phosphatase 3,CHEMBL2635,P51452,3F81,Not Available,93.67%,94%
+Stem cell growth factor receptor,CHEMBL1936,P10721,2EC8,T57700,93.48%,84.17%
+Nuclear factor NF-kappa-B p105 subunit,CHEMBL3251,P19838,1SVC,Not Available,93.15%,96.09%
+GABA-A receptor; alpha-1/beta-3/gamma-2,CHEMBL2094121,P14867,6HUJ,T51487,90.90%,95.50%
+Tyrosine-protein kinase FYN,CHEMBL1841,P06241,2DQ7,T17980,90.17%,81.29%
+Nerve growth factor receptor Trk-A,CHEMBL2815,P04629,2IFG,Not Available,89.30%,87.16%
+Hypoxia-inducible factor 1 alpha,CHEMBL4261,Q16665,4H6J,Not Available,88.24%,85.14%
+Nuclear factor erythroid 2-related factor 2,CHEMBL1075094,Q16236,2FLU,Not Available,86.50%,96%
+DNA-(apurinic or apyrimidinic site) lyase,CHEMBL5619,P27695,6BOW,T13348,86.39%,91.11%
+Dual specificity phosphatase Cdc25C,CHEMBL2378,P30307,3OP3,Not Available,84.86%,96.67%
+Multidrug resistance-associated protein 1,CHEMBL3004,P33527,4C3Z,T11288,83.19%,96.37%
+Telomerase reverse transcriptase,CHEMBL2916,O14746,7BG9,T86052,82.99%,90%
+Platelet-derived growth factor receptor,CHEMBL2095189,P09619,3MJG,T53524,82.89%,71.67%
+Toll-like receptor 8,CHEMBL5805,Q9NR97,3WN4,T48703,82.65%,96.25%
+Histone acetyltransferase KAT6A,CHEMBL3774298,Q92794,2OZU,Not Available,81.33%,97.50%
+Serotonin 2c (5-HT2c) receptor,CHEMBL225,P28335,6BQH,T83813,81.25%,89.62%
+Casein kinase II alpha/beta,CHEMBL3038477,P67870,6TLS,T51565,81.19%,99.23%
+Glycine transporter 2,CHEMBL3060,Q9Y345,Not Available,Not Available,80.85%,99.17%
+Carboxylesterase 2,CHEMBL3180,O00748,Not Available,Not Available,80.34%,90%
+dCTP pyrophosphatase 1,CHEMBL3769292,Q9H773,Not Available,Not Available,79.97%,94.40%
+Tyrosine-protein kinase CSK,CHEMBL2634,P41240,1BYG,T64721,79.91%,78.61%
+Tyrosine-protein kinase YES,CHEMBL2073,P07947,2HDA,Not Available,79.56%,83.14%
+Kelch-like ECH-associated protein 1,CHEMBL2069156,Q14145,6WCQ,Not Available,77.46%,82.38%
+Adenosine A2b receptor,CHEMBL255,P29275,Not Available,T86679,77.14%,98.59%
+HERG,CHEMBL240,Q12809,5VA1,T20251,76.85%,89.76%
+Calpain 1,CHEMBL3891,P07384,1ZCM,Not Available,75.95%,93.04%
+IgG receptor FcRn large subunit p51,CHEMBL5966,P55899,6FGB,Not Available,75.88%,90.93%
+Cysteinyl leukotriene receptor 2,CHEMBL4330,Q9NS75,Not Available,T74238,75.56%,98%
+Kinesin-like protein 1,CHEMBL4581,P52732,6TIW,T28484,75.11%,93.18%
+Cysteine protease ATG4B,CHEMBL1741221,Q9Y4P1,2CY7,Not Available,74.46%,87.50%
+Glucose transporter,CHEMBL2535,P11166,6THA,Not Available,74.19%,98.75%
+ADAM10,CHEMBL5028,O14672,6BE6,T31902,74.12%,97.50%
+Glutamate NMDA receptor; GRIN1/GRIN2B,CHEMBL1907603,Q05586,5EWM,Not Available,74.01%,95.89%
+Acyl coenzyme A:cholesterol acyltransferase 1,CHEMBL2782,P35610,6P2J,Not Available,73.31%,91.65%
+Histamine H3 receptor,CHEMBL264,Q9Y5N1,Not Available,Not Available,73.24%,91.43%
+DNA topoisomerase I,CHEMBL1781,P11387,1K4T,T09826,72.93%,97%
+MAP kinase p38 beta,CHEMBL3961,Q15759,3GP0,Not Available,72.88%,94.75%
+NT-3 growth factor receptor,CHEMBL5608,Q16288,6KZD,Not Available,72.84%,95.89%
+PI3-kinase p110-delta subunit,CHEMBL3130,O00329,6PYR,T67849,72.77%,96.47%
+Lysosomal Pro-X carboxypeptidase,CHEMBL2335,P42785,3N2Z,Not Available,72.54%,100%
+L-lactate dehydrogenase A chain,CHEMBL4835,P00338,5W8J,Not Available,72.29%,95.34%
+Glutathione S-transferase Pi,CHEMBL3902,P09211,5J41,T21669,71.96%,93.81%
+Kallikrein 7,CHEMBL2443,P49862,2QXI,Not Available,71%,94%
+Cyclooxygenase-1,CHEMBL221,P23219,6Y3C,Not Available,70.99%,90.17%
+Signal transducer and activator of transcription 3,CHEMBL4026,P40763,6QHD,T29130,69.74%,82.69%
+Dual specificity mitogen-activated protein kinase kinase 2,CHEMBL2964,P36507,1S9I,Not Available,69.34%,80%
+"Nitric oxide synthase, inducible",CHEMBL4481,P35228,3E7G,T02703,68.94%,94.80%
+Glycine receptor subunit alpha-1,CHEMBL5845,P23415,4X5T,T50269,68.81%,90.71%
+Coagulation factor XIII,CHEMBL4530,P00488,4KTY,Not Available,67.77%,96%
+G-protein coupled bile acid receptor 1,CHEMBL5409,Q8TDU6,7CFM,T86273,67.73%,93.65%
+Adenosylhomocysteinase,CHEMBL2664,P23526,1LI4,Not Available,67.53%,86.67%
+Macrophage-stimulating protein receptor,CHEMBL2689,Q04912,4QT8,Not Available,67.05%,89.82%
+Phosphodiesterase 11A,CHEMBL2717,Q9HCR9,Not Available,Not Available,66.92%,85%
+Serotonin transporter,CHEMBL228,P31645,6VRH,Not Available,66.78%,95.51%
+Beta-glucosidase,CHEMBL3761,Q9HCG7,Not Available,Not Available,66.34%,99%
+Aldose reductase,CHEMBL1900,P15121,1US0,T26623,66.12%,92.38%
+Maternal embryonic leucine zipper kinase,CHEMBL4578,Q14680,5K00,T61518,65.60%,81.58%
+Ephrin type-B receptor 2,CHEMBL3290,P29323,3ZFM,T73756,65.19%,78%
+Serine/threonine-protein kinase MST2,CHEMBL4708,Q13188,6AO5,Not Available,65.13%,71.67%
+Kallikrein 5,CHEMBL4447,Q9Y337,6QFE,Not Available,65.05%,87.50%
+"AMP-activated protein kinase, alpha-1 subunit",CHEMBL4045,Q13131,6C9H,Not Available,64.99%,73.50%
+Nuclear receptor ROR-beta,CHEMBL3091268,Q92753,Not Available,Not Available,64.83%,95.50%
+Glutamate carboxypeptidase II,CHEMBL1892,Q04609,5O5T,Not Available,64.42%,97.50%
+Serotonin 7 (5-HT7) receptor,CHEMBL3155,P34969,Not Available,T79062,64.20%,90.71%
+Glucocorticoid receptor,CHEMBL2034,P04150,4UDD,T40016,64.04%,94.82%
+"Nitric-oxide synthase, brain",CHEMBL3568,P29475,6CIC,T16117,64.01%,95.46%
+Transmembrane protease serine 6,CHEMBL1795139,Q8IU80,Not Available,Not Available,63.94%,98.33%
+Tyrosine-protein kinase FRK,CHEMBL4223,P42685,Not Available,Not Available,63.71%,71.25%
+Vascular endothelial growth factor receptor 1,CHEMBL1868,P17948,5T89,Not Available,63.31%,96.47%
+Complement factor D,CHEMBL2176771,P00746,6QMT,T66383,62.55%,98%
+Acetylcholinesterase,CHEMBL220,P22303,1F8U,T30082,62.48%,94.45%
+Cytochrome P450 2A6,CHEMBL5282,P11509,2FDV,T06455,62.38%,71.78%
+Sodium channel protein type IV alpha subunit,CHEMBL2072,P35499,6AGF,T02546,61.45%,92.32%
+Voltage-gated T-type calcium channel alpha-1H subunit,CHEMBL1859,O95180,Not Available,T54644,61.43%,98.57%
+G-protein coupled receptor 55,CHEMBL1075322,Q9Y2T6,Not Available,T87670,61.11%,78.15%
+Heat shock protein HSP 90-beta,CHEMBL4303,P08238,5FWK,Not Available,60.50%,96.77%
+Coagulation factor X,CHEMBL244,P00742,1NFU,T84631,60.23%,98.41%
+Tyrosine-protein kinase Lyn,CHEMBL3905,P07948,5XY1,Not Available,60.01%,75.53%
+P-glycoprotein 1,CHEMBL4302,P08183,7A69,T25258,59.66%,92.98%
+Glyoxalase I,CHEMBL2424,Q04760,3W0T,Not Available,59.23%,91.67%
+G-protein coupled receptor 6,CHEMBL3714130,P46095,Not Available,Not Available,59.17%,97.36%
+Cystinyl aminopeptidase,CHEMBL2693,Q9UIQ6,5MJ6,Not Available,58.98%,97.64%
+Macrophage migration inhibitory factor,CHEMBL2085,P14174,6B1K,T39977,57.43%,80.78%
+CDK2/Cyclin A,CHEMBL3038469,P24941,4BCN,T70176,57.22%,91.38%
+T-cell protein-tyrosine phosphatase,CHEMBL3807,P17706,1L8K,Not Available,56.80%,93%
+Protein arginine N-methyltransferase 6,CHEMBL1275221,Q96LA8,4QQK,Not Available,56.58%,98.33%
+Inhibitor of nuclear factor kappa B kinase alpha subunit,CHEMBL3476,O15111,5EBZ,Not Available,56.55%,95.83%
+Muscarinic acetylcholine receptor M5,CHEMBL2035,P08912,6OL9,T79961,56.25%,94.62%
+Neurotensin receptor 2,CHEMBL2514,O95665,Not Available,Not Available,55.94%,100%
+Aurora kinase B/Inner centromere protein,CHEMBL3430907,Q96GD4,6YIH,T46781,55.89%,97.50%
+Serotonin 2a (5-HT2a) receptor,CHEMBL224,P28223,6WHA,T32060,55.61%,91.43%
+MAP/microtubule affinity-regulating kinase 4,CHEMBL5754,Q96L34,5ES1,Not Available,55.53%,79.50%
+G-protein coupled receptor 35,CHEMBL1293267,Q9HC97,Not Available,Not Available,55.15%,89.34%
+Cathepsin B,CHEMBL4072,P07858,3PBH,T61746,55.02%,93.67%
+Cyclin-dependent kinase 5/CDK5 activator 1,CHEMBL1907600,Q00535,1UNL,T20973,54.98%,93.03%
+Ghrelin receptor,CHEMBL4616,Q92847,6KO5,T59604,54.85%,92%
+Endoplasmic reticulum-associated amyloid beta-peptide-binding protein,CHEMBL4159,Q99714,2O23,Not Available,54.81%,70.16%
+Ribosomal protein S6 kinase alpha 1,CHEMBL2553,Q15418,2Z7Q,Not Available,54.69%,85.11%
+Protein kinase N1,CHEMBL3384,Q16512,4OTH,Not Available,54.54%,80.71%
+P2X purinoceptor 7,CHEMBL4805,Q99572,Not Available,T63414,54.45%,97.50%
+Histone deacetylase 8,CHEMBL3192,Q9BY41,5VI6,T28887,54.38%,93.99%
+DNA topoisomerase II alpha,CHEMBL1806,P11388,6ZY5,T17048,53.91%,89%
+Excitatory amino acid transporter 1,CHEMBL3085,P43003,5LM4,Not Available,53.81%,94.67%
+Cyclin-dependent kinase 7,CHEMBL3055,P50613,7B5O,T58449,53.11%,81.88%
+Niemann-Pick C1 protein,CHEMBL1293277,O15118,6W5S,Not Available,53.05%,81.11%
+G protein-coupled receptor 44,CHEMBL5071,Q9Y5Y4,6D27,T61722,52.95%,96%
+Tissue factor pathway inhibitor,CHEMBL3713062,P10646,5NMV,T78890,52.72%,97.33%
+Matrix metalloproteinase 8,CHEMBL4588,P22894,1I76,Not Available,52.48%,94.66%
+Stimulator of interferon genes protein,CHEMBL4523377,Q86WV6,6NT5,Not Available,52.24%,95.48%
+Dual specificity phosphatase Cdc25B,CHEMBL4804,P30305,1QB0,Not Available,52.11%,79.50%
+Tyrosine-protein kinase HCK,CHEMBL3234,P08631,5H0B,Not Available,51.88%,88.89%
+Histone deacetylase 10,CHEMBL5103,Q969S8,Not Available,T94324,51.06%,90.08%
+Neuronal acetylcholine receptor; alpha4/beta4,CHEMBL1907591,P30926,6UR8,T70967,51.04%,100%
+Peroxisome proliferator-activated receptor gamma,CHEMBL235,P37231,3DZY,Not Available,50.81%,95.39%
+Non-receptor tyrosine-protein kinase TNK1,CHEMBL5334,Q13470,Not Available,Not Available,50.71%,73.33%
+Choline kinase alpha,CHEMBL3117,P35790,4DA5,T55709,50.30%,78%
+Endoplasmic reticulum aminopeptidase 1,CHEMBL5939,Q9NZ08,6Q4R,Not Available,50.28%,100%

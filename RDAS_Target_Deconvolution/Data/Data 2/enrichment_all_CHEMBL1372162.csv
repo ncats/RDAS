@@ -1,0 +1,187 @@
+Enrichment FDR,nGenes,Pathway Genes,Fold Enrichment,Pathway,URL,Genes
+1.64E-18,26,530,11.69233491,Path:hsa05200 Pathways in cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05200 , CDK2  CREBBP  EDNRA  EGFR  ERBB2  FGFR1  FGFR3  FGFR2  FLT4  ALK  HSP90AA1  IKBKB  JAK2  MMP1  MMP9  PDGFRB  PIK3CD  PIK3R1  MAPK8  PTK2  RAF1  ROCK1  SMO  BRAF  STAT3  ROCK2
+4.44E-16,14,97,34.40012887,Path:hsa05215 Prostate cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05215 , CDK2  CREBBP  EGFR  ERBB2  FGFR1  FGFR2  HSP90AA1  IKBKB  MMP9  PDGFRB  PIK3CD  PIK3R1  RAF1  BRAF
+7.40E-16,17,202,20.05863243,Path:hsa05205 Proteoglycans in cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05205 , CTSL  EGFR  ERBB2  ERBB4  FGFR1  MMP9  PIK3CD  PIK3R1  MAPK13  PTK2  RAF1  ROCK1  MAPK12  SMO  BRAF  STAT3  ROCK2
+1.45E-15,20,354,13.46574859,Path:hsa04151 PI3K-Akt signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04151 , CDK2  EGFR  ERBB2  ERBB4  FGFR1  FGFR3  FGFR2  FLT1  FLT4  HSP90AA1  IKBKB  JAK2  PDGFRB  PIK3CD  PIK3CG  PIK3R1  PTK2  RAF1  SYK  TEK
+8.22E-15,17,240,16.88268229,Path:hsa04020 Calcium signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04020 , EDNRA  EGFR  ERBB2  ERBB4  FGFR1  FGFR3  FGFR2  FLT1  FLT4  HTR2C  HTR6  PDGFRB  PTAFR  SLC8A1  TRHR  CCKAR  CCKBR
+1.08E-14,18,294,14.59247449,Path:hsa04010 MAPK signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04010 , EGFR  ERBB2  ERBB4  FGFR1  FGFR3  FGFR2  FLT1  FLT4  IKBKB  PDGFRB  MAPK8  MAPK13  RAF1  RPS6KA3  MAPK12  BRAF  TEK  MAPKAPK2
+8.22E-14,12,89,32.13623596,Path:hsa05235 PD-L1 expression and PD-1 checkpoint pathway in cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05235 , CSNK2A1  EGFR  ALK  IKBKB  JAK2  LCK  PIK3CD  PIK3R1  MAPK13  RAF1  MAPK12  STAT3
+1.56E-13,14,162,20.59760802,Path:hsa05161 Hepatitis B,http://www.genome.jp/kegg-bin/show_pathway?hsa05161 , CDK2  CREBBP  TBK1  IKBKB  JAK2  MMP9  PIK3CD  PIK3R1  MAPK8  MAPK13  RAF1  MAPK12  BRAF  STAT3
+1.56E-13,14,161,20.72554348,Path:hsa05206 MicroRNAs in cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05206 , CREBBP  EGFR  ERBB2  FGFR3  SIRT1  IKBKB  MMP9  PDGFRB  ABCB1  PIK3CD  PIK3R1  RAF1  ROCK1  STAT3
+2.25E-13,13,131,23.65243321,Path:hsa04068 FoxO signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04068 , CDK2  CREBBP  EGFR  SIRT1  IKBKB  PIK3CD  PIK3R1  MAPK8  MAPK13  RAF1  MAPK12  BRAF  STAT3
+5.52E-13,11,79,33.18710443,Path:hsa01521 EGFR tyrosine kinase inhibitor resistance,http://www.genome.jp/kegg-bin/show_pathway?hsa01521 , EGFR  ERBB2  FGFR3  FGFR2  JAK2  PDGFRB  PIK3CD  PIK3R1  RAF1  BRAF  STAT3
+1.45E-12,14,194,17.20006443,Path:hsa05167 Kaposi sarcoma-associated herpesvirus infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05167 , CREBBP  TBK1  IKBKB  JAK2  PIK3CD  PIK3CG  PIK3R1  MAPK8  MAPK13  RAF1  MAPK12  STAT3  SYK  MAPKAPK2
+2.04E-12,14,200,16.6840625,Path:hsa04510 Focal adhesion,http://www.genome.jp/kegg-bin/show_pathway?hsa04510 , EGFR  ERBB2  FLT1  FLT4  PDGFRB  PIK3CD  PIK3R1  MAPK8  PTK2  RAF1  ROCK1  BRAF  CAPN2  ROCK2
+3.46E-12,11,95,27.59769737,Path:hsa01522 Endocrine resistance,http://www.genome.jp/kegg-bin/show_pathway?hsa01522 , EGFR  ERBB2  MMP9  PIK3CD  PIK3R1  MAPK8  MAPK13  PTK2  RAF1  MAPK12  BRAF
+3.46E-12,14,210,15.88958333,Path:hsa04015 Rap1 signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04015 , EGFR  FGFR1  FGFR3  FGFR2  FLT1  FLT4  PDGFRB  PIK3CD  PIK3R1  MAPK13  RAF1  MAPK12  BRAF  TEK
+4.20E-12,14,214,15.59258178,Path:hsa05417 Lipid and atherosclerosis,http://www.genome.jp/kegg-bin/show_pathway?hsa05417 , TBK1  HSP90AA1  IKBKB  JAK2  MMP1  MMP9  PIK3CD  PIK3R1  MAPK8  MAPK13  PTK2  MAPK12  STAT3  ROCK2
+4.28E-12,10,70,34.04910714,Path:hsa05230 Central carbon metabolism in cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05230 , EGFR  ERBB2  FGFR1  FGFR3  FGFR2  GCK  PDGFRB  PIK3CD  PIK3R1  RAF1
+6.02E-12,11,102,25.70373775,Path:hsa04914 Progesterone-mediated oocyte maturation,http://www.genome.jp/kegg-bin/show_pathway?hsa04914 , CDK2  HSP90AA1  PIK3CD  PIK3R1  MAPK8  MAPK13  RAF1  RPS6KA3  MAPK12  BRAF  AURKA
+6.02E-12,12,137,20.87682482,Path:hsa05135 Yersinia infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05135 , TBK1  IKBKB  LCK  PIK3CD  PIK3R1  MAPK8  MAPK13  PTK2  ROCK1  RPS6KA3  MAPK12  ROCK2
+1.21E-11,14,235,14.19920213,Path:hsa04014 Ras signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04014 , EGFR  FGFR1  FGFR3  FGFR2  FLT1  FLT4  TBK1  IKBKB  PDGFRB  PIK3CD  PIK3R1  MAPK8  RAF1  TEK
+2.14E-11,14,246,13.56427846,Path:hsa05131 Shigellosis,http://www.genome.jp/kegg-bin/show_pathway?hsa05131 , EGFR  TBK1  IKBKB  PIK3CD  PIK3R1  MAPK8  MAPK13  PTK2  ROCK1  MAPK12  CAPN1  CAPN2  CAPNS1  ROCK2
+8.74E-11,13,221,14.02022059,Path:hsa04024 cAMP signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04024 , CFTR  CREBBP  EDNRA  HTR6  PDE4A  PDE4B  PIK3CD  PIK3R1  MAPK8  RAF1  ROCK1  BRAF  ROCK2
+1.36E-10,9,70,30.64419643,Path:hsa04917 Prolactin signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04917 , GCK  JAK2  PIK3CD  PIK3R1  MAPK8  MAPK13  RAF1  MAPK12  STAT3
+2.79E-10,9,76,28.22491776,Path:hsa05212 Pancreatic cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05212 , EGFR  ERBB2  IKBKB  PIK3CD  PIK3R1  MAPK8  RAF1  BRAF  STAT3
+6.48E-10,9,84,25.53683036,Path:hsa04012 ErbB signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04012 , EGFR  ERBB2  ERBB4  PIK3CD  PIK3R1  MAPK8  PTK2  RAF1  BRAF
+6.48E-10,10,119,20.02888655,Path:hsa04722 Neurotrophin signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04722 , IKBKB  PIK3CD  PIK3R1  MAPK8  MAPK13  RAF1  RPS6KA3  MAPK12  BRAF  MAPKAPK2
+6.64E-10,10,120,19.86197917,Path:hsa04935 Growth hormone synthesis secretion and action,http://www.genome.jp/kegg-bin/show_pathway?hsa04935 , CREBBP  JAK2  PIK3CD  PIK3R1  MAPK8  MAPK13  PTK2  RAF1  MAPK12  STAT3
+9.34E-10,12,217,13.18029954,Path:hsa04810 Regulation of actin cytoskeleton,http://www.genome.jp/kegg-bin/show_pathway?hsa04810 , EGFR  FGFR1  FGFR3  FGFR2  PDGFRB  PIK3CD  PIK3R1  PTK2  RAF1  ROCK1  BRAF  ROCK2
+1.01E-09,10,126,18.91617063,Path:hsa04380 Osteoclast differentiation,http://www.genome.jp/kegg-bin/show_pathway?hsa04380 , CTSK  IKBKB  LCK  PIK3CD  PIK3R1  MAPK8  MAPK13  MAPK12  SYK  BTK
+1.26E-09,12,224,12.76841518,Path:hsa05163 Human cytomegalovirus infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05163 , EGFR  TBK1  IKBKB  PIK3CD  PIK3R1  MAPK13  PTK2  RAF1  ROCK1  MAPK12  STAT3  ROCK2
+2.32E-09,10,138,17.27128623,Path:hsa05418 Fluid shear stress and atherosclerosis,http://www.genome.jp/kegg-bin/show_pathway?hsa05418 , CTSL  HSP90AA1  IKBKB  MMP9  PIK3CD  PIK3R1  MAPK8  MAPK13  PTK2  MAPK12
+2.47E-09,7,41,40.69283537,Path:hsa05219 Bladder cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05219 , EGFR  ERBB2  FGFR3  MMP1  MMP9  RAF1  BRAF
+2.81E-09,8,68,28.04044118,Path:hsa04664 Fc epsilon RI signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04664 , PIK3CD  PIK3R1  MAPK8  MAPK13  RAF1  MAPK12  SYK  BTK
+3.00E-09,10,143,16.6673951,Path:hsa04550 Signaling pathways regulating pluripotency of stem cells,http://www.genome.jp/kegg-bin/show_pathway?hsa04550 , FGFR1  FGFR3  FGFR2  JAK2  PIK3CD  PIK3R1  MAPK13  RAF1  MAPK12  STAT3
+3.02E-09,11,191,13.7266034,Path:hsa04062 Chemokine signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04062 , IKBKB  JAK2  PIK3CD  PIK3CG  PIK3R1  PTK2  RAF1  ROCK1  BRAF  STAT3  ROCK2
+3.26E-09,9,104,20.62590144,Path:hsa04625 C-type lectin receptor signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04625 , IKBKB  PIK3CD  PIK3R1  MAPK8  MAPK13  RAF1  MAPK12  SYK  MAPKAPK2
+4.00E-09,8,72,26.48263889,Path:hsa05223 Non-small cell lung cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05223 , EGFR  ERBB2  ALK  PIK3CD  PIK3R1  RAF1  BRAF  STAT3
+4.34E-09,9,108,19.86197917,Path:hsa04659 Th17 cell differentiation,http://www.genome.jp/kegg-bin/show_pathway?hsa04659 , HSP90AA1  IKBKB  JAK2  LCK  MAPK8  MAPK13  RORC  MAPK12  STAT3
+4.59E-09,9,109,19.67975917,Path:hsa04066 HIF-1 signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04066 , CREBBP  EGFR  ERBB2  FLT1  PFKFB3  PIK3CD  PIK3R1  STAT3  TEK
+4.78E-09,11,202,12.9791151,Path:hsa05169 Epstein-Barr virus infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05169 , CDK2  TBK1  IKBKB  PIK3CD  PIK3R1  MAPK8  MAPK13  MAPK12  STAT3  SYK  BTK
+5.84E-09,10,156,15.27844551,Path:hsa04218 Cellular senescence,http://www.genome.jp/kegg-bin/show_pathway?hsa04218 , CDK2  SIRT1  PIK3CD  PIK3R1  MAPK13  RAF1  MAPK12  CAPN1  CAPN2  MAPKAPK2
+1.29E-08,11,223,11.75686659,Path:hsa05208 Chemical carcinogenesis-reactive oxygen species,http://www.genome.jp/kegg-bin/show_pathway?hsa05208 , EGFR  IKBKB  PIK3CD  PIK3R1  MAPK8  MAPK13  PTK2  PTPN1  RAF1  MAPK12  BRAF
+1.32E-08,9,124,17.29914315,Path:hsa04611 Platelet activation,http://www.genome.jp/kegg-bin/show_pathway?hsa04611 , PIK3CD  PIK3CG  PIK3R1  MAPK13  ROCK1  MAPK12  SYK  TBXAS1  BTK
+1.82E-08,9,129,16.62863372,Path:hsa04926 Relaxin signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04926 , EGFR  MMP1  MMP9  PIK3CD  PIK3R1  MAPK8  MAPK13  RAF1  MAPK12
+1.82E-08,11,232,11.30078125,Path:hsa05171 Coronavirus disease-COVID-19,http://www.genome.jp/kegg-bin/show_pathway?hsa05171 , EGFR  TBK1  IKBKB  MMP1  PIK3CD  PIK3R1  MAPK8  MAPK13  MAPK12  STAT3  SYK
+2.46E-08,7,59,28.27807203,Path:hsa04370 VEGF signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04370 , PIK3CD  PIK3R1  MAPK13  PTK2  RAF1  MAPK12  MAPKAPK2
+2.49E-08,8,93,20.50268817,Path:hsa04657 IL-17 signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04657 , TBK1  HSP90AA1  IKBKB  MMP1  MMP9  MAPK8  MAPK13  MAPK12
+2.67E-08,9,136,15.77274816,Path:hsa04210 Apoptosis,http://www.genome.jp/kegg-bin/show_pathway?hsa04210 , CTSK  CTSL  IKBKB  PIK3CD  PIK3R1  MAPK8  RAF1  CAPN1  CAPN2
+5.28E-08,8,103,18.51213592,Path:hsa04620 Toll-like receptor signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04620 , CTSK  TBK1  IKBKB  PIK3CD  PIK3R1  MAPK8  MAPK13  MAPK12
+5.28E-08,8,103,18.51213592,Path:hsa04660 T cell receptor signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04660 , IKBKB  LCK  PIK3CD  PIK3R1  MAPK8  MAPK13  RAF1  MAPK12
+5.28E-08,9,148,14.49387669,Path:hsa05226 Gastric cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05226 , CDK2  EGFR  ERBB2  FGFR2  ABCB1  PIK3CD  PIK3R1  RAF1  BRAF
+7.40E-08,8,108,17.65509259,Path:hsa04931 Insulin resistance,http://www.genome.jp/kegg-bin/show_pathway?hsa04931 , IKBKB  SLC27A1  PIK3CD  PIK3R1  MAPK8  PTPN1  RPS6KA3  STAT3
+7.92E-08,10,210,11.34970238,Path:hsa05170 Human immunodeficiency virus 1 infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05170 , TBK1  IKBKB  PIK3CD  PIK3R1  MAPK8  MAPK13  PTK2  RAF1  MAPK12  WEE1
+8.35E-08,9,157,13.66301752,Path:hsa05160 Hepatitis C,http://www.genome.jp/kegg-bin/show_pathway?hsa05160 , CDK2  EGFR  TBK1  IKBKB  PIK3CD  PIK3R1  RAF1  BRAF  STAT3
+8.49E-08,7,72,23.17230903,Path:hsa05218 Melanoma,http://www.genome.jp/kegg-bin/show_pathway?hsa05218 , EGFR  FGFR1  PDGFRB  PIK3CD  PIK3R1  RAF1  BRAF
+1.04E-07,9,162,13.24131944,Path:hsa04630 JAK-STAT signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04630 , CREBBP  EGFR  JAK2  PDGFRB  PIK3CD  PIK3R1  PTPN2  RAF1  STAT3
+1.04E-07,8,114,16.72587719,Path:hsa04670 Leukocyte transendothelial migration,http://www.genome.jp/kegg-bin/show_pathway?hsa04670 , MMP9  PIK3CD  PIK3R1  MAPK13  PTK2  ROCK1  MAPK12  ROCK2
+1.42E-07,8,119,16.02310924,Path:hsa04071 Sphingolipid signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04071 , PIK3CD  PIK3R1  MAPK8  MAPK13  RAF1  ROCK1  MAPK12  ROCK2
+2.61E-07,9,181,11.85134669,Path:hsa04360 Axon guidance,http://www.genome.jp/kegg-bin/show_pathway?hsa04360 , CDK5  EPHB2  PIK3CD  PIK3R1  PTK2  RAF1  ROCK1  SMO  ROCK2
+4.12E-07,8,137,13.91788321,Path:hsa04910 Insulin signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04910 , GCK  IKBKB  PIK3CD  PIK3R1  MAPK8  PTPN1  RAF1  BRAF
+4.54E-07,8,139,13.7176259,Path:hsa05162 Measles,http://www.genome.jp/kegg-bin/show_pathway?hsa05162 , CDK2  CSNK2A1  TBK1  IKBKB  PIK3CD  PIK3R1  MAPK8  STAT3
+5.51E-07,6,58,24.65625,Path:hsa05213 Endometrial cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05213 , EGFR  ERBB2  PIK3CD  PIK3R1  RAF1  BRAF
+6.37E-07,7,98,17.02455357,Path:hsa04750 Inflammatory mediator regulation of TRP channels,http://www.genome.jp/kegg-bin/show_pathway?hsa04750 , HTR2C  PIK3CD  PIK3R1  MAPK8  MAPK13  MAPK12  TRPV1
+6.66E-07,8,147,12.97108844,Path:hsa05224 Breast cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05224 , EGFR  ERBB2  FGFR1  FLT4  PIK3CD  PIK3R1  RAF1  BRAF
+7.10E-07,7,100,16.6840625,Path:hsa04933 AGE-RAGE signaling pathway in diabetic complications,http://www.genome.jp/kegg-bin/show_pathway?hsa04933 , JAK2  PIK3CD  PIK3R1  MAPK8  MAPK13  MAPK12  STAT3
+1.16E-06,11,362,7.242489641,Path:hsa04080 Neuroactive ligand-receptor interaction,http://www.genome.jp/kegg-bin/show_pathway?hsa04080 , CALCRL  EDNRA  MLNR  HTR2C  HTR6  NPY5R  PTAFR  TRHR  TRPV1  CCKAR  CCKBR
+1.22E-06,6,67,21.34421642,Path:hsa05221 Acute myeloid leukemia,http://www.genome.jp/kegg-bin/show_pathway?hsa05221 , IKBKB  PIK3CD  PIK3R1  RAF1  BRAF  STAT3
+1.45E-06,7,112,14.89648438,Path:hsa04668 TNF signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04668 , IKBKB  MMP9  PIK3CD  PIK3R1  MAPK8  MAPK13  MAPK12
+1.45E-06,7,112,14.89648438,Path:hsa05145 Toxoplasmosis,http://www.genome.jp/kegg-bin/show_pathway?hsa05145 , IKBKB  JAK2  PIK3CG  MAPK8  MAPK13  MAPK12  STAT3
+1.65E-06,6,71,20.14172535,Path:hsa04520 Adherens junction,http://www.genome.jp/kegg-bin/show_pathway?hsa04520 , CREBBP  CSNK2A1  EGFR  ERBB2  FGFR1  PTPN1
+1.93E-06,11,384,6.827555339,Path:hsa05010 Alzheimer disease,http://www.genome.jp/kegg-bin/show_pathway?hsa05010 , CDK5  CSNK2A1  IKBKB  PIK3CD  PIK3R1  MAPK8  RAF1  BRAF  CAPN1  CAPN2  CDK5R1
+2.23E-06,6,75,19.0675,Path:hsa05214 Glioma,http://www.genome.jp/kegg-bin/show_pathway?hsa05214 , EGFR  PDGFRB  PIK3CD  PIK3R1  RAF1  BRAF
+3.12E-06,9,249,8.614834337,Path:hsa05132 Salmonella infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05132 , HSP90AA1  IKBKB  PIK3CD  PIK3CG  MAPK8  MAPK13  RAF1  MAPK12  ROCK2
+3.42E-06,6,81,17.65509259,Path:hsa04662 B cell receptor signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04662 , IKBKB  PIK3CD  PIK3R1  RAF1  SYK  BTK
+3.79E-06,10,331,7.200717523,Path:hsa05165 Human papillomavirus infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05165 , CDK2  CREBBP  EGFR  TBK1  IKBKB  PDGFRB  PIK3CD  PIK3R1  PTK2  RAF1
+3.98E-06,5,46,25.90692935,Path:hsa04930 Type II diabetes mellitus,http://www.genome.jp/kegg-bin/show_pathway?hsa04930 , GCK  IKBKB  PIK3CD  PIK3R1  MAPK8
+4.69E-06,6,86,16.62863372,Path:hsa05210 Colorectal cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05210 , EGFR  PIK3CD  PIK3R1  MAPK8  RAF1  BRAF
+5.03E-06,8,197,9.67893401,Path:hsa05207 Chemical carcinogenesis-receptor activation,http://www.genome.jp/kegg-bin/show_pathway?hsa05207 , EGFR  HSP90AA1  JAK2  PIK3CD  PIK3R1  RAF1  RPS6KA3  STAT3
+5.99E-06,7,141,11.83266844,Path:hsa04936 Alcoholic liver disease,http://www.genome.jp/kegg-bin/show_pathway?hsa04936 , SIRT1  TBK1  IKBKB  MAPK8  MAPK13  MAPK12  SCD
+6.70E-06,6,92,15.54415761,Path:hsa04658 Th1 and Th2 cell differentiation,http://www.genome.jp/kegg-bin/show_pathway?hsa04658 , IKBKB  JAK2  LCK  MAPK8  MAPK13  MAPK12
+8.07E-06,7,148,11.2730152,Path:hsa04072 Phospholipase D signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04072 , EGFR  PDGFRB  PIK3CD  PIK3CG  PIK3R1  RAF1  SYK
+9.46E-06,6,98,14.59247449,Path:hsa05231 Choline metabolism in cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05231 , EGFR  PDGFRB  PIK3CD  PIK3R1  MAPK8  RAF1
+1.11E-05,6,101,14.15903465,Path:hsa05142 Chagas disease,http://www.genome.jp/kegg-bin/show_pathway?hsa05142 , IKBKB  PIK3CD  PIK3R1  MAPK8  MAPK13  MAPK12
+1.30E-05,11,476,5.507943803,Path:hsa05022 Pathways of neurodegeneration-multiple diseases,http://www.genome.jp/kegg-bin/show_pathway?hsa05022 , CDK5  CSNK2A1  TBK1  MAPK8  MAPK13  RAF1  MAPK12  BRAF  CAPN1  CAPN2  CDK5R1
+1.44E-05,6,106,13.49115566,Path:hsa04928 Parathyroid hormone synthesis secretion and action,http://www.genome.jp/kegg-bin/show_pathway?hsa04928 , EGFR  FGFR1  PDE4A  PDE4B  RAF1  BRAF
+1.97E-05,7,171,9.756761696,Path:hsa05164 Influenza A,http://www.genome.jp/kegg-bin/show_pathway?hsa05164 , CREBBP  TBK1  IKBKB  JAK2  PIK3CD  PIK3R1  RAF1
+2.46E-05,5,68,17.52527574,Path:hsa05211 Renal cell carcinoma,http://www.genome.jp/kegg-bin/show_pathway?hsa05211 , CREBBP  PIK3CD  PIK3R1  RAF1  BRAF
+2.60E-05,7,179,9.320705307,Path:hsa05152 Tuberculosis,http://www.genome.jp/kegg-bin/show_pathway?hsa05152 , CREBBP  JAK2  MAPK8  MAPK13  RAF1  MAPK12  SYK
+2.74E-05,5,70,17.02455357,Path:hsa04622 RIG-I-like receptor signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04622 , TBK1  IKBKB  MAPK8  MAPK13  MAPK12
+2.74E-05,5,70,17.02455357,Path:hsa05120 Epithelial cell signaling in Helicobacter pylori infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05120 , EGFR  IKBKB  MAPK8  MAPK13  MAPK12
+2.87E-05,6,121,11.81869835,Path:hsa04152 AMPK signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04152 , CFTR  SIRT1  PFKFB3  PIK3CD  PIK3R1  SCD
+2.87E-05,7,183,9.116974044,Path:hsa04621 NOD-like receptor signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04621 , NAMPT  TBK1  HSP90AA1  IKBKB  MAPK8  MAPK13  MAPK12
+3.97E-05,5,76,15.68050987,Path:hsa05220 Chronic myeloid leukemia,http://www.genome.jp/kegg-bin/show_pathway?hsa05220 , IKBKB  PIK3CD  PIK3R1  RAF1  BRAF
+4.20E-05,6,130,11.00048077,Path:hsa04650 Natural killer cell mediated cytotoxicity,http://www.genome.jp/kegg-bin/show_pathway?hsa04650 , LCK  PIK3CD  PIK3R1  RAF1  BRAF  SYK
+4.93E-05,6,134,10.67210821,Path:hsa04270 Vascular smooth muscle contraction,http://www.genome.jp/kegg-bin/show_pathway?hsa04270 , CALCRL  EDNRA  RAF1  ROCK1  BRAF  ROCK2
+5.20E-05,7,202,8.259436881,Path:hsa05203 Viral carcinogenesis,http://www.genome.jp/kegg-bin/show_pathway?hsa05203 , CDK2  CREBBP  PIK3CD  PIK3R1  STAT3  SYK  MAPKAPK2
+5.71E-05,6,138,10.36277174,Path:hsa04915 Estrogen signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04915 , EGFR  HSP90AA1  MMP9  PIK3CD  PIK3R1  RAF1
+6.38E-05,6,141,10.14228723,Path:hsa04140 Autophagy-animal,http://www.genome.jp/kegg-bin/show_pathway?hsa04140 , CTSL  TBK1  PIK3CD  PIK3R1  MAPK8  RAF1
+9.21E-05,7,222,7.515343468,Path:hsa05166 Human T-cell leukemia virus 1 infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05166 , CDK2  CREBBP  IKBKB  LCK  PIK3CD  PIK3R1  MAPK8
+9.23E-05,5,92,12.95346467,Path:hsa05222 Small cell lung cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05222 , CDK2  IKBKB  PIK3CD  PIK3R1  PTK2
+9.23E-05,5,92,12.95346467,Path:hsa05323 Rheumatoid arthritis,http://www.genome.jp/kegg-bin/show_pathway?hsa05323 , CTSK  CTSL  FLT1  MMP1  TEK
+9.62E-05,5,93,12.81418011,Path:hsa04912 GnRH signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04912 , EGFR  MAPK8  MAPK13  RAF1  MAPK12
+0.000102185,6,155,9.226209677,Path:hsa04150 mTOR signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04150 , IKBKB  PIK3CD  PIK3R1  RAF1  RPS6KA3  BRAF
+0.000102185,6,155,9.226209677,Path:hsa04932 Non-alcoholic fatty liver disease,http://www.genome.jp/kegg-bin/show_pathway?hsa04932 , IKBKB  PIK3CD  PIK3R1  MAPK8  MAPK13  MAPK12
+0.000116646,6,159,8.994103774,Path:hsa04217 Necroptosis,http://www.genome.jp/kegg-bin/show_pathway?hsa04217 , HSP90AA1  JAK2  MAPK8  STAT3  CAPN1  CAPN2
+0.00014675,6,166,8.614834337,Path:hsa04022 cGMP-PKG signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04022 , EDNRA  PIK3CG  RAF1  ROCK1  SLC8A1  ROCK2
+0.000156512,5,104,11.45883413,Path:hsa04064 NF-kappa B signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04064 , CSNK2A1  IKBKB  LCK  SYK  BTK
+0.000293718,6,189,7.566468254,Path:hsa04613 Neutrophil extracellular trap formation,http://www.genome.jp/kegg-bin/show_pathway?hsa04613 , PIK3CD  PIK3R1  MAPK13  RAF1  MAPK12  SYK
+0.000360958,4,67,14.22947761,Path:hsa04720 Long-term potentiation,http://www.genome.jp/kegg-bin/show_pathway?hsa04720 , CREBBP  RAF1  RPS6KA3  BRAF
+0.000361211,6,197,7.259200508,Path:hsa05130 Pathogenic Escherichia coli infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05130 , IKBKB  MAPK8  MAPK13  ROCK1  MAPK12  ROCK2
+0.000397231,4,69,13.81702899,Path:hsa04920 Adipocytokine signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04920 , IKBKB  JAK2  MAPK8  STAT3
+0.000417227,6,203,7.044642857,Path:hsa05415 Diabetic cardiomyopathy,http://www.genome.jp/kegg-bin/show_pathway?hsa05415 , MMP9  PIK3CD  PIK3R1  MAPK8  MAPK13  MAPK12
+0.000438746,5,131,9.097089695,Path:hsa04114 Oocyte meiosis,http://www.genome.jp/kegg-bin/show_pathway?hsa04114 , CDK2  MAPK13  RPS6KA3  MAPK12  AURKA
+0.000915825,5,154,7.738433442,Path:hsa04921 Oxytocin signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04921 , EGFR  PIK3CG  RAF1  ROCK1  ROCK2
+0.000973247,4,88,10.83380682,Path:hsa04540 Gap junction,http://www.genome.jp/kegg-bin/show_pathway?hsa04540 , EGFR  HTR2C  PDGFRB  RAF1
+0.001299914,5,167,7.136040419,Path:hsa05225 Hepatocellular carcinoma,http://www.genome.jp/kegg-bin/show_pathway?hsa05225 , EGFR  PIK3CD  PIK3R1  RAF1  BRAF
+0.001359869,5,169,7.051590237,Path:hsa04530 Tight junction,http://www.genome.jp/kegg-bin/show_pathway?hsa04530 , CFTR  ERBB2  MAPK8  ROCK1  ROCK2
+0.00136941,4,97,9.828608247,Path:hsa04666 Fc gamma R-mediated phagocytosis,http://www.genome.jp/kegg-bin/show_pathway?hsa04666 , PIK3CD  PIK3R1  RAF1  SYK
+0.001373012,5,170,7.010110294,Path:hsa04310 Wnt signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04310 , CREBBP  CSNK2A1  MAPK8  PORCN  ROCK2
+0.001608828,3,45,15.88958333,Path:hsa02010 ABC transporters,http://www.genome.jp/kegg-bin/show_pathway?hsa02010 , CFTR  ABCB1  ABCG2
+0.001842478,6,273,5.238324176,Path:hsa05020 Prion disease,http://www.genome.jp/kegg-bin/show_pathway?hsa05020 , CSNK2A1  PIK3CD  PIK3R1  MAPK8  MAPK13  MAPK12
+0.00226333,4,112,8.512276786,Path:hsa04726 Serotonergic synapse,http://www.genome.jp/kegg-bin/show_pathway?hsa04726 , HTR2C  HTR6  RAF1  BRAF
+0.002319909,4,113,8.436946903,Path:hsa04725 Cholinergic synapse,http://www.genome.jp/kegg-bin/show_pathway?hsa04725 , JAK2  PIK3CD  PIK3CG  PIK3R1
+0.00295988,4,121,7.879132231,Path:hsa04919 Thyroid hormone signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04919 , CREBBP  PIK3CD  PIK3R1  RAF1
+0.003909956,3,62,11.5327621,Path:hsa04213 Longevity regulating pathway-multiple species,http://www.genome.jp/kegg-bin/show_pathway?hsa04213 , SIRT1  PIK3CD  PIK3R1
+0.004247428,3,64,11.17236328,Path:hsa04929 GnRH secretion,http://www.genome.jp/kegg-bin/show_pathway?hsa04929 , PIK3CD  PIK3R1  RAF1
+0.00588817,3,72,9.930989583,Path:hsa04137 Mitophagy-animal,http://www.genome.jp/kegg-bin/show_pathway?hsa04137 , CSNK2A1  TBK1  MAPK8
+0.006042066,3,73,9.79494863,Path:hsa01524 Platinum drug resistance,http://www.genome.jp/kegg-bin/show_pathway?hsa01524 , ERBB2  PIK3CD  PIK3R1
+0.006042066,4,149,6.398489933,Path:hsa04261 Adrenergic signaling in cardiomyocytes,http://www.genome.jp/kegg-bin/show_pathway?hsa04261 , PIK3CG  MAPK13  MAPK12  SLC8A1
+0.006454137,3,75,9.53375,Path:hsa03320 PPAR signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa03320 , SLC27A1  MMP1  SCD
+0.006597646,3,76,9.408305921,Path:hsa05133 Pertussis,http://www.genome.jp/kegg-bin/show_pathway?hsa05133 , MAPK8  MAPK13  MAPK12
+0.006597646,3,76,9.408305921,Path:hsa05140 Leishmaniasis,http://www.genome.jp/kegg-bin/show_pathway?hsa05140 , JAK2  MAPK13  MAPK12
+0.006792993,3,77,9.28612013,Path:hsa05100 Bacterial invasion of epithelial cells,http://www.genome.jp/kegg-bin/show_pathway?hsa05100 , PIK3CD  PIK3R1  PTK2
+0.006990891,3,78,9.167067308,Path:hsa04612 Antigen processing and presentation,http://www.genome.jp/kegg-bin/show_pathway?hsa04612 , CTSL  HSP90AA1  LGMN
+0.009011952,4,169,5.641272189,Path:hsa04141 Protein processing in endoplasmic reticulum,http://www.genome.jp/kegg-bin/show_pathway?hsa04141 , HSP90AA1  MAPK8  CAPN1  CAPN2
+0.009874797,3,89,8.034058989,Path:hsa04211 Longevity regulating pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04211 , SIRT1  PIK3CD  PIK3R1
+0.009874797,3,89,8.034058989,Path:hsa04976 Bile secretion,http://www.genome.jp/kegg-bin/show_pathway?hsa04976 , CFTR  ABCB1  ABCG2
+0.013962271,4,193,4.939766839,Path:hsa05202 Transcriptional misregulation in cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05202 , FLT1  MMP9  PTK2  CCNT1
+0.01415159,3,102,7.010110294,Path:hsa05146 Amoebiasis,http://www.genome.jp/kegg-bin/show_pathway?hsa05146 , PIK3CD  PIK3R1  PTK2
+0.015432608,2,36,13.24131944,Path:hsa00760 Nicotinate and nicotinamide metabolism,http://www.genome.jp/kegg-bin/show_pathway?hsa00760 , NAMPT  SIRT1
+0.015488106,3,106,6.74557783,Path:hsa04922 Glucagon signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04922 , CREBBP  SIRT1  GCK
+0.016041104,2,37,12.88344595,Path:hsa04960 Aldosterone-regulated sodium reabsorption,http://www.genome.jp/kegg-bin/show_pathway?hsa04960 , PIK3CD  PIK3R1
+0.016768322,2,38,12.54440789,Path:hsa05340 Primary immunodeficiency,http://www.genome.jp/kegg-bin/show_pathway?hsa05340 , LCK  BTK
+0.017868386,13,1538,2.01460907,Path:hsa01100 Metabolic pathways,http://www.genome.jp/kegg-bin/show_pathway?hsa01100 , NAMPT  SIRT1  GCK  IDO1  MGAT2  PDE4A  PDE4B  PFKFB3  PIK3CD  PIK3CG  SCD  TBXAS1  DGAT2
+0.020955862,2,43,11.08575581,Path:hsa04975 Fat digestion and absorption,http://www.genome.jp/kegg-bin/show_pathway?hsa04975 , SLC27A1  DGAT2
+0.024478984,4,232,4.109375,Path:hsa04714 Thermogenesis,http://www.genome.jp/kegg-bin/show_pathway?hsa04714 , FGFR1  MAPK13  RPS6KA3  MAPK12
+0.024478984,2,47,10.14228723,Path:hsa04973 Carbohydrate digestion and absorption,http://www.genome.jp/kegg-bin/show_pathway?hsa04973 , PIK3CD  PIK3R1
+0.026159014,3,132,5.416903409,Path:hsa04142 Lysosome,http://www.genome.jp/kegg-bin/show_pathway?hsa04142 , CTSK  CTSL  LGMN
+0.026159014,3,132,5.416903409,Path:hsa04728 Dopaminergic synapse,http://www.genome.jp/kegg-bin/show_pathway?hsa04728 , MAPK8  MAPK13  MAPK12
+0.026159014,6,495,2.889015152,Path:hsa05168 Herpes simplex virus 1 infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05168 , TBK1  IKBKB  JAK2  PIK3CD  PIK3R1  SYK
+0.02919564,3,138,5.18138587,Path:hsa04371 Apelin signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04371 , PIK3CG  RAF1  SLC8A1
+0.031244598,3,142,5.035431338,Path:hsa05017 Spinocerebellar ataxia,http://www.genome.jp/kegg-bin/show_pathway?hsa05017 , PIK3CD  PIK3R1  MAPK8
+0.034551842,3,148,4.83129223,Path:hsa04723 Retrograde endocannabinoid signaling,http://www.genome.jp/kegg-bin/show_pathway?hsa04723 , MAPK8  MAPK13  MAPK12
+0.034685,2,58,8.21875,Path:hsa04923 Regulation of lipolysis in adipocytes,http://www.genome.jp/kegg-bin/show_pathway?hsa04923 , PIK3CD  PIK3R1
+0.03670215,2,60,7.944791667,Path:hsa04730 Long-term depression,http://www.genome.jp/kegg-bin/show_pathway?hsa04730 , RAF1  BRAF
+0.038750632,2,62,7.688508065,Path:hsa03250 Viral life cycle-HIV-1,http://www.genome.jp/kegg-bin/show_pathway?hsa03250 , CREBBP  CCNT1
+0.039659387,2,63,7.566468254,Path:hsa04623 Cytosolic DNA-sensing pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04623 , TBK1  IKBKB
+0.041745907,2,65,7.333653846,Path:hsa05321 Inflammatory bowel disease,http://www.genome.jp/kegg-bin/show_pathway?hsa05321 , RORC  STAT3
+0.051298942,2,73,6.529965753,Path:hsa00562 Inositol phosphate metabolism,http://www.genome.jp/kegg-bin/show_pathway?hsa00562 , PIK3CD  PIK3CG
+0.054842048,2,76,6.272203947,Path:hsa04971 Gastric acid secretion,http://www.genome.jp/kegg-bin/show_pathway?hsa04971 , CFTR  CCKBR
+0.066646619,2,85,5.608088235,Path:hsa04610 Complement and coagulation cascades,http://www.genome.jp/kegg-bin/show_pathway?hsa04610 , F10  F11
+0.067631445,2,86,5.542877907,Path:hsa04911 Insulin secretion,http://www.genome.jp/kegg-bin/show_pathway?hsa04911 , GCK  CCKAR
+0.074310656,2,91,5.238324176,Path:hsa05032 Morphine addiction,http://www.genome.jp/kegg-bin/show_pathway?hsa05032 , PDE4A  PDE4B
+0.076748145,2,93,5.125672043,Path:hsa04350 TGF-beta signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04350 , CREBBP  ROCK1
+0.082144227,2,97,4.914304124,Path:hsa04070 Phosphatidylinositol signaling system,http://www.genome.jp/kegg-bin/show_pathway?hsa04070 , PIK3CD  PIK3R1
+0.087097629,2,101,4.719678218,Path:hsa04916 Melanogenesis,http://www.genome.jp/kegg-bin/show_pathway?hsa04916 , CREBBP  RAF1
+0.087097629,4,364,2.619162088,Path:hsa05014 Amyotrophic lateral sclerosis,http://www.genome.jp/kegg-bin/show_pathway?hsa05014 , ERBB4  TBK1  MAPK13  MAPK12
+0.088076599,2,102,4.673406863,Path:hsa04972 Pancreatic secretion,http://www.genome.jp/kegg-bin/show_pathway?hsa04972 , CFTR  CCKAR
+0.103121083,1,20,11.9171875,Path:hsa00100 Steroid biosynthesis,http://www.genome.jp/kegg-bin/show_pathway?hsa00100 , SOAT1
+0.112980276,3,251,2.84873008,Path:hsa04144 Endocytosis,http://www.genome.jp/kegg-bin/show_pathway?hsa04144 , EGFR  FGFR3  FGFR2
+0.124158628,2,126,3.783234127,Path:hsa04110 Cell cycle,http://www.genome.jp/kegg-bin/show_pathway?hsa04110 , CREBBP  WEE1
+0.126733619,2,128,3.724121094,Path:hsa00230 Purine metabolism,http://www.genome.jp/kegg-bin/show_pathway?hsa00230 , PDE4A  PDE4B
+0.129358099,1,26,9.167067308,Path:hsa04950 Maturity onset diabetes of the young,http://www.genome.jp/kegg-bin/show_pathway?hsa04950 , GCK
+0.133288712,1,27,8.827546296,Path:hsa01040 Biosynthesis of unsaturated fatty acids,http://www.genome.jp/kegg-bin/show_pathway?hsa01040 , SCD
+0.146353493,1,30,7.944791667,Path:hsa01523 Antifolate resistance,http://www.genome.jp/kegg-bin/show_pathway?hsa01523 , IKBKB
+0.150066514,1,31,7.688508065,Path:hsa00052 Galactose metabolism,http://www.genome.jp/kegg-bin/show_pathway?hsa00052 , GCK
+0.153718792,1,32,7.448242188,Path:hsa04215 Apoptosis-multiple species,http://www.genome.jp/kegg-bin/show_pathway?hsa04215 , MAPK8
+0.157311428,1,33,7.222537879,Path:hsa00051 Fructose and mannose metabolism,http://www.genome.jp/kegg-bin/show_pathway?hsa00051 , PFKFB3
+0.160845498,1,34,7.010110294,Path:hsa04710 Circadian rhythm,http://www.genome.jp/kegg-bin/show_pathway?hsa04710 , RORC
+0.165686258,2,155,3.075403226,Path:hsa04934 Cushing syndrome,http://www.genome.jp/kegg-bin/show_pathway?hsa04934 , EGFR  BRAF
+0.167742121,1,36,6.620659722,Path:hsa00500 Starch and sucrose metabolism,http://www.genome.jp/kegg-bin/show_pathway?hsa00500 , GCK
+0.169246852,1,37,6.441722973,Path:hsa01250 Biosynthesis of nucleotide sugars,http://www.genome.jp/kegg-bin/show_pathway?hsa01250 , GCK
+0.169246852,1,37,6.441722973,Path:hsa05143 African trypanosomiasis,http://www.genome.jp/kegg-bin/show_pathway?hsa05143 , IDO1
+0.169246852,1,37,6.441722973,Path:hsa05216 Thyroid cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05216 , BRAF
+0.176712948,1,39,6.111378205,Path:hsa00513 Various types of N-glycan biosynthesis,http://www.genome.jp/kegg-bin/show_pathway?hsa00513 , MGAT2
+0.188137146,1,42,5.67485119,Path:hsa00380 Tryptophan metabolism,http://www.genome.jp/kegg-bin/show_pathway?hsa00380 , IDO1

@@ -1,0 +1,15 @@
+
+PIP
+chembl-webresource-client
+pandas
+Json
+ast
+requests
+re
+nltk
+beautifulsoup4
+concurrent
+torch
+tqdm 
+random
+numpy 
