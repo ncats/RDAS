@@ -1,0 +1,34 @@
+.DS_Store
+.env*
+**/.pytest_cache
+**/__pycache__
+**/bkp
+*.log
+*.sh
+*.json
+*.sql
+*.cypher
+**/data
+mtu
+test
+tools
+movies
+*/screenshots
+ZTA-pipeline
+setup.txt
+spacy-readme.txt
+token.txt
+orcid.txt
+rdas-graph.png
+__init__.py
+
+# Jupyter
+.ipynb_checkpoints/
+.virtual_documents/
+
+# Checkpoint CSVs
+*-checkpoint.csv
+
+# Moon intermediate files
+F_person/riea/Moon_*.csv
+#!F_person/riea/Moon_final.csv
