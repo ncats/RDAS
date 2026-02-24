@@ -44,10 +44,11 @@ class InitBase:
         self.table_name = table_name
         self.formatted_today = datetime.today().strftime("%Y-%m-%d") # Format as YYYY-MM-DD
 
+        '''
         class_name = type(self).__name__
         self.log_file = f'{self.log_dir}/0-{class_name}-{_date_string()}.log'
         self.appender = FileAppender(self.log_file)
-        
+        '''
 
     @abstractmethod
     def init_nodes(self):
