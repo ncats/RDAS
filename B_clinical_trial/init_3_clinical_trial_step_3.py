@@ -40,9 +40,7 @@ class InterventionDrugInitializer:
 
     def __init__(self):
 
-        self._conn = db().memgraph_conn()
         self.mysql = db().mysql_conn()
-        print('\n Init...\n')
 
 
     def do_init(self, start_id, end_id):

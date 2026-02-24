@@ -17,10 +17,6 @@ logger = AppLogger().get_logger()
 #MySQL
 """ 
 # Step 1: Fetch and Store Clinical-Trials into  MySQL database
-# (Step 2: See init_clinical_trial_step_2.py)
-#
-# conda activate rds
-# python clinical_trial/init_1_clinical_trial_step_1.py  
 #
 """
 
