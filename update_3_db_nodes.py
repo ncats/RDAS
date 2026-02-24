@@ -13,21 +13,33 @@ init()
 from utils.tools import ask_to_continue
 
 # updaters
-from E_integrate.updater.organization_location_1_finder import OrganizationLocationFinder
-from E_integrate.updater.organization_location_2_updater import OrganizationLocationUpdater
- 
+
+# - Article
+from G_update.updater.article_is_gene_review_updater import ArticleIsGeneReviewUpdater
+from G_update.updater.article_EPI_NHS_updater_multithread import EPIAndNHSUpdater
+
+# - Organization & Location
+from G_update.updater.organization_location_step_1_finder_multiple import OrganizationLocationFinder
+from G_update.updater.organization_location_step_2_updater import OrganizationLocationUpdater
+
 
 def run_updaters(stage):
 
     updaters = [
-        OrganizationLocationFinder,
-        OrganizationLocationUpdater
 
+        # GARDRelationshipsStatisticsUpdater
+
+        # ArticleIsGeneReviewUpdater,
+        # EPIAndNHSUpdater
+
+        OrganizationLocationFinder,
+        OrganizationLocationUpdater,
+       
     ]
 
     for updater in updaters:
 
-        print(f'\n\n{Fore.BLUE}{"*"*50} {updater.__name__} {"*"*50}{Style.RESET_ALL}\n\n')
+        print(f'\n\n{Fore.BLUE}{"*"*50} Stage: {stage}, Updater: {updater.__name__} {"*"*50}{Style.RESET_ALL}\n\n')
 
         updater().update()
 
@@ -36,6 +48,7 @@ def run_updaters(stage):
 if __name__ == '__main__':
 
     stage = os.getenv('STAGE')
+
     print(f'\n\n{Fore.RED}{"*"*50} Stage: {stage} {"*"*50}{Style.RESET_ALL}\n\n')
     
     prompts = [
