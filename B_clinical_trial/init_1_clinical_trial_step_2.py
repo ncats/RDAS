@@ -10,31 +10,24 @@ logger = AppLogger().get_logger()
 
 #MySQL
 """ 
-# Step 1.2: Create and Store UNIQUE Clinical Trial into  clinical_trial_unique table
+# Create and Store UNIQUE Clinical Trial into  clinical_trial_unique table
 
 CREATE TABLE clinical_trial_unique (
-id INT AUTO_INCREMENT PRIMARY KEY,
-nctid VARCHAR(255) NOT NULL,
-studies MEDIUMTEXT NULL
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nctid VARCHAR(255) NOT NULL,
+    studies MEDIUMTEXT NULL
 );
-
-# (Step 2: See init_clinical_trial_step_2.py)
-#
-# conda activate rds
-# python clinical_trial/init_1dot5_clinical_trial_step_1.py  
+ 
 #
 """
 
 class ClinicalTrialInitializer:
 
-    def __init__(self):
- 
+    def __init__(self): 
         self.mysqldb = db().mysql_conn() 
         
 
-
     def do_init(self):
-
         #1. 
         query = 'SELECT DISTINCT CONCAT(\'\\\'\', nctid, \'\\\'\') AS nct_id FROM clinical_trial WHERE nctid is not null ORDER BY nctid'
 
