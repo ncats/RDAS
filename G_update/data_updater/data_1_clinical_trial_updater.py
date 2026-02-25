@@ -163,6 +163,8 @@ class ClinicalTrialDataUpdater(InitBase):
             gardId (str): GARD identifier
             names (list): List of disease names and synonyms
         """
+        count = 0
+
         # 5.
         for name in names:
             # Escape quotes in disease name
@@ -213,6 +215,7 @@ class ClinicalTrialDataUpdater(InitBase):
                             
                             # 6. save
                             self._save_new(gardId, name, nctid, initial_query)
+                            count += 1
                             
                         # Check for pagination
                         if 'nextPageToken' not in response_txt:
@@ -222,10 +225,14 @@ class ClinicalTrialDataUpdater(InitBase):
                
             except Exception as e:
                 self.appender.log_stdout(f"\tError processing - {name}: {Fore.RED}{e}{Style.RESET_ALL}")
+
+        return count
  
 
     def do_clinical_trial_update(self, gard_nodes_generator):
         
+        total = 0
+
         # 4
         for node in gard_nodes_generator:
             
@@ -243,14 +250,19 @@ class ClinicalTrialDataUpdater(InitBase):
             self.appender.log_stdout(f'Processing GARD ID: {gid}')
 
             # 5. Generate the nctId list by the names
-            self._save_new_clinical_trail_to_database(gid, names)
+            count =self._save_new_clinical_trail_to_database(gid, names)
+            total += count
   
             # commit
             self.mysql.commit()
+
+        return total
             
 
     # Overwrite
     def update(self):
+
+        total = 0
 
         # 1. Count how many nodes of GARD in Memgraph database
         # 1.1 The execute_and_fetch method returns a generator
@@ -276,7 +288,10 @@ class ClinicalTrialDataUpdater(InitBase):
             gard_nodes_generator = self.memgraph.execute_and_fetch(query)
 
             # 4
-            self.do_clinical_trial_update(gard_nodes_generator)
+            count = self.do_clinical_trial_update(gard_nodes_generator)
+            total += count
+
+        self.appender.log_stdout(f'\n{"*"*27} Total new clinical trials: {Fore.GREEN}{total}{Style.RESET_ALL} inserted to the database {"*"*27} ')
 
 
     def __enter__(self):
@@ -296,7 +311,7 @@ class ClinicalTrialDataUpdater(InitBase):
 if __name__ == '__main__':
 
     ok = ask_to_continue('Update clinical trial data from ClinicalTrials.gov API for GARD disease nodes?')
-    
+
     if not ok:
         sys.exit(f'{Fore.RED}------Stopped------{Style.RESET_ALL}')
  
