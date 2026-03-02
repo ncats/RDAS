@@ -15,6 +15,7 @@ tools
 movies
 */screenshots
 ZTA-pipeline
+**/tables.txt
 setup.txt
 spacy-readme.txt
 token.txt
