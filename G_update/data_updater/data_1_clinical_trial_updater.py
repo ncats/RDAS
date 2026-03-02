@@ -124,8 +124,8 @@ class ClinicalTrialDataUpdater(InitBase):
     def _save_new(self, gardId, name, nctid, initial_query): 
 
         # 6.
-        insert_into_clinical_trial_unique_table = f"INSERT INTO {self.table_name} (nctid, studies, is_new) values (%s, %s, %s) " 
-        insert_into_clinical_trial_table = "INSERT INTO clinical_trial (gardId, disease, nctid, studies, url, is_new) VALUES (%s, %s, %s, %s, %s, %s)"
+        insert_into_clinical_trial_unique_table = f"INSERT INTO {self.table_name} (nctid, brief_title, brief_summary, studies, is_new) values (%s, %s, %s, %s, %s) " 
+        insert_into_clinical_trial_table = "INSERT INTO clinical_trial (gardId, disease, nctid,  brief_title, brief_summary, studies, url, is_new) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
 
         studies_json = self._fetch_clinical_trial_details(nctid)
 
@@ -137,8 +137,13 @@ class ClinicalTrialDataUpdater(InitBase):
 
                     studies = json.dumps(studies_json)
 
-                    val1 = (nctid, studies, 1)
-                    val2 = (gardId, name, nctid, studies, initial_query, 1)
+                    protocol_section = studies.get('protocolSection', {})
+                    brief_title = protocol_section.get('identificationModule', {}).get('briefTitle', 'N/A')
+                    brief_summary = protocol_section.get('descriptionModule', {}).get('briefSummary', 'N/A')
+                    
+
+                    val1 = (nctid, brief_title, brief_summary, studies, 1)
+                    val2 = (gardId, name, nctid, brief_title, brief_summary, studies, initial_query, 1)
                     
                     cursor.execute(insert_into_clinical_trial_unique_table, val1)
                     cursor.execute(insert_into_clinical_trial_table, val2)
