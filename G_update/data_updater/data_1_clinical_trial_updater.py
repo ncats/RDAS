@@ -84,7 +84,7 @@ class ClinicalTrialDataUpdater(InitBase):
                 response = requests.get(f'https://clinicaltrials.gov/api/v2/studies/{nctid}', timeout=self.timeout)
                 response.raise_for_status()  # Raise an exception for HTTP errors (4xx and 5xx)
 
-                # Parse JSON response
+                # Return a Python dictionary parsed from the API response
                 return response.json()
 
             except requests.exceptions.Timeout:
@@ -127,23 +127,24 @@ class ClinicalTrialDataUpdater(InitBase):
         insert_into_clinical_trial_unique_table = f"INSERT INTO {self.table_name} (nctid, brief_title, brief_summary, studies, is_new) values (%s, %s, %s, %s, %s) " 
         insert_into_clinical_trial_table = "INSERT INTO clinical_trial (gardId, disease, nctid,  brief_title, brief_summary, studies, url, is_new) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
 
-        studies_json = self._fetch_clinical_trial_details(nctid)
+        # studyObj is a Python dictionary
+        studyObj = self._fetch_clinical_trial_details(nctid)
 
         # 6.1
-        if studies_json is not None:
+        if studyObj is not None:
             try:
                 # The 'with' statement ensures the cursor is always closed automatically
                 with self.mysql.cursor() as cursor:
 
-                    studies = json.dumps(studies_json)
+                    studies_str = json.dumps(studyObj) 
 
-                    protocol_section = studies.get('protocolSection', {})
+                    protocol_section = studyObj.get('protocolSection', {})
                     brief_title = protocol_section.get('identificationModule', {}).get('briefTitle', 'N/A')
                     brief_summary = protocol_section.get('descriptionModule', {}).get('briefSummary', 'N/A')
                     
 
-                    val1 = (nctid, brief_title, brief_summary, studies, 1)
-                    val2 = (gardId, name, nctid, brief_title, brief_summary, studies, initial_query, 1)
+                    val1 = (nctid, brief_title, brief_summary, studies_str, 1)
+                    val2 = (gardId, name, nctid, brief_title, brief_summary, studies_str, initial_query, 1)
                     
                     cursor.execute(insert_into_clinical_trial_unique_table, val1)
                     cursor.execute(insert_into_clinical_trial_table, val2)
