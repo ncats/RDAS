@@ -31,7 +31,7 @@ init()
 import re
 import hashlib
 import unicodedata
-
+from typing import Any
 
 def read_csv(file_path):
 
@@ -589,3 +589,28 @@ def _remove_parentheses(text):
     
     # Remove any trailing whitespace
     return result.strip()
+ 
+
+
+
+def _escape_sql_literal(value: Any) -> str:
+    """
+    Minimal ANSI SQL literal serializer.
+
+    WARNING:
+        - For string literals only.
+        - NOT safe for identifiers.
+        - Prefer parameterized queries.
+    """
+    if value is None:
+        return "NULL"
+
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+
+    if isinstance(value, (int, float)):
+        return str(value)
+
+    # Treat everything else as string
+    s = str(value).replace("'", "''")
+    return f"'{s}'"
