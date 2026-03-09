@@ -591,8 +591,6 @@ def _remove_parentheses(text):
     return result.strip()
  
 
-
-
 def _escape_sql_literal(value: Any) -> str:
     """
     Minimal ANSI SQL literal serializer.
