@@ -56,6 +56,23 @@ def read_csv_as_dict(file_path):
 
         return [row for row in reader]
     
+    
+def write_json_to_file(data: Any, file_path: str) -> None:
+    """
+    Serialize a Python object to a JSON file.
+
+    Args:
+        data: JSON-serializable Python object (dict, list, etc.)
+        file_path: Destination file path
+    """
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(
+            data,
+            f,
+            ensure_ascii=False,  # preserve Unicode characters
+            indent=2             # readable formatting
+        )
+
 
 def insert_params_to_template(template, params):
 
