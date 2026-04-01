@@ -8,6 +8,7 @@ datasets==3.1.0
 fastapi==0.109.0
 filelock==3.13.1
 firebase-admin==6.1.0
+Jinja2==3.1.6
 fuzzywuzzy==0.18.0
 gqlalchemy==1.8.0
 jmespath==1.0.1
