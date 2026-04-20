@@ -193,7 +193,7 @@ class ClinicalTrialInitializer:
         gardsyns_eng = [syn for syn in syns if _is_english(syn)]
         gardsyns_char_threshold = [syn for syn in syns if _is_under_char_threshold(syn)]
 
-        filtered_syns = [x for x in syns if not x in gardsyns_eng]
+        filtered_syns = [x for x in syns if x in gardsyns_eng]
         filtered_syns = [x for x in filtered_syns if not x in gardsyns_char_threshold]
 
         ''' ??? Is this logic correct ??? '''
@@ -205,7 +205,6 @@ class ClinicalTrialInitializer:
         self._generate_GARD_ID_and_nctId(gid, names, db)
 
         
-
 
     def do_init(self):
 
