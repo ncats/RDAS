@@ -5,7 +5,6 @@ from pathlib import Path
 import firebase_admin
 from firebase_admin import auth, credentials, firestore
 
-
 BASE_DIR = Path(__file__).resolve().parent
 SERVICE_ACCOUNT_PATH = BASE_DIR / "firebase_service_Sccount_key.json"
 DEFAULT_COLLECTION = "users"
@@ -17,7 +16,7 @@ class FirebaseAgent:
     def __init__(self, service_account_path: Path = SERVICE_ACCOUNT_PATH):
 
         self.service_account_path = service_account_path
-        self.db = self._create_firestore_client()
+        self.firestore_client = self._create_firestore_client()
 
 
     def _create_firestore_client(self):
@@ -37,6 +36,7 @@ class FirebaseAgent:
     def get_firebase_auth_users(self):
 
         users = []
+        # The 'auth' is initialized by firebase_admin.initialize_app(...)
         page = auth.list_users()
 
         while page:
@@ -57,7 +57,7 @@ class FirebaseAgent:
 
     def get_firestore_users_collection(self, collection_name: str = DEFAULT_COLLECTION, limit: int = DEFAULT_LIMIT):
 
-        query = self.db.collection(collection_name)
+        query = self.firestore_client.collection(collection_name)
 
         if limit is not None:
             query = query.limit(limit)
