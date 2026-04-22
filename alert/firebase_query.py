@@ -21,6 +21,7 @@ class FirebaseAgent:
 
 
     def _create_firestore_client(self):
+
         if not self.service_account_path.exists():
             raise FileNotFoundError(
                 f"Missing service account file: {self.service_account_path}"
@@ -33,7 +34,8 @@ class FirebaseAgent:
         return firestore.client()
 
 
-    def get_all_auth_users(self):
+    def get_firebase_auth_users(self):
+
         users = []
         page = auth.list_users()
 
@@ -53,7 +55,7 @@ class FirebaseAgent:
         return users
  
 
-    def get_users_collection(self, collection_name: str = DEFAULT_COLLECTION, limit: int = DEFAULT_LIMIT):
+    def get_firestore_users_collection(self, collection_name: str = DEFAULT_COLLECTION, limit: int = DEFAULT_LIMIT):
 
         query = self.db.collection(collection_name)
 
@@ -66,18 +68,14 @@ class FirebaseAgent:
 
     def _iter_firestore_user_subscriptions(self, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
 
-        firestore_users = self.get_users_collection(
+        firestore_users = self.get_firestore_users_collection(
             collection_name=collection_name,
             limit=limit,
         )
 
         for firestore_user in firestore_users:
             firestore_data = firestore_user.get("data") or {}
-            subscriptions = (
-                firestore_data.get("subscriptions")
-                or firestore_data.get("subscritions")
-                or []
-            )
+            subscriptions = firestore_data.get("subscriptions") or []
 
             for subscription in subscriptions:
                 if not isinstance(subscription, dict):
@@ -85,23 +83,19 @@ class FirebaseAgent:
                 yield firestore_user, firestore_data, subscription
 
 
-    def get_firebase_auth_users_by_disease_name(self, disease_name: str, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
+    def get_firebase_auth_users_by_firestore_disease_name(self, disease_name: str, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
 
-        firestore_users = self.get_users_collection(
+        firestore_users = self.get_firestore_users_collection(
             collection_name=collection_name,
             limit=limit,
         )
-        auth_users = self.get_all_auth_users()
+        auth_users = self.get_firebase_auth_users()
         auth_users_by_uid = {user["uid"]: user for user in auth_users}
         matched_users = []
 
         for firestore_user in firestore_users:
             firestore_data = firestore_user.get("data") or {}
-            subscriptions = (
-                firestore_data.get("subscriptions")
-                or firestore_data.get("subscritions")
-                or []
-            )
+            subscriptions = firestore_data.get("subscriptions") or []
 
             disease_names = {
                 subscription.get("diseaseName")
@@ -127,9 +121,9 @@ class FirebaseAgent:
         return matched_users
 
 
-    def get_firebase_auth_users_by_gard_id(self, gard_id: str, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
+    def get_firebase_auth_users_by_firestore_gard_id(self, gard_id: str, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
 
-        auth_users = self.get_all_auth_users()
+        auth_users = self.get_firebase_auth_users()
         auth_users_by_uid = {user["uid"]: user for user in auth_users}
         matched_users = []
         matched_uids = set()
@@ -160,9 +154,53 @@ class FirebaseAgent:
         return matched_users
 
 
-    def get_all_registered_disease_names(self, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
+    def get_firebase_authed_users_with_firestore_gard_ids_list(self, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
 
-        firestore_users = self.get_users_collection(
+        auth_users = self.get_firebase_auth_users()
+        auth_users_by_uid = {
+            user["uid"]: user
+            for user in auth_users
+            if not user.get("disabled") and user.get("email_verified")
+        }
+
+        matched_users = []
+
+        firestore_users = self.get_firestore_users_collection(collection_name=collection_name, limit=limit,)
+
+        for firestore_user in firestore_users:
+
+            firestore_data = firestore_user.get("data") or {}
+            uid = firestore_data.get("uid") or firestore_user.get("id")
+            auth_user = auth_users_by_uid.get(uid)
+
+            if not auth_user:
+                continue
+
+            subscriptions = firestore_data.get("subscriptions") or []
+
+            gard_id_list = []
+            for subscription in subscriptions:
+                if not isinstance(subscription, dict):
+                    continue
+
+                gard_id = subscription.get("gardID")
+                if gard_id and gard_id not in gard_id_list:
+                    gard_id_list.append(gard_id)
+
+            matched_users.append(
+                {
+                    "display_name": auth_user.get("display_name"),
+                    "email": auth_user.get("email"),
+                    "gard_id_list": gard_id_list,
+                }
+            )
+
+        return matched_users
+
+
+    def get_firestore_registered_disease_names(self, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
+
+        firestore_users = self.get_firestore_users_collection(
             collection_name=collection_name,
             limit=limit,
         )
@@ -170,11 +208,7 @@ class FirebaseAgent:
 
         for firestore_user in firestore_users:
             firestore_data = firestore_user.get("data") or {}
-            subscriptions = (
-                firestore_data.get("subscriptions")
-                or firestore_data.get("subscritions")
-                or []
-            )
+            subscriptions = firestore_data.get("subscriptions") or []
 
             for subscription in subscriptions:
                 if not isinstance(subscription, dict):
@@ -187,7 +221,7 @@ class FirebaseAgent:
         return sorted(disease_names)
 
 
-    def get_all_registered_disease_names_with_counts(self, collection_name: str = DEFAULT_COLLECTION):
+    def get_firestore_registered_disease_names_with_counts(self, collection_name: str = DEFAULT_COLLECTION):
 
         disease_counter = Counter()
 
@@ -209,14 +243,18 @@ if __name__ == "__main__":
     #main()
     agent = FirebaseAgent()
     
-    #matched_users = agent.get_firebase_auth_users_by_disease_name('Chronic myeloid leukemia')
-    #print(json.dumps(matched_users, indent=2, ensure_ascii=False))
+    matched_users = agent.get_firebase_auth_users_by_firestore_disease_name('Chronic myeloid leukemia')
+    print(json.dumps(matched_users, indent=2, ensure_ascii=False))
 
-    #disease_names = agent.get_all_registered_disease_names()
-    #print(json.dumps(disease_names, indent=2))
+    disease_names = agent.get_firestore_registered_disease_names()
+    print(json.dumps(disease_names, indent=2))
 
-    #rows = agent.get_all_registered_disease_names_with_counts()
-    #print(json.dumps(rows, indent=2))   
+    rows = agent.get_firestore_registered_disease_names_with_counts()
+    print(json.dumps(rows, indent=2))   
 
-    users = agent.get_firebase_auth_users_by_gard_id('GARD:0017890')
+    users = agent.get_firebase_auth_users_by_firestore_gard_id('GARD:0017890')
     print(json.dumps(users, indent=2, ensure_ascii=False))
+
+    sers = agent.get_firebase_authed_users_with_firestore_gard_ids_list()
+    print(json.dumps(sers, indent=2, ensure_ascii=False))
+    
