@@ -34,7 +34,7 @@ class ArticleInitializer(InitBase):
         self.log_file = f'{self.log_dir}/3-{class_name}-{_date_string()}.log'
         self.appender = FileAppender(self.log_file)
         
-        self.create_indexes('Article', ['pubmedId'])
+        self.create_indexes('Article', ['pubmedId', 'publicationYear'])
 
      # Override the abstract method
     def init_nodes(self):   

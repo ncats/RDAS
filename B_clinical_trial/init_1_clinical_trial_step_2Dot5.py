@@ -33,26 +33,31 @@ class ClinicalTrialDataInitializer:
 
         count = 0
         batch_num = 0
-    
+        last_id = 0
         
         try:
-            cursor = self.mysql.cursor(dictionary=True, buffered=True)            
-            
             # Fetch results in batches
             while True:
 
                 chunks = []
+                cursor = self.mysql.cursor(dictionary=True, buffered=True)         
 
-                query = f'SELECT nctid, studies FROM clinical_trial_unique where brief_title IS NULL LIMIT {batch_num * batch_size}, {batch_size}'
+                query = f'''SELECT id, nctid, studies 
+                    FROM clinical_trial_unique 
+                    WHERE brief_title IS NULL AND id > {last_id} 
+                    ORDER BY id 
+                    LIMIT {batch_size}
+                '''
+    
                 cursor.execute(query)
-
-                print(f'\n{Fore.BLUE}====== batch# = {batch_num} ======{Style.RESET_ALL}')
-                batch_num += 1
-
                 rows = cursor.fetchall()
                 if not rows:
-                    print(f'{Fore.BLUE}\n\n\n====== done ====== {Style.RESET_ALL}')
                     break
+                
+                last_id = rows[-1]['id'] 
+            
+                print(f'\n{Fore.BLUE}====== batch# = {batch_num} ======{Style.RESET_ALL}')
+                batch_num += 1
 
                 for row in rows:
                     nctid = row['nctid']
@@ -74,6 +79,8 @@ class ClinicalTrialDataInitializer:
                         
                         chunks.append(('N/A', 'N/A', nctid))
                         continue
+                
+                cursor.close()  # free memory immediately
                 
                 if len(chunks) > 0:
                     self._save(chunks)
@@ -102,10 +109,14 @@ class ClinicalTrialDataInitializer:
 
         try:
             cursor = self.mysql.cursor()
+            cursor2 = self.mysql.cursor()
             cursor.executemany(insert_1_sql, chunks)
             self.mysql.commit() 
-            cursor.executemany(insert_2_sql, chunks)
+            cursor2.executemany(insert_2_sql, chunks)
             self.mysql.commit() 
+
+            cursor.close()
+            cursor2.close()
             
         except Exception as e:
             print(e)

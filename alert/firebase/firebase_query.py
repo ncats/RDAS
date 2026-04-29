@@ -16,21 +16,50 @@ class FirebaseAgent:
     def __init__(self, service_account_path: Path = SERVICE_ACCOUNT_PATH):
 
         self.service_account_path = service_account_path
+        self.firebase_app = None
+        self._owns_firebase_app = False
         self.firestore_client = self._create_firestore_client()
 
 
     def _create_firestore_client(self):
 
-        if not self.service_account_path.exists():
-            raise FileNotFoundError(
-                f"Missing service account file: {self.service_account_path}"
-            )
+        try:
+            self.firebase_app = firebase_admin.get_app()
+        except ValueError:
+            if not self.service_account_path.exists():
+                raise FileNotFoundError(
+                    f"Missing service account file: {self.service_account_path}"
+                )
 
-        if not firebase_admin._apps:
             cred = credentials.Certificate(str(self.service_account_path))
-            firebase_admin.initialize_app(cred)
+            self.firebase_app = firebase_admin.initialize_app(cred)
+            self._owns_firebase_app = True
 
-        return firestore.client()
+        return firestore.client(app=self.firebase_app)
+
+
+    def close(self):
+
+        if self.firestore_client is None:
+            return
+
+        try:
+            close_client = getattr(self.firestore_client, "close", None)
+            if callable(close_client):
+                close_client()
+            else:
+                firestore_api = getattr(self.firestore_client, "_firestore_api", None)
+                transport = getattr(firestore_api, "transport", None)
+                close_transport = getattr(transport, "close", None)
+                if callable(close_transport):
+                    close_transport()
+        finally:
+            self.firestore_client = None
+
+            if self._owns_firebase_app and self.firebase_app is not None:
+                firebase_admin.delete_app(self.firebase_app)
+                self.firebase_app = None
+                self._owns_firebase_app = False
 
 
     def get_firebase_auth_users(self):
@@ -179,19 +208,27 @@ class FirebaseAgent:
             subscriptions = firestore_data.get("subscriptions") or []
 
             gard_id_list = []
+            subscription_map = {}
             for subscription in subscriptions:
+                
                 if not isinstance(subscription, dict):
                     continue
 
                 gard_id = subscription.get("gardID")
+                disease_name = subscription.get("diseaseName")
+
                 if gard_id and gard_id not in gard_id_list:
                     gard_id_list.append(gard_id)
+
+                if gard_id and disease_name:
+                    subscription_map[gard_id] = disease_name
 
             matched_users.append(
                 {
                     "display_name": auth_user.get("display_name"),
                     "email": auth_user.get("email"),
                     "gard_id_list": gard_id_list,
+                    "subscriptions": subscription_map,
                 }
             )
 

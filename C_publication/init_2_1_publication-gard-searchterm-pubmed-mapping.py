@@ -33,86 +33,97 @@ if not ok:
 
 
 mysql = db().mysql_conn()
-mycursor = mysql.cursor()
+select_cursor = mysql.cursor(buffered=True)
+insert_cursor = mysql.cursor()
 
-SEPARATOR = '$$$'
-query = f"select gard_id, search_term, pubmed_ids, id from rdas_db.{publication_gard_pubmed} where year_range !='ignore'"
+batch_size = 100
+query = f'''
+    SELECT
+        gard_id,
+        search_term,
+        GROUP_CONCAT(pubmed_ids SEPARATOR ',') AS pubmed_ids 
+    FROM rdas_db.{publication_gard_pubmed}
+    WHERE year_range != 'ignore'
+    GROUP BY gard_id, search_term
+    ORDER BY gard_id, search_term
+'''
 
-mycursor.execute(query)
-rows = mycursor.fetchall()
-
-# Initialize the collections before the loop 
-bigGardPubmedIdDict = {}    # To store GARD ID to PubMed ID sets mapping
-
-for row in rows:
-
-    gard_id = row[0]
-    search_term = row[1]
-    ids_str = row[2]
-
-    if ids_str and len(ids_str.strip())>0:
-  
-        key = gard_id+ SEPARATOR +search_term
-        pubmed_ids = ids_str.split(',')  # Split the comma-separated string
-        
-        # Initialize dictionary entry if it doesn't exist
-        if key not in bigGardPubmedIdDict:
-            bigGardPubmedIdDict[key] = set()
-        
-        bigGardPubmedIdDict[key].update(pubmed_ids)
-
- 
- 
 # 2. Inert unique gard_id & pubmed_id mapping into table {publication_gard_searchterm_pubmed_mapping}
-sorted_items = sorted(bigGardPubmedIdDict.items())
- 
-for key, pubmed_id_set in sorted_items:
+insert_sql = f'''
+    INSERT INTO {publication_gard_searchterm_pubmed_mapping}
+        (gard_id, search_term, pubmed_id)
+    VALUES (%s, %s, %s)
+'''
 
-    val_sorted = sorted(pubmed_id_set)
+select_cursor.execute(query)
 
-    temp = key.split(SEPARATOR)
-    gard_id = temp[0]
-    search_term = temp[1]
+total_groups = 0
+total_inserted = 0
 
-    print(f'{gard_id} - {len(val_sorted)}')
+while True:
 
-    val_list = [(gard_id, search_term, pubmedid) for pubmedid in val_sorted]  # List comprehension for pairs
-    
-    # SQL query with placeholders
-    insert_sql = f"INSERT INTO {publication_gard_searchterm_pubmed_mapping} (gard_id, search_term, pubmed_id) VALUES (%s, %s, %s)"
-    
-    # Use executemany for batch insert
-    mycursor.executemany(insert_sql, val_list)
+    rows = select_cursor.fetchmany(batch_size)
+    if not rows:
+        break
 
-    # Commit the transaction
+    for row in rows:
+
+        gard_id = row[0]
+        search_term = row[1]
+        ids_str = row[2]
+
+        if not ids_str or not ids_str.strip():
+            continue
+
+        pubmed_ids = sorted({
+            pubmed_id.strip()
+            for pubmed_id in ids_str.split(',')
+            if pubmed_id.strip()
+        })
+
+        val_list = [(gard_id, search_term, pubmed_id) for pubmed_id in pubmed_ids]
+        if not val_list:
+            continue
+
+        insert_cursor.executemany(insert_sql, val_list)
+
+        total_groups += 1
+        total_inserted += len(val_list)
+        print(f'{gard_id} - {len(val_list)}')
+
     mysql.commit()
 
+print(f'\nInserted {total_inserted} rows from {total_groups} grouped gard/search_term rows.\n')
 
+''' 
 print(f'\n**********Process done, create indexes **********\n') 
 
 
 # create indexes
 idx_gard_id = f'CREATE INDEX idx_gard_id ON {publication_gard_searchterm_pubmed_mapping} (gard_id)'
-mycursor.execute(idx_gard_id)
+insert_cursor.execute(idx_gard_id)
 print(idx_gard_id)
 
 idx_pubmed_id = f'CREATE INDEX idx_pubmed_id ON {publication_gard_searchterm_pubmed_mapping} (pubmed_id)'
-mycursor.execute(idx_pubmed_id)
+insert_cursor.execute(idx_pubmed_id)
 print(idx_pubmed_id)
   
 idx_gard_id_searchterm = f'CREATE INDEX idx_gardid_searchterm ON {publication_gard_searchterm_pubmed_mapping} (gard_id, search_term)'
-mycursor.execute(idx_gard_id_searchterm)
+insert_cursor.execute(idx_gard_id_searchterm)
 print(idx_gard_id_searchterm)
  
 idx_gard_id_searchterm_pubmed = f'CREATE INDEX idx_gardid_searchterm_pubmed on  {publication_gard_searchterm_pubmed_mapping} (gard_id, search_term, pubmed_id)'
-mycursor.execute(idx_gard_id_searchterm_pubmed)
+insert_cursor.execute(idx_gard_id_searchterm_pubmed)
 print(idx_gard_id_searchterm_pubmed)
-
+'''
 # commit create indexes
 mysql.commit()
 
-if mycursor:
-    mycursor.close()
+if select_cursor:
+    select_cursor.close()
+
+if insert_cursor:
+    insert_cursor.close()
 
 if mysql:
     mysql.close()

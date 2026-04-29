@@ -43,6 +43,7 @@ from C_publication.initializer.journal import JournalInitializer
 from C_publication.initializer.keyword import KeywordInitializer
 from C_publication.initializer.article_attrs import ArticleExtraAttributesInitializer 
 from C_publication.initializer.substance import SubstanceInitializer
+from C_publication.initializer.x_epi_nhs_count import EpiAndNhsCountsInitializer
 
 from D_grant.initializer.project import ProjectInitializer 
 from D_grant.initializer.gard_project_relation import GardProjectReleationInitializer
@@ -107,6 +108,7 @@ if __name__ == '__main__':
         GARDToArticleRelationshipInitializer,
         PubtatorInitializer,     
         SubstanceInitializer,
+        EpiAndNhsCountsInitializer,
         
         # Do this first: 3_publication/initializer/omim_article.py before doing the OMIMRefInitializer
         OMIMRefInitializer,
@@ -124,15 +126,26 @@ if __name__ == '__main__':
     ]
  
 
+    # testing
     base_initializers = [  
-        OrganizationLocationInitializer 
+        EpiAndNhsCountsInitializer
     ]
 
+    for index, InitializerClass in enumerate(base_initializers):
+         
+         initializer = InitializerClass()
+
+         initializer.init_nodes()
+
+
+
+    # production
+    ''' 
     # Execute all initializers
     for index, InitializerClass in enumerate(base_initializers):
         
         initializer = InitializerClass()
-
+ 
         processed_flag = initializer.get_current_processed_flag()
 
         print(f'\n------ {Fore.GREEN}Current processed_flag: {processed_flag}{Style.RESET_ALL} ------\n')
@@ -145,10 +158,10 @@ if __name__ == '__main__':
                 continue
             
         initializer.processed_flag = str(index)+ f"_{stage}_"+ "".join(initializer.label_name.split())  
-
+        
         initializer.init_nodes()
 
-        
+    '''
  
     decoration = "".join("=**" for i in range(15)) + '='
     print(Fore.BLUE + f'\n{decoration} All Done {decoration}'+ Style.RESET_ALL+'\n')

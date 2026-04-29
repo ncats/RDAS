@@ -3,8 +3,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 
-BASE_DIR = Path(__file__).resolve().parent
-TEMPLATE_DIR = BASE_DIR / "templates"
+TEMPLATE_DIR = Path(__file__).resolve().parent
 DEFAULT_TEMPLATE_NAME = "alert_email_template.html"
 
 

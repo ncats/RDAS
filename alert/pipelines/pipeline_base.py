@@ -1,0 +1,68 @@
+# Add the project root to the Python path
+import os
+import sys
+from abc import ABC, abstractmethod
+from datetime import datetime
+
+_dir = os.path.dirname(__file__)
+sys.path.extend([
+    os.path.abspath(os.path.join(_dir, "../..")),
+    os.path.abspath(os.path.join(_dir, "../../..")),
+])
+
+from utils.file_appender import FileAppender
+from utils.conn import DBConnection as db
+from utils.tools import _date_string
+
+class PipelineBase(ABC):
+
+    def __init__(self, table_name='data', init_mysql=True, init_memgraph=False):
+        
+        self.log_dir = "logs"
+        self.mysql = None
+        self.memgraph = None
+
+        os.makedirs(self.log_dir, exist_ok=True)
+        class_name = type(self).__name__
+        self.log_file = f"{self.log_dir}/alert-{class_name}-{_date_string()}.log"
+        self.appender = FileAppender(self.log_file)
+        
+        if init_mysql:
+            self.mysql = db().mysql_conn() 
+
+        if init_memgraph:
+            self.memgraph = db().memgraph_conn() 
+
+        self.formatted_today = datetime.today().strftime("%Y-%m-%d")
+
+        self.appender.log_stdout(f'The {class_name} is initialized.')
+
+        
+
+
+    @abstractmethod
+    def find_new_data(self, gard_node)-> None:
+        pass
+
+    @abstractmethod
+    def process_new_data(self)-> None:
+        pass
+
+    
+    def close(self) -> None:
+
+        if self.mysql is not None and self.mysql.is_connected():
+            print(f"Closing MySQL connection...")
+            self.mysql.close()
+
+        self.mysql = None
+        self.memgraph = None
+
+        print('MySQL connection closed')
+        print('Memgraph connection closed')
+
+        if hasattr(self, "appender") and self.appender is not None:
+            self.appender.close()
+            self.appender = None
+
+            print('File Appender closed')

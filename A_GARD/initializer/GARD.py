@@ -32,7 +32,9 @@ class GARDInitializer(InitBase):
                 d.gardName = chunk.gardName,
                 d.classificationLevel = chunk.classificationLevel,
                 d.disorderType = chunk.disorderType,
-                d.synonyms = chunk.synonyms
+                d.synonyms = chunk.synonyms,
+                d.countEpiArticles = 0,
+                d.countNhsArticles = 0
             ON MATCH SET
                 d.gardName = chunk.gardName,
                 d.classificationLevel = chunk.classificationLevel,

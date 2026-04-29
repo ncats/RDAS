@@ -16,12 +16,17 @@ from utils.tools import ask_to_continue
 
 # - Clinical Trial
 from G_update.data_updater.data_1_clinical_trial_updater import ClinicalTrialDataUpdater
+from G_update.data_updater.data_2_clinical_trial_invervention_drug_updater import InterventionDrugDataUpdater
+from G_update.data_updater.data_3_clinical_trial_pmid_updater import ClinicalTrialPubchemIdDataUpdater
+
  
 
 def run_updaters(stage):
 
     updaters = [
-        ClinicalTrialDataUpdater       
+        #ClinicalTrialDataUpdater       
+        #InterventionDrugDataUpdater
+        ClinicalTrialPubchemIdDataUpdater
     ]
 
     for updater in updaters:

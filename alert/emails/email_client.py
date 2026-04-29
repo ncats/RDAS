@@ -3,10 +3,9 @@ import smtplib
 from email.message import EmailMessage
 from pathlib import Path
 
-from email_template_engine import EmailTemplateEngine
+from .email_template_engine import EmailTemplateEngine
 
-BASE_DIR = Path(__file__).resolve().parent
-CONFIG_PATH = BASE_DIR / "email_config.json"
+CONFIG_PATH = Path(__file__).resolve().with_name("email_config.json")
 
 class EmailClient:
 
@@ -130,6 +129,7 @@ if __name__ == "__main__":
                 "update_date_end": "2026-03-31"
             }
         },
+         
         mail_to='tongan.zhao@nih.gov',
         mail_cc='zhaotongan@gmail.com',
     )
