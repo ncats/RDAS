@@ -23,16 +23,19 @@ class AlertSender(PipelineBase):
         self.subject="RDAS Alert"
         self.LOOK_BACK_DAYS = look_back_days
 
+
     # Not implemented
     def process_new_data(self) -> None:
         raise NotImplementedError("AlertSender does not implement process_new_data().")
    
+
     # Not implemented   
     def find_new_data(self, gard_node) -> None:
         raise NotImplementedError("AlertSender does not implement find_new_data().")
  
+
     '''
-    Find new clinical trail & publication
+    Find new clinical trail & publication and send alert to users which suscribe to them.
     '''
     def find_new_and_send_alert(self):
  
