@@ -20,6 +20,15 @@ load_dotenv()
 from pipelines.pipeline_base import PipelineBase
 from utils.publication_worker import PublicationWorker
 
+"""
+    Find and store newly published PubMed articles for updated GARD diseases.
+
+    For each GARD node, this pipeline searches PubMed with the node's filtered
+    disease names between the node's last update date and today. It downloads
+    article metadata for PMIDs that are not already in publication_article,
+    stores those article rows in update_publication_article, and records the
+    GARD/search-term/PMID relationship in publication_gard_searchterm_pubmed_mapping.
+    """
 class PublicationPipeline_1(PipelineBase):
 
 
@@ -140,6 +149,12 @@ class PublicationPipeline_1(PipelineBase):
 
         insert_new_article_sql = self.publication_worker.get_insert_sql("update_publication_article")
 
+        insert_gard_searchterm_pubmed_mapping_sql = '''
+            INSERT INTO publication_gard_searchterm_pubmed_mapping (gard_id, search_term, pubmed_id)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE gard_id = VALUES(gard_id), search_term = VALUES(search_term), pubmed_id = VALUES(pubmed_id)
+        '''
+        
         try:
             # 1.
               
@@ -182,13 +197,7 @@ class PublicationPipeline_1(PipelineBase):
                 self.mysql.commit()
                 self.appender.log_stdout(f"1. update_publication_article :: gard_id: {gard_id}\tsearch_term: {search_term}\tpubmed_id: {pubmed_id}")
 
-                # 7. save the gard_id, search_term and pubmed_id
-                insert_gard_searchterm_pubmed_mapping_sql = f'''
-                    INSERT INTO publication_gard_searchterm_pubmed_mapping (gard_id, search_term, pubmed_id)
-                    VALUES (%s, %s, %s)
-                    ON DUPLICATE KEY UPDATE gard_id = VALUES(gard_id), search_term = VALUES(search_term), pubmed_id = VALUES(pubmed_id)
-                '''
-
+                # 7. save the gard_id, search_term and pubmed_id               
                 insert_gard_searchterm_pubmed_mapping_cursor.execute(insert_gard_searchterm_pubmed_mapping_sql, (gard_id, search_term, pubmed_id))
 
                 self.appender.log_stdout(f"2. publication_gard_searchterm_pubmed_mapping ::  gard_id: {gard_id}\tsearch_term: {search_term}\tpubmed_id: {pubmed_id}")
