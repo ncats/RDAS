@@ -13,6 +13,17 @@ sys.path.extend([
 
 from pipelines.pipeline_base import PipelineBase
 
+"""
+Find and stage newly updated clinical trials for GARD diseases.
+
+For each updated GARD node, this pipeline searches ClinicalTrials.gov with the
+node's filtered disease names and last update date. It fetches each matching
+study by NCT ID, then stores only trials that are not already present in
+clinical_trial or update_clinical_trial into update_clinical_trial for later
+pipeline steps.
+"""
+# Reference: B_clinical_trial/init_1_clinical_trial_step_1.py
+
 class ClinicalTrialPipeline_1(PipelineBase):
 
     def __init__(self):
@@ -29,6 +40,7 @@ class ClinicalTrialPipeline_1(PipelineBase):
 
     def find_new_data(self, gard_node) -> None:
 
+        # Search ClinicalTrials.gov using each filtered disease name for this GARD node.
         gid = gard_node['gardId']
         names = gard_node['filtered_names']
         last_update_date = gard_node.get("updated")
@@ -53,8 +65,12 @@ class ClinicalTrialPipeline_1(PipelineBase):
 
             #print(f'Get nctid for: {name}')
 
+            # Search for studies whose condition, detailed description, or brief summary
+            # match this disease name and whose last update is newer than the GARD update.
             initial_query = f'https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Term]{name} OR AREA[DetailedDescription]EXPANSION[Term]{name} OR AREA[BriefSummary]EXPANSION[Term]{name}) AND AREA[LastUpdatePostDate]RANGE[{last_update_date},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
             
+            # Stage each new NCT ID only if it is absent from both the historical
+            # clinical_trial table and the current update_clinical_trial staging table.
             insert_sql = """
                 INSERT INTO update_clinical_trial (gardId, disease, nctid, studies, url)
                 SELECT %s, %s, %s, %s, %s
@@ -94,7 +110,7 @@ class ClinicalTrialPipeline_1(PipelineBase):
 
                             nctid = trial['protocolSection']['identificationModule']['nctId']
                            
-                            # Initialize retry counter
+                            # Fetch the full ClinicalTrials.gov study JSON for the NCT ID.
                             retries = 0
                             response_txt = None
                             max_retries=10
@@ -164,6 +180,7 @@ class ClinicalTrialPipeline_1(PipelineBase):
             if pageToken: 
                 query += f'&pageToken={pageToken}'
             
+            # Return a page of matching NCT IDs from the ClinicalTrials.gov search API.
             #url_logger.info(query)
             response = requests.get(query)
             response_txt = response.json()

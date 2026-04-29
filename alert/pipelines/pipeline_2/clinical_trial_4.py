@@ -13,6 +13,7 @@ from utils.tools import _clean
 """ 
 Save new Clinical-Trial {nctid - pubmed_id} pairs into clinical_trial_nctid_pmids_mapping table if not exist
 """
+# Reference: B_clinical_trial/init_5_clinical_trial_retrieve_pmids_umlti.py
 
 class ClinicalTrialPipeline_4(PipelineBase):
 

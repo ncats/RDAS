@@ -22,6 +22,7 @@ CREATE TABLE clinical_trial_unique (
 );
 #
 """
+# Reference: B_clinical_trial/init_1_clinical_trial_step_2.py
 
 class ClinicalTrialPipeline_2(PipelineBase):
 

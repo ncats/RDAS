@@ -24,6 +24,7 @@ from utils.tools import _clean
 """ 
 Store Clinical-Trial Intervertion-Drug properties into clinical_trail_intervention_drug table
 """
+# Reference: B_clinical_trial/init_3_clinical_trial_step_3.py
 
 class ClinicalTrialPipeline_3(PipelineBase):
 
