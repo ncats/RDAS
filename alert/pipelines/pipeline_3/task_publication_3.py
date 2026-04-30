@@ -28,6 +28,7 @@ class PublicationTask_3(PipelineBase):
         raise NotImplementedError("PublicationTask_3 does not implement find_new_data().")
    
 
+    # implement
     def process_new_data(self) -> None:
         
         fetch_query = 'SELECT GardID, group_concat(Label_Xref) AS xrefs FROM gard GROUP BY gardid ORDER BY GardID'

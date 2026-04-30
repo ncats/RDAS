@@ -197,7 +197,7 @@ class PublicationTask_2(PipelineBase):
     # implement
     def process_new_data(self) -> None:
         
-        fetch_epi_is_null_query = f'SELECT id, pubmed_id, title, abstract_text FROM update_publication_article WHERE is_new = 1'
+        fetch_is_new_query = f'SELECT id, pubmed_id, title, abstract_text FROM update_publication_article WHERE is_new = 1'
 
         update_sql = " UPDATE update_publication_article SET is_EPI = %s, is_NHS = %s, epi_probability =%s, epi_extract = %s WHERE pubmed_id = %s "
 
@@ -205,7 +205,7 @@ class PublicationTask_2(PipelineBase):
         update_cursor = self.mysql.cursor()    
 
         fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
-        fetch_cursor.execute(fetch_epi_is_null_query)
+        fetch_cursor.execute(fetch_is_new_query)
 
         batch_num = 0
         batch_size = 15
@@ -236,8 +236,7 @@ class PublicationTask_2(PipelineBase):
                     except Exception as e:
                         self.appender.log_stdout(f"Error processing batch#{batch_num}: {e}")
                         continue
-
-                    '''
+ 
                     try:
                         update_cursor.executemany(update_sql, val_list)
                         self.mysql.commit()
@@ -245,7 +244,8 @@ class PublicationTask_2(PipelineBase):
                     except Exception as e:
                         self.appender.log_stdout(f"Error during update: {e}")
                         self.mysql.rollback()
-                    '''
+                        continue
+                        
         except Exception as e:
             self.appender.log_stdout(f"An unexpected error occurred: {e}")
 

@@ -28,6 +28,7 @@ class PublicationTask_4(PipelineBase):
 
     # Not implemented
     def find_new_data(self) -> None:
+        
         raise NotImplementedError("PublicationTask_4 does not implement find_new_data().")
    
 
@@ -93,12 +94,12 @@ class PublicationTask_4(PipelineBase):
                     omim_id = row['omim_id'] 
     
                     url = f'https://api.omim.org/api/entry?mimNumber={omim_id}&include=all&format=json&apiKey={self.api_key}'
-                    #https://api.omim.org/api/entry?mimNumber=611126&include=all&format=json&apiKey=TV0j9GgAT3K4T8nyzOCQJw
+                    ''' https://api.omim.org/api/entry?mimNumber=611126&include=all&format=json&apiKey=TV0j9GgAT3K4T8nyzOCQJw '''
 
                     entry_json = self.get_omim(url)
 
                     # Error: Failed executing the operation; Python type dict cannot be converted
-                    # Solution: json.dumps(entry_json)
+                    ''' Solution: json.dumps(entry_json) '''
                     val = (omim_id, json.dumps(entry_json))
                     val_list.append(val)
                 
@@ -121,6 +122,5 @@ class PublicationTask_4(PipelineBase):
             if insert_cursor:
                 insert_cursor.close()
 
-
-            # Explicitly close the all the db connections
+            ''' Explicitly close the all the db connections '''
             self.close()
