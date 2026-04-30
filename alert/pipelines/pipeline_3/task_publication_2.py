@@ -191,7 +191,7 @@ class PublicationTask_2(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        self.appender.log_stdout("PublicationTask_2 does not implement find_new_data().")
+        self.logger.info("PublicationTask_2 does not implement find_new_data().")
 
 
     # implement
@@ -217,10 +217,10 @@ class PublicationTask_2(PipelineBase):
                     rows = fetch_cursor.fetchmany(batch_size)
 
                     batch_num += 1
-                    self.appender.log_stdout(f'\n--- batch# = {batch_num} ---')
+                    self.logger.info(f'\n--- batch# = {batch_num} ---')
 
                     if not rows:
-                        self.appender.log_stdout(f"No more rows to fetch.")
+                        self.logger.info(f"No more rows to fetch.")
                         break
  
                     obj_list = [{
@@ -234,7 +234,7 @@ class PublicationTask_2(PipelineBase):
                         val_list = active_pool.map(process_publication_article, obj_list)
                         print(val_list)
                     except Exception as e:
-                        self.appender.log_stdout(f"Error processing batch#{batch_num}: {e}")
+                        self.logger.error(f"Error processing batch#{batch_num}: {e}")
                         continue
  
                     try:
@@ -242,12 +242,12 @@ class PublicationTask_2(PipelineBase):
                         self.mysql.commit()
 
                     except Exception as e:
-                        self.appender.log_stdout(f"Error during update: {e}")
+                        self.logger.error(f"Error during update: {e}")
                         self.mysql.rollback()
                         continue
                         
         except Exception as e:
-            self.appender.log_stdout(f"An unexpected error occurred: {e}")
+            self.logger.error(f"An unexpected error occurred: {e}")
 
         finally:
             if fetch_cursor:

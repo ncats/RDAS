@@ -72,7 +72,7 @@ class GARDTask_1(PipelineBase):
             cursor.close()
 
             if not rows:
-                self.appender.log_stdout(f"{datetime.now().strftime('%Y-%m-%d')}: No more rows to fetch.")
+                self.logger.info(f"{datetime.now().strftime('%Y-%m-%d')}: No more rows to fetch.")
                 break
 
             batch = []
@@ -91,10 +91,10 @@ class GARDTask_1(PipelineBase):
                 })
 
             # log
-            self.appender.log_stdout(f'\n---Fetched # of GARD IDs: {total} ---\n')
+            self.logger.info(f'\n---Fetched # of GARD IDs: {total} ---\n')
             
             for item in batch:
-                self.appender.append_to_file(f"{item}")
+                self.logger.info(f"{item}")
 
             ''' Update the 'updated' column in rdas_db.gard table with value CURDATE() '''
             self._set_updated_flag(gard_id_set)

@@ -62,7 +62,7 @@ class PublicationTask_1(PipelineBase):
             pubmed_ids = self.retrieve_pubmed_ids(gard_id, name, last_update_date, today)
 
             if not pubmed_ids:
-                self.appender.log_stdout(f"No pubmed_ids found for gard_id={gard_id}, search_term={name}")
+                self.logger.info(f"No pubmed_ids found for gard_id={gard_id}, search_term={name}")
                 continue
             
             self.find_new_publications(gard_id, name, pubmed_ids)
@@ -92,7 +92,7 @@ class PublicationTask_1(PipelineBase):
                 response = requests.get(url)
 
                 if response.status_code >= 400:
-                    self.appender.log_stdout(f"PubMed request failed: status={response.status_code}, url={url}")
+                    self.logger.error(f"PubMed request failed: status={response.status_code}, url={url}")
                     break
 
                 try:
@@ -108,12 +108,12 @@ class PublicationTask_1(PipelineBase):
                     quotedphrasesnotfound = result['warninglist']['quotedphrasesnotfound'] 
  
                 except KeyError as e:
-                    self.appender.log_stdout(f"KeyError: {e} - The required key does not exist in the JSON structure.")
-                    self.appender.log_stdout(f'{url}')
-                    self.appender.log_stdout(f'\n{result}\n')  
+                    self.logger.error(f"KeyError: {e} - The required key does not exist in the JSON structure.")
+                    self.logger.error(f'{url}')
+                    self.logger.error(f'\n{result}\n')
                 except (TypeError, AttributeError):
-                    self.appender.log_stdout("The JSON structure is not as expected or 'response' might not be JSON.")
-                    self.appender.log_stdout(f'{url}')
+                    self.logger.error("The JSON structure is not as expected or 'response' might not be JSON.")
+                    self.logger.error(f'{url}')
                 
                 break  # Exit the loop if successful
             except requests.exceptions.Timeout:
@@ -196,23 +196,23 @@ class PublicationTask_1(PipelineBase):
                 article_val = self.publication_worker.download_by_pmid(pubmed_id)
 
                 if not article_val:
-                    self.appender.log_stdout(f"Unable to download pubmed_id={pubmed_id} for gard_id={gard_id}" )
+                    self.logger.error(f"Unable to download pubmed_id={pubmed_id} for gard_id={gard_id}" )
                     continue
                  
                 # 6. save the new article into update_publication_article table
                 insert_article_cursor.execute(insert_new_article_sql, article_val)
 
                 self.mysql.commit()
-                self.appender.log_stdout(f"1. update_publication_article :: gard_id: {gard_id}\tsearch_term: {search_term}\tpubmed_id: {pubmed_id}")
+                self.logger.info(f"1. update_publication_article :: gard_id: {gard_id}\tsearch_term: {search_term}\tpubmed_id: {pubmed_id}")
 
                 # 7. save the gard_id, search_term and pubmed_id               
                 insert_gard_searchterm_pubmed_mapping_cursor.execute(insert_gard_searchterm_pubmed_mapping_sql, (gard_id, search_term, pubmed_id))
 
-                self.appender.log_stdout(f"2. publication_gard_searchterm_pubmed_mapping ::  gard_id: {gard_id}\tsearch_term: {search_term}\tpubmed_id: {pubmed_id}")
+                self.logger.info(f"2. publication_gard_searchterm_pubmed_mapping ::  gard_id: {gard_id}\tsearch_term: {search_term}\tpubmed_id: {pubmed_id}")
                 self.mysql.commit()
  
         except Exception as e:
-            self.appender.log_stdout(e)    
+            self.logger.error(e)
             self.mysql.commit()
 
         finally:

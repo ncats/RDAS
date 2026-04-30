@@ -84,7 +84,7 @@ class ClinicalTrialTask_2(PipelineBase):
 
         cursor = self.mysql.cursor()
         cursor.execute(add_new_nctid_sql)
-        self.appender.log_stdout(f"\n{cursor.rowcount} rows form update_clinical_trial have been added into clinical_trial table.\n")
+        self.logger.info(f"\n{cursor.rowcount} rows form update_clinical_trial have been added into clinical_trial table.\n")
 
         self.mysql.commit()
 
@@ -118,7 +118,7 @@ class ClinicalTrialTask_2(PipelineBase):
         cursor = self.mysql.cursor()
         cursor.execute(add_new_nctid_sql)
 
-        self.appender.log_stdout(f"\n{cursor.rowcount} rows form update_clinical_trial have been added into clinical_trial_unique table.\n")
+        self.logger.info(f"\n{cursor.rowcount} rows form update_clinical_trial have been added into clinical_trial_unique table.\n")
 
         self.mysql.commit()
 
@@ -152,10 +152,10 @@ class ClinicalTrialTask_2(PipelineBase):
                 rows = fetch_cursor.fetchall()
 
                 if not rows:
-                    self.appender.log_stdout(f"No more rows to fetch.")
+                    self.logger.info(f"No more rows to fetch.")
                     break
 
-                self.appender.log_stdout(f'\n--- batch# = {batch_num} ---')
+                self.logger.info(f'\n--- batch# = {batch_num} ---')
                 batch_num += 1
 
                 for row in rows:
@@ -171,10 +171,10 @@ class ClinicalTrialTask_2(PipelineBase):
 
                         chunks.append((brief_title, brief_summary, nctid))
 
-                        self.appender.log_stdout(f'NCTID = {nctid}')
+                        self.logger.info(f'NCTID = {nctid}')
 
                     except json.JSONDecodeError as e:
-                        self.appender.log_stdout(f"Error parsing JSON for ID {nctid}:\n {e}")
+                        self.logger.error(f"Error parsing JSON for ID {nctid}:\n {e}")
 
                         chunks.append(('N/A', 'N/A', nctid))
                         continue
@@ -184,7 +184,7 @@ class ClinicalTrialTask_2(PipelineBase):
                     self._save(chunks)
 
         except Exception as err:
-            self.appender.log_stdout(f"Error: {err}")
+            self.logger.error(f"Error: {err}")
             return None
 
         finally:
@@ -216,8 +216,7 @@ class ClinicalTrialTask_2(PipelineBase):
             cursor2.close()
 
         except Exception as e:
-            self.appender.log_stdout(e)
+            self.logger.error(e)
             self.mysql.rollback()
-
 
 

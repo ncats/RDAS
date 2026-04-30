@@ -10,7 +10,7 @@ sys.path.extend([
     os.path.abspath(os.path.join(_dir, "../../..")),
 ])
 
-from utils.file_appender import FileAppender
+from utils.applogger import AppLogger
 from utils.conn import DBConnection as db
 from utils.tools import _date_string
 
@@ -24,8 +24,9 @@ class PipelineBase(ABC):
 
         os.makedirs(self.log_dir, exist_ok=True)
         class_name = type(self).__name__
-        self.log_file = f"{self.log_dir}/alert-{class_name}-{_date_string()}.log"
-        self.appender = FileAppender(self.log_file)
+        self.log_file = f"{self.log_dir}/alert-{class_name}.log"
+        #self.log_file = f"{self.log_dir}/alert-{class_name}-{_date_string()}.log"
+        self.logger = AppLogger(class_name, self.log_file).get_logger()
         
         if init_mysql:
             self.mysql = db().mysql_conn() 
@@ -35,7 +36,7 @@ class PipelineBase(ABC):
 
         self.formatted_today = datetime.today().strftime("%Y-%m-%d")
 
-        self.appender.log_stdout(f'The {class_name} is initialized.')
+        self.logger.info(f'The {class_name} is initialized.')
 
         
 
@@ -61,8 +62,11 @@ class PipelineBase(ABC):
         print('MySQL connection closed')
         print('Memgraph connection closed')
 
-        if hasattr(self, "appender") and self.appender is not None:
-            self.appender.close()
-            self.appender = None
+        if hasattr(self, "logger") and self.logger is not None:
+            for handler in list(self.logger.handlers):
+                handler.flush()
+                handler.close()
+                self.logger.removeHandler(handler)
 
-            print('File Appender closed')
+            self.logger = None
+            print('Logger closed')

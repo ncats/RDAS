@@ -119,7 +119,7 @@ class AlertSender(PipelineBase):
 
                 subscription_count = len(active_subscriptions)
                 if subscription_count == 0:
-                    self.appender.log_stdout(f'* No new subscriptions found for user: {user} - {datetime.now()}')
+                    self.logger.info(f'* No new subscriptions found for user: {user} - {datetime.now()}')
                     continue
     
                 payload["data"]["datasets"] = sorted(datasets)
@@ -135,8 +135,8 @@ class AlertSender(PipelineBase):
                     mail_cc = None,
                 )
         
-                self.appender.log_stdout(f'\nSent alert to user: {user} - {datetime.now()}')
-                self.appender.log_stdout(json.dumps(payload, indent=2, ensure_ascii=False))
+                self.logger.info(f'\nSent alert to user: {user} - {datetime.now()}')
+                self.logger.info(json.dumps(payload, indent=2, ensure_ascii=False))
 
         finally:
             # Explicitly close the db connections

@@ -154,7 +154,7 @@ class ClinicalTrialTask_1(PipelineBase):
                                     if mycursor.rowcount == 1:
                                         #print(initial_query)
 
-                                        self.appender.log_stdout(f"New nctid added: {nctid} for: {gardId}")
+                                        self.logger.info(f"New nctid added: {nctid} for: {gardId}")
                                         self.mysql.commit()
 
                                 except mysql.connector.Error as error:

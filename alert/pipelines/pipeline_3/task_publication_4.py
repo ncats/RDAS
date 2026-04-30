@@ -81,11 +81,11 @@ class PublicationTask_4(PipelineBase):
                 rows = fetch_cursor.fetchmany(batch_size)
 
                 if not rows:
-                    self.appender.log_stdout(f"No more rows to fetch.\nNo difference of omim_id between table publication_gard_omim_mapping and publication_omim.\n")
+                    self.logger.info(f"No more rows to fetch.\nNo difference of omim_id between table publication_gard_omim_mapping and publication_omim.\n")
                     break
  
                 batch_num += 1
-                self.appender.log_stdout(f'\n--- batch# = {batch_num} ---')
+                self.logger.info(f'\n--- batch# = {batch_num} ---')
 
                 val_list = []
 
@@ -107,13 +107,13 @@ class PublicationTask_4(PipelineBase):
                     try:  
                         insert_cursor.executemany(insert_sql, val_list)
                         self.mysql.commit() 
-                        self.appender.log_stdout(f'Batch#: {batch_num} - {len(val_list)} rows have been inserted into publication_omim table') 
+                        self.logger.info(f'Batch#: {batch_num} - {len(val_list)} rows have been inserted into publication_omim table')
                     
                     except Exception as e:
-                        self.appender.log_stdout(f'insert_sql error: \n{e}') 
+                        self.logger.error(f'insert_sql error: \n{e}')
                 
         except Exception as e:
-            self.appender.log_stdout(f"An unexpected error occurred: {e}")
+            self.logger.error(f"An unexpected error occurred: {e}")
 
         finally:
             if fetch_cursor:

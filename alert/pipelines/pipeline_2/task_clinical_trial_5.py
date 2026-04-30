@@ -66,16 +66,16 @@ class ClinicalTrialTask_5(PipelineBase):
                 rows = fetch_cursor.fetchmany(batch_size)
 
                 if not rows:
-                    self.appender.log_stdout(f"No more rows to fetch.")
+                    self.logger.info(f"No more rows to fetch.")
                     break
 
                 batch_num += 1
-                self.appender.log_stdout(f'\n--- batch# = {batch_num} ---')
+                self.logger.info(f'\n--- batch# = {batch_num} ---')
 
                 pubmed_ids = [row['pmid'] for row in rows]
 
                 count += len(pubmed_ids)
-                self.appender.log_stdout(f'Total count = {count}')
+                self.logger.info(f'Total count = {count}')
 
                 for pubmed_id in pubmed_ids:
 
@@ -83,17 +83,17 @@ class ClinicalTrialTask_5(PipelineBase):
                     article_val = self.publication_worker.download_by_pmid(pubmed_id)
 
                     if not article_val:
-                        self.appender.log_stdout(f"Unable to download Article of pubmed_id = {pubmed_id}" )
+                        self.logger.error(f"Unable to download Article of pubmed_id = {pubmed_id}" )
                         continue
 
                     ''' save the new article into update_publication_article table '''
                     insert_article_cursor.execute(insert_new_article_sql, article_val)
 
                     self.mysql.commit()
-                    self.appender.log_stdout(f"Insert into update_publication_article :: pubmed_id: {pubmed_id}")
+                    self.logger.info(f"Insert into update_publication_article :: pubmed_id: {pubmed_id}")
 
         except Exception as err:
-            self.appender.log_stdout(f"Error: {err}")
+            self.logger.error(f"Error: {err}")
 
         finally:
             if fetch_cursor:
@@ -101,4 +101,3 @@ class ClinicalTrialTask_5(PipelineBase):
 
             # Explicitly close the all the db connections
             self.close()
-

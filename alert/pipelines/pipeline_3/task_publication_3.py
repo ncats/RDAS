@@ -63,10 +63,10 @@ class PublicationTask_3(PipelineBase):
                 rows = fetch_cursor.fetchmany(batch_size)
 
                 batch_num += 1
-                self.appender.log_stdout(f'\n--- batch# = {batch_num} ---')
+                self.logger.info(f'\n--- batch# = {batch_num} ---')
 
                 if not rows:
-                    self.appender.log_stdout(f"No more rows to fetch.")
+                    self.logger.info(f"No more rows to fetch.")
                     break
 
 
@@ -97,15 +97,15 @@ class PublicationTask_3(PipelineBase):
                     #log
                     rowcount = insert_cursor.rowcount
                     count += rowcount
-                    self.appender.log_stdout(f"{rowcount} [gard_id - omim_id] pairs have been added into publication_gard_omim_mapping table.")
+                    self.logger.info(f"{rowcount} [gard_id - omim_id] pairs have been added into publication_gard_omim_mapping table.")
 
             if count > 0:
-                self.appender.log_stdout(f"{count} [gard_id - omim_id] pairs have been added into publication_gard_omim_mapping table.")
+                self.logger.info(f"{count} [gard_id - omim_id] pairs have been added into publication_gard_omim_mapping table.")
             else:
-                self.appender.log_stdout('No changes in GARD table for Label_Xref field.\nSo, no [gard_id - omim_id] pairs have been added into publication_gard_omim_mapping table')
+                self.logger.info('No changes in GARD table for Label_Xref field.\nSo, no [gard_id - omim_id] pairs have been added into publication_gard_omim_mapping table')
 
         except Exception as e:
-            self.appender.log_stdout(f"An unexpected error occurred: {e}")
+            self.logger.error(f"An unexpected error occurred: {e}")
 
         finally:
             if fetch_cursor:

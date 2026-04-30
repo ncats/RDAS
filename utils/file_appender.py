@@ -1,6 +1,6 @@
 
 import os
-
+import time
 
 class FileAppender:
 
@@ -20,7 +20,7 @@ class FileAppender:
 
     def append_to_file(self, text):
         ''' Write text with a newline using the stored file object. '''
-        self.file.write(text + '\n')
+        self.file.write(f'{time.strftime("%Y-%m-%d %H:%M:%S")}: {text}\n')
         ''' Call self.file.flush() here if immediate disk writes are needed. '''
 
 

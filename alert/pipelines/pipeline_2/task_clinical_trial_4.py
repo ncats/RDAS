@@ -50,7 +50,7 @@ class ClinicalTrialTask_4(PipelineBase):
             insert_cursor.executemany(insert_sql, chunks)
             self.mysql.commit()
 
-            self.appender.log_stdout(f"{insert_cursor.rowcount} [nctid - pubmed_id] pairs have been added into clinical_trial_nctid_pmids_mapping table.\n")
+            self.logger.info(f"{insert_cursor.rowcount} [nctid - pubmed_id] pairs have been added into clinical_trial_nctid_pmids_mapping table.\n")
 
         insert_cursor.close()
 
@@ -83,10 +83,10 @@ class ClinicalTrialTask_4(PipelineBase):
             rows = cursor.fetchmany(batch_size)
 
             if not rows:
-                self.appender.log_stdout(f"No more rows to fetch.")
+                self.logger.info(f"No more rows to fetch.")
                 break
 
-            self.appender.log_stdout(f'\n--- batch# = {batch_num} ---')
+            self.logger.info(f'\n--- batch# = {batch_num} ---')
 
             ''' processe rows in batches '''
             chunks = []

@@ -3,18 +3,14 @@ from logging.handlers import RotatingFileHandler
 
 class AppLogger:
 
-    def __init__(self):
+    def __init__(self, name='rdas-logger', log_file='rdas.log', level=logging.INFO, max_bytes=1024*1024*10, backup_count=10):
          
-        self.logger = self.create_logger(name='rdas-logger', log_file='log-rdas.log', level=logging.INFO)
+        self.logger = self.create_logger(name, log_file, level)
 
 
     # This is the default logger for the app, returns the logger instance.
     def get_logger(self): 
         return self.logger
-
-
-    def get_another_logger(self, name='url-logger', log_file='log-url.log',level=logging.INFO):        
-        return self.create_logger(name, log_file)
 
 
     def create_logger(self, name, log_file, level=logging.INFO, max_bytes=1024*1024*10, backup_count=10):

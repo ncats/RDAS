@@ -59,10 +59,10 @@ class ClinicalTrialTask_3(PipelineBase):
                 rows = fetch_cursor.fetchmany(batch_size)
 
                 if not rows:
-                    self.appender.log_stdout(f"No more rows to fetch.")
+                    self.logger.info(f"No more rows to fetch.")
                     break
 
-                self.appender.log_stdout(f'\n--- batch# = {batch_num} ---')
+                self.logger.info(f'\n--- batch# = {batch_num} ---')
 
                 for row in rows:
                     gardid = row['gardid']
@@ -71,7 +71,7 @@ class ClinicalTrialTask_3(PipelineBase):
                     study = json.loads(row['studies'])
                     id = row['id']
 
-                    self.appender.log_stdout(f"# Id: {id}, Gard_ID: {gardid}, NCTID: {nctid}, Disease: {disease}")
+                    self.logger.info(f"# Id: {id}, Gard_ID: {gardid}, NCTID: {nctid}, Disease: {disease}")
 
                     intervention_module = study.get('protocolSection', dict()).get('armsInterventionsModule', dict())
                     interventions = intervention_module.get('interventions', list())
@@ -91,7 +91,7 @@ class ClinicalTrialTask_3(PipelineBase):
             fetch_cursor.close()
 
         except Exception as err:
-            self.appender.log_stdout(f"Error: {err}")
+            self.logger.error(f"Error: {err}")
 
         finally:
             # close all connections
@@ -140,7 +140,7 @@ class ClinicalTrialTask_3(PipelineBase):
                     add_to_db(rxdata, intervention, drug, wspacy=1)
 
                 else:
-                    self.appender.log_stdout(f'\t\tMap to RxNorm failed for intervention name:{intervention}, drug name: {drug}')
+                    self.logger.error(f'\t\tMap to RxNorm failed for intervention name:{intervention}, drug name: {drug}')
 
 
         def drug_normalize(drug_name):
@@ -162,7 +162,7 @@ class ClinicalTrialTask_3(PipelineBase):
         rxdata = self.get_rxnorm_data(the_drug)
 
         if rxdata:
-            self.appender.log_stdout(f'\t\tSave to database :: Drug: {the_drug}, rxdata.RxNormID = {rxdata["RxNormID"]}')
+            self.logger.info(f'\t\tSave to database :: Drug: {the_drug}, rxdata.RxNormID = {rxdata["RxNormID"]}')
             ''' Create connections in the database using RxNorm data '''
             add_to_db(rxdata, intervention_name, drug, 0)
 
@@ -194,7 +194,7 @@ class ClinicalTrialTask_3(PipelineBase):
                     response = requests.get(rq)
 
                     if response.status_code >= 400:
-                        self.appender.log_stdout(f"RxNav request failed: status={response.status_code}, url={rq}")
+                        self.logger.error(f"RxNav request failed: status={response.status_code}, url={rq}")
                         break
 
                     ''' Extract RxNormID from the response '''
