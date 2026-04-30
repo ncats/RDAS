@@ -90,7 +90,11 @@ class PublicationTask_1(PipelineBase):
         while retries < max_retries:
             try:                
                 response = requests.get(url)
-                response.raise_for_status()  # Raise an exception for HTTP errors (4xx and 5xx)                                
+
+                if response.status_code >= 400:
+                    self.appender.log_stdout(f"PubMed request failed: status={response.status_code}, url={url}")
+                    break
+
                 try:
                     obj = response.json()
                     result = obj['esearchresult']

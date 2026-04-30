@@ -94,7 +94,6 @@ class ClinicalTrialTask_5(PipelineBase):
 
         except Exception as err:
             self.appender.log_stdout(f"Error: {err}")
-            raise
 
         finally:
             if fetch_cursor:
@@ -102,5 +101,4 @@ class ClinicalTrialTask_5(PipelineBase):
 
             # Explicitly close the all the db connections
             self.close()
-
 

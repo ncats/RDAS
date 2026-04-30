@@ -217,8 +217,7 @@ class ClinicalTrialTask_2(PipelineBase):
 
         except Exception as e:
             self.appender.log_stdout(e)
-            raise
-
+            self.mysql.rollback()
 
 
 

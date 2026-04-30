@@ -118,7 +118,10 @@ class ClinicalTrialTask_1(PipelineBase):
                             while retries < max_retries:
                                 try:
                                     response = requests.get(f'https://clinicaltrials.gov/api/v2/studies/{nctid}', timeout=10)
-                                    response.raise_for_status()  # Raise an exception for HTTP errors (4xx and 5xx)
+
+                                    if response.status_code >= 400:
+                                        print(f"Request failed for {nctid}: status={response.status_code}")
+                                        break
 
                                     # Parse JSON response
                                     response_txt = response.json()

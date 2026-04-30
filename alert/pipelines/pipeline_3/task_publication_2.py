@@ -191,7 +191,7 @@ class PublicationTask_2(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("PublicationTask_2 does not implement find_new_data().")
+        self.appender.log_stdout("PublicationTask_2 does not implement find_new_data().")
 
 
     # implement
@@ -230,8 +230,13 @@ class PublicationTask_2(PipelineBase):
                         'pubmed_id': row['pubmed_id']
                     } for row in rows]
 
-                    val_list = active_pool.map(process_publication_article, obj_list)
-                    print(val_list)
+                    try:
+                        val_list = active_pool.map(process_publication_article, obj_list)
+                        print(val_list)
+                    except Exception as e:
+                        self.appender.log_stdout(f"Error processing batch#{batch_num}: {e}")
+                        continue
+
                     '''
                     try:
                         update_cursor.executemany(update_sql, val_list)
@@ -243,7 +248,6 @@ class PublicationTask_2(PipelineBase):
                     '''
         except Exception as e:
             self.appender.log_stdout(f"An unexpected error occurred: {e}")
-            raise
 
         finally:
             if fetch_cursor:

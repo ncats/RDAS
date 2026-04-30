@@ -81,101 +81,109 @@ class ClinicalTrialTask_6(PipelineBase):
         except OSError as e:
             self.appender.log_stdout(f"Error loading scispaCy models: {e}")
             self.appender.log_stdout("Please ensure all models are installed correctly using the pip commands provided in the comments.")
-            raise
+            return None, None, None, None
         except ValueError as e:
             self.appender.log_stdout(f"Pipeline configuration error: {e}")
             self.appender.log_stdout("This might be due to incorrect component names or order.")
-            raise
+            return None, None, None, None
 
 
     # implement
     def process_new_data(self) -> None:
-
-        ''' Step 1. Load the scispaCy NER models and UMLS linkers used for annotation. '''
-        nlp_bionlp, bionlp_linker, nlp_bc5cdr, bc5cdrlinker = self.load_models()
-
-        ''' Step 2. Cache each linker's semantic type tree for later UMLS type lookup. '''
-        bionlp_semantic_type_tree = bionlp_linker.kb.semantic_type_tree
-        bc5cdr_semantic_type_tree = bc5cdrlinker.kb.semantic_type_tree
-
-        ''' Step 3. Select newly added clinical trials that should be annotated. '''
-        query = '''
-            SELECT nctid, studies
-            FROM clinical_trial_unique
-            WHERE is_new = 1
-        '''
-
-        batch_num = 0
-        batch_size = 100
+        fetch_cursor = None
 
         try:
-            ''' Step 4. Stream matching trial rows in batches to avoid loading all studies at once. '''
-            fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
-            fetch_cursor.execute(query)
+            ''' Step 1. Load the scispaCy NER models and UMLS linkers used for annotation. '''
+            nlp_bionlp, bionlp_linker, nlp_bc5cdr, bc5cdrlinker = self.load_models()
 
-            while True:
-                rows = fetch_cursor.fetchmany(batch_size)
+            if not all([nlp_bionlp, bionlp_linker, nlp_bc5cdr, bc5cdrlinker]):
+                self.appender.log_stdout("Skipping clinical trial annotation generation because one or more scispaCy models failed to load.")
+            else:
+                ''' Step 2. Cache each linker's semantic type tree for later UMLS type lookup. '''
+                bionlp_semantic_type_tree = bionlp_linker.kb.semantic_type_tree
+                bc5cdr_semantic_type_tree = bc5cdrlinker.kb.semantic_type_tree
 
-                if not rows:
-                    self.appender.log_stdout(f"No more rows to fetch.")
-                    break
-
-                batch_num += 1
-                self.appender.log_stdout(f'\n--- batch# = {batch_num} ---')
-
-                nctid_list = []
-                description_list = []
-
-                ''' Step 5. Extract the NCT ID and trial description text from each study JSON. '''
-                for row in rows:
-                    nctid = row['nctid']
-                    studies = row['studies']
-
-                    if studies:
-                        obj = json.loads(studies)
-                        descriptionModule = obj.get('protocolSection', {}).get('descriptionModule')
-
-                        if descriptionModule:
-                            # This line handles the primary/fallback logic.
-                            # It tries to get 'detailedDescription', and if that's None (or not found), it falls back to 'briefSummary'.
-                            description = descriptionModule.get('detailedDescription') or descriptionModule.get('briefSummary')
-
-                            if description:
-                                nctid_list.append(nctid)
-                                description_list.append(description)
-
-                if len(nctid_list) <= 0:
-                    continue
-
-                ''' Step 6. Generate biomedical annotations with the BioNLP model. '''
-                processed_annotations_1 = self.process_description_text(nlp_bionlp, bionlp_linker, bionlp_semantic_type_tree, nctid_list, description_list)
-                self.appender.log_stdout(f'en_ner_bionlp13cg_md generated: {len(processed_annotations_1)} annotations')
-
-                ''' Step 7. Generate disease and chemical annotations with the BC5CDR model. '''
-                processed_annotations_2 = self.process_description_text(nlp_bc5cdr, bc5cdrlinker, bc5cdr_semantic_type_tree, nctid_list, description_list)
-                print(f'en_ner_bc5cdr_md generated: {len(processed_annotations_2)} annotations')
-
-                ''' Step 8. Merge annotations produced by both models. '''
-                processed_annotations = processed_annotations_1 + processed_annotations_2
-                self.appender.log_stdout(f'Total generated: {len(processed_annotations)} annotations')
-
+                ''' Step 3. Select newly added clinical trials that should be annotated. '''
+                query = '''
+                    SELECT nctid, studies
+                    FROM clinical_trial_unique
+                    WHERE is_new = 1
                 '''
-                Step 9. Remove duplicate NCT ID/concept ID pairs, keeping the
-                annotation with the highest linker score.
-                '''
-                processed_annotations = self.remove_duplicate_annotations(processed_annotations)
-                self.appender.log_stdout(f'After removing duplicates: {len(processed_annotations)} annotations')
 
-                ''' Step 10. Save the processed annotations to the database. '''
-                self.save_processed_annotations_to_db(processed_annotations)
+                batch_num = 0
+                batch_size = 100
 
-                for ann in processed_annotations:
-                    print(ann)
+                ''' Step 4. Stream matching trial rows in batches to avoid loading all studies at once. '''
+                fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
+                fetch_cursor.execute(query)
 
+                while True:
+                    rows = fetch_cursor.fetchmany(batch_size)
+
+                    if not rows:
+                        self.appender.log_stdout(f"No more rows to fetch.")
+                        break
+
+                    batch_num += 1
+                    self.appender.log_stdout(f'\n--- batch# = {batch_num} ---')
+
+                    try:
+                        nctid_list = []
+                        description_list = []
+
+                        ''' Step 5. Extract the NCT ID and trial description text from each study JSON. '''
+                        for row in rows:
+                            nctid = row['nctid']
+                            studies = row['studies']
+
+                            if studies:
+                                obj = json.loads(studies)
+                                descriptionModule = obj.get('protocolSection', {}).get('descriptionModule')
+
+                                if descriptionModule:
+                                    # This line handles the primary/fallback logic.
+                                    # It tries to get 'detailedDescription', and if that's None (or not found), it falls back to 'briefSummary'.
+                                    description = descriptionModule.get('detailedDescription') or descriptionModule.get('briefSummary')
+
+                                    if description:
+                                        nctid_list.append(nctid)
+                                        description_list.append(description)
+
+                        if len(nctid_list) <= 0:
+                            continue
+
+                        ''' Step 6. Generate biomedical annotations with the BioNLP model. '''
+                        processed_annotations_1 = self.process_description_text(nlp_bionlp, bionlp_linker, bionlp_semantic_type_tree, nctid_list, description_list)
+                        self.appender.log_stdout(f'en_ner_bionlp13cg_md generated: {len(processed_annotations_1)} annotations')
+
+                        ''' Step 7. Generate disease and chemical annotations with the BC5CDR model. '''
+                        processed_annotations_2 = self.process_description_text(nlp_bc5cdr, bc5cdrlinker, bc5cdr_semantic_type_tree, nctid_list, description_list)
+                        print(f'en_ner_bc5cdr_md generated: {len(processed_annotations_2)} annotations')
+
+                        ''' Step 8. Merge annotations produced by both models. '''
+                        processed_annotations = processed_annotations_1 + processed_annotations_2
+                        self.appender.log_stdout(f'Total generated: {len(processed_annotations)} annotations')
+
+                        '''
+                        Step 9. Remove duplicate NCT ID/concept ID pairs, keeping the
+                        annotation with the highest linker score.
+                        '''
+                        processed_annotations = self.remove_duplicate_annotations(processed_annotations)
+                        self.appender.log_stdout(f'After removing duplicates: {len(processed_annotations)} annotations')
+
+                        ''' Step 10. Save the processed annotations to the database. '''
+                        self.save_processed_annotations_to_db(processed_annotations)
+
+                        for ann in processed_annotations:
+                            print(ann)
+
+                    except Exception as err:
+                        self.appender.log_stdout(f"Error processing clinical trial annotation batch#{batch_num}: {err}")
+                        continue
 
         except Exception as err:
             self.appender.log_stdout(f"Error: {err}")
-            raise
+
         finally:
             ''' Step 10. Close the cursor and database connections after processing finishes. '''
             if fetch_cursor:
@@ -336,5 +344,3 @@ class ClinicalTrialTask_6(PipelineBase):
             return []
 
         return processed_annotations
-
-

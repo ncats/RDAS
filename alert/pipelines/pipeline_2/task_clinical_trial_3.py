@@ -92,7 +92,6 @@ class ClinicalTrialTask_3(PipelineBase):
 
         except Exception as err:
             self.appender.log_stdout(f"Error: {err}")
-            raise
 
         finally:
             # close all connections
@@ -193,7 +192,10 @@ class ClinicalTrialTask_3(PipelineBase):
                     ''' Form RxNav API request to get RxNormID based on drug name '''
                     rq = f'https://rxnav.nlm.nih.gov/REST/rxcui.json?name={drug_name}&search=2'
                     response = requests.get(rq)
-                    response.raise_for_status()  # Raise an exception for HTTP errors (4xx and 5xx)
+
+                    if response.status_code >= 400:
+                        self.appender.log_stdout(f"RxNav request failed: status={response.status_code}, url={rq}")
+                        break
 
                     ''' Extract RxNormID from the response '''
                     try:
