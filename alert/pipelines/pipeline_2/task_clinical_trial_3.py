@@ -20,13 +20,13 @@ matcher.add('DRUG',[pattern])
 
 from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean
- 
-""" 
+
+"""
 Store Clinical-Trial Intervertion-Drug properties into clinical_trail_intervention_drug table
 """
 # Reference: B_clinical_trial/init_3_clinical_trial_step_3.py
 
-class ClinicalTrialPipeline_3(PipelineBase):
+class ClinicalTrialTask_3(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=True)
@@ -34,28 +34,28 @@ class ClinicalTrialPipeline_3(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialPipeline_2 does not implement find_new_data().")
+        raise NotImplementedError("ClinicalTrialTask_2 does not implement find_new_data().")
 
 
     def process_new_data(self) -> None:
 
-        select_new_clinic_trial_sql = ''' 
+        select_new_clinic_trial_sql = '''
             SELECT gardid, disease, nctid, studies, id
-            FROM clinical_trial 
-            WHERE nctid IS NOT NULL 
+            FROM clinical_trial
+            WHERE nctid IS NOT NULL
             AND is_new = 1
         '''
 
         batch_num = 0
         batch_size = 100
 
-        try: 
+        try:
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
             fetch_cursor.execute(select_new_clinic_trial_sql)
 
             while True:
-                 
-                batch_num += 1 
+
+                batch_num += 1
                 rows = fetch_cursor.fetchmany(batch_size)
 
                 if not rows:
@@ -69,7 +69,7 @@ class ClinicalTrialPipeline_3(PipelineBase):
                     disease = row['disease']
                     nctid = row['nctid']
                     study = json.loads(row['studies'])
-                    id = row['id']  
+                    id = row['id']
 
                     self.appender.log_stdout(f"# Id: {id}, Gard_ID: {gardid}, NCTID: {nctid}, Disease: {disease}")
 
@@ -79,14 +79,14 @@ class ClinicalTrialPipeline_3(PipelineBase):
                     if interventions == list(): #is empty
                         continue
 
-                    for intervention in interventions: 
+                    for intervention in interventions:
 
-                        intervention_name = _clean(intervention.get('name','')) 
+                        intervention_name = _clean(intervention.get('name',''))
                         intervention_type = _clean(intervention.get('type',''))
-                
-                        if intervention_type == 'DRUG':                    
+
+                        if intervention_type == 'DRUG':
                             self.rxnorm_map(gardid, disease, nctid, intervention_name)
- 
+
 
             fetch_cursor.close()
 
@@ -105,7 +105,7 @@ class ClinicalTrialPipeline_3(PipelineBase):
         cursor = self.mysql.cursor()
 
         sql = '''
-            INSERT INTO clinical_trail_intervention_drug (gardId, disease, nctid, rxnormid, intervention, drug_name, wspacy, property_key, property_val, is_new) 
+            INSERT INTO clinical_trail_intervention_drug (gardId, disease, nctid, rxnormid, intervention, drug_name, wspacy, property_key, property_val, is_new)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         '''
 
@@ -119,14 +119,14 @@ class ClinicalTrialPipeline_3(PipelineBase):
                 property_key = property_key.replace(' ','')
 
                 if isinstance(property_val, list):
-                    property_val = json.dumps(property_val) 
- 
+                    property_val = json.dumps(property_val)
+
                 print(f'{gardid}\t{nctid}\t{rxnormid}\t{property_key}')
 
                 val = (gardid, disease, nctid, rxnormid, intervention, drug_name, wspacy, property_key, property_val, 1)
- 
+
                 cursor.execute(sql, val)
-             
+
 
         def nlp_to_drug(intervention, matches):
 
@@ -142,7 +142,7 @@ class ClinicalTrialPipeline_3(PipelineBase):
 
                 else:
                     self.appender.log_stdout(f'\t\tMap to RxNorm failed for intervention name:{intervention}, drug name: {drug}')
-    
+
 
         def drug_normalize(drug_name):
 
@@ -153,7 +153,7 @@ class ClinicalTrialPipeline_3(PipelineBase):
             ''' Replace non-word characters with spaces '''
             updated_str = re.sub('\W+',' ', updated_str)
             return updated_str
-        
+
         # -----------------------------------------------------------------------------------------------------------------------------------------------------
 
         drug = drug_normalize(intervention_name)
@@ -171,17 +171,17 @@ class ClinicalTrialPipeline_3(PipelineBase):
             # If RxNorm data not found, use SpaCy NLP to detect drug names and map to RxNorm
             doc = nlp(drug)
             matches = matcher(doc)
-            
+
             nlp_to_drug(intervention_name, matches)
 
         cursor.close()
         self.mysql.commit()
-        
+
 
 
 
     def get_rxnorm_data(self, drug_name):
-            
+
             ''' Initialize retry counter '''
             retries = 0
             rxnormid = None
@@ -194,7 +194,7 @@ class ClinicalTrialPipeline_3(PipelineBase):
                     rq = f'https://rxnav.nlm.nih.gov/REST/rxcui.json?name={drug_name}&search=2'
                     response = requests.get(rq)
                     response.raise_for_status()  # Raise an exception for HTTP errors (4xx and 5xx)
-                                    
+
                     ''' Extract RxNormID from the response '''
                     try:
                         obj = response.json()
@@ -212,7 +212,7 @@ class ClinicalTrialPipeline_3(PipelineBase):
                     except (TypeError, AttributeError):
                         print("The JSON structure is not as expected or 'response' might not be JSON.")
                         rxnormid = None  # or handle this case appropriately
-                    
+
                     break  # Exit the loop if successful
                 except requests.exceptions.Timeout:
                     retries += 1
@@ -222,12 +222,12 @@ class ClinicalTrialPipeline_3(PipelineBase):
 
             if not rxnormid:
                 return None
-            
+
             # re-init
             retries = 0
             max_retries=10
             while retries < max_retries:
-                try:        
+                try:
 
                     ''' Form RxNav API request to get all properties of the drug using RxNormID '''
                     rq2 = f'https://rxnav.nlm.nih.gov/REST/rxcui/{rxnormid}/allProperties.json?prop=codes+attributes+names+sources'
@@ -242,7 +242,7 @@ class ClinicalTrialPipeline_3(PipelineBase):
                         else:
                             rxdata[propName] = [r['propValue']]
                     return rxdata
-                
+
                 except requests.exceptions.Timeout:
                     retries += 1
                     time.sleep(1)

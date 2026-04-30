@@ -8,8 +8,8 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
- 
-""" 
+
+"""
 1. Find new Clinical Trail in table update_clinical_trial
 2. Insert new Clinical Trail into  clinical_trial_unique table
 
@@ -24,7 +24,7 @@ CREATE TABLE clinical_trial_unique (
 """
 # Reference: B_clinical_trial/init_1_clinical_trial_step_2.py
 
-class ClinicalTrialPipeline_2(PipelineBase):
+class ClinicalTrialTask_2(PipelineBase):
 
     def __init__(self):
 
@@ -33,7 +33,7 @@ class ClinicalTrialPipeline_2(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialPipeline_2 does not implement find_new_data().")
+        raise NotImplementedError("ClinicalTrialTask_2 does not implement find_new_data().")
 
 
     def process_new_data(self) -> None:
@@ -50,7 +50,7 @@ class ClinicalTrialPipeline_2(PipelineBase):
     ''' Insert new Clinical Trail into  clinical_trial table '''
     def step_1_add_new_nctid_to_clinical_trial(self)-> None:
 
-        add_new_nctid_sql = ''' 
+        add_new_nctid_sql = '''
             INSERT INTO clinical_trial (
                 gardId,
                 disease,
@@ -91,8 +91,8 @@ class ClinicalTrialPipeline_2(PipelineBase):
 
     ''' Insert new Clinical Trail into  clinical_trial_unique table '''
     def step_2_add_new_nctid_to_clinical_trial_unique(self)-> None:
-        
-        add_new_nctid_sql = ''' 
+
+        add_new_nctid_sql = '''
             INSERT INTO clinical_trial_unique (nctid, studies, is_new)
             SELECT
                 uct.nctid,
@@ -117,28 +117,28 @@ class ClinicalTrialPipeline_2(PipelineBase):
 
         cursor = self.mysql.cursor()
         cursor.execute(add_new_nctid_sql)
-        
+
         self.appender.log_stdout(f"\n{cursor.rowcount} rows form update_clinical_trial have been added into clinical_trial_unique table.\n")
 
         self.mysql.commit()
 
 
-    
+
     ''' Update the 2 columns: brief_title and brief_summary in the clinical_trial & clinical_trial_unique table '''
     def step_3_update_brief_title_and_brief_summary(self)-> None:
 
         select_new_query = f'''
-            SELECT id, nctid, studies 
-            FROM clinical_trial_unique 
-            WHERE brief_title IS NULL 
+            SELECT id, nctid, studies
+            FROM clinical_trial_unique
+            WHERE brief_title IS NULL
             -- AND id > %s
             AND is_new = 1
-            ORDER BY id 
+            ORDER BY id
             LIMIT %s
         '''
 
         try:
-            fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True) 
+            fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
 
             last_id = 0
             batch_size = 20
@@ -154,7 +154,7 @@ class ClinicalTrialPipeline_2(PipelineBase):
                 if not rows:
                     self.appender.log_stdout(f"No more rows to fetch.")
                     break
-                
+
                 self.appender.log_stdout(f'\n--- batch# = {batch_num} ---')
                 batch_num += 1
 
@@ -172,13 +172,13 @@ class ClinicalTrialPipeline_2(PipelineBase):
                         chunks.append((brief_title, brief_summary, nctid))
 
                         self.appender.log_stdout(f'NCTID = {nctid}')
-                        
+
                     except json.JSONDecodeError as e:
                         self.appender.log_stdout(f"Error parsing JSON for ID {nctid}:\n {e}")
-                        
+
                         chunks.append(('N/A', 'N/A', nctid))
                         continue
-                 
+
                 ''' save the brief_title and brief_summary into the clinical_trial & clinical_trial_unique table '''
                 if len(chunks) > 0:
                     self._save(chunks)
@@ -189,13 +189,13 @@ class ClinicalTrialPipeline_2(PipelineBase):
 
         finally:
             if fetch_cursor:
-                fetch_cursor.close() 
+                fetch_cursor.close()
 
-            # Close the mysql connction for whole ClinicalTrialPipeline_2
+            # Close the mysql connction for whole ClinicalTrialTask_2
             if self.mysql.is_connected():
                 self.mysql.close()
-        
-        
+
+
     ''' save the brief_title and brief_summary into the clinical_trial & clinical_trial_unique table '''
     def _save(self, chunks):
 
@@ -205,20 +205,20 @@ class ClinicalTrialPipeline_2(PipelineBase):
         try:
             cursor = self.mysql.cursor()
             cursor2 = self.mysql.cursor()
-            
+
             cursor.executemany(insert_1_sql, chunks)
-            self.mysql.commit() 
+            self.mysql.commit()
 
             cursor2.executemany(insert_2_sql, chunks)
-            self.mysql.commit() 
+            self.mysql.commit()
 
             cursor.close()
             cursor2.close()
-            
+
         except Exception as e:
             self.appender.log_stdout(e)
             raise
-        
-    
+
+
 
 

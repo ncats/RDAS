@@ -12,7 +12,7 @@ sys.path.extend([
 from pipelines.pipeline_base import PipelineBase
 
 
-class GARDPipeline_1(PipelineBase):
+class GARDTask_1(PipelineBase):
 
  
     def __init__(self):
@@ -24,10 +24,10 @@ class GARDPipeline_1(PipelineBase):
 
     # Not implemented
     def find_new_data(self) -> None:
-        raise NotImplementedError("GARDPipeline_1 does not implement find_new_data().")
+        raise NotImplementedError("GARDTask_1 does not implement find_new_data().")
     
     def process_new_data(self, gard_node) -> None:
-        raise NotImplementedError("GARDPipeline_1 does not implement process_new_data().")
+        raise NotImplementedError("GARDTask_1 does not implement process_new_data().")
 
     '''
     Generator

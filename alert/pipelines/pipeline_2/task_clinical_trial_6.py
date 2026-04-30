@@ -13,27 +13,27 @@ from scispacy.linking import EntityLinker
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
-    os.path.abspath(os.path.join(_dir, "../..")), 
+    os.path.abspath(os.path.join(_dir, "../..")),
     os.path.abspath(os.path.join(_dir, "../../..")),
 ])
 
 from utils.tools import _val, _normalize_txt, _clean
-from pipelines.pipeline_base import PipelineBase  
- 
-"""  
+from pipelines.pipeline_base import PipelineBase
+
+"""
 Generate the Annotation data for NEW Clinical Trail
 """
 # Reference: B_clinical_trial/init_9_clinical_trail_annotation_generator.py
 
-class ClinicalTrialPipeline_6(PipelineBase):
+class ClinicalTrialTask_6(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=True)
- 
+
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialPipeline_2 does not implement find_new_data().")
+        raise NotImplementedError("ClinicalTrialTask_2 does not implement find_new_data().")
 
 
     def load_models(self):
@@ -45,8 +45,8 @@ class ClinicalTrialPipeline_6(PipelineBase):
         linker so later steps can map detected spans to UMLS concepts and
         semantic type metadata.
         """
-        try:             
-            ''' 
+        try:
+            '''
             Load the BioNLP NER model with non-NER pipeline components disabled
             because this pipeline only needs entity spans and UMLS linking.
             '''
@@ -56,28 +56,28 @@ class ClinicalTrialPipeline_6(PipelineBase):
             ''' Add the UMLS linker to normalize BioNLP entities to UMLS concepts. '''
             linker_bionlp_component = nlp_bionlp.add_pipe("scispacy_linker", config={"linker_name": "umls"})
             self.appender.log_stdout("The linker for 'en_ner_bionlp13cg_md'")
-            
+
 
             ''' Load the BC5CDR model to capture disease and chemical mentions. '''
             nlp_bc5cdr = spacy.load("en_ner_bc5cdr_md", disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer"])
-            self.appender.log_stdout("Model 'en_ner_bc5cdr_md'")        
-        
-            ''' 
+            self.appender.log_stdout("Model 'en_ner_bc5cdr_md'")
+
+            '''
             Add a separate UMLS linker for BC5CDR entities so each model can
             expose its own knowledge base and semantic type tree.
             '''
             linker_bc5cdr_component = nlp_bc5cdr.add_pipe("scispacy_linker", config={"linker_name": "umls"})
             self.appender.log_stdout("The linker for 'en_ner_bc5cdr_md'")
-            
+
             #semantic_type_tree = linker.kb.semantic_type_tree
             #self.appender.log_stdout("UMLS Semantic Type Tree loaded successfully.")
 
-            ''' 
+            '''
             Return both NLP objects and their linker components for annotation
             generation and semantic type lookup in process_new_data().
             '''
             return nlp_bionlp, linker_bionlp_component, nlp_bc5cdr, linker_bc5cdr_component
-    
+
         except OSError as e:
             self.appender.log_stdout(f"Error loading scispaCy models: {e}")
             self.appender.log_stdout("Please ensure all models are installed correctly using the pip commands provided in the comments.")
@@ -168,7 +168,7 @@ class ClinicalTrialPipeline_6(PipelineBase):
 
                 ''' Step 10. Save the processed annotations to the database. '''
                 self.save_processed_annotations_to_db(processed_annotations)
-                
+
                 for ann in processed_annotations:
                     print(ann)
 
@@ -179,7 +179,7 @@ class ClinicalTrialPipeline_6(PipelineBase):
         finally:
             ''' Step 10. Close the cursor and database connections after processing finishes. '''
             if fetch_cursor:
-                fetch_cursor.close() 
+                fetch_cursor.close()
 
             self.close()
 
@@ -187,7 +187,7 @@ class ClinicalTrialPipeline_6(PipelineBase):
 
     ''' Step 10. Save the processed annotations to the database. '''
     def save_processed_annotations_to_db(self, processed_annotations):
-    
+
         if not processed_annotations:
             return
 
@@ -242,7 +242,7 @@ class ClinicalTrialPipeline_6(PipelineBase):
         Key: (nctid, concept_id)
         Value: The annotation dictionary with the highest score
         '''
-        unique_annotations = {} 
+        unique_annotations = {}
 
         for annotation in annotations_list:
 
@@ -280,15 +280,15 @@ class ClinicalTrialPipeline_6(PipelineBase):
         ''' Convert the dictionary values back to a list '''
         return list(unique_annotations.values())
 
- 
+
 
     def process_description_text(self, nlp, linker, semantic_type_tree, nctid_list, description_list):
 
         processed_annotations = []
         try:
             for i, doc in enumerate(nlp.pipe(description_list, disable=["parser", "attribute_ruler", "lemmatizer"])):
-                
-                current_app_id = nctid_list[i] 
+
+                current_app_id = nctid_list[i]
                 self.appender.log_stdout(f"Processing nctid: {current_app_id}")
 
                 for ent in doc.ents:
@@ -296,7 +296,7 @@ class ClinicalTrialPipeline_6(PipelineBase):
                     if hasattr(ent._, 'kb_ents') and ent._.kb_ents:
                         # Taking the first linked entity as the primary
                         concept_id, score = ent._.kb_ents[0]
-                        try: 
+                        try:
                             kb_entity = linker.kb.cui_to_entity[concept_id]
 
                             semantic_type_names = []
@@ -308,17 +308,17 @@ class ClinicalTrialPipeline_6(PipelineBase):
                                 except KeyError:
                                     semantic_type_names.append(f"{abbr} (Name not found)")
                                     continue
-                            
+
                             processed_annotations.append( {
                                 'nctid': current_app_id,
                                 #'entity_label': _val(ent.label_),
                                 'concept_id': concept_id,
                                 'score': f'{score:.4f}',
                                 'umls_concept': _val(kb_entity.canonical_name),
-                                'umls_cui': kb_entity.concept_id, 
+                                'umls_cui': kb_entity.concept_id,
                                 'semantic_types': ','.join(kb_entity.types),
                                 'semantic_type_names': ','.join(_normalize_txt(name) for name in semantic_type_names),
-                                'aliases': ','.join(_normalize_txt(alias) for alias in kb_entity.aliases), 
+                                'aliases': ','.join(_normalize_txt(alias) for alias in kb_entity.aliases),
                                 'definition': _normalize_txt(kb_entity.definition) if kb_entity.definition else ''
                             })
 
@@ -330,11 +330,11 @@ class ClinicalTrialPipeline_6(PipelineBase):
                 if not processed_annotations:
                     self.appender.log_stdout(f'No new annotations generated')
                     return []
-                
+
         except Exception as e:
-            self.appender.log_stdout(f'Error during NLP processing: {e}')  
+            self.appender.log_stdout(f'Error during NLP processing: {e}')
             return []
-            
+
         return processed_annotations
-                
-            
+
+

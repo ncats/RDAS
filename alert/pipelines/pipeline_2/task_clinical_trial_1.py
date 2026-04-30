@@ -24,7 +24,7 @@ pipeline steps.
 """
 # Reference: B_clinical_trial/init_1_clinical_trial_step_1.py
 
-class ClinicalTrialPipeline_1(PipelineBase):
+class ClinicalTrialTask_1(PipelineBase):
 
     def __init__(self):
 
@@ -35,8 +35,8 @@ class ClinicalTrialPipeline_1(PipelineBase):
 
     # Not implemented
     def process_new_data(self) -> None:
-        raise NotImplementedError("ClinicalTrialPipeline_1 does not implement process_new_data().")
-    
+        raise NotImplementedError("ClinicalTrialTask_1 does not implement process_new_data().")
+
 
     def find_new_data(self, gard_node) -> None:
 
@@ -50,16 +50,16 @@ class ClinicalTrialPipeline_1(PipelineBase):
 
 
     def _generate_GARD_ID_and_nctId(self, gardId, names, last_update_date):
-        
-        mycursor = self.mysql.cursor() 
+
+        mycursor = self.mysql.cursor()
 
         for name in names:
             #
-            # Check the name like: 
+            # Check the name like:
             # GARD:0000536	Acute myeloid leukemia with abnormal bone marrow eosinophils inv(16)(p13q22) or t(16;16)(p13;q22)
             # GARD:0000538	AML with t(15;17)(q22;q12);(PML/RARalpha) and variants
             #
-            
+
             nctid_list = list()
             name = name.replace('"','\"')
 
@@ -68,7 +68,7 @@ class ClinicalTrialPipeline_1(PipelineBase):
             # Search for studies whose condition, detailed description, or brief summary
             # match this disease name and whose last update is newer than the GARD update.
             initial_query = f'https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Term]{name} OR AREA[DetailedDescription]EXPANSION[Term]{name} OR AREA[BriefSummary]EXPANSION[Term]{name}) AND AREA[LastUpdatePostDate]RANGE[{last_update_date},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
-            
+
             # Stage each new NCT ID only if it is absent from both the historical
             # clinical_trial table and the current update_clinical_trial staging table.
             insert_sql = """
@@ -85,10 +85,10 @@ class ClinicalTrialPipeline_1(PipelineBase):
                     WHERE uct.nctid = %s
                 )
             """
-            
+
             try:
                 pageToken = None
-               
+
                 while True:
                     response_txt = self.call_get_nctids(initial_query, pageToken=pageToken)
                     #response_txt example:
@@ -101,15 +101,15 @@ class ClinicalTrialPipeline_1(PipelineBase):
                             {"protocolSection":{"identificationModule":{"nctId":"NCT06294652"}}}
                         ]
                     }
-                    '''                    
+                    '''
                     trials_list = response_txt['studies']
-                   
+
                     if trials_list:
 
                         for trial in trials_list:
 
                             nctid = trial['protocolSection']['identificationModule']['nctId']
-                           
+
                             # Fetch the full ClinicalTrials.gov study JSON for the NCT ID.
                             retries = 0
                             response_txt = None
@@ -134,7 +134,7 @@ class ClinicalTrialPipeline_1(PipelineBase):
 
 
                             if response_txt is not None:
-                               
+
                                 try:
                                     val = (
                                         gardId,
@@ -147,28 +147,28 @@ class ClinicalTrialPipeline_1(PipelineBase):
                                     )
 
                                     mycursor.execute(insert_sql, val)
-                                    
+
                                     if mycursor.rowcount == 1:
                                         #print(initial_query)
 
                                         self.appender.log_stdout(f"New nctid added: {nctid} for: {gardId}")
-                                        self.mysql.commit() 
+                                        self.mysql.commit()
 
                                 except mysql.connector.Error as error:
                                     print(f"Failed to insert record into table: {error}")
-  
+
                         if not 'nextPageToken' in response_txt:
                             break
                         else:
                             pageToken = response_txt['nextPageToken']
-                    
-                    else: 
+
+                    else:
                         #print(f'No nctid for: {gardId}')
                         #val = (gardId, name, None, None, initial_query)
                         #mycursor.execute(insert_sql, val)
 
-                        break 
-               
+                        break
+
             except Exception as e:
                 print(e)
 
@@ -177,16 +177,16 @@ class ClinicalTrialPipeline_1(PipelineBase):
 
     def call_get_nctids (self, query, pageToken=None):
         try:
-            if pageToken: 
+            if pageToken:
                 query += f'&pageToken={pageToken}'
-            
+
             # Return a page of matching NCT IDs from the ClinicalTrials.gov search API.
             #url_logger.info(query)
             response = requests.get(query)
             response_txt = response.json()
 
         except Exception as e:
-            print(f'Unable to Process Query: {query}\n{e}') 
+            print(f'Unable to Process Query: {query}\n{e}')
             response_txt = None
 
         return response_txt

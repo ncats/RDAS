@@ -21,15 +21,19 @@ from pipelines.pipeline_base import PipelineBase
 from utils.publication_worker import PublicationWorker
 
 """
-    Find and store newly published PubMed articles for updated GARD diseases.
+Find and store newly published PubMed articles for updated GARD diseases.
 
-    For each GARD node, this pipeline searches PubMed with the node's filtered
-    disease names between the node's last update date and today. It downloads
-    article metadata for PMIDs that are not already in publication_article,
-    stores those article rows in update_publication_article, and records the
-    GARD/search-term/PMID relationship in publication_gard_searchterm_pubmed_mapping.
-    """
-class PublicationPipeline_1(PipelineBase):
+For each GARD node, this pipeline searches PubMed with the node's filtered
+disease names between the node's last update date and today. 
+It downloads article metadata for PMIDs that are not already in publication_article,
+stores those article rows in update_publication_article, and records the
+GARD/search-term/PMID relationship in publication_gard_searchterm_pubmed_mapping.
+"""
+# Reference: C_publication/init_1_publication_gard_pubmed-id.py
+# Reference: C_publication/init_2_1_publication-gard-searchterm-pubmed-mapping.py
+# Reference: C_publication/init_3_1_publication-article-by-pubmed-id.py
+
+class PublicationTask_1(PipelineBase):
 
 
     def __init__(self):
@@ -43,7 +47,7 @@ class PublicationPipeline_1(PipelineBase):
 
     # Not implemented
     def process_new_data(self) -> None:
-        raise NotImplementedError("PublicationPipeline_1 does not implement process_new_data().")
+        raise NotImplementedError("PublicationTask_1 does not implement process_new_data().")
    
 
     def find_new_data(self, gard_node) -> None:

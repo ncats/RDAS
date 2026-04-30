@@ -6,16 +6,16 @@ sys.path.extend([
     os.path.abspath(os.path.join(_dir, "..")),
     os.path.abspath(os.path.join(_dir, "../..")),
 ])
- 
+
 from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean
- 
-""" 
+
+"""
 Save new Clinical-Trial {nctid - pubmed_id} pairs into clinical_trial_nctid_pmids_mapping table if not exist
 """
 # Reference: B_clinical_trial/init_5_clinical_trial_retrieve_pmids_umlti.py
 
-class ClinicalTrialPipeline_4(PipelineBase):
+class ClinicalTrialTask_4(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=True)
@@ -23,12 +23,12 @@ class ClinicalTrialPipeline_4(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialPipeline_2 does not implement find_new_data().")
+        raise NotImplementedError("ClinicalTrialTask_2 does not implement find_new_data().")
 
 
     # implement
     def process_new_data(self) -> None:
-        
+
         insert_sql = '''
             INSERT INTO clinical_trial_nctid_pmids_mapping (nctid, pmid, is_new)
             SELECT %s, %s, 1
@@ -38,11 +38,11 @@ class ClinicalTrialPipeline_4(PipelineBase):
                 WHERE nctid = %s
                 AND pmid = %s
             )
-        ''' 
+        '''
 
         insert_cursor = self.mysql.cursor()
 
-        for chunks in self._nctid_pmids_generator(): 
+        for chunks in self._nctid_pmids_generator():
 
             if not chunks:
                 continue
@@ -52,11 +52,11 @@ class ClinicalTrialPipeline_4(PipelineBase):
 
             self.appender.log_stdout(f"{insert_cursor.rowcount} [nctid - pubmed_id] pairs have been added into clinical_trial_nctid_pmids_mapping table.\n")
 
-        insert_cursor.close() 
+        insert_cursor.close()
 
         # Explicitly close the all the db connections
         self.close()
-        
+
 
 
     def _nctid_pmids_generator(self):
@@ -64,15 +64,15 @@ class ClinicalTrialPipeline_4(PipelineBase):
         ''' This will not be an infinite loop within one run. It will stop when the cursor result set is exhausted.  '''
         query = f'''
             SELECT id, nctid, studies  FROM clinical_trial_unique
-            WHERE 
-                nctid IS NOT NULL 
+            WHERE
+                nctid IS NOT NULL
             AND is_new = 1
-            ORDER BY id 
+            ORDER BY id
         '''
-        
+
         batch_num = 0
         batch_size = 100
-        
+
         cursor = self.mysql.cursor(dictionary=True, buffered=True)
         cursor.execute(query)
 
@@ -87,29 +87,29 @@ class ClinicalTrialPipeline_4(PipelineBase):
                 break
 
             self.appender.log_stdout(f'\n--- batch# = {batch_num} ---')
- 
+
             ''' processe rows in batches '''
             chunks = []
 
-            for row in rows: 
-                nctid = row['nctid'] 
+            for row in rows:
+                nctid = row['nctid']
                 study = json.loads(row['studies'])
 
-                ref_module = study.get('protocolSection', dict()).get('referencesModule', {}) 
+                ref_module = study.get('protocolSection', dict()).get('referencesModule', {})
                 references = ref_module.get('references', [])
 
                 if not references:
                     continue
 
-                for ref in references: 
+                for ref in references:
                     if not ref.get('pmid'):
                         continue
-        
+
                     pmid = _clean(ref.get('pmid'))
                     if not pmid:
                         continue
 
                     chunks.append((nctid, pmid, nctid, pmid))
-                
+
             yield chunks
-            
+
