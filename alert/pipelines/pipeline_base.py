@@ -18,16 +18,9 @@ class PipelineBase(ABC):
 
     def __init__(self, table_name='data', init_mysql=True, init_memgraph=False):
         
-        self.log_dir = "logs"
         self.mysql = None
         self.memgraph = None
 
-        os.makedirs(self.log_dir, exist_ok=True)
-        class_name = type(self).__name__
-        self.log_file = f"{self.log_dir}/alert-{class_name}.log"
-        #self.log_file = f"{self.log_dir}/alert-{class_name}-{_date_string()}.log"
-        self.logger = AppLogger(class_name, self.log_file).get_logger()
-        
         if init_mysql:
             self.mysql = db().mysql_conn() 
 
@@ -36,9 +29,14 @@ class PipelineBase(ABC):
 
         self.formatted_today = datetime.today().strftime("%Y-%m-%d")
 
-        self.logger.info(f'The {class_name} is initialized.')
+        self.log_dir = 'logs'
+        os.makedirs(self.log_dir, exist_ok=True)
+        class_name = type(self).__name__
+        self.log_file = f"{self.log_dir}/alert-{class_name}.log"
+        #self.log_file = f"{self.log_dir}/alert-{class_name}-{_date_string()}.log"
 
-        
+        self.logger = AppLogger(class_name, self.log_file).get_logger()
+        self.logger.info(f'The {class_name} is initialized.')
 
 
     @abstractmethod
