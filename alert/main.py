@@ -14,13 +14,9 @@ from datetime import date, datetime, timedelta
 from utils.tools import _is_english, _is_under_char_threshold
 from pipelines.pipeline_1.task_gard_1 import GARDTask_1
 from pipelines.pipeline_2.task_clinical_trial_1 import ClinicalTrialTask_1
-from pipelines.pipeline_2.task_clinical_trial_2 import ClinicalTrialTask_2
-from pipelines.pipeline_2.task_clinical_trial_3 import ClinicalTrialTask_3
-from pipelines.pipeline_2.task_clinical_trial_4 import ClinicalTrialTask_4
-from pipelines.pipeline_2.task_clinical_trial_5 import ClinicalTrialTask_5
-from pipelines.pipeline_2.task_clinical_trial_6 import ClinicalTrialTask_6
 
 from pipelines.pipeline_3.task_publication_1 import PublicationTask_1
+from pipelines.pipeline_3.task_publication_2 import PublicationTask_2
 
 from firebase.firebase_query import FirebaseAgent
 from emails.email_client import EmailClient
@@ -29,19 +25,36 @@ from utils.conn import DBConnection as db
 from alert_sender import AlertSender
 
 
+def run_clinical_trial_mysql_updates():
+
+    ''' importing spaCy-heavy clinical trial processing tasks at module load time '''
+
+    from pipelines.pipeline_2.task_clinical_trial_2 import ClinicalTrialTask_2
+    from pipelines.pipeline_2.task_clinical_trial_3 import ClinicalTrialTask_3
+    from pipelines.pipeline_2.task_clinical_trial_4 import ClinicalTrialTask_4
+    from pipelines.pipeline_2.task_clinical_trial_5 import ClinicalTrialTask_5
+    from pipelines.pipeline_2.task_clinical_trial_6 import ClinicalTrialTask_6
+
+    ClinicalTrialTask_2().process_new_data()
+    ClinicalTrialTask_3().process_new_data()
+    ClinicalTrialTask_4().process_new_data()
+    ClinicalTrialTask_5().process_new_data()
+    ClinicalTrialTask_6().process_new_data()
+
+
 def run_update():
 
     ''' 1. '''
-    gardPipeline_1 = GARDTask_1()
+    gardTask_1 = GARDTask_1()
 
     ''' update rdas_db.gard set updated = null;'''
-    batch_nodes_generator = gardPipeline_1.get_gard_nodes()
+    batch_nodes_generator = gardTask_1.get_gard_nodes()
 
     ''' 2. '''
     clinicalTrialTask_1 = ClinicalTrialTask_1()
 
     ''' 3. '''
-    publicationPipeline_1 = PublicationTask_1()
+    publicationTask_1 = PublicationTask_1()
 
 
     ''' 1.1 '''
@@ -82,25 +95,20 @@ def run_update():
             ''' 2.1 '''
             #clinicalTrialTask_1.find_new_data(gard_node)
 
-
             ''' 3.1 '''
-            #publicationPipeline_1.find_new_data(gard_node)
+            #publicationTask_1.find_new_data(gard_node)
 
 
     # Explicitly close the db connections
     clinicalTrialTask_1.close()
-    publicationPipeline_1.close()
+    publicationTask_1.close()
 
 
-    # Update MySQL database
-    """
-    ClinicalTrialTask_2().process_new_data()
-    ClinicalTrialTask_3().process_new_data()
-    ClinicalTrialTask_4().process_new_data()
-    ClinicalTrialTask_5().process_new_data()
-    ClinicalTrialTask_6().process_new_data()
-    """
+    ''' Update MySQL database '''
+    #run_clinical_trial_mysql_updates()
 
+    PublicationTask_2().process_new_data()
+ 
 
     # Update Memgraph database
 
@@ -118,8 +126,8 @@ def send_alert(look_back_days = 7):
 if __name__ == "__main__":
 
     ''' 1. '''
-    #run_update()
+    run_update()
 
     ''' 2. '''
     LOOK_BACK_DAYS = 7
-    send_alert(LOOK_BACK_DAYS)
+    #send_alert(LOOK_BACK_DAYS)
