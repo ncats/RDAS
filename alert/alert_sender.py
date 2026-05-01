@@ -67,14 +67,43 @@ class AlertSender(PipelineBase):
             emailClient = EmailClient()
             firebaseAgent = FirebaseAgent()
 
+            ''' 1. Get all users '''
             users = firebaseAgent.get_firebase_authed_users_with_firestore_gard_ids_list()
             
+            ''' 2. Send alert to each user '''
             for user in users:
-                
+                '''
+                {
+                    "display_name": "Timothy Sheils",
+                    "email": "timothy.sheils@ncats.nih.gov",
+                    "gard_id_list": [
+                        "GARD:0007704",
+                        "GARD:0007827",
+                        "GARD:0023606",
+                        "GARD:0023607",
+                        "GARD:0023954",
+                        "GARD:0024146",
+                        "GARD:0016773"
+                    ],
+                    "subscriptions": {
+                        "GARD:0007704": "gastric cancer",
+                        "GARD:0007827": "tuberculosis",
+                        "GARD:0023606": "pediatric lymphoma",
+                        "GARD:0023607": "adult lymphoma",
+                        "GARD:0023954": "childhood leukemia",
+                        "GARD:0024146": "leukemia",
+                        "GARD:0016773": "hepatocellular carcinoma"
+                    }
+                }        
+                '''
+
+                gard_id_list = user['gard_id_list']
+                if not gard_id_list:
+                    continue
+
                 email = user['email']
                 display_name = user['display_name']
-                gard_id_list = user['gard_id_list']
-
+               
                 user_subscriptions = user.get("subscriptions", {})
                 update_date_end = date.today()
     
@@ -84,6 +113,7 @@ class AlertSender(PipelineBase):
                 #  Remove for PRODUCTION
                 update_date_start = '2025-01-01'
 
+                ''' A payload template / initial payload structure'''
                 payload = {
                     "data": {
                         "total": 0,
@@ -96,11 +126,12 @@ class AlertSender(PipelineBase):
                 
                 datasets = set()
                 active_subscriptions = {}
-                    
+                ''' 3. For each user subscriped GARD id'''
                 for gard_id in gard_id_list:
 
                     cursor = self.mysql.cursor()
                     try:
+                        ''' Find new clinical-trial & publication items by gard_id '''
                         cursor.execute(find_new_items_query, (gard_id, gard_id))
                         rows = cursor.fetchall()
                     finally:
@@ -110,6 +141,8 @@ class AlertSender(PipelineBase):
                         continue
 
                     payload["data"][gard_id] = {}
+
+                    ''' If gard_id exists in user_subscriptions, use its saved value. Otherwise, use gard_id itself as the fallback value. '''
                     active_subscriptions[gard_id] = user_subscriptions.get(gard_id, gard_id)
 
                     for row in rows:
@@ -120,8 +153,8 @@ class AlertSender(PipelineBase):
                 subscription_count = len(active_subscriptions)
                 if subscription_count == 0:
                     self.logger.info(f'* No new subscriptions found for user: {user} - {datetime.now()}')
-                    continue
-    
+                    continue 
+
                 payload["data"]["datasets"] = sorted(datasets)
                 payload["data"]["subscriptions"] = active_subscriptions
                 payload["data"]["total"] = subscription_count

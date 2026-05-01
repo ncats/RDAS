@@ -185,6 +185,31 @@ class FirebaseAgent:
 
     def get_firebase_authed_users_with_firestore_gard_ids_list(self, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
 
+        # return result
+        '''
+        {
+            "display_name": "Timothy Sheils",
+            "email": "timothy.sheils@ncats.nih.gov",
+            "gard_id_list": [
+                "GARD:0007704",
+                "GARD:0007827",
+                "GARD:0023606",
+                "GARD:0023607",
+                "GARD:0023954",
+                "GARD:0024146",
+                "GARD:0016773"
+            ],
+            "subscriptions": {
+                "GARD:0007704": "gastric cancer",
+                "GARD:0007827": "tuberculosis",
+                "GARD:0023606": "pediatric lymphoma",
+                "GARD:0023607": "adult lymphoma",
+                "GARD:0023954": "childhood leukemia",
+                "GARD:0024146": "leukemia",
+                "GARD:0016773": "hepatocellular carcinoma"
+            }
+        }        
+        '''
         auth_users = self.get_firebase_auth_users()
         auth_users_by_uid = {
             user["uid"]: user
@@ -279,7 +304,7 @@ class FirebaseAgent:
 if __name__ == "__main__":
     #main()
     agent = FirebaseAgent()
-    
+    ''' 
     matched_users = agent.get_firebase_auth_users_by_firestore_disease_name('Chronic myeloid leukemia')
     print(json.dumps(matched_users, indent=2, ensure_ascii=False))
 
@@ -291,7 +316,7 @@ if __name__ == "__main__":
 
     users = agent.get_firebase_auth_users_by_firestore_gard_id('GARD:0017890')
     print(json.dumps(users, indent=2, ensure_ascii=False))
-
-    sers = agent.get_firebase_authed_users_with_firestore_gard_ids_list()
-    print(json.dumps(sers, indent=2, ensure_ascii=False))
+    '''
+    users = agent.get_firebase_authed_users_with_firestore_gard_ids_list()
+    print(json.dumps(users, indent=2, ensure_ascii=False))
     
