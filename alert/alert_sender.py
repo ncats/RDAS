@@ -69,6 +69,8 @@ class AlertSender(PipelineBase):
 
             ''' 1. Get all users '''
             users = firebaseAgent.get_firebase_authed_users_with_firestore_gard_ids_list()
+
+            all_updates = []
             
             ''' 2. Send alert to each user '''
             for user in users:
@@ -158,9 +160,8 @@ class AlertSender(PipelineBase):
                 payload["data"]["datasets"] = sorted(datasets)
                 payload["data"]["subscriptions"] = active_subscriptions
                 payload["data"]["total"] = subscription_count
-    
-                                
-                emailClient.send_html_email(
+     
+                emailClient.send_html_alert_email(
                     subject = self.subject,
                     payload = payload,                            
                     #mail_to = user.get('email'), # For PRODUCTION
@@ -170,6 +171,8 @@ class AlertSender(PipelineBase):
         
                 self.logger.info(f'\nSent alert to user: {user} - {datetime.now()}')
                 self.logger.info(json.dumps(payload, indent=2, ensure_ascii=False))
+
+                all_updates.append({"email": email, "display_name": display_name, "payload": payload})
 
         finally:
             # Explicitly close the db connections

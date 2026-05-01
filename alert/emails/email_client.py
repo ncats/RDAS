@@ -82,7 +82,7 @@ class EmailClient:
             server.send_message(message, to_addrs=recipients)
 
 
-    def send_html_email(self, subject: str, payload, title: str = "RDAS Notification", mail_to: str = None, mail_cc: str = None):
+    def send_html_alert_email(self, subject: str, payload, title: str = "RDAS Notification", mail_to: str = None, mail_cc: str = None):
 
         html_body = EmailTemplateEngine.json_to_html_email_body(payload, title=title)
 
@@ -104,7 +104,7 @@ if __name__ == "__main__":
 
     client = EmailClient()
 
-    client.send_html_email(
+    client.send_html_alert_email(
         subject="RDAS EmailClient Test",
 
         payload = {
