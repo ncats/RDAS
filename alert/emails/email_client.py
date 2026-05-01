@@ -18,6 +18,35 @@ class EmailClient:
         with CONFIG_PATH.open("r", encoding="utf-8") as file:
             return json.load(file)
 
+
+    @staticmethod
+    def _format_recipients(recipients):
+
+        if recipients is None:
+            return None
+
+        if isinstance(recipients, (list, tuple, set)):
+            return ", ".join(str(email).strip() for email in recipients if str(email).strip())
+
+        return str(recipients)
+
+
+    @staticmethod
+    def _recipient_list(*recipient_values):
+
+        recipients = []
+
+        for value in recipient_values:
+            if not value:
+                continue
+
+            if isinstance(value, (list, tuple, set)):
+                recipients.extend(str(email).strip() for email in value if str(email).strip())
+            else:
+                recipients.extend(email.strip() for email in str(value).split(",") if email.strip())
+
+        return recipients
+
     def __init__(self, mail_to: str = None, mail_from: str = None, mail_cc: str = None):
 
         config = self._load_email_config()
@@ -91,6 +120,31 @@ class EmailClient:
         recipients = [message["To"]]
         if message.get("Cc"):
             recipients.extend([email.strip() for email in message["Cc"].split(",") if email.strip()])
+
+        with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=self.smtp_connection_timeout) as server:
+            server.timeout = self.smtp_timeout
+            if self.smtp_starttls_enable:
+                server.starttls()
+            server.send_message(message, to_addrs=recipients)
+
+
+    def send_html_summary_email(self, subject: str, all_updates_summary, title: str = "RDAS Alert Summary", mail_to: list = None, mail_cc: list = None):
+
+        payload = {
+            "all_updates_summary": all_updates_summary or []
+        }
+
+        html_body = EmailTemplateEngine.json_to_html_email_body(
+            payload,
+            title=title,
+            template_name="alert_summary_email_template.html"
+        )
+
+        to_value = self._format_recipients(mail_to or self.mail_to)
+        cc_value = self._format_recipients(mail_cc if mail_cc is not None else self.mail_cc)
+        message = self._build_html_message(subject, html_body, mail_to=to_value, mail_cc=cc_value)
+
+        recipients = self._recipient_list(to_value, cc_value)
 
         with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=self.smtp_connection_timeout) as server:
             server.timeout = self.smtp_timeout

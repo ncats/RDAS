@@ -1,0 +1,74 @@
+<html>
+<head>
+    <style>
+        body { background-color: white; font-family: Arial, sans-serif; color: #222; }
+        table { width: 95%; margin: auto; border-collapse: collapse; }
+        th, td { border: 1px solid #444; padding: 8px 12px; text-align: left; }
+        th { background-color: #f0f3f7; }
+        .title { text-align: center; color: purple; font-size: 38px; margin-bottom: 10px; }
+        .subtitle { text-align: center; margin-top: 0; }
+        .user-row th { background-color: #dce7f7; font-size: 16px; }
+        .column-row th { background-color: #eef2f6; }
+        .count { text-align: right; }
+        .spacer td { border-left: none; border-right: none; height: 12px; background-color: white; }
+        .empty { text-align: center; font-style: italic; }
+    </style>
+</head>
+
+<body>
+    <h1 class="title">Rare Disease Alert System</h1>
+    <h3 class="subtitle"><br/>{{ title }}</h3>
+
+    <table>
+        {% if all_updates_summary %}
+            {% for update in all_updates_summary %}
+                {% set data = update.get('payload', {}).get('data', {}) %}
+                <tr class="user-row">
+                    <th colspan="3">Display Name: {{ update.get('display_name', '') }}</th>
+                    <th colspan="3">Email: {{ update.get('email', '') }}</th>
+                </tr>
+                <tr class="column-row">
+                    <th>Disease Name</th>
+                    <th>GARD ID</th>
+                    <th>New Articles</th>
+                    <th>New Clinical Trials</th>
+                    <th>New Fundings</th>
+                    <th>Total Items</th>
+                </tr>
+                {% for gard_id, disease_name in data.get('subscriptions', {}).items() %}
+                    {% set gard_data = data.get(gard_id, {}) %}
+                    {% set articles = gard_data.get('articles', 0) %}
+                    {% set trials = gard_data.get('trials', 0) %}
+                    {% set grants = gard_data.get('grants', 0) %}
+                    {% set total = articles + trials + grants %}
+                    {% if total > 0 %}
+                        <tr>
+                            <td><a href="https://rdas.ncats.nih.gov/disease?id={{ gard_id }}">{{ disease_name }}</a></td>
+                            <td>{{ gard_id }}</td>
+                            <td class="count">{{ articles }}</td>
+                            <td class="count">{{ trials }}</td>
+                            <td class="count">{{ grants }}</td>
+                            <td class="count">{{ total }}</td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+                {% if not loop.last %}
+                    <tr class="spacer"><td colspan="6"></td></tr>
+                {% endif %}
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td class="empty" colspan="6">No user updates were found.</td>
+            </tr>
+        {% endif %}
+    </table>
+
+    {% if all_updates_summary %}
+        {% set first_data = all_updates_summary[0].get('payload', {}).get('data', {}) %}
+        <h4 class="subtitle">
+            <br/>Results gathered within the time period of
+            {{ first_data.get('update_date_start', '') }} - {{ first_data.get('update_date_end', '') }}
+        </h4>
+    {% endif %}
+</body>
+</html>

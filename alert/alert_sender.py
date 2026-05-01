@@ -9,10 +9,13 @@ sys.path.extend([
     os.path.abspath(os.path.join(_dir, "../..")),
 ])
 
+from dotenv import load_dotenv
 from datetime import date, datetime, timedelta 
 from firebase.firebase_query import FirebaseAgent
 from emails.email_client import EmailClient
 from pipelines.pipeline_base import PipelineBase 
+
+load_dotenv()
 
 class AlertSender(PipelineBase):
 
@@ -20,7 +23,7 @@ class AlertSender(PipelineBase):
 
         super().__init__(init_mysql=True, init_memgraph=False)
 
-        self.subject="RDAS Alert"
+        self.subject="RDAS Notification"
         self.LOOK_BACK_DAYS = look_back_days
 
 
@@ -32,6 +35,18 @@ class AlertSender(PipelineBase):
     # Not implemented   
     def find_new_data(self, gard_node) -> None:
         raise NotImplementedError("AlertSender does not implement find_new_data().")
+
+
+    @staticmethod
+    def _parse_email_recipients(email_recipients):
+        if not email_recipients:
+            return []
+
+        return [
+            email.strip()
+            for email in email_recipients.split(",")
+            if email.strip()
+        ]
  
 
     '''
@@ -70,7 +85,7 @@ class AlertSender(PipelineBase):
             ''' 1. Get all users '''
             users = firebaseAgent.get_firebase_authed_users_with_firestore_gard_ids_list()
 
-            all_updates = []
+            all_updates_summary = []
             
             ''' 2. Send alert to each user '''
             for user in users:
@@ -160,7 +175,8 @@ class AlertSender(PipelineBase):
                 payload["data"]["datasets"] = sorted(datasets)
                 payload["data"]["subscriptions"] = active_subscriptions
                 payload["data"]["total"] = subscription_count
-     
+                 
+                ''' 4. Send alert email to user '''
                 emailClient.send_html_alert_email(
                     subject = self.subject,
                     payload = payload,                            
@@ -171,8 +187,32 @@ class AlertSender(PipelineBase):
         
                 self.logger.info(f'\nSent alert to user: {user} - {datetime.now()}')
                 self.logger.info(json.dumps(payload, indent=2, ensure_ascii=False))
+                 
+                all_updates_summary.append({"email": email, "display_name": display_name, "payload": payload})
 
-                all_updates.append({"email": email, "display_name": display_name, "payload": payload})
+            ''' 5. Send summary email to admins '''
+            if all_updates_summary:
+                try:
+                    summary_recipients = self._parse_email_recipients( os.getenv("ALERT_SUMMARY_EMAIL_RECIPIENTS") )
+
+                    if summary_recipients:
+
+                        emailClient.send_html_summary_email(
+                            subject = f"{self.subject} Summary",
+                            all_updates_summary = all_updates_summary,
+                            title = "RDAS Alert Summary",
+                            mail_to = summary_recipients,
+                            mail_cc = [],
+                        )
+                        self.logger.info(f"Sent summary alert email with {len(all_updates_summary)} user sections.")
+                    else:
+                        self.logger.error("ALERT_SUMMARY_EMAIL_RECIPIENTS is empty. Summary alert email was not sent.")
+
+                except Exception as e:
+                    self.logger.error(f"Unable to send summary alert email: {e}")
+
+            else:
+                self.logger.info("No user updates found. Summary alert email was not sent.")
 
         finally:
             # Explicitly close the db connections
@@ -180,7 +220,3 @@ class AlertSender(PipelineBase):
 
             if firebaseAgent is not None:
                 firebaseAgent.close()
-
-
-
-
