@@ -36,7 +36,7 @@ class PipelineBase(ABC):
         #self.log_file = f"{self.log_dir}/alert-{class_name}-{_date_string()}.log"
 
         self.logger = AppLogger(class_name, self.log_file).get_logger()
-        self.logger.info(f'The {class_name} is initialized.')
+        self.logger.info(f'\n\n{"*" * 20} The {class_name} is initialized. {"*" * 20}\n')
 
 
     @abstractmethod
