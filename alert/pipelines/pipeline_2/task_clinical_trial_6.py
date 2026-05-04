@@ -28,7 +28,7 @@ Generate the Annotation data for NEW Clinical Trail
 class ClinicalTrialTask_6(PipelineBase):
 
     def __init__(self):
-        super().__init__(init_mysql=True, init_memgraph=True)
+        super().__init__(init_mysql=True, init_memgraph=False)
 
 
     # Not implemented

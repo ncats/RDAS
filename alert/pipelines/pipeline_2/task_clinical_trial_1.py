@@ -28,7 +28,7 @@ class ClinicalTrialTask_1(PipelineBase):
 
     def __init__(self):
 
-        super().__init__(init_mysql=True, init_memgraph=True)
+        super().__init__(init_mysql=True, init_memgraph=False)
 
         self.LOOKBACK_DAYS =7
 

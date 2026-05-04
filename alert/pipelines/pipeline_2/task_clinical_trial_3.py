@@ -29,7 +29,7 @@ Store Clinical-Trial Intervertion-Drug properties into clinical_trail_interventi
 class ClinicalTrialTask_3(PipelineBase):
 
     def __init__(self):
-        super().__init__(init_mysql=True, init_memgraph=True)
+        super().__init__(init_mysql=True, init_memgraph=False)
 
 
     # Not implemented

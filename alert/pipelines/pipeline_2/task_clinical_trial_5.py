@@ -24,7 +24,7 @@ store the article row in UPDATE_publication_article for the alert workflow.
 class ClinicalTrialTask_5(PipelineBase):
 
     def __init__(self):
-        super().__init__(init_mysql=True, init_memgraph=True)
+        super().__init__(init_mysql=True, init_memgraph=False)
 
         self.publication_worker = PublicationWorker()
 

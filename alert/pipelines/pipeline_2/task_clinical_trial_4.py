@@ -18,7 +18,7 @@ Save new Clinical-Trial {nctid - pubmed_id} pairs into clinical_trial_nctid_pmid
 class ClinicalTrialTask_4(PipelineBase):
 
     def __init__(self):
-        super().__init__(init_mysql=True, init_memgraph=True)
+        super().__init__(init_mysql=True, init_memgraph=False)
 
 
     # Not implemented
