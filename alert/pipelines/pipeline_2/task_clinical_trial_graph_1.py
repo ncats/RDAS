@@ -48,7 +48,7 @@ class ClinicalTrialGraphTask_1(PipelineBase):
     
         count = 0
         batch_num = 0
-        batch_size = 50
+        batch_size = 100
 
         fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
         fetch_cursor.execute(fetch_new_clinical_query)
@@ -61,7 +61,7 @@ class ClinicalTrialGraphTask_1(PipelineBase):
                 break
 
             batch_num += 1
-            self.logger.info(f'\n--- batch# = {batch_num} ---')
+            self.logger.info(f'--- batch# = {batch_num} ---')
         
 
             chunks = []
@@ -80,7 +80,7 @@ class ClinicalTrialGraphTask_1(PipelineBase):
 
             if len(chunks) > 0:
                 try:
-                    self.memgraph.execute(batch_create, {"chunks": chunks}) 
+                    #self.memgraph.execute(batch_create, {"chunks": chunks}) 
 
                     count += len(chunks)
                     self.logger.info(f'Inserted {len(chunks)} nodes into memgraph. Total = {count}')

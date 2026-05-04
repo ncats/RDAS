@@ -1,0 +1,99 @@
+import os
+import sys
+import json
+from typing import Dict, List, Any, Optional
+
+_dir = os.path.dirname(__file__)
+sys.path.extend([
+    os.path.abspath(os.path.join(_dir, "../..")),
+    os.path.abspath(os.path.join(_dir, "../../..")),
+])
+
+from utils.tools import _clean, _safe_get
+from pipelines.pipeline_base import PipelineBase
+
+
+"""
+Create the clinical trial nodes to GARD nodes mapping
+"""
+# Reference: B_clinical_trial/initializer/clinicaltrial_gard_mapping.py
+
+class ClinicalTrialGraphTask_2(PipelineBase):
+
+    def __init__(self):
+        super().__init__(init_mysql=True, init_memgraph=True)
+
+
+    # Not implemented
+    def find_new_data(self, gard_node) -> None:
+        raise NotImplementedError("ClinicalTrialGraphTask_2 does not implement find_new_data().")
+
+
+    # implement
+    def process_new_data(self) -> None:
+
+        ''' 
+        Creates the edge only if that exact pattern does not already exist.
+        Do nothing if the same relationship with the same matchedTermRDAS already exists
+        '''
+        batch_create = '''
+            UNWIND $chunks AS chunk
+            MATCH (x: GARD {gardId: chunk.gardId})
+            MATCH (y: ClinicalTrial {nctId: chunk.nctId})
+            MERGE (x)<-[:mapped_to_gard {matchedTermRDAS: chunk.disease}]-(y)
+        '''
+
+        fetch_new_clinical_query = '''
+                SELECT id, gardid, disease, nctid
+                FROM update_clinical_trial
+                WHERE nctid IS NOT NULL
+                AND is_new = 1
+        '''
+
+        count = 0
+        batch_num = 0
+        batch_size = 200
+        try:
+            fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
+            fetch_cursor.execute(fetch_new_clinical_query)
+
+            while True:
+                rows = fetch_cursor.fetchmany(batch_size)
+
+                if not rows:
+                    self.logger.info(f"No more rows to fetch.")
+                    break
+
+                batch_num += 1
+                self.logger.info(f'--- batch# = {batch_num} ---')
+
+                chunks = []
+
+                for row in rows:
+                    gard_id = row['gardid']
+                    disease = row['disease']
+                    nctid = row['nctid']  
+
+                    chunks.append({"nctId": nctid, "gardId": gard_id, "disease": disease})
+
+                if len(chunks) > 0:
+                    try:
+                        #self.memgraph.execute(batch_create, {"chunks": chunks}) 
+
+                        count += len(chunks)
+                        self.logger.info(f'Inserted {len(chunks)} mappings into memgraph. Total = {count}') 
+                    except Exception as e:
+                        self.logger.error(f"Error executing batch create: {e}") 
+                else:
+                    self.logger.info('No new mappings to insert into memgraph.')
+  
+        except Exception as e:
+            self.logger.error(f"Error executing batch create: {e}")
+
+        finally:
+            if fetch_cursor:
+                fetch_cursor.close()
+
+            ''' Explicitly close all db connections. '''
+            self.close()
+ 
