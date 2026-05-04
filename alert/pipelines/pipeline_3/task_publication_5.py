@@ -153,6 +153,7 @@ class PublicationTask_5(PipelineBase):
 
                 try:
                     if list_of_tuples:
+                        
                         insert_cursor.executemany(insert_sql, list_of_tuples)
                         self.mysql.commit()
 
