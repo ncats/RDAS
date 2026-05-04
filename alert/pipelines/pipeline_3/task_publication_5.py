@@ -42,8 +42,7 @@ class PublicationTask_5(PipelineBase):
         self.retrieve_pubtator()
 
         ''' step 2 '''
-        # Not tested yet
-        #self.parse_pubtator()
+        self.parse_pubtator()
 
         ''' step 3  '''
 
@@ -60,28 +59,24 @@ class PublicationTask_5(PipelineBase):
         publication_pubtator_parsed.
         '''
         fetch_query = '''
-            WITH BatchToProcess AS (
+            SELECT btp.pubmed_id, btp.source_json
+            FROM (
                 SELECT pp.pubmed_id, pp.source_json
                 FROM update_publication_article upa
-                INNER JOIN publication_pubtator pp
-                    ON upa.pubmed_id = pp.pubmed_id
+                INNER JOIN publication_pubtator pp ON upa.pubmed_id = pp.pubmed_id
                 WHERE upa.is_new = 1
                 AND pp.source_json IS NOT NULL
-            )
-            SELECT btp.pubmed_id, btp.source_json
-            FROM BatchToProcess btp
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM publication_pubtator_parsed parsed
-                WHERE btp.pubmed_id = parsed.pubmed_id
-            )
+            ) btp
+            LEFT JOIN publication_pubtator_parsed parsed
+                ON btp.pubmed_id = parsed.pubmed_id
+            WHERE parsed.pubmed_id IS NULL
         '''
 
-        insert_sql = 'INSERT INTO publication_pubtator_parsed (pubmed_id, source_json) VALUES (%s, %s)'
+        insert_sql = f'INSERT INTO publication_pubtator_parsed (pubmed_id, infons_identifier, infons_type, infons_text, relation_type) VALUES (%s, %s, %s, %s, %s)'
 
         count = 0
         batch_num = 0
-        batch_size = 10
+        batch_size = 100
 
         insert_cursor = None
         fetch_cursor = None
@@ -95,7 +90,7 @@ class PublicationTask_5(PipelineBase):
             while True:
 
                 rows = fetch_cursor.fetchmany(batch_size)
-                
+
                 if not rows:
                     self.logger.info(f"No more rows to fetch.")
                     break
@@ -109,10 +104,10 @@ class PublicationTask_5(PipelineBase):
                     pubmed_id = row['pubmed_id']
                     source_json = row.get('source_json') or '{}'
 
-                    try: 
+                    try:
                         ''' This will raise a TypeError if row['source_json'] is None, or a JSONDecodeError if it's an empty string or invalid JSON. '''
                         data = json.loads(source_json)
-                            
+
                         if not data:
                             self.logger.info(f'No valid content found for pubmed_id: {pubmed_id}')
                             continue
@@ -120,30 +115,30 @@ class PublicationTask_5(PipelineBase):
                         pubTator3_content = data.get('PubTator3', [{}])
                         ''' Safely get the passages list from the first element, defaulting to an empty list '''
                         passages = pubTator3_content[0].get('passages', [])
-                    
+
                         if not passages:
                             self.logger.info(f'No PubTator3 or no passages found for pubmed_id: {pubmed_id}')
                             continue
-                        
+
                         relation_type = None
 
                         for passage in passages:
                             ''' Use .get() with a default empty dict to prevent errors if 'infons' is missing '''
                             relation_type = passage.get('infons', {}).get('type')
 
-                            for ann in passage.get('annotations', []): 
+                            for ann in passage.get('annotations', []):
                                 ''' Use .get() with default empty dictionary {} for safe nested access '''
                                 ann_infons = ann.get('infons', {})
-                                
+
                                 ''' Safely extract from nested dicts, defaulting to None if key is absent '''
                                 obj = {
-                                    'pubmed_id': pubmed_id,                                     
+                                    'pubmed_id': pubmed_id,
                                     'infons_identifier': ann_infons.get('identifier'),
                                     'infons_type': ann_infons.get('type'),
                                     'infons_text': ann.get('text'),
                                     'relation_type': relation_type
-                                } 
- 
+                                }
+
                                 val_list.append(obj)
 
                     except (json.JSONDecodeError, TypeError) as e:
@@ -156,16 +151,17 @@ class PublicationTask_5(PipelineBase):
 
                 list_of_tuples = self.convert_to_tuples(merged_val_list)
 
-                try: 
-                    if len(list_of_tuples) > 0:
+                try:
+                    if list_of_tuples:
                         insert_cursor.executemany(insert_sql, list_of_tuples)
                         self.mysql.commit()
-                    
+
                         count += len(list_of_tuples)
-                        self.logger.info(f'Inserted {len(list_of_tuples)} rows into publication_pubtator_parsed table. Current total count = {count}') 
+                        self.logger.info(f'Inserted {len(list_of_tuples)} rows into publication_pubtator_parsed table. Current total count = {count}')
 
                 except Exception as e:
-                   self.logger.error(f'While inserting into publication_pubtator_parsed table:\n{e}')
+                    self.logger.error(f'While inserting into publication_pubtator_parsed table:\n{e}')
+                    self.mysql.rollback()
 
         except Exception as e:
             self.logger.error(f"An unexpected error occurred: {e}")
@@ -176,7 +172,8 @@ class PublicationTask_5(PipelineBase):
 
             if insert_cursor:
                 insert_cursor.close()
-            
+        
+        self.logger.info(f'Total inserted = {count} rows into publication_pubtator_parsed table')
         
 
     def retrieve_pubtator(self):
@@ -256,6 +253,8 @@ class PublicationTask_5(PipelineBase):
 
             if insert_cursor:
                 insert_cursor.close()
+
+        self.logger.info(f'Total inserted = {count} rows into publication_pubtator table')
  
 
 
