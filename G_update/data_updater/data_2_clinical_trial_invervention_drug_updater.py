@@ -35,7 +35,7 @@ class InterventionDrugDataUpdater(InitBase):
 
     def __init__(self):
 
-        super().__init__('clinical_trail_intervention_drug', 'Data-ClinicalTrial-InterventionDrugDataUpdater')
+        super().__init__('clinical_trial_intervention_drug', 'Data-ClinicalTrial-InterventionDrugDataUpdater')
 
         self.timeout = 10
         self.max_retries = 10         

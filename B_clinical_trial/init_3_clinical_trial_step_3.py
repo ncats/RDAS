@@ -76,7 +76,7 @@ class InterventionDrugInitializer:
     def rxnorm_map(self, gardid, disease, nctid, intervention_name):
 
         cursor = self.mysql.cursor()
-        sql = "INSERT INTO clinical_trail_intervention_drug (gardId, disease, nctid, rxnormid, intervention, drug_name, wspacy, property_key, property_val) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        sql = "INSERT INTO clinical_trial_intervention_drug (gardId, disease, nctid, rxnormid, intervention, drug_name, wspacy, property_key, property_val) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
 
         def add_to_db(rxdata, intervention, drug_name, wspacy):
 

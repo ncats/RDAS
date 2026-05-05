@@ -22,7 +22,7 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean
 
 """
-Store Clinical-Trial Intervertion-Drug properties into clinical_trail_intervention_drug table
+Store Clinical-Trial Intervertion-Drug properties into clinical_trial_intervention_drug table
 """
 # Reference: B_clinical_trial/init_3_clinical_trial_step_3.py
 
@@ -104,7 +104,7 @@ class ClinicalTrialTask_3(PipelineBase):
         cursor = self.mysql.cursor()
 
         sql = '''
-            INSERT INTO clinical_trail_intervention_drug (gardId, disease, nctid, rxnormid, intervention, drug_name, wspacy, property_key, property_val, is_new)
+            INSERT INTO clinical_trial_intervention_drug (gardId, disease, nctid, rxnormid, intervention, drug_name, wspacy, property_key, property_val, is_new)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         '''
 

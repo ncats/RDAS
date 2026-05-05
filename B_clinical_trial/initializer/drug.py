@@ -15,7 +15,7 @@ class DrugInitializer(InitBase):
 
     def __init__(self): 
 
-        super().__init__('clinical_trail_intervention_drug', 'Drug')
+        super().__init__('clinical_trial_intervention_drug', 'Drug')
 
         self.no_column_named_processed = True
         
@@ -105,7 +105,7 @@ class DrugInitializer(InitBase):
         # 1. Create optimized index with property_key FIRST
         '''
         CREATE INDEX idx_drug_optimized 
-            ON clinical_trail_intervention_drug(
+            ON clinical_trial_intervention_drug(
                 property_key,
                 RxNormID, 
                 intervention,
@@ -115,7 +115,7 @@ class DrugInitializer(InitBase):
         # 2. Create index for filter
         ''' 
         CREATE INDEX idx_drug_group_filter 
-            ON clinical_trail_intervention_drug(
+            ON clinical_trial_intervention_drug(
                 RxNormID,
                 intervention,
                 wspacy,

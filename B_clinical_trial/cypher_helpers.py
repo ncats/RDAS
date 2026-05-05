@@ -659,7 +659,7 @@ def cypher_Intervention(nctid, study):
         # Ignore the `Drug`` at this time. 
         # The "Drug" nodes will be created by "RxNormID" and create the relationship from Intervention to Drug in the later process(init_clinical_trial_step_4.py).
 
-        # see init_clinical_trial_step_3.py, the drug properties are in table "clinical_trail_intervention_drug" (Also 'drug_property')
+        # see init_clinical_trial_step_3.py, the drug properties are in table "clinical_trial_intervention_drug" (Also 'drug_property')
         # See init_clinical_trial_step_4.py
 
         '''
