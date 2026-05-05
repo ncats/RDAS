@@ -25,9 +25,12 @@ Find and store newly published PubMed articles for updated GARD diseases.
 
 For each GARD node, this pipeline searches PubMed with the node's filtered
 disease names between the node's last update date and today. 
-It downloads article metadata for PMIDs that are not already in publication_article,
-stores those article rows in update_publication_article, and records the
-GARD/search-term/PMID relationship in publication_gard_searchterm_pubmed_mapping.
+
+It downloads article metadata for PMIDs that are NOT already in publication_article,
+stores those article rows in UPDATE_publication_article, and records the
+GARD/search-term/PMID relationship(unique)in publication_gard_searchterm_pubmed_mapping.
+
+*** Needs copy arictles from UPDATE_publication_article to publication_article later ***
 """
 # Reference: C_publication/init_1_publication_gard_pubmed-id.py
 # Reference: C_publication/init_2_1_publication-gard-searchterm-pubmed-mapping.py
