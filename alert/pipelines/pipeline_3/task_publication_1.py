@@ -36,6 +36,18 @@ GARD/search-term/PMID relationship(unique)in publication_gard_searchterm_pubmed_
 # Reference: C_publication/init_2_1_publication-gard-searchterm-pubmed-mapping.py
 # Reference: C_publication/init_3_1_publication-article-by-pubmed-id.py
 
+# The pubmed_id in publication_article & UPDATE_publication_article are unique
+'''
+# check uniqueness of pubmed_id in update_publication_article/publication_article
+
+SELECT distinct pubmed_id, count(*) as ct
+FROM rdas_db.update_publication_article
+WHERE pubmed_id IS NOT NULL
+GROUP BY pubmed_id
+HAVING COUNT(*) > 1
+limit 10;
+'''
+
 class PublicationTask_1(PipelineBase):
 
 
@@ -44,7 +56,6 @@ class PublicationTask_1(PipelineBase):
         super().__init__(init_mysql=True, init_memgraph=False)
 
         self.api_key = os.getenv("NCBI_KEY") 
-
         self.publication_worker = PublicationWorker()
 
 
