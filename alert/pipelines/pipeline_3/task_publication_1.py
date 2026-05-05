@@ -169,33 +169,34 @@ class PublicationTask_1(PipelineBase):
         try:
             # 1.
               
-            # 2. check if the pubmed_id is already in the publication_article table
+            # 2. check if the pubmed_id is already in publication_article or update_publication_article
             placeholders = ",".join(["%s"] * len(pubmed_ids))
 
             batch_check_exist_query = f'''
                 SELECT pubmed_id
                 FROM publication_article
                 WHERE pubmed_id IN ({placeholders})
+                UNION
+                SELECT pubmed_id
+                FROM update_publication_article
+                WHERE pubmed_id IN ({placeholders})
             '''
 
-            check_cursor.execute(batch_check_exist_query, pubmed_ids)
+            check_cursor.execute(batch_check_exist_query, list(pubmed_ids) + list(pubmed_ids))
 
             existing_pubmed_ids = {
                 str(existing_row[0])
                 for existing_row in check_cursor.fetchall()
             }
 
-            if not existing_pubmed_ids:
-                return
-
             # 3. 
             for pubmed_id in pubmed_ids: 
 
-                # the pubmed_is is in publication_article table
+                # the pubmed_id is already in publication_article or update_publication_article table
                 if pubmed_id in existing_pubmed_ids:
                     continue
                  
-                # 5. the pubmed_id is NOT in publication_article, download article
+                # 5. the pubmed_id is NOT in publication_article or update_publication_article, download article
                 article_val = self.publication_worker.download_by_pmid(pubmed_id)
 
                 if not article_val:
