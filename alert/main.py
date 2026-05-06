@@ -11,9 +11,8 @@ sys.path.extend([
     os.path.abspath(os.path.join(_dir, "../..")),
 ])
 
-from utils.tools import _is_english, _is_under_char_threshold
 from utils.applogger import AppLogger
-
+from utils.tools import _is_english, _is_under_char_threshold, _time_hms
 
 class AlertPipelineRunner:
     """
@@ -45,6 +44,8 @@ class AlertPipelineRunner:
 
         self.logger.info("Starting run_find_new_clinical_trial_and_publication_updates().")
 
+        start_time = time.time()
+        total_gard_nodes = 0
         gard_task = None
         clinical_trial_task = None
         publication_task = None
@@ -57,8 +58,6 @@ class AlertPipelineRunner:
             gard_task = GARDTask_1()
             clinical_trial_task = ClinicalTrialTask_1()
             publication_task = PublicationTask_1()
-
-            total_gard_nodes = 0
 
             for batch in gard_task.get_gard_nodes():
                 self.logger.info(f"Processing GARD discovery batch with {len(batch)} nodes.")
@@ -77,8 +76,34 @@ class AlertPipelineRunner:
                     gard_node["updated"] = self.TEST_LAST_UPDATE_DATE or last_update_date
                     gard_node["filtered_names"] = filtered_names
 
+                    gard_id = gard_node.get("gardId") or gard_node.get("gard_id") or "UNKNOWN_GARD_ID"
+                    gard_name = gard_node.get("gardName") or gard_node.get("gard_name") or ""
+
+                    # 1
+                    ct_start_time = time.time()
+ 
                     clinical_trial_task.find_new_data(gard_node)
+
+                    ''' log the total run time '''
+                    ct_hours, ct_minutes, ct_seconds = _time_hms(time.time() - ct_start_time )
+                    self.logger.info(
+                        f"Finished ClinicalTrialTask_1.find_new_data() for {gard_id} {gard_name} "
+                        f"in {ct_hours} hours, {ct_minutes} minutes, "
+                        f"{ct_seconds} seconds."
+                    )
+
+                    # 2
+                    pub_start_time = time.time()
+
                     publication_task.find_new_data(gard_node)
+
+                    ''' log the total run time '''
+                    pub_hours, pub_minutes, pub_seconds = _time_hms(time.time() - pub_start_time)
+                    self.logger.info(
+                        f"Finished PublicationTask_1.find_new_data() for {gard_id} {gard_name} "
+                        f"in {pub_hours} hours, {pub_minutes} minutes, "
+                        f"{pub_seconds} seconds."
+                    )
 
                     total_gard_nodes += 1
 
@@ -88,12 +113,20 @@ class AlertPipelineRunner:
             )
 
         except Exception as e:
-            self.logger.error(f"run_find_new_clinical_trial_and_publication_updates() failed: {e}")
-            raise
+            self.logger.error(f"run_find_new_clinical_trial_and_publication_updates() failed: {e}") 
 
         finally:
             for task in (clinical_trial_task, publication_task, gard_task):
                 self._close_task_if_needed(task)
+
+            ''' log the total run time '''
+            elapsed = time.time() - start_time
+            hours, minutes, seconds = _time_hms(elapsed)
+            self.logger.info(
+                "Finished run_find_new_clinical_trial_and_publication_updates() "
+                f"in {hours} hours, {minutes} minutes, {seconds} seconds. "
+                f"Processed {total_gard_nodes} GARD nodes."
+            )
 
 
     def run_mysql_database_updates(self) -> None:
@@ -156,6 +189,7 @@ class AlertPipelineRunner:
         self.logger.info("Starting run_memgraph_database_updates().")
 
         self.run_clinical_trial_graph_updates()
+        
         self.run_publication_graph_updates()
 
         self.logger.info("Completed run_memgraph_database_updates().")
@@ -279,7 +313,10 @@ class AlertPipelineRunner:
             task.process_new_data()
 
             elapsed = time.time() - start_time
-            self.logger.info(f"Finished task: {name} in {elapsed:.2f} seconds.")
+            hours, minutes, seconds = _time_hms(elapsed)
+            self.logger.info(
+                f"Finished task: {name} in {hours} hours, {minutes} minutes, {seconds} seconds."
+            )
 
         except Exception as e:
             self.logger.error(f"Task failed: {name}. Error: {e}")
