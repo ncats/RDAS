@@ -156,6 +156,7 @@ class AlertPipelineRunner:
         self.logger.info("Starting run_memgraph_database_updates().")
 
         self.run_clinical_trial_graph_updates()
+        self.run_publication_graph_updates()
 
         self.logger.info("Completed run_memgraph_database_updates().")
 
@@ -192,14 +193,29 @@ class AlertPipelineRunner:
         self.logger.info("Completed run_clinical_trial_graph_updates().")
 
 
+    def run_publication_graph_updates(self) -> None:
+        """Run publication Memgraph node and relationship update tasks."""
+
+        self.logger.info("Starting run_publication_graph_updates().")
+
+        from pipelines.pipeline_3.task_publication_graph_1 import PublicationGraphTask_1
+
+        self._run_pipeline_task(PublicationGraphTask_1)
+
+        self.logger.info("Completed run_publication_graph_updates().")
+
+
+
     def run_pipeline_completion_update(self) -> None:
         """Run final graph statistics updates after pipeline data loads finish."""
 
         self.logger.info("Starting run_pipeline_completion_update().")
 
         from pipelines.pipeline_5.task_pipeline_completion_update_1 import PipelineCompletionUpdateTask_1
+        from pipelines.pipeline_5.task_pipeline_completion_update_2 import PipelineCompletionUpdateTask_2
 
         self._run_pipeline_task(PipelineCompletionUpdateTask_1)
+        self._run_pipeline_task(PipelineCompletionUpdateTask_2)
 
         self.logger.info("Completed run_pipeline_completion_update().")
 
