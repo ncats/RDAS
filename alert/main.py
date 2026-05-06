@@ -138,12 +138,14 @@ class AlertPipelineRunner:
         from pipelines.pipeline_3.task_publication_4 import PublicationTask_4
         from pipelines.pipeline_3.task_publication_5 import PublicationTask_5
         from pipelines.pipeline_3.task_publication_6 import PublicationTask_6
+        from pipelines.pipeline_3.task_publication_7 import PublicationTask_7
 
         self._run_pipeline_task(PublicationTask_2)
         self._run_pipeline_task(PublicationTask_3)
         self._run_pipeline_task(PublicationTask_4)
         self._run_pipeline_task(PublicationTask_5)
         self._run_pipeline_task(PublicationTask_6)
+        self._run_pipeline_task(PublicationTask_7)
 
         self.logger.info("Completed run_publication_mysql_updates().")
 
