@@ -51,6 +51,7 @@ from D_grant.initializer.core_project import CoreProjectInitializer
 from D_grant.initializer.patent import PatentInitializer
 #from D_grant.initializer.agent  import AgentInitializer
 from D_grant.initializer.annotation import GrantAnnotationInitializer
+from D_grant.initializer.core_project_GARD_relation import CoreProjectToGARDRelationInitializer
 from D_grant.initializer.core_project_article_relation import CoreProjectToArticleRelationInitializer
 from D_grant.initializer.core_project_clinical_trail_relation import CoreProjectClinicalTrialRelationInitializer
 from D_grant.initializer.funding_IC import FundingIcInitializer
@@ -120,6 +121,7 @@ if __name__ == '__main__':
         PatentInitializer,
         #AgentInitializer,
         GrantAnnotationInitializer,
+        CoreProjectToGARDRelationInitializer,
         CoreProjectToArticleRelationInitializer,
         CoreProjectClinicalTrialRelationInitializer,
         FundingIcInitializer
@@ -128,7 +130,8 @@ if __name__ == '__main__':
 
     # testing
     base_initializers = [  
-        EpiAndNhsCountsInitializer
+        #EpiAndNhsCountsInitializer
+        CoreProjectToGARDRelationInitializer
     ]
 
     for index, InitializerClass in enumerate(base_initializers):
