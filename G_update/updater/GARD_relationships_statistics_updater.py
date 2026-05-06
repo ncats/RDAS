@@ -51,7 +51,22 @@ class GARDRelationshipsStatisticsUpdater(InitBase):
             WITH count(r) as counts, n
             SET n.countTrials = counts
             """,
+
+            # Set count of CoreProject
+            """
+            MATCH (n:Disease)-[r]-(a:CoreProject)
+            WITH count(r) as counts, n
+            SET n.countCoreProjects = counts
+            """,
             
+            # Set count of Project
+            """
+            MATCH (n:Disease)-[r]-(a:Project)
+            WITH count(r) as counts, n
+            SET n.countProjects = counts
+            """,
+            
+
             # Set count of genes
             """
             MATCH (n:Disease)-[r]-(a:Gene)
