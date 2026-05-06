@@ -199,8 +199,26 @@ class AlertPipelineRunner:
         self.logger.info("Starting run_publication_graph_updates().")
 
         from pipelines.pipeline_3.task_publication_graph_1 import PublicationGraphTask_1
+        from pipelines.pipeline_3.task_publication_graph_2 import PublicationGraphTask_2
+        from pipelines.pipeline_3.task_publication_graph_3 import PublicationGraphTask_3
+        from pipelines.pipeline_3.task_publication_graph_4 import PublicationGraphTask_4
+        from pipelines.pipeline_3.task_publication_graph_5 import PublicationGraphTask_5
+        from pipelines.pipeline_3.task_publication_graph_6 import PublicationGraphTask_6
+        from pipelines.pipeline_3.task_publication_graph_7 import PublicationGraphTask_7
+        from pipelines.pipeline_3.task_publication_graph_8 import PublicationGraphTask_8
+        from pipelines.pipeline_3.task_publication_graph_9 import PublicationGraphTask_9
+        from pipelines.pipeline_3.task_publication_graph_10 import PublicationGraphTask_10
 
         self._run_pipeline_task(PublicationGraphTask_1)
+        self._run_pipeline_task(PublicationGraphTask_2)
+        self._run_pipeline_task(PublicationGraphTask_3)
+        self._run_pipeline_task(PublicationGraphTask_4)
+        self._run_pipeline_task(PublicationGraphTask_5)
+        self._run_pipeline_task(PublicationGraphTask_6)
+        self._run_pipeline_task(PublicationGraphTask_7)
+        self._run_pipeline_task(PublicationGraphTask_8)
+        self._run_pipeline_task(PublicationGraphTask_9)
+        self._run_pipeline_task(PublicationGraphTask_10)
 
         self.logger.info("Completed run_publication_graph_updates().")
 
