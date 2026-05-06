@@ -2,7 +2,7 @@ import os
 import sys
 import time
 from datetime import date, timedelta
-from typing import Optional, Type
+from typing import Any, Optional, Type
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -12,89 +12,99 @@ sys.path.extend([
 ])
 
 from utils.tools import _is_english, _is_under_char_threshold
-from pipelines.pipeline_base import PipelineBase
-from pipelines.pipeline_1.task_gard_1 import GARDTask_1
-from pipelines.pipeline_2.task_clinical_trial_1 import ClinicalTrialTask_1
-from pipelines.pipeline_3.task_publication_1 import PublicationTask_1
-from alert_sender import AlertSender
+from utils.applogger import AppLogger
 
 
-class AlertPipelineRunner(PipelineBase):
+class AlertPipelineRunner:
     """
     This class owns the high-level order only. Each individual pipeline task
     still opens, uses, and closes its own database connections.
     """
 
+    # Testing override from the original script. Set this to None for PRODUCTION.
+    TEST_LAST_UPDATE_DATE = date(2025, 7, 1)
+
+
     def __init__(self, look_back_days: int = 7):
 
-        super().__init__(init_mysql=False, init_memgraph=False)
-
         self.look_back_days = look_back_days
+        self.log_dir = "logs"
+        os.makedirs(self.log_dir, exist_ok=True)
+
+        class_name = type(self).__name__
+        self.log_file = f"{self.log_dir}/alert-{class_name}.log"
+        self.logger = AppLogger(class_name, self.log_file).get_logger()
+
+        self.logger.info(f'\n\n{"*" * 20} The {class_name} is initialized. {"*" * 20}\n')
         self.logger.info(f"AlertPipelineRunner configured with look_back_days={self.look_back_days}.")
 
 
-    def _run_pipeline_task(self, task_class: Type[PipelineBase], task_name: Optional[str] = None) -> None:
 
-        """Run one PipelineBase task and log the duration."""
+    def run_find_new_clinical_trial_and_publication_updates(self) -> None:
+        """Search for new clinical trials and publications for updated GARD nodes."""
 
-        name = task_name or task_class.__name__
+        self.logger.info("Starting run_find_new_clinical_trial_and_publication_updates().")
 
-        start_time = time.time()
-        task = None
-
-        self.logger.info(f"Starting task: {name}")
+        gard_task = None
+        clinical_trial_task = None
+        publication_task = None
 
         try:
-            task = task_class()
-            task.process_new_data()
+            from pipelines.pipeline_1.task_gard_1 import GARDTask_1
+            from pipelines.pipeline_2.task_clinical_trial_1 import ClinicalTrialTask_1
+            from pipelines.pipeline_3.task_publication_1 import PublicationTask_1
 
-            elapsed = time.time() - start_time
-            self.logger.info(f"Finished task: {name} in {elapsed:.2f} seconds.")
+            gard_task = GARDTask_1()
+            clinical_trial_task = ClinicalTrialTask_1()
+            publication_task = PublicationTask_1()
+
+            total_gard_nodes = 0
+
+            for batch in gard_task.get_gard_nodes():
+                self.logger.info(f"Processing GARD discovery batch with {len(batch)} nodes.")
+
+                for gard_node in batch:
+                    filtered_names = self._get_filtered_gard_names(gard_node)
+
+                    last_update_date = gard_node.get("updated")
+                    if last_update_date is None:
+                        last_update_date = date.today() - timedelta(days=self.look_back_days)
+
+                    '''
+                    # TEST_LAST_UPDATE_DATE keeps the old testing behavior in one place;
+                    set it to None to use the real last_update_date.
+                    '''
+                    gard_node["updated"] = self.TEST_LAST_UPDATE_DATE or last_update_date
+                    gard_node["filtered_names"] = filtered_names
+
+                    clinical_trial_task.find_new_data(gard_node)
+                    publication_task.find_new_data(gard_node)
+
+                    total_gard_nodes += 1
+
+            self.logger.info(
+                "Completed run_find_new_clinical_trial_and_publication_updates(); "
+                f"processed {total_gard_nodes} GARD nodes."
+            )
 
         except Exception as e:
-            self.logger.error(f"Task failed: {name}. Error: {e}")
+            self.logger.error(f"run_find_new_clinical_trial_and_publication_updates() failed: {e}")
             raise
 
         finally:
-            '''
-            # Most tasks close themselves, but this prevents leaked connections if a task raises before reaching its own cleanup block.
-            '''
-            if task is not None and (
-                getattr(task, "mysql", None) is not None
-                or getattr(task, "memgraph", None) is not None
-            ):
-                task.close()
+            for task in (clinical_trial_task, publication_task, gard_task):
+                self._close_task_if_needed(task)
 
 
+    def run_mysql_database_updates(self) -> None:
+        """Run all MySQL update stages."""
 
-    def find_new_data(self, gard_node=None) -> None:
-        """Run the GARD-driven discovery step for new trials and publications."""
+        self.logger.info("Starting run_mysql_database_updates().")
 
-        self.logger.info("Starting find_new_data().")
+        self.run_clinical_trial_mysql_updates()
+        self.run_publication_mysql_updates()
 
-        self.run_find_new_clinical_trial_and_publication_updates()
-
-        self.logger.info("Completed find_new_data().")
-
-
-    def process_new_data(self) -> None:
-        """Run the full data update workflow in order."""
-
-        start_time = time.time()
-        self.logger.info("Starting full data update pipeline workflow.")
-
-        try:
-            self.find_new_data()
-            self.run_mysql_database_updates()
-            self.run_memgraph_database_updates()
-            self.run_pipeline_completion_update()
-
-            elapsed = time.time() - start_time
-            self.logger.info(f"Completed full data update pipeline workflow in {elapsed:.2f} seconds.")
-
-        except Exception as e:
-            self.logger.error(f"Full data update pipeline workflow failed: {e}")
-            raise
+        self.logger.info("Completed run_mysql_database_updates().")
 
 
     def run_clinical_trial_mysql_updates(self) -> None:
@@ -136,6 +146,16 @@ class AlertPipelineRunner(PipelineBase):
         self._run_pipeline_task(PublicationTask_6)
 
         self.logger.info("Completed run_publication_mysql_updates().")
+
+
+    def run_memgraph_database_updates(self) -> None:
+        """Run all Memgraph update stages."""
+
+        self.logger.info("Starting run_memgraph_database_updates().")
+
+        self.run_clinical_trial_graph_updates()
+
+        self.logger.info("Completed run_memgraph_database_updates().")
 
 
     def run_clinical_trial_graph_updates(self) -> None:
@@ -182,90 +202,6 @@ class AlertPipelineRunner(PipelineBase):
         self.logger.info("Completed run_pipeline_completion_update().")
 
 
-    def run_find_new_clinical_trial_and_publication_updates(self) -> None:
-        """Search for new clinical trials and publications for updated GARD nodes."""
-
-        self.logger.info("Starting run_find_new_clinical_trial_and_publication_updates().")
-
-        gard_task = None
-        clinical_trial_task = None
-        publication_task = None
-
-        try:
-            gard_task = GARDTask_1()
-            clinical_trial_task = ClinicalTrialTask_1()
-            publication_task = PublicationTask_1()
-
-            total_gard_nodes = 0
-
-            for batch in gard_task.get_gard_nodes():
-                self.logger.info(f"Processing GARD discovery batch with {len(batch)} nodes.")
-
-                for gard_node in batch:
-                    name = gard_node["gardName"]
-                    synonyms = gard_node["synonyms"]
-
-                    english_synonyms = [syn for syn in synonyms if _is_english(syn)]
-                    short_synonyms = [syn for syn in synonyms if _is_under_char_threshold(syn)]
-
-                    filtered_synonyms = [syn for syn in synonyms if syn in english_synonyms]
-                    filtered_synonyms = [syn for syn in filtered_synonyms if syn not in short_synonyms]
-
-                    last_update_date = gard_node.get("updated")
-                    if last_update_date is None:
-                        last_update_date = date.today() - timedelta(days=self.look_back_days)
-
-                    # Testing override from the original script. Use last_update_date
-                    # below for production.
-                    gard_node["updated"] = date(2025, 7, 1)
-                    # gard_node["updated"] = last_update_date
-
-                    gard_node["filtered_names"] = [name] + filtered_synonyms
-
-                    clinical_trial_task.find_new_data(gard_node)
-                    publication_task.find_new_data(gard_node)
-
-                    total_gard_nodes += 1
-
-            self.logger.info(
-                "Completed run_find_new_clinical_trial_and_publication_updates(); "
-                f"processed {total_gard_nodes} GARD nodes."
-            )
-
-        except Exception as e:
-            self.logger.error(f"run_find_new_clinical_trial_and_publication_updates() failed: {e}")
-            raise
-
-        finally:
-            for task in (clinical_trial_task, publication_task, gard_task):
-                if task is not None and (
-                    getattr(task, "mysql", None) is not None
-                    or getattr(task, "memgraph", None) is not None
-                ):
-                    task.close()
-
-
-    def run_mysql_database_updates(self) -> None:
-        """Run all MySQL update stages."""
-
-        self.logger.info("Starting run_mysql_database_updates().")
-
-        self.run_clinical_trial_mysql_updates()
-        self.run_publication_mysql_updates()
-
-        self.logger.info("Completed run_mysql_database_updates().")
-
-
-
-    def run_memgraph_database_updates(self) -> None:
-        """Run all Memgraph update stages."""
-
-        self.logger.info("Starting run_memgraph_database_updates().")
-
-        self.run_clinical_trial_graph_updates()
-
-        self.logger.info("Completed run_memgraph_database_updates().")
-
 
     def send_alert(self, look_back_days: Optional[int] = None) -> None:
         """Send alert emails for the newly staged records."""
@@ -276,6 +212,8 @@ class AlertPipelineRunner(PipelineBase):
         days = look_back_days if look_back_days is not None else self.look_back_days
 
         try:
+            from alert_sender import AlertSender
+
             alert_sender = AlertSender(days)
             alert_sender.find_new_and_send_alert()
 
@@ -286,12 +224,78 @@ class AlertPipelineRunner(PipelineBase):
             raise
 
         finally:
-            if alert_sender is not None and (
-                getattr(alert_sender, "mysql", None) is not None
-                or getattr(alert_sender, "memgraph", None) is not None
-            ):
-                alert_sender.close()
+            self._close_task_if_needed(alert_sender)
 
+
+
+    def _run_pipeline_task(self, task_class: Type[Any], task_name: Optional[str] = None) -> None:
+        """Run one pipeline task and log the duration."""
+
+        name = task_name or task_class.__name__
+
+        start_time = time.time()
+        task = None
+
+        self.logger.info(f"Starting task: {name}")
+
+        try:
+            task = task_class()
+            task.process_new_data()
+
+            elapsed = time.time() - start_time
+            self.logger.info(f"Finished task: {name} in {elapsed:.2f} seconds.")
+
+        except Exception as e:
+            self.logger.error(f"Task failed: {name}. Error: {e}")
+            raise
+
+        finally:
+            self._close_task_if_needed(task)
+
+
+
+    def _get_filtered_gard_names(self, gard_node) -> list:
+        """Build the disease search names used by the first trial/publication tasks."""
+
+        name = gard_node["gardName"]
+        synonyms = gard_node["synonyms"]
+
+        english_synonyms = [syn for syn in synonyms if _is_english(syn)]
+        short_synonyms = [syn for syn in synonyms if _is_under_char_threshold(syn)]
+
+        filtered_synonyms = [syn for syn in synonyms if syn in english_synonyms]
+        filtered_synonyms = [syn for syn in filtered_synonyms if syn not in short_synonyms]
+
+        return [name] + filtered_synonyms
+
+
+
+    def _close_task_if_needed(self, task) -> None:
+        """Close a child task only if it still owns an open database handle."""
+
+        if task is None:
+            return
+
+        if getattr(task, "mysql", None) is None and getattr(task, "memgraph", None) is None:
+            return
+
+        task.close()
+
+
+
+    def close(self) -> None:
+        """Flush and close the runner logger."""
+
+        if not getattr(self, "logger", None):
+            return
+
+        for handler in list(self.logger.handlers):
+            handler.flush()
+            handler.close()
+            self.logger.removeHandler(handler)
+
+        self.logger = None
+        print("Logger closed")
 
 
 
@@ -301,7 +305,7 @@ if __name__ == "__main__":
 
     try:
         # Step 1
-        # runner.find_new_data()
+        # runner.run_find_new_clinical_trial_and_publication_updates()
 
         # Step 2
         # runner.run_mysql_database_updates()
@@ -315,8 +319,6 @@ if __name__ == "__main__":
         # Step 9
         # runner.send_alert()
 
-        # Full workflow
-        # runner.process_new_data()
         pass
 
     finally:
