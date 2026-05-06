@@ -9,6 +9,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
+from utils.tools import _as_bool, _empty_if_none
 
 """
 Insert new Article nodes into Memgraph from update_publication_article.
@@ -134,19 +135,19 @@ class PublicationGraphTask_1(PipelineBase):
 
         return {
             "pubmedId": pubmed_id,
-            "doi": self._value(row.get("doi")),
-            "title": self._value(row.get("title")),
-            "abstractText": self._value(row.get("abstract_text")),
-            "firstPublicationDate": self._value(row.get("first_publication_date")),
+            "doi": _empty_if_none(row.get("doi")),
+            "title": _empty_if_none(row.get("title")),
+            "abstractText": _empty_if_none(row.get("abstract_text")),
+            "firstPublicationDate": _empty_if_none(row.get("first_publication_date")),
             "publicationYear": row.get("publication_year"),
             "citationCount": row.get("cited_by_count"),
-            "isOpenAccess": self._as_bool(row.get("is_open_access")),
-            "inEPMC": self._as_bool(row.get("in_EPMC")),
-            "inPMC": self._as_bool(row.get("in_PMC")),
-            "isEpidemiologicalStudy": self._as_bool(row.get("is_EPI")),
-            "isNaturalHistoryStudy": self._as_bool(row.get("is_NHS")),
-            "hasPDF": self._as_bool(row.get("has_PDF")),
-            "pubType": self._value(row.get("pub_type")),
+            "isOpenAccess": _as_bool(row.get("is_open_access")),
+            "inEPMC": _as_bool(row.get("in_EPMC")),
+            "inPMC": _as_bool(row.get("in_PMC")),
+            "isEpidemiologicalStudy": _as_bool(row.get("is_EPI")),
+            "isNaturalHistoryStudy": _as_bool(row.get("is_NHS")),
+            "hasPDF": _as_bool(row.get("has_PDF")),
+            "pubType": _empty_if_none(row.get("pub_type")),
             "dateCreatedByRDAS": self.formatted_today,
             "lastUpdatedDateByRDAS": self.formatted_today,
 
@@ -155,22 +156,3 @@ class PublicationGraphTask_1(PipelineBase):
             "issue": "",
             "volume": "",
         }
-
-
-    @staticmethod
-    def _value(value: Any) -> Any:
-        return "" if value is None else value
-
-
-    @staticmethod
-    def _as_bool(value: Any) -> bool:
-        if isinstance(value, bool):
-            return value
-
-        if isinstance(value, int):
-            return value == 1
-
-        if isinstance(value, str):
-            return value.strip().lower() in {"1", "true", "t", "yes", "y"}
-
-        return False

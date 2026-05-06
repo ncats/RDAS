@@ -9,7 +9,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _clean, _make_hash_key
+from utils.tools import _clean, _make_hash_key, _to_stripped_string
 
 """
 Create Substance nodes for newly staged publication articles.
@@ -183,8 +183,8 @@ class PublicationGraphTask_10(PipelineBase):
                 if pubmed_id is not None:
                     pubmed_id_list.append(pubmed_id)
 
-                row_substance_name = self._value(row.get("substance_name"))
-                row_registry_number = self._value(row.get("registry_number"))
+                row_substance_name = _to_stripped_string(row.get("substance_name"))
+                row_registry_number = _to_stripped_string(row.get("registry_number"))
                 row_registry_number = None if row_registry_number == "0" else row_registry_number
 
                 substance_name = substance_name or row_substance_name
@@ -208,8 +208,7 @@ class PublicationGraphTask_10(PipelineBase):
         return substances
 
 
-    @staticmethod
-    def _make_composite_key(substance_name: Any, registry_number: Any) -> str:
+    def _make_composite_key(self, substance_name: Any, registry_number: Any) -> str:
 
         if registry_number:
             composite_str = str(registry_number).lower()
@@ -218,11 +217,6 @@ class PublicationGraphTask_10(PipelineBase):
 
         composite_str = "".join(composite_str.split())
         return _make_hash_key(composite_str)
-
-
-    @staticmethod
-    def _value(value: Any) -> str:
-        return "" if value is None else str(value).strip()
 
 
     def _to_int(self, value: Any):

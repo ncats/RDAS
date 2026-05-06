@@ -1,7 +1,5 @@
-import hashlib
 import json
 import os
-import re
 import sys
 from typing import Any, Dict, List
 
@@ -12,6 +10,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
+from utils.tools import _make_hash_key, _to_string
 
 """
 Create PubtatorAnnotation nodes for newly staged publication articles.
@@ -176,8 +175,8 @@ class PublicationGraphTask_9(PipelineBase):
             infons_identifier = "" if (not infons_identifier or infons_identifier == "-") else str(infons_identifier)
 
             pubmed_id_ann_dict[pubmed_id].append({
-                "annotation": self._value(row.get("infons_text")),
-                "annotationType": self._value(row.get("infons_type")),
+                "annotation": _to_string(row.get("infons_text")),
+                "annotationType": _to_string(row.get("infons_type")),
                 "relation_type": self._parse_relation_type(row.get("relation_type"), pubmed_id),
                 "annotationIdentifier": infons_identifier,
             })
@@ -228,7 +227,7 @@ class PublicationGraphTask_9(PipelineBase):
                     "annotation": list(annotations),
                     "annotationType": annotation_type,
                     "relation_type": list(relation_type_tuple),
-                    "_composite_key": self._make_hash_key(composite_key_str),
+                    "_composite_key": _make_hash_key(composite_key_str),
                     "lastUpdatedByRDAS": self.formatted_today,
                     "dateCreatedByRDAS": self.formatted_today,
                 })
@@ -258,15 +257,3 @@ class PublicationGraphTask_9(PipelineBase):
             for item in relation_type
             if item is not None and str(item).strip()
         })
-
-
-    @staticmethod
-    def _value(value: Any) -> str:
-        return "" if value is None else str(value)
-
-
-    @staticmethod
-    def _make_hash_key(input_str: str) -> str:
-        cleaned = re.sub(r"[^\x20-\x7E]+", "", str(input_str))
-        normalized = re.sub(r"\s+", "_", cleaned).lower()
-        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()

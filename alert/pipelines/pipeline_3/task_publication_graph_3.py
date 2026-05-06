@@ -1,4 +1,3 @@
-import hashlib
 import json
 import os
 import sys
@@ -11,6 +10,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
+from utils.tools import _as_list, _make_hash_key, _to_string
 
 """
 Create EpidemiologyAnnotation nodes for new publication articles.
@@ -144,12 +144,12 @@ class PublicationGraphTask_3(PipelineBase):
             self.logger.error(f"Error parsing epi_extract for pubmed_id={pubmed_id}: {e}")
             return None
 
-        epidemiology_type = self._as_list(epi_obj.get("EPI"))
-        epidemiology_rate = self._as_list(epi_obj.get("STAT"))
-        study_date = self._as_list(epi_obj.get("DATE"))
-        study_location = self._as_list(epi_obj.get("LOC"))
-        ethnicity = self._as_list(epi_obj.get("ETHN"))
-        sex = self._as_list(epi_obj.get("SEX"))
+        epidemiology_type = _as_list(epi_obj.get("EPI"))
+        epidemiology_rate = _as_list(epi_obj.get("STAT"))
+        study_date = _as_list(epi_obj.get("DATE"))
+        study_location = _as_list(epi_obj.get("LOC"))
+        ethnicity = _as_list(epi_obj.get("ETHN"))
+        sex = _as_list(epi_obj.get("SEX"))
 
         composite_key = self._make_composite_key(
             epidemiology_type,
@@ -162,7 +162,7 @@ class PublicationGraphTask_3(PipelineBase):
 
         return {
             "pubmedId": pubmed_id,
-            "epiProbability": self._to_string(row.get("epi_probability")),
+            "epiProbability": _to_string(row.get("epi_probability")),
             "epidemiologyType": epidemiology_type,
             "epidemiologyRate": epidemiology_rate,
             "date": study_date,
@@ -175,22 +175,6 @@ class PublicationGraphTask_3(PipelineBase):
         }
 
 
-    @staticmethod
-    def _as_list(value: Any) -> List[str]:
-        if value is None:
-            return []
-
-        if isinstance(value, list):
-            return [str(item) for item in value if item is not None]
-
-        return [str(value)]
-
-
-    @staticmethod
-    def _to_string(value: Any) -> str:
-        return "" if value is None else str(value)
-
-
     def _make_composite_key(self, *values: List[str]) -> str:
         composite_key_str = "_".join(
             "_".join(sorted(value_list))
@@ -198,4 +182,4 @@ class PublicationGraphTask_3(PipelineBase):
         )
         composite_key_str = "_".join(composite_key_str.split())
 
-        return hashlib.sha256(composite_key_str.encode()).hexdigest()
+        return _make_hash_key(composite_key_str)

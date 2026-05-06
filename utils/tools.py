@@ -74,6 +74,44 @@ def write_json_to_file(data: Any, file_path: str) -> None:
         )
 
 
+def _load_json_file(file_path: Any) -> Any:
+    """Load JSON from a path-like value."""
+    path = Path(file_path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"Missing JSON file: {path}")
+
+    with path.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def _format_recipients(recipients: Any) -> Optional[str]:
+    """Format one or more email recipients for an email header."""
+    if recipients is None:
+        return None
+
+    if isinstance(recipients, (list, tuple, set)):
+        return ", ".join(str(email).strip() for email in recipients if str(email).strip())
+
+    return str(recipients)
+
+
+def _recipient_list(*recipient_values: Any) -> List[str]:
+    """Flatten comma-separated and iterable recipient values into a clean list."""
+    recipients = []
+
+    for value in recipient_values:
+        if not value:
+            continue
+
+        if isinstance(value, (list, tuple, set)):
+            recipients.extend(str(email).strip() for email in value if str(email).strip())
+        else:
+            recipients.extend(email.strip() for email in str(value).split(",") if email.strip())
+
+    return recipients
+
+
 def insert_params_to_template(template, params):
 
     real_query = template
@@ -559,6 +597,67 @@ def _safe_get(data: Dict, *keys: str, default: Any = '') -> Any:
         if result == default:
             return default
     return result
+
+
+def _empty_if_none(value: Any) -> Any:
+    """Return an empty string for None, otherwise keep the original value."""
+    return "" if value is None else value
+
+
+def _to_string(value: Any) -> str:
+    """Return an empty string for None, otherwise convert the value to string."""
+    return "" if value is None else str(value)
+
+
+def _to_stripped_string(value: Any) -> str:
+    """Return an empty string for None, otherwise convert to a stripped string."""
+    return "" if value is None else str(value).strip()
+
+
+def _na_if_empty(value: Any) -> str:
+    """Return 'N/A' for None or blank values, otherwise a stripped string."""
+    value = _to_stripped_string(value)
+    return value if value else "N/A"
+
+
+def _as_bool(value: Any) -> bool:
+    """Convert common database/string truthy values to a boolean."""
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, int):
+        return value == 1
+
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "t", "yes", "y"}
+
+    return False
+
+
+def _as_list(value: Any) -> List[str]:
+    """Normalize a scalar/list value to a list of strings."""
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return [str(item) for item in value if item is not None]
+
+    return [str(value)]
+
+
+def _normalize_keywords(value: Any) -> List[str]:
+    """Normalize keyword data to sorted, unique, lowercase strings."""
+    if value is None:
+        return []
+
+    if not isinstance(value, list):
+        value = [value]
+
+    return sorted({
+        str(keyword).strip().lower()
+        for keyword in value
+        if keyword is not None and str(keyword).strip()
+    })
 
 
 def _make_hash_key(input_str: str = None) -> str:

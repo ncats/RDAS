@@ -1,7 +1,7 @@
 import json
 import os
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -10,6 +10,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
+from utils.tools import _normalize_keywords
 
 """
 Create Keyword nodes for new publication articles.
@@ -131,7 +132,7 @@ class PublicationGraphTask_4(PipelineBase):
             return None
 
         try:
-            keywords = self._normalize_keywords(keyword_list.get("keyword", []))
+            keywords = _normalize_keywords(keyword_list.get("keyword", []))
         except Exception as e:
             self.logger.error(f"Error processing keywords for pubmed_id={pubmed_id}: {e}")
             return None
@@ -143,18 +144,3 @@ class PublicationGraphTask_4(PipelineBase):
             "pubmedId": pubmed_id,
             "keywords": keywords,
         }
-
-
-    @staticmethod
-    def _normalize_keywords(value: Any) -> List[str]:
-        if value is None:
-            return []
-
-        if not isinstance(value, list):
-            value = [value]
-
-        return sorted({
-            str(keyword).strip().lower()
-            for keyword in value
-            if keyword is not None and str(keyword).strip()
-        })

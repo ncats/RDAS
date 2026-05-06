@@ -1,55 +1,17 @@
-import json
 import smtplib
 from email.message import EmailMessage
 from pathlib import Path
 
 from .email_template_engine import EmailTemplateEngine
+from utils.tools import _format_recipients, _load_json_file, _recipient_list
 
 CONFIG_PATH = Path(__file__).resolve().with_name("email_config.json")
 
 class EmailClient:
 
-    @staticmethod
-    def _load_email_config():
-
-        if not CONFIG_PATH.exists():
-            raise FileNotFoundError(f"Missing email config file: {CONFIG_PATH}")
-
-        with CONFIG_PATH.open("r", encoding="utf-8") as file:
-            return json.load(file)
-
-
-    @staticmethod
-    def _format_recipients(recipients):
-
-        if recipients is None:
-            return None
-
-        if isinstance(recipients, (list, tuple, set)):
-            return ", ".join(str(email).strip() for email in recipients if str(email).strip())
-
-        return str(recipients)
-
-
-    @staticmethod
-    def _recipient_list(*recipient_values):
-
-        recipients = []
-
-        for value in recipient_values:
-            if not value:
-                continue
-
-            if isinstance(value, (list, tuple, set)):
-                recipients.extend(str(email).strip() for email in value if str(email).strip())
-            else:
-                recipients.extend(email.strip() for email in str(value).split(",") if email.strip())
-
-        return recipients
-
     def __init__(self, mail_to: str = None, mail_from: str = None, mail_cc: str = None):
 
-        config = self._load_email_config()
+        config = _load_json_file(CONFIG_PATH)
 
         self.mail_to = mail_to or config["DEFAULT_TO"]
         self.mail_from = mail_from or config["DEFAULT_FROM"]
@@ -140,11 +102,11 @@ class EmailClient:
             template_name="alert_summary_email_template.html"
         )
 
-        to_value = self._format_recipients(mail_to or self.mail_to)
-        cc_value = self._format_recipients(mail_cc if mail_cc is not None else self.mail_cc)
+        to_value = _format_recipients(mail_to or self.mail_to)
+        cc_value = _format_recipients(mail_cc if mail_cc is not None else self.mail_cc)
         message = self._build_html_message(subject, html_body, mail_to=to_value, mail_cc=cc_value)
 
-        recipients = self._recipient_list(to_value, cc_value)
+        recipients = _recipient_list(to_value, cc_value)
 
         with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=self.smtp_connection_timeout) as server:
             server.timeout = self.smtp_timeout

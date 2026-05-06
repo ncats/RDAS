@@ -10,6 +10,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
+from utils.tools import _na_if_empty
 
 """
 Create Journal nodes for new publication articles.
@@ -150,18 +151,9 @@ class PublicationGraphTask_5(PipelineBase):
         return {
             "pubmedId": pubmed_id,
             "journal": {
-                "title": self._journal_value(journal.get("title")),
-                "issn": self._journal_value(journal.get("issn")),
-                "essn": self._journal_value(journal.get("essn")),
-                "nlmid": self._journal_value(journal.get("nlmid")),
+                "title": _na_if_empty(journal.get("title")),
+                "issn": _na_if_empty(journal.get("issn")),
+                "essn": _na_if_empty(journal.get("essn")),
+                "nlmid": _na_if_empty(journal.get("nlmid")),
             },
         }
-
-
-    @staticmethod
-    def _journal_value(value: Any) -> str:
-        if value is None:
-            return "N/A"
-
-        value = str(value).strip()
-        return value if value else "N/A"

@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta
 from firebase.firebase_query import FirebaseAgent
 from emails.email_client import EmailClient
 from pipelines.pipeline_base import PipelineBase 
+from utils.tools import _recipient_list
 
 load_dotenv()
 
@@ -36,18 +37,6 @@ class AlertSender(PipelineBase):
     def find_new_data(self, gard_node) -> None:
         raise NotImplementedError("AlertSender does not implement find_new_data().")
 
-
-    @staticmethod
-    def _parse_email_recipients(email_recipients):
-        if not email_recipients:
-            return []
-
-        return [
-            email.strip()
-            for email in email_recipients.split(",")
-            if email.strip()
-        ]
- 
 
     '''
     Find new clinical trail & publication and send alert to users which suscribe to them.
@@ -193,7 +182,7 @@ class AlertSender(PipelineBase):
             ''' 5. Send summary email to admins '''
             if all_updates_summary:
                 try:
-                    summary_recipients = self._parse_email_recipients( os.getenv("ALERT_SUMMARY_EMAIL_RECIPIENTS") )
+                    summary_recipients = _recipient_list(os.getenv("ALERT_SUMMARY_EMAIL_RECIPIENTS"))
 
                     if summary_recipients:
 
