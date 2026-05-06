@@ -19,7 +19,7 @@ Create StudyDesign nodes and ClinicalTrial/StudyDesign mappings for new clinical
 # Reference: B_clinical_trial/initializer/study_design.py
 
 
-class ClinicalTrialGraphTask_8(PipelineBase):
+class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
@@ -55,7 +55,7 @@ class ClinicalTrialGraphTask_8(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialGraphTask_8 does not implement find_new_data().")
+        raise NotImplementedError("NewClinicalTrialStudyDesignGraphTask does not implement find_new_data().")
 
 
     # implement

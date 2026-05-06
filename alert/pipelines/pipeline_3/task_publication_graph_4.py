@@ -22,7 +22,7 @@ Article node to each Keyword with has_keyword.
 # Reference: C_publication/initializer/keyword.py
 
 
-class PublicationGraphTask_4(PipelineBase):
+class NewPublicationKeywordGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
@@ -50,7 +50,7 @@ class PublicationGraphTask_4(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        self.logger.info("PublicationGraphTask_4 does not use find_new_data().")
+        self.logger.info("NewPublicationKeywordGraphTask does not use find_new_data().")
 
 
     # implement

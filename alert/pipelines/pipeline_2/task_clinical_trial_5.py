@@ -21,7 +21,7 @@ store the article row in UPDATE_publication_article for the alert workflow.
 """
 # Reference: B_clinical_trial/init_6_clinical_trial_pmids_not_in_Article_umlti.py
 
-class ClinicalTrialTask_5(PipelineBase):
+class ClinicalTrialPmidArticleImportTask(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=False)
@@ -31,7 +31,7 @@ class ClinicalTrialTask_5(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialTask_2 does not implement find_new_data().")
+        raise NotImplementedError("ClinicalTrialPmidArticleImportTask does not implement find_new_data().")
 
 
     # implement

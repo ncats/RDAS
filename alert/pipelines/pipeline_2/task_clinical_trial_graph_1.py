@@ -19,7 +19,7 @@ Insert NEW Clinical Trail nodes
 # Reference: alert/pipelines/pipeline_2/task_clinical_trial_2.py
 # Reference: B_clinical_trial/initializer/clinicaltrial.py
 
-class ClinicalTrialGraphTask_1(PipelineBase):
+class NewClinicalTrialGraphTask(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=True)
@@ -27,7 +27,7 @@ class ClinicalTrialGraphTask_1(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialGraphTask_1 does not implement find_new_data().")
+        raise NotImplementedError("NewClinicalTrialGraphTask does not implement find_new_data().")
 
 
     # implement

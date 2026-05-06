@@ -19,7 +19,7 @@ It recomputes the GARD/Disease relationship count properties used by the UI and 
 """
 # Reference: G_update/updater/GARD_relationships_statistics_updater.py
 
-class PipelineCompletionUpdateTask_1(PipelineBase):
+class GardRelationshipCountRefreshTask(PipelineBase):
 
     '''
     Each tuple is: (short log label, Cypher statement).
@@ -136,7 +136,7 @@ class PipelineCompletionUpdateTask_1(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:        
-        raise NotImplementedError("PipelineCompletionUpdateTask_1 does not implement find_new_data().")
+        raise NotImplementedError("GardRelationshipCountRefreshTask does not implement find_new_data().")
     
 
     # implement

@@ -18,7 +18,7 @@ reset the clinical-trial related is_new flags so the same rows are not processed
 again in the next alert run.
 """
 
-class ClinicalTrialPipelineCompletedTask(PipelineBase):
+class ClinicalTrialPipelineWrapUpTask(PipelineBase):
 
     '''
     Tables from rdas_db_schema.sql that are clinical-trial related and have
@@ -39,7 +39,7 @@ class ClinicalTrialPipelineCompletedTask(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialPipelineCompletedTask does not implement find_new_data().")
+        raise NotImplementedError("ClinicalTrialPipelineWrapUpTask does not implement find_new_data().")
 
 
     # implement

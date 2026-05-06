@@ -16,7 +16,7 @@ from utils.https_request import HTTPSUtils as HttpsUtil
 """
 # Reference: C_publication/init_6_publication-retrieve-omim.py
 
-class PublicationTask_4(PipelineBase):
+class PublicationOminDataRetrievalTask(PipelineBase):
 
 
     def __init__(self):
@@ -29,7 +29,7 @@ class PublicationTask_4(PipelineBase):
     # Not implemented
     def find_new_data(self) -> None:
         
-        raise NotImplementedError("PublicationTask_4 does not implement find_new_data().")
+        raise NotImplementedError("PublicationOminDataRetrievalTask does not implement find_new_data().")
    
 
     def get_omim(self, url):

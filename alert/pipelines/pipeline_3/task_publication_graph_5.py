@@ -22,7 +22,7 @@ matching Article node to the Journal with published_in.
 # Reference: C_publication/initializer/journal.py
 
 
-class PublicationGraphTask_5(PipelineBase):
+class NewPublicationJournalGraphTask(PipelineBase):
 
     BATCH_SIZE = 100
 
@@ -71,7 +71,7 @@ class PublicationGraphTask_5(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        self.logger.info("PublicationGraphTask_5 does not use find_new_data().")
+        self.logger.info("NewPublicationJournalGraphTask does not use find_new_data().")
 
 
     # implement

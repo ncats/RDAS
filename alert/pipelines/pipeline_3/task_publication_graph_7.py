@@ -19,7 +19,7 @@ to the existing GARD node countEpiArticles and countNhsArticles properties.
 # Reference: C_publication/initializer/x_epi_nhs_count.py
 
 
-class PublicationGraphTask_7(PipelineBase):
+class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
 
     BATCH_SIZE = 300
 
@@ -46,7 +46,7 @@ class PublicationGraphTask_7(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        self.logger.info("PublicationGraphTask_7 does not use find_new_data().")
+        self.logger.info("GardPublicationEpiNhsCountUpdateTask does not use find_new_data().")
 
 
     # implement

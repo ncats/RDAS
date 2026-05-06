@@ -24,7 +24,7 @@ Update the is_EPI, is_NHS (default is NULL) in table UPDATE_publication_article
 # Reference: C_publication/init_4_publication-update-EPI-NHS-of-Article-multi.py
 
 '''
-These are module-level functions, not class methods, and keeping them outside PublicationTask_2 is correct for multiprocessing.
+These are module-level functions, not class methods, and keeping them outside PublicationEpiNhsClassificationTask is correct for multiprocessing.
 '''
 
 DEFAULT_EPI_PREDICTION = {'isEpi': False, 'probability': None}
@@ -182,7 +182,7 @@ def process_publication_article(obj: Dict[str, Any]) -> Tuple[bool, bool, Any, O
 
 
 
-class PublicationTask_2(PipelineBase):
+class PublicationEpiNhsClassificationTask(PipelineBase):
 
 
     def __init__(self):
@@ -191,7 +191,7 @@ class PublicationTask_2(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        self.logger.info("PublicationTask_2 does not implement find_new_data().")
+        self.logger.info("PublicationEpiNhsClassificationTask does not use find_new_data().")
 
 
     # implement

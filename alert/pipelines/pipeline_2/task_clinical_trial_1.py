@@ -24,7 +24,7 @@ pipeline steps.
 """
 # Reference: B_clinical_trial/init_1_clinical_trial_step_1.py
 
-class ClinicalTrialTask_1(PipelineBase):
+class NewClinicalTrialDiscoveryTask(PipelineBase):
 
     def __init__(self):
 
@@ -35,7 +35,7 @@ class ClinicalTrialTask_1(PipelineBase):
 
     # Not implemented
     def process_new_data(self) -> None:
-        raise NotImplementedError("ClinicalTrialTask_1 does not implement process_new_data().")
+        raise NotImplementedError("NewClinicalTrialDiscoveryTask does not implement process_new_data().")
 
 
     def find_new_data(self, gard_node) -> None:

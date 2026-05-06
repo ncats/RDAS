@@ -48,7 +48,7 @@ HAVING COUNT(*) > 1
 limit 10;
 '''
 
-class PublicationTask_1(PipelineBase):
+class NewPublicationDiscoveryTask(PipelineBase):
 
 
     def __init__(self):
@@ -61,7 +61,7 @@ class PublicationTask_1(PipelineBase):
 
     # Not implemented
     def process_new_data(self) -> None:
-        raise NotImplementedError("PublicationTask_1 does not implement process_new_data().")
+        raise NotImplementedError("NewPublicationDiscoveryTask does not implement process_new_data().")
    
 
     def find_new_data(self, gard_node) -> None:

@@ -19,7 +19,7 @@ Create Participant nodes and ClinicalTrial/Participant mappings for new clinical
 # Reference: B_clinical_trial/initializer/participant.py
 
 
-class ClinicalTrialGraphTask_6(PipelineBase):
+class NewClinicalTrialParticipantGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
@@ -52,7 +52,7 @@ class ClinicalTrialGraphTask_6(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialGraphTask_6 does not implement find_new_data().")
+        raise NotImplementedError("NewClinicalTrialParticipantGraphTask does not implement find_new_data().")
 
 
     # implement

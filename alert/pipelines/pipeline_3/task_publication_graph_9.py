@@ -29,7 +29,7 @@ annotation type, and relation type, matching the initializer behavior.
 # Reference: C_publication/initializer/pubtator.py
 
 
-class PublicationGraphTask_9(PipelineBase):
+class NewPublicationPubtatorGraphTask(PipelineBase):
 
     BATCH_SIZE = 1000
 
@@ -78,7 +78,7 @@ class PublicationGraphTask_9(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        self.logger.info("PublicationGraphTask_9 does not use find_new_data().")
+        self.logger.info("NewPublicationPubtatorGraphTask does not use find_new_data().")
 
 
     # implement

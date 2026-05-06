@@ -19,7 +19,7 @@ Create Intervention nodes and ClinicalTrial/Intervention mappings for new clinic
 # Reference: B_clinical_trial/initializer/intervention.py
 
 
-class ClinicalTrialGraphTask_4(PipelineBase):
+class NewClinicalTrialInterventionGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
@@ -48,7 +48,7 @@ class ClinicalTrialGraphTask_4(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialGraphTask_4 does not implement find_new_data().")
+        raise NotImplementedError("NewClinicalTrialInterventionGraphTask does not implement find_new_data().")
 
 
     # implement

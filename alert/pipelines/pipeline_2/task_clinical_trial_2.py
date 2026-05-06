@@ -24,7 +24,7 @@ CREATE TABLE clinical_trial_unique (
 """
 # Reference: B_clinical_trial/init_1_clinical_trial_step_2.py
 
-class ClinicalTrialTask_2(PipelineBase):
+class NewClinicalTrialImportTask(PipelineBase):
 
     def __init__(self):
 
@@ -33,7 +33,7 @@ class ClinicalTrialTask_2(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialTask_2 does not implement find_new_data().")
+        raise NotImplementedError("NewClinicalTrialImportTask does not implement find_new_data().")
 
 
     def process_new_data(self) -> None:
@@ -191,7 +191,7 @@ class ClinicalTrialTask_2(PipelineBase):
             if fetch_cursor:
                 fetch_cursor.close()
 
-            # Close the mysql connction for whole ClinicalTrialTask_2
+            # Close the mysql connection for the whole NewClinicalTrialImportTask.
             if self.mysql.is_connected():
                 self.mysql.close()
 
@@ -218,5 +218,4 @@ class ClinicalTrialTask_2(PipelineBase):
         except Exception as e:
             self.logger.error(e)
             self.mysql.rollback()
-
 

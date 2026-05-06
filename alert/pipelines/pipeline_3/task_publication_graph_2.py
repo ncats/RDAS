@@ -22,7 +22,7 @@ For each new publication row (is_new = 1), parse source_json and update the matc
 # Reference: C_publication/initializer/article_attrs.py
 
 
-class PublicationGraphTask_2(PipelineBase):
+class NewPublicationArticleNodeAttrsUpdateTask(PipelineBase):
 
     BATCH_SIZE = 200
 
@@ -50,7 +50,7 @@ class PublicationGraphTask_2(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        self.logger.info("PublicationGraphTask_2 does not use find_new_data().")
+        self.logger.info("PublicationArticleNodeAttributesUpdateTask does not use find_new_data().")
 
 
     # implement

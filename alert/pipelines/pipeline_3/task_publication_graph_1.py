@@ -17,7 +17,7 @@ Insert new Article nodes into Memgraph from update_publication_article.
 # Reference: C_publication/initializer/article.py
 
 
-class PublicationGraphTask_1(PipelineBase):
+class NewPublicationArticleGraphTask(PipelineBase):
 
     BATCH_SIZE = 300
 
@@ -67,7 +67,7 @@ class PublicationGraphTask_1(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("PublicationGraphTask_1 does not implement find_new_data().")
+        raise NotImplementedError("NewPublicationArticleGraphTask does not implement find_new_data().")
 
 
     # implement

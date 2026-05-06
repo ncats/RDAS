@@ -24,7 +24,7 @@ the matching Article nodes with:
 # Reference: C_publication/initializer/substance.py
 
 
-class PublicationGraphTask_10(PipelineBase):
+class NewPublicationSubstanceGraphTask(PipelineBase):
 
     BATCH_SIZE = 100
 
@@ -77,7 +77,7 @@ class PublicationGraphTask_10(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        self.logger.info("PublicationGraphTask_10 does not use find_new_data().")
+        self.logger.info("NewPublicationSubstanceGraphTask does not use find_new_data().")
 
 
     # implement

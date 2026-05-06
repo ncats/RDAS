@@ -15,7 +15,7 @@ Save new Clinical-Trial {nctid - pubmed_id} pairs into clinical_trial_nctid_pmid
 """
 # Reference: B_clinical_trial/init_5_clinical_trial_retrieve_pmids_umlti.py
 
-class ClinicalTrialTask_4(PipelineBase):
+class ClinicalTrialPublicationMappingTask(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=False)
@@ -23,7 +23,7 @@ class ClinicalTrialTask_4(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialTask_2 does not implement find_new_data().")
+        raise NotImplementedError("ClinicalTrialPublicationMappingTask does not implement find_new_data().")
 
 
     # implement
@@ -112,4 +112,3 @@ class ClinicalTrialTask_4(PipelineBase):
                     chunks.append((nctid, pmid, nctid, pmid))
 
             yield chunks
-

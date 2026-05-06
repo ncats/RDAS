@@ -19,7 +19,7 @@ Create Annotation nodes and ClinicalTrial/Annotation mappings for new clinical t
 # Reference: alert/pipelines/pipeline_2/task_clinical_trial_6.py
 
 
-class ClinicalTrialGraphTask_10(PipelineBase):
+class NewClinicalTrialAnnotationGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
@@ -57,7 +57,7 @@ class ClinicalTrialGraphTask_10(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialGraphTask_10 does not implement find_new_data().")
+        raise NotImplementedError("NewClinicalTrialAnnotationGraphTask does not implement find_new_data().")
 
 
     # implement

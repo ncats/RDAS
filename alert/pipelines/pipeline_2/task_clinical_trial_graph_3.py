@@ -18,7 +18,7 @@ Create Condition nodes and ClinicalTrial/Condition/GARD mappings for new clinica
 # Reference: B_clinical_trial/initializer/condition.py
 
 
-class ClinicalTrialGraphTask_3(PipelineBase):
+class NewClinicalTrialConditionGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
@@ -53,7 +53,7 @@ class ClinicalTrialGraphTask_3(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialGraphTask_3 does not implement find_new_data().")
+        raise NotImplementedError("NewClinicalTrialConditionGraphTask does not implement find_new_data().")
 
 
     # implement

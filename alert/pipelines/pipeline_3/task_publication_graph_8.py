@@ -26,7 +26,7 @@ this alert pipeline run.
 # Reference: C_publication/initializer/relationship_GARD.py
 
 
-class PublicationGraphTask_8(PipelineBase):
+class NewPublicationGardArticleRelationshipTask(PipelineBase):
 
     BATCH_SIZE = 300
 
@@ -56,7 +56,7 @@ class PublicationGraphTask_8(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        self.logger.info("PublicationGraphTask_8 does not use find_new_data().")
+        self.logger.info("NewPublicationGardArticleRelationshipTask does not use find_new_data().")
 
 
     # implement

@@ -21,7 +21,7 @@ and link each MeshTerm to the matching Article with mesh_term_for.
 # Reference: C_publication/initializer/mesh_term.py
 
 
-class PublicationGraphTask_6(PipelineBase):
+class NewPublicationMeshTermGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
@@ -49,7 +49,7 @@ class PublicationGraphTask_6(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        self.logger.info("PublicationGraphTask_6 does not use find_new_data().")
+        self.logger.info("NewPublicationMeshTermGraphTask does not use find_new_data().")
 
 
     # implement

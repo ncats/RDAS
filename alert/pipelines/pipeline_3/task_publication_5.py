@@ -19,7 +19,7 @@ Retrieve pubtator data from API and insert into table publication_pubtator
 # Reference: C_publication/init_7a_publication-pubtator-Retrieve.py
 # Reference: C_publication/init_7b_publication-pubtator-Parse.py
 
-class PublicationTask_5(PipelineBase):
+class NewPublicationPubtatorRetrievalTask(PipelineBase):
 
 
     def __init__(self):
@@ -32,7 +32,7 @@ class PublicationTask_5(PipelineBase):
     # Not implemented
     def find_new_data(self) -> None:
         
-        raise NotImplementedError("PublicationTask_5 does not implement find_new_data().")
+        raise NotImplementedError("NewPublicationPubtatorRetrievalTask does not implement find_new_data().")
     
 
     # implement

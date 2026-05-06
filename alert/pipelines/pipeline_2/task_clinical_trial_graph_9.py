@@ -19,7 +19,7 @@ Create IndividualPatientData nodes and ClinicalTrial/IndividualPatientData mappi
 # Reference: B_clinical_trial/initializer/patient_data.py
 
 
-class ClinicalTrialGraphTask_9(PipelineBase):
+class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
@@ -50,7 +50,7 @@ class ClinicalTrialGraphTask_9(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialGraphTask_9 does not implement find_new_data().")
+        raise NotImplementedError("NewClinicalTrialIndividualPatientDataGraphTask does not implement find_new_data().")
 
 
     # implement

@@ -15,7 +15,7 @@ If there are no changes in GARD table for Label_Xref field, so no [gard_id - omi
 """
 # Reference: C_publication/init_5_publication-gard-omim-mapping.py
 
-class PublicationTask_3(PipelineBase):
+class GardOmimPublicationMappingTask(PipelineBase):
 
     def __init__(self):
 
@@ -25,7 +25,7 @@ class PublicationTask_3(PipelineBase):
     # Not implemented
     def find_new_data(self) -> None:
 
-        raise NotImplementedError("PublicationTask_3 does not implement find_new_data().")
+        raise NotImplementedError("GardOmimPublicationMappingTask does not implement find_new_data().")
    
 
     # implement

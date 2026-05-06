@@ -25,7 +25,7 @@ Generate the Annotation data for NEW Clinical Trail
 """
 # Reference: B_clinical_trial/init_9_clinical_trail_annotation_generator.py
 
-class ClinicalTrialTask_6(PipelineBase):
+class NewClinicalTrialAnnotationTask(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=False)
@@ -33,7 +33,7 @@ class ClinicalTrialTask_6(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        raise NotImplementedError("ClinicalTrialTask_2 does not implement find_new_data().")
+        raise NotImplementedError("NewClinicalTrialAnnotationTask does not implement find_new_data().")
 
 
     def load_models(self):

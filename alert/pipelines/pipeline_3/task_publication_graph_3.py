@@ -22,7 +22,7 @@ node with has_epidemiological_annotation.
 # Reference: C_publication/initializer/epidemiology.py
 
 
-class PublicationGraphTask_3(PipelineBase):
+class NewPublicationEpidemiologyGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
@@ -66,7 +66,7 @@ class PublicationGraphTask_3(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        self.logger.info("PublicationGraphTask_3 does not use find_new_data().")
+        self.logger.info("NewPublicationEpidemiologyGraphTask does not use find_new_data().")
 
 
     # implement

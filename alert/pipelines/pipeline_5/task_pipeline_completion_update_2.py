@@ -21,7 +21,7 @@ This task should run after Article nodes have been written to Memgraph.
 # Reference: G_update/updater/article_is_gene_review_updater.py
 
 
-class PipelineCompletionUpdateTask_2(PipelineBase):
+class ArticleGeneReviewFlagUpdateTask(PipelineBase):
 
     GENE_REVIEWS_TITLE_URL = "https://ftp.ncbi.nih.gov/pub/GeneReviews/GRtitle_shortname_NBKid.txt"
     
@@ -40,7 +40,7 @@ class PipelineCompletionUpdateTask_2(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
-        self.logger.info("PipelineCompletionUpdateTask_2 does not use find_new_data().")
+        self.logger.info("ArticleGeneReviewFlagUpdateTask does not use find_new_data().")
 
 
     # implement
@@ -76,7 +76,7 @@ class PipelineCompletionUpdateTask_2(PipelineBase):
             self.logger.info(f"Completed GeneReview Article update. Total Article nodes updated = {total_updated}")
 
         except Exception as e:
-            self.logger.error(f"PipelineCompletionUpdateTask_2 failed: {e}")
+            self.logger.error(f"ArticleGeneReviewFlagUpdateTask failed: {e}")
 
         finally:
             ''' Explicitly close all db connections. '''

@@ -18,7 +18,7 @@ into publication_substance and publication_substance_unique tables.
 # Reference: C_publication/init_9_publication_substance.py
 
 
-class PublicationTask_6(PipelineBase):
+class NewPublicationChemicalSubstanceTask(PipelineBase):
 
     '''
     Keep the fetch size in one place so the batch volume can be tuned safely.
@@ -71,7 +71,7 @@ class PublicationTask_6(PipelineBase):
 
     # Not implemented
     def find_new_data(self) -> None:
-        raise NotImplementedError("PublicationTask_6 does not implement find_new_data().")
+        raise NotImplementedError("NewPublicationChemicalSubstanceTask does not implement find_new_data().")
 
 
     # implement
