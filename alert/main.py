@@ -279,9 +279,14 @@ class AlertPipelineRunner:
 
         from pipelines.pipeline_5.task_pipeline_followup_update_1 import GardRelationshipCountRefreshTask
         from pipelines.pipeline_5.task_pipeline_followup_update_2 import ArticleGeneReviewFlagUpdateTask
+        from pipelines.pipeline_5.task_pipeline_followup_update_3 import OrganizationLocationRorLookupTask
+        from pipelines.pipeline_5.task_pipeline_followup_update_4 import OrganizationLocationGraphSyncTask
 
         self._run_pipeline_task(GardRelationshipCountRefreshTask)
         self._run_pipeline_task(ArticleGeneReviewFlagUpdateTask)
+        self._run_pipeline_task(OrganizationLocationRorLookupTask)
+        self._run_pipeline_task(OrganizationLocationGraphSyncTask)
+
 
         self.logger.info("Completed run_pipeline_followup_update().")
 
