@@ -14,6 +14,7 @@ from utils.https_request import HTTPSUtils as HttpsUtil
 1. Get unique omim_id list from table publication_gard_omim_mapping  which are not in publication_omim'
 2. Retrieve OMIM data from API and insert into table publication_omim
 """
+# Reference: GardOmimPublicationMappingTask - alert/pipelines/pipeline_3/task_publication_3.py
 # Reference: C_publication/init_6_publication-retrieve-omim.py
 
 class PublicationOminDataRetrievalTask(PipelineBase):
