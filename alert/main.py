@@ -287,10 +287,10 @@ class AlertPipelineRunner:
 
 
 
-    def send_alert(self, look_back_days: Optional[int] = None) -> None:
+    def send_alert_emails(self, look_back_days: Optional[int] = None) -> None:
         """Send alert emails for the newly staged records."""
 
-        self.logger.info("Starting send_alert().")
+        self.logger.info("Starting send_alert_emails().")
 
         alert_sender = None
         days = look_back_days if look_back_days is not None else self.look_back_days
@@ -301,10 +301,10 @@ class AlertPipelineRunner:
             alert_sender = AlertSender(days)
             alert_sender.find_new_and_send_alert()
 
-            self.logger.info("Completed send_alert().")
+            self.logger.info("Completed send_alert_emails().")
 
         except Exception as e:
-            self.logger.error(f"send_alert() failed: {e}")
+            self.logger.error(f"send_alert_emails() failed: {e}")
             raise
 
         finally:
@@ -410,12 +410,13 @@ if __name__ == "__main__":
         # Step 3
         # runner.run_memgraph_database_updates()
 
-        # Step 7
+        # Step 4
         # runner.run_pipeline_followup_update()
 
-        # Step 9
-        # runner.send_alert()
+        # Step 5
+        # runner.send_alert_emails()
 
+        # Step 6
         # runner.run_pipeline_wrapup()
 
         pass
