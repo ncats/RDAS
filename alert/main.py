@@ -192,9 +192,7 @@ class AlertPipelineRunner:
         from pipelines.pipeline_2.task_clinical_trial_graph_9 import NewClinicalTrialIndividualPatientDataGraphTask 
         from pipelines.pipeline_2.task_clinical_trial_graph_10 import NewClinicalTrialAnnotationGraphTask
 
-        from pipelines.pipeline_2.task_clinical_trial_pipeline_wrapup import ClinicalTrialPipelineWrapUpTask
-
-
+    
         self._run_pipeline_task(NewClinicalTrialGraphTask)
         self._run_pipeline_task(NewClinicalTrialGardRelationshipTask)
         self._run_pipeline_task(NewClinicalTrialConditionGraphTask)
@@ -206,9 +204,6 @@ class AlertPipelineRunner:
         self._run_pipeline_task(NewClinicalTrialIndividualPatientDataGraphTask)
         self._run_pipeline_task(NewClinicalTrialAnnotationGraphTask)
 
-
-        # for PRODUCTION
-        #self._run_pipeline_task(ClinicalTrialPipelineWrapUpTask)
 
         self.logger.info("Completed run_clinical_trial_graph_updates().")
 
@@ -257,6 +252,8 @@ class AlertPipelineRunner:
         from pipelines.pipeline_3.task_publication_graph_8 import NewPublicationGardArticleRelationshipTask
         from pipelines.pipeline_3.task_publication_graph_9 import NewPublicationPubtatorGraphTask
         from pipelines.pipeline_3.task_publication_graph_10 import NewPublicationSubstanceGraphTask
+        from pipelines.pipeline_3.task_publication_graph_11 import NewPublicationOmimRefGraphTask
+
 
         self._run_pipeline_task(NewPublicationArticleGraphTask)
         self._run_pipeline_task(NewPublicationArticleNodeAttrsUpdateTask)
@@ -268,6 +265,8 @@ class AlertPipelineRunner:
         self._run_pipeline_task(NewPublicationGardArticleRelationshipTask)
         self._run_pipeline_task(NewPublicationPubtatorGraphTask)
         self._run_pipeline_task(NewPublicationSubstanceGraphTask)
+        self._run_pipeline_task(NewPublicationOmimRefGraphTask)
+
 
         self.logger.info("Completed run_publication_graph_updates().")
 
@@ -310,6 +309,16 @@ class AlertPipelineRunner:
 
         finally:
             self._close_task_if_needed(alert_sender)
+
+
+    def run_pipeline_wrapup(self) -> None:
+ 
+        from pipelines.pipeline_2.task_clinical_trial_pipeline_wrapup import ClinicalTrialPipelineWrapUpTask
+        from pipelines.pipeline_3.task_publication_pipeline_wrapup import PublicationPipelineWrapUpTask
+
+        self._run_pipeline_task(ClinicalTrialPipelineWrapUpTask)
+        self._run_pipeline_task(PublicationPipelineWrapUpTask)
+
 
 
 
@@ -406,6 +415,8 @@ if __name__ == "__main__":
 
         # Step 9
         # runner.send_alert()
+
+        # runner.run_pipeline_wrapup()
 
         pass
 
