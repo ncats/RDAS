@@ -277,8 +277,8 @@ class AlertPipelineRunner:
 
         self.logger.info("Starting run_pipeline_followup_update().")
 
-        from pipelines.pipeline_5.task_pipeline_completion_update_1 import GardRelationshipCountRefreshTask
-        from pipelines.pipeline_5.task_pipeline_completion_update_2 import ArticleGeneReviewFlagUpdateTask
+        from pipelines.pipeline_5.task_pipeline_followup_update_1 import GardRelationshipCountRefreshTask
+        from pipelines.pipeline_5.task_pipeline_followup_update_2 import ArticleGeneReviewFlagUpdateTask
 
         self._run_pipeline_task(GardRelationshipCountRefreshTask)
         self._run_pipeline_task(ArticleGeneReviewFlagUpdateTask)
