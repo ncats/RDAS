@@ -12,7 +12,7 @@ sys.path.extend([
 ])
 
 from utils.applogger import AppLogger
-from utils.tools import _is_english, _is_under_char_threshold, _time_hms
+from utils.tools import _time_hms
 
 class AlertPipelineRunner:
     """
@@ -42,9 +42,6 @@ class AlertPipelineRunner:
     def run_find_new_clinical_trial_and_publication_updates(self) -> None:
         """Search for new clinical trials and publications for updated GARD nodes."""
 
-        self.logger.info("Starting run_find_new_clinical_trial_and_publication_updates().")
-
-        start_time = time.time()
         total_gard_nodes = 0
         gard_task = None
         clinical_trial_task = None
@@ -107,11 +104,6 @@ class AlertPipelineRunner:
 
                     total_gard_nodes += 1
 
-            self.logger.info(
-                "Completed run_find_new_clinical_trial_and_publication_updates(); "
-                f"processed {total_gard_nodes} GARD nodes."
-            )
-
         except Exception as e:
             self.logger.error(f"run_find_new_clinical_trial_and_publication_updates() failed: {e}") 
 
@@ -119,21 +111,14 @@ class AlertPipelineRunner:
             for task in (clinical_trial_task, publication_task, gard_task):
                 self._close_task_if_needed(task)
 
-            ''' log the total run time '''
-            elapsed = time.time() - start_time
-            hours, minutes, seconds = _time_hms(elapsed)
-            self.logger.info(
-                "Finished run_find_new_clinical_trial_and_publication_updates() "
-                f"in {hours} hours, {minutes} minutes, {seconds} seconds. "
-                f"Processed {total_gard_nodes} GARD nodes."
-            )
+            self.logger.info(f"Processed {total_gard_nodes} GARD nodes.")
 
 
 
     def run_clinical_trial_mysql_updates(self) -> None:
         """Run clinical-trial MySQL staging and enrichment tasks."""
 
-        self.logger.info("Starting run_clinical_trial_mysql_updates().")
+        self.logger.info("\n\nStarting run_clinical_trial_mysql_updates().")
 
         # Import here because ClinicalTrialDrugInterventionMappingTask loads the spaCy model.
         from pipelines.pipeline_2.task_clinical_trial_2 import NewClinicalTrialImportTask
@@ -155,7 +140,7 @@ class AlertPipelineRunner:
     def run_clinical_trial_graph_updates(self) -> None:
         """Run clinical-trial Memgraph node and relationship update tasks."""
 
-        self.logger.info("Starting run_clinical_trial_graph_updates().")
+        self.logger.info("\n\nStarting run_clinical_trial_graph_updates().")
 
         from pipelines.pipeline_2.task_clinical_trial_graph_1 import NewClinicalTrialGraphTask
         from pipelines.pipeline_2.task_clinical_trial_graph_2 import NewClinicalTrialGardRelationshipTask
@@ -180,7 +165,6 @@ class AlertPipelineRunner:
         self._run_pipeline_task(NewClinicalTrialIndividualPatientDataGraphTask)
         self._run_pipeline_task(NewClinicalTrialAnnotationGraphTask)
 
-
         self.logger.info("Completed run_clinical_trial_graph_updates().")
 
 
@@ -188,7 +172,7 @@ class AlertPipelineRunner:
     def run_publication_mysql_updates(self) -> None:
         """Run publication MySQL enrichment tasks."""
 
-        self.logger.info("Starting run_publication_mysql_updates().")
+        self.logger.info("\n\nStarting run_publication_mysql_updates().")
 
         from pipelines.pipeline_3.task_publication_2 import PublicationEpiNhsClassificationTask
         from pipelines.pipeline_3.task_publication_3 import GardOmimPublicationMappingTask
@@ -209,14 +193,14 @@ class AlertPipelineRunner:
         self._run_pipeline_task(NewPublicationArticleImportTask)
         self._run_pipeline_task(NewOmimPublicationArticleImportTask)
 
-
         self.logger.info("Completed run_publication_mysql_updates().")
+
 
 
     def run_publication_graph_updates(self) -> None:
         """Run publication Memgraph node and relationship update tasks."""
 
-        self.logger.info("Starting run_publication_graph_updates().")
+        self.logger.info("\n\nStarting run_publication_graph_updates().")
 
         from pipelines.pipeline_3.task_publication_graph_1 import NewPublicationArticleGraphTask
         from pipelines.pipeline_3.task_publication_graph_2 import NewPublicationArticleNodeAttrsUpdateTask
@@ -243,15 +227,12 @@ class AlertPipelineRunner:
         self._run_pipeline_task(NewPublicationSubstanceGraphTask)
         self._run_pipeline_task(NewPublicationOmimRefGraphTask)
 
-
         self.logger.info("Completed run_publication_graph_updates().")
 
 
 
-    def run_pipeline_followup_update(self) -> None:
+    def run_pipeline_followup_updates(self) -> None:
         """Run final graph statistics updates after pipeline data loads finish."""
-
-        self.logger.info("Starting run_pipeline_followup_update().")
 
         from pipelines.pipeline_5.task_pipeline_followup_update_1 import GardRelationshipCountRefreshTask
         from pipelines.pipeline_5.task_pipeline_followup_update_2 import ArticleGeneReviewFlagUpdateTask
@@ -264,37 +245,25 @@ class AlertPipelineRunner:
         self._run_pipeline_task(OrganizationLocationGraphSyncTask)
 
 
-        self.logger.info("Completed run_pipeline_followup_update().")
-
 
     def run_mysql_database_updates(self) -> None:
         """Run all MySQL update stages."""
 
-        self.logger.info("Starting run_mysql_database_updates().")
-
         self.run_clinical_trial_mysql_updates()
         self.run_publication_mysql_updates()
-
-        self.logger.info("Completed run_mysql_database_updates().")
 
 
 
     def run_memgraph_database_updates(self) -> None:
         """Run all Memgraph update stages."""
 
-        self.logger.info("Starting run_memgraph_database_updates().")
-
         self.run_clinical_trial_graph_updates()
 
         self.run_publication_graph_updates()
 
-        self.logger.info("Completed run_memgraph_database_updates().")
-
 
     def send_alert_emails(self, look_back_days: Optional[int] = None) -> None:
         """Send alert emails for the newly staged records."""
-
-        self.logger.info("Starting send_alert_emails().")
 
         alert_sender = None
         days = look_back_days if look_back_days is not None else self.look_back_days
@@ -305,8 +274,6 @@ class AlertPipelineRunner:
             alert_sender = AlertSender(days)
             alert_sender.find_new_and_send_alert()
 
-            self.logger.info("Completed send_alert_emails().")
-
         except Exception as e:
             self.logger.error(f"send_alert_emails() failed: {e}")
             raise
@@ -316,8 +283,27 @@ class AlertPipelineRunner:
 
 
 
+    def run_regroup_the_person(self) -> None:
+
+        from pipelines.pipeline_6.task_person_1_publication import NewPublicationPersonTask
+        from pipelines.pipeline_6.task_person_2_clinical_trial import NewClinicalTrialPersonTask
+        from pipelines.pipeline_6.task_person_3_grant import NewGrantPersonTask
+        from pipelines.pipeline_6.task_person_4_grouping import NewPersonGroupingTask
+
+        from pipelines.pipeline_6.task_person_5_graph import NewPersonAgentGraphTask
+        from pipelines.pipeline_6.task_person_pipeline_wrapup import PersonPipelineWrapUpTask
+
+        self._run_pipeline_task(NewPublicationPersonTask)
+        self._run_pipeline_task(NewClinicalTrialPersonTask)
+        self._run_pipeline_task(NewGrantPersonTask)
+        self._run_pipeline_task(NewPersonGroupingTask)
+
+        self._run_pipeline_task(NewPersonAgentGraphTask)
+        self._run_pipeline_task(PersonPipelineWrapUpTask)
+
+
     def run_pipeline_wrapup(self) -> None:
- 
+
         from pipelines.pipeline_2.task_clinical_trial_pipeline_wrapup import ClinicalTrialPipelineWrapUpTask
         from pipelines.pipeline_3.task_publication_pipeline_wrapup import PublicationPipelineWrapUpTask
 
@@ -388,24 +374,64 @@ if __name__ == "__main__":
 
     runner = AlertPipelineRunner(look_back_days=7)
 
+
+    def run_step_with_timing(step_name, step_func) -> None:
+
+        step_start_time = time.time()
+        runner.logger.info(f"Starting {step_name}.")
+
+        try:
+            step_func()
+
+        finally:
+            hours, minutes, seconds = _time_hms(time.time() - step_start_time)
+            runner.logger.info(
+                f"\n\n{'*' * 20}Finished {step_name} in {hours} hours, {minutes} minutes, "
+                f"{seconds} seconds {'*' * 20}\n\n"
+            )
+
     try:
         # Step 1
-        # runner.run_find_new_clinical_trial_and_publication_updates()
+        # run_step_with_timing(
+        #     "Step 1: run_find_new_clinical_trial_and_publication_updates()",
+        #     runner.run_find_new_clinical_trial_and_publication_updates,
+        # )
 
         # Step 2
-        # runner.run_mysql_database_updates()
+        # run_step_with_timing(
+        #     "Step 2: run_mysql_database_updates()",
+        #     runner.run_mysql_database_updates,
+        # )
 
         # Step 3
-        # runner.run_memgraph_database_updates()
+        # run_step_with_timing(
+        #     "Step 3: run_memgraph_database_updates()",
+        #     runner.run_memgraph_database_updates,
+        # )
 
         # Step 4
-        # runner.run_pipeline_followup_update()
+        # run_step_with_timing(
+        #     "Step 4: run_pipeline_followup_updates()",
+        #     runner.run_pipeline_followup_updates,
+        # )
 
         # Step 5
-        # runner.send_alert_emails()
+        # run_step_with_timing(
+        #     "Step 5: send_alert_emails()",
+        #     runner.send_alert_emails,
+        # )
 
         # Step 6
-        # runner.run_pipeline_wrapup()
+        # run_step_with_timing(
+        #     "Step 6: run_regroup_the_person()",
+        #     runner.run_regroup_the_person,
+        # )
+
+        # Step 7
+        # run_step_with_timing(
+        #     "Step 7: run_pipeline_wrapup()",
+        #     runner.run_pipeline_wrapup,
+        # )
 
         pass
 
