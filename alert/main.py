@@ -129,30 +129,6 @@ class AlertPipelineRunner:
             )
 
 
-    def run_mysql_database_updates(self) -> None:
-        """Run all MySQL update stages."""
-
-        self.logger.info("Starting run_mysql_database_updates().")
-
-        self.run_clinical_trial_mysql_updates()
-        self.run_publication_mysql_updates()
-
-        self.logger.info("Completed run_mysql_database_updates().")
-
-
-
-    def run_memgraph_database_updates(self) -> None:
-        """Run all Memgraph update stages."""
-
-        self.logger.info("Starting run_memgraph_database_updates().")
-
-        self.run_clinical_trial_graph_updates()
-
-        self.run_publication_graph_updates()
-
-        self.logger.info("Completed run_memgraph_database_updates().")
-
-
 
     def run_clinical_trial_mysql_updates(self) -> None:
         """Run clinical-trial MySQL staging and enrichment tasks."""
@@ -291,6 +267,29 @@ class AlertPipelineRunner:
         self.logger.info("Completed run_pipeline_followup_update().")
 
 
+    def run_mysql_database_updates(self) -> None:
+        """Run all MySQL update stages."""
+
+        self.logger.info("Starting run_mysql_database_updates().")
+
+        self.run_clinical_trial_mysql_updates()
+        self.run_publication_mysql_updates()
+
+        self.logger.info("Completed run_mysql_database_updates().")
+
+
+
+    def run_memgraph_database_updates(self) -> None:
+        """Run all Memgraph update stages."""
+
+        self.logger.info("Starting run_memgraph_database_updates().")
+
+        self.run_clinical_trial_graph_updates()
+
+        self.run_publication_graph_updates()
+
+        self.logger.info("Completed run_memgraph_database_updates().")
+
 
     def send_alert_emails(self, look_back_days: Optional[int] = None) -> None:
         """Send alert emails for the newly staged records."""
@@ -316,6 +315,7 @@ class AlertPipelineRunner:
             self._close_task_if_needed(alert_sender)
 
 
+
     def run_pipeline_wrapup(self) -> None:
  
         from pipelines.pipeline_2.task_clinical_trial_pipeline_wrapup import ClinicalTrialPipelineWrapUpTask
@@ -323,7 +323,6 @@ class AlertPipelineRunner:
 
         self._run_pipeline_task(ClinicalTrialPipelineWrapUpTask)
         self._run_pipeline_task(PublicationPipelineWrapUpTask)
-
 
 
 
