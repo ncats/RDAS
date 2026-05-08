@@ -65,7 +65,7 @@ class PublicationOminDataRetrievalTask(PipelineBase):
         fetch_cursor = None
         insert_cursor = None
 
-        insert_sql = 'INSERT INTO publication_omim (omim_id, entry_json) VALUES (%s, %s)'
+        insert_sql = 'INSERT INTO publication_omim (omim_id, entry_json, is_new) VALUES (%s, %s, 1)'
 
         batch_num = 0
         batch_size = 20

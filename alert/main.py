@@ -140,25 +140,78 @@ class AlertPipelineRunner:
         self.logger.info("Completed run_mysql_database_updates().")
 
 
+
+    def run_memgraph_database_updates(self) -> None:
+        """Run all Memgraph update stages."""
+
+        self.logger.info("Starting run_memgraph_database_updates().")
+
+        self.run_clinical_trial_graph_updates()
+
+        self.run_publication_graph_updates()
+
+        self.logger.info("Completed run_memgraph_database_updates().")
+
+
+
     def run_clinical_trial_mysql_updates(self) -> None:
         """Run clinical-trial MySQL staging and enrichment tasks."""
 
         self.logger.info("Starting run_clinical_trial_mysql_updates().")
 
         # Import here because ClinicalTrialDrugInterventionMappingTask loads the spaCy model.
-        from pipelines.pipeline_2.task_clinical_trial_2 import NewClinicalTrialImportTask as task_2
-        from pipelines.pipeline_2.task_clinical_trial_3 import ClinicalTrialDrugInterventionMappingTask as task_3
-        from pipelines.pipeline_2.task_clinical_trial_4 import ClinicalTrialPublicationMappingTask as task_4
-        from pipelines.pipeline_2.task_clinical_trial_5 import ClinicalTrialPmidArticleImportTask as task_5
-        from pipelines.pipeline_2.task_clinical_trial_6 import NewClinicalTrialAnnotationTask as task_6
+        from pipelines.pipeline_2.task_clinical_trial_2 import NewClinicalTrialImportTask
+        from pipelines.pipeline_2.task_clinical_trial_3 import ClinicalTrialDrugInterventionMappingTask
+        from pipelines.pipeline_2.task_clinical_trial_4 import ClinicalTrialPublicationMappingTask
+        from pipelines.pipeline_2.task_clinical_trial_5 import ClinicalTrialPmidArticleImportTask
+        from pipelines.pipeline_2.task_clinical_trial_6 import NewClinicalTrialAnnotationTask
 
-        self._run_pipeline_task(task_2)
-        self._run_pipeline_task(task_3)
-        self._run_pipeline_task(task_4)
-        self._run_pipeline_task(task_5)
-        self._run_pipeline_task(task_6)
+        self._run_pipeline_task(NewClinicalTrialImportTask)
+        self._run_pipeline_task(ClinicalTrialDrugInterventionMappingTask)
+        self._run_pipeline_task(ClinicalTrialPublicationMappingTask)
+        self._run_pipeline_task(ClinicalTrialPmidArticleImportTask)
+        self._run_pipeline_task(NewClinicalTrialAnnotationTask)
 
         self.logger.info("Completed run_clinical_trial_mysql_updates().")
+
+
+
+    def run_clinical_trial_graph_updates(self) -> None:
+        """Run clinical-trial Memgraph node and relationship update tasks."""
+
+        self.logger.info("Starting run_clinical_trial_graph_updates().")
+
+        from pipelines.pipeline_2.task_clinical_trial_graph_1 import NewClinicalTrialGraphTask
+        from pipelines.pipeline_2.task_clinical_trial_graph_2 import NewClinicalTrialGardRelationshipTask
+        from pipelines.pipeline_2.task_clinical_trial_graph_3 import NewClinicalTrialConditionGraphTask
+        from pipelines.pipeline_2.task_clinical_trial_graph_4 import NewClinicalTrialInterventionGraphTask
+        from pipelines.pipeline_2.task_clinical_trial_graph_5 import NewClinicalTrialDrugGraphTask
+        from pipelines.pipeline_2.task_clinical_trial_graph_6 import NewClinicalTrialParticipantGraphTask
+        from pipelines.pipeline_2.task_clinical_trial_graph_7 import NewClinicalTrialPrimaryOutcomeGraphTask
+        from pipelines.pipeline_2.task_clinical_trial_graph_8 import NewClinicalTrialStudyDesignGraphTask
+        from pipelines.pipeline_2.task_clinical_trial_graph_9 import NewClinicalTrialIndividualPatientDataGraphTask 
+        from pipelines.pipeline_2.task_clinical_trial_graph_10 import NewClinicalTrialAnnotationGraphTask
+
+        from pipelines.pipeline_2.task_clinical_trial_pipeline_wrapup import ClinicalTrialPipelineWrapUpTask
+
+
+        self._run_pipeline_task(NewClinicalTrialGraphTask)
+        self._run_pipeline_task(NewClinicalTrialGardRelationshipTask)
+        self._run_pipeline_task(NewClinicalTrialConditionGraphTask)
+        self._run_pipeline_task(NewClinicalTrialInterventionGraphTask)
+        self._run_pipeline_task(NewClinicalTrialDrugGraphTask)
+        self._run_pipeline_task(NewClinicalTrialParticipantGraphTask)
+        self._run_pipeline_task(NewClinicalTrialPrimaryOutcomeGraphTask)
+        self._run_pipeline_task(NewClinicalTrialStudyDesignGraphTask)
+        self._run_pipeline_task(NewClinicalTrialIndividualPatientDataGraphTask)
+        self._run_pipeline_task(NewClinicalTrialAnnotationGraphTask)
+
+
+        # for PRODUCTION
+        #self._run_pipeline_task(ClinicalTrialPipelineWrapUpTask)
+
+        self.logger.info("Completed run_clinical_trial_graph_updates().")
+
 
 
     def run_publication_mysql_updates(self) -> None:
@@ -173,6 +226,7 @@ class AlertPipelineRunner:
         from pipelines.pipeline_3.task_publication_6 import NewPublicationChemicalSubstanceTask
         from pipelines.pipeline_3.task_publication_7 import PublicationFalsePositiveFilterTask
         from pipelines.pipeline_3.task_publication_8 import NewPublicationArticleImportTask
+        from pipelines.pipeline_3.task_publication_9 import NewOmimPublicationArticleImportTask
 
 
         self._run_pipeline_task(PublicationEpiNhsClassificationTask)
@@ -182,56 +236,10 @@ class AlertPipelineRunner:
         self._run_pipeline_task(NewPublicationChemicalSubstanceTask)
         self._run_pipeline_task(PublicationFalsePositiveFilterTask)
         self._run_pipeline_task(NewPublicationArticleImportTask)
+        self._run_pipeline_task(NewOmimPublicationArticleImportTask)
 
 
         self.logger.info("Completed run_publication_mysql_updates().")
-
-
-    def run_memgraph_database_updates(self) -> None:
-        """Run all Memgraph update stages."""
-
-        self.logger.info("Starting run_memgraph_database_updates().")
-
-        self.run_clinical_trial_graph_updates()
-
-        self.run_publication_graph_updates()
-
-        self.logger.info("Completed run_memgraph_database_updates().")
-
-
-    def run_clinical_trial_graph_updates(self) -> None:
-        """Run clinical-trial Memgraph node and relationship update tasks."""
-
-        self.logger.info("Starting run_clinical_trial_graph_updates().")
-
-        from pipelines.pipeline_2.task_clinical_trial_graph_1 import NewClinicalTrialGraphTask as task_1
-        from pipelines.pipeline_2.task_clinical_trial_graph_2 import NewClinicalTrialGardRelationshipTask as task_2
-        from pipelines.pipeline_2.task_clinical_trial_graph_3 import NewClinicalTrialConditionGraphTask as task_3
-        from pipelines.pipeline_2.task_clinical_trial_graph_4 import NewClinicalTrialInterventionGraphTask as task_4
-        from pipelines.pipeline_2.task_clinical_trial_graph_5 import NewClinicalTrialDrugGraphTask as task_5
-        from pipelines.pipeline_2.task_clinical_trial_graph_6 import NewClinicalTrialParticipantGraphTask as task_6
-        from pipelines.pipeline_2.task_clinical_trial_graph_7 import NewClinicalTrialPrimaryOutcomeGraphTask as task_7
-        from pipelines.pipeline_2.task_clinical_trial_graph_8 import NewClinicalTrialStudyDesignGraphTask as task_8
-        from pipelines.pipeline_2.task_clinical_trial_graph_9 import NewClinicalTrialIndividualPatientDataGraphTask as task_9
-        from pipelines.pipeline_2.task_clinical_trial_graph_10 import NewClinicalTrialAnnotationGraphTask as task_10
-
-        from pipelines.pipeline_2.task_clinical_trial_pipeline_wrapup import ClinicalTrialPipelineWrapUpTask as task_11
-
-
-        self._run_pipeline_task(task_1)
-        self._run_pipeline_task(task_2)
-        self._run_pipeline_task(task_3)
-        self._run_pipeline_task(task_4)
-        self._run_pipeline_task(task_5)
-        self._run_pipeline_task(task_6)
-        self._run_pipeline_task(task_7)
-        self._run_pipeline_task(task_8)
-        self._run_pipeline_task(task_9)
-
-        # for PRODUCTION
-        #self._run_pipeline_task(task_11)
-
-        self.logger.info("Completed run_clinical_trial_graph_updates().")
 
 
     def run_publication_graph_updates(self) -> None:
@@ -239,44 +247,44 @@ class AlertPipelineRunner:
 
         self.logger.info("Starting run_publication_graph_updates().")
 
-        from pipelines.pipeline_3.task_publication_graph_1 import NewPublicationArticleGraphTask as task_1
-        from pipelines.pipeline_3.task_publication_graph_2 import NewPublicationArticleNodeAttrsUpdateTask as task_2
-        from pipelines.pipeline_3.task_publication_graph_3 import NewPublicationEpidemiologyGraphTask as task_3
-        from pipelines.pipeline_3.task_publication_graph_4 import NewPublicationKeywordGraphTask as task_4
-        from pipelines.pipeline_3.task_publication_graph_5 import NewPublicationJournalGraphTask as task_5
-        from pipelines.pipeline_3.task_publication_graph_6 import NewPublicationMeshTermGraphTask as task_6
-        from pipelines.pipeline_3.task_publication_graph_7 import GardPublicationEpiNhsCountUpdateTask as task_7
-        from pipelines.pipeline_3.task_publication_graph_8 import NewPublicationGardArticleRelationshipTask as task_8
-        from pipelines.pipeline_3.task_publication_graph_9 import NewPublicationPubtatorGraphTask as task_9
-        from pipelines.pipeline_3.task_publication_graph_10 import NewPublicationSubstanceGraphTask as task_10
+        from pipelines.pipeline_3.task_publication_graph_1 import NewPublicationArticleGraphTask
+        from pipelines.pipeline_3.task_publication_graph_2 import NewPublicationArticleNodeAttrsUpdateTask
+        from pipelines.pipeline_3.task_publication_graph_3 import NewPublicationEpidemiologyGraphTask
+        from pipelines.pipeline_3.task_publication_graph_4 import NewPublicationKeywordGraphTask
+        from pipelines.pipeline_3.task_publication_graph_5 import NewPublicationJournalGraphTask
+        from pipelines.pipeline_3.task_publication_graph_6 import NewPublicationMeshTermGraphTask
+        from pipelines.pipeline_3.task_publication_graph_7 import GardPublicationEpiNhsCountUpdateTask
+        from pipelines.pipeline_3.task_publication_graph_8 import NewPublicationGardArticleRelationshipTask
+        from pipelines.pipeline_3.task_publication_graph_9 import NewPublicationPubtatorGraphTask
+        from pipelines.pipeline_3.task_publication_graph_10 import NewPublicationSubstanceGraphTask
 
-        self._run_pipeline_task(task_1)
-        self._run_pipeline_task(task_2)
-        self._run_pipeline_task(task_3)
-        self._run_pipeline_task(task_4)
-        self._run_pipeline_task(task_5)
-        self._run_pipeline_task(task_6)
-        self._run_pipeline_task(task_7)
-        self._run_pipeline_task(task_8)
-        self._run_pipeline_task(task_9)
-        self._run_pipeline_task(task_10)
+        self._run_pipeline_task(NewPublicationArticleGraphTask)
+        self._run_pipeline_task(NewPublicationArticleNodeAttrsUpdateTask)
+        self._run_pipeline_task(NewPublicationEpidemiologyGraphTask)
+        self._run_pipeline_task(NewPublicationKeywordGraphTask)
+        self._run_pipeline_task(NewPublicationJournalGraphTask)
+        self._run_pipeline_task(NewPublicationMeshTermGraphTask)
+        self._run_pipeline_task(GardPublicationEpiNhsCountUpdateTask)
+        self._run_pipeline_task(NewPublicationGardArticleRelationshipTask)
+        self._run_pipeline_task(NewPublicationPubtatorGraphTask)
+        self._run_pipeline_task(NewPublicationSubstanceGraphTask)
 
         self.logger.info("Completed run_publication_graph_updates().")
 
 
 
-    def run_pipeline_completion_update(self) -> None:
+    def run_pipeline_followup_update(self) -> None:
         """Run final graph statistics updates after pipeline data loads finish."""
 
-        self.logger.info("Starting run_pipeline_completion_update().")
+        self.logger.info("Starting run_pipeline_followup_update().")
 
-        from pipelines.pipeline_5.task_pipeline_completion_update_1 import GardRelationshipCountRefreshTask as task_1
-        from pipelines.pipeline_5.task_pipeline_completion_update_2 import ArticleGeneReviewFlagUpdateTask as task_2
+        from pipelines.pipeline_5.task_pipeline_completion_update_1 import GardRelationshipCountRefreshTask
+        from pipelines.pipeline_5.task_pipeline_completion_update_2 import ArticleGeneReviewFlagUpdateTask
 
-        self._run_pipeline_task(task_1)
-        self._run_pipeline_task(task_2)
+        self._run_pipeline_task(GardRelationshipCountRefreshTask)
+        self._run_pipeline_task(ArticleGeneReviewFlagUpdateTask)
 
-        self.logger.info("Completed run_pipeline_completion_update().")
+        self.logger.info("Completed run_pipeline_followup_update().")
 
 
 
@@ -394,7 +402,7 @@ if __name__ == "__main__":
         # runner.run_memgraph_database_updates()
 
         # Step 7
-        # runner.run_pipeline_completion_update()
+        # runner.run_pipeline_followup_update()
 
         # Step 9
         # runner.send_alert()
