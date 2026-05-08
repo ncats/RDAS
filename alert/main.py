@@ -63,7 +63,7 @@ class AlertPipelineRunner:
                 self.logger.info(f"Processing GARD discovery batch with {len(batch)} nodes.")
 
                 for gard_node in batch:
-                    filtered_names = self._get_filtered_gard_names(gard_node)
+                    filtered_names = gard_node.get("filtered_names")
 
                     last_update_date = gard_node.get("updated")
                     if last_update_date is None:
@@ -354,23 +354,7 @@ class AlertPipelineRunner:
         finally:
             self._close_task_if_needed(task)
 
-
-
-    def _get_filtered_gard_names(self, gard_node) -> list:
-        """Build the disease search names used by the first trial/publication tasks."""
-
-        name = gard_node["gardName"]
-        synonyms = gard_node["synonyms"]
-
-        english_synonyms = [syn for syn in synonyms if _is_english(syn)]
-        short_synonyms = [syn for syn in synonyms if _is_under_char_threshold(syn)]
-
-        filtered_synonyms = [syn for syn in synonyms if syn in english_synonyms]
-        filtered_synonyms = [syn for syn in filtered_synonyms if syn not in short_synonyms]
-
-        return [name] + filtered_synonyms
-
-
+ 
 
     def _close_task_if_needed(self, task) -> None:
         """Close a child task only if it still owns an open database handle."""

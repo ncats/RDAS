@@ -10,7 +10,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-
+from utils.tools import _is_english, _is_under_char_threshold
 
 class GardNodeNamesTask(PipelineBase):
 
@@ -83,11 +83,15 @@ class GardNodeNamesTask(PipelineBase):
                 gardId = row["GardID"] 
                 gard_id_set.add(gardId) 
 
+                gardName = row["gardName"]
+                synonyms = self._split_values(row["synonyms"], self.SYNONYM_SEPARATOR)
+
                 batch.append({
                     "gardId": gardId,
-                    "gardName": row["gardName"],
-                    "synonyms": self._split_values(row["synonyms"], self.SYNONYM_SEPARATOR),
+                    "gardName": gardName,
+                    "synonyms": synonyms,
                     "updated": row["min_updated"],
+                    "filtered_names": self._get_filtered_gard_names(gardName, synonyms)
                 })
 
             # log
@@ -104,6 +108,19 @@ class GardNodeNamesTask(PipelineBase):
         # close all 
         self.close()
 
+
+
+
+    def _get_filtered_gard_names(self, name, synonyms) -> list:
+        """Build the disease search names used by the first trial/publication tasks."""
+
+        english_synonyms = [syn for syn in synonyms if _is_english(syn)]
+        short_synonyms = [syn for syn in synonyms if _is_under_char_threshold(syn)]
+
+        filtered_synonyms = [syn for syn in synonyms if syn in english_synonyms]
+        filtered_synonyms = [syn for syn in filtered_synonyms if syn not in short_synonyms]
+
+        return [name] + filtered_synonyms
 
 
     """ Set the 'updated' column in rdas_db.gard table with value CURDATE() """
