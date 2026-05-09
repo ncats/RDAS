@@ -29,8 +29,13 @@ class PipelineBase(ABC):
 
         self.formatted_today = datetime.today().strftime("%Y-%m-%d")
 
-        self.log_dir = 'logs'
+        ''' 
+        Python file APIs do not expand "~" automatically, so resolve it to
+        the current user's home directory before creating the log folder.
+        '''
+        self.log_dir = os.path.expanduser('~/rdas-memgraph-alert-logs')
         os.makedirs(self.log_dir, exist_ok=True)
+
         class_name = type(self).__name__
         self.log_file = f"{self.log_dir}/alert-{class_name}.log"
         #self.log_file = f"{self.log_dir}/alert-{class_name}-{_date_string()}.log"
