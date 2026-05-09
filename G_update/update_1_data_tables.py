@@ -1,7 +1,7 @@
 import os
 import sys
 # Add the project root to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -14,27 +14,19 @@ from utils.tools import ask_to_continue
 
 # updaters
 
-# - Article
-from G_update.updater.article_is_gene_review_updater import ArticleIsGeneReviewUpdater
-from G_update.updater.article_EPI_NHS_updater_multithread import EPIAndNHSUpdater
+# - Clinical Trial
+from G_update.data_updater.data_1_clinical_trial_updater import ClinicalTrialDataUpdater
+from G_update.data_updater.data_2_clinical_trial_invervention_drug_updater import InterventionDrugDataUpdater
+from G_update.data_updater.data_3_clinical_trial_pmid_updater import ClinicalTrialPubchemIdDataUpdater
 
-# - Organization & Location
-from G_update.updater.organization_location_step_1_finder_multiple import OrganizationLocationFinder
-from G_update.updater.organization_location_step_2_updater import OrganizationLocationUpdater
-
+ 
 
 def run_updaters(stage):
 
     updaters = [
-
-        # GARDRelationshipsStatisticsUpdater
-
-        # ArticleIsGeneReviewUpdater,
-        # EPIAndNHSUpdater
-
-        OrganizationLocationFinder,
-        OrganizationLocationUpdater,
-       
+        #ClinicalTrialDataUpdater       
+        #InterventionDrugDataUpdater
+        ClinicalTrialPubchemIdDataUpdater
     ]
 
     for updater in updaters:
@@ -68,4 +60,3 @@ if __name__ == '__main__':
       
 
    
-
