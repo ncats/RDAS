@@ -15,7 +15,7 @@ from utils.tools import _arr, _val
 Create Annotation nodes and ClinicalTrial/Annotation mappings for new clinical trials.
 """
 # Reference: B_clinical_trial/initializer/annotation.py
-# Reference: alert/pipelines/pipeline_2/task_clinical_trial_6.py
+# Reference: alert/pipelines/pipeline_2_clinical_trial/task_clinical_trial_6.py
 
 
 class NewClinicalTrialAnnotationGraphTask(PipelineBase):
