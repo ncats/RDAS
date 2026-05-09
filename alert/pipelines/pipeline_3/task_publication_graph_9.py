@@ -25,14 +25,18 @@ then creates:
 Duplicate PubTator rows are merged by PubMed ID, annotation identifier,
 annotation type, and relation type, matching the initializer behavior.
 """
+
 # Reference: alert/pipelines/pipeline_3/task_publication_5.py
 # Reference: C_publication/initializer/pubtator.py
 
 
 class NewPublicationPubtatorGraphTask(PipelineBase):
+    """Create PubTator annotation nodes for newly staged publications."""
 
     BATCH_SIZE = 1000
 
+    # Each Article chunk can contain many parsed PubTator annotations. The
+    # annotation node is keyed by the same composite hash used by the initializer.
     BATCH_CREATE = '''
         WITH $chunks AS chunks
         WHERE chunks IS NOT NULL AND size(chunks) > 0
@@ -56,6 +60,8 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
         MERGE (a)-[:has_pubtator_annotation {type: pt.relation_type}]->(p)
     '''
 
+    # PubTator data is populated by task_publication_5; this query limits graph
+    # updates to parsed rows that belong to newly staged publication articles.
     FETCH_NEW_PUBTATOR_QUERY = '''
         SELECT DISTINCT
             ppp.id,
@@ -83,6 +89,7 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Stream parsed PubTator rows and create Article annotation chunks."""
 
         fetch_cursor = None
         count = 0
@@ -105,6 +112,8 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
 
                 rows = carryover_rows + rows
                 last_pubmed_id = rows[-1].get("pubmed_id")
+                # Keep the final PubMed ID in carryover so annotations for one
+                # article are not split across two Memgraph chunks.
                 complete_rows = [
                     row for row in rows
                     if row.get("pubmed_id") != last_pubmed_id
@@ -123,6 +132,7 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
                 count = self._submit_chunks(chunks, count)
 
             if carryover_rows:
+                # Flush the final PubMed group after the cursor is exhausted.
                 chunks = self._create_pubtator_chunks(carryover_rows)
                 count = self._submit_chunks(chunks, count)
 
@@ -138,6 +148,7 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
 
 
     def _submit_chunks(self, chunks: List[Dict[str, Any]], count: int) -> int:
+        """Submit a prepared PubTator batch and return the updated chunk count."""
 
         if not chunks:
             return count
@@ -159,6 +170,7 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
 
 
     def _create_pubtator_chunks(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Group parsed PubTator rows by PubMed ID for graph insertion."""
 
         pubmed_id_ann_dict = {}
 
@@ -171,6 +183,8 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
 
             pubmed_id_ann_dict[pubmed_id] = pubmed_id_ann_dict.get(pubmed_id, [])
 
+            # PubTator uses "-" for missing identifiers; store those as blank
+            # strings so the composite key remains stable.
             infons_identifier = row.get("infons_identifier")
             infons_identifier = "" if (not infons_identifier or infons_identifier == "-") else str(infons_identifier)
 
@@ -191,6 +205,7 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
 
 
     def merge_annotations(self, val_dict: Dict[int, List[Dict[str, Any]]]) -> Dict[int, List[Dict[str, Any]]]:
+        """Merge duplicate PubTator annotations and build stable hash keys."""
 
         result_dict = {}
 
@@ -198,6 +213,8 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
             temp_obj = {}
 
             for item in items:
+                # The initializer collapses annotations by identifier, type,
+                # and relationship type, while preserving all text variants.
                 relation_type_tuple = tuple(sorted(item["relation_type"]))
                 compose_key = (
                     item["annotationIdentifier"],
@@ -215,6 +232,8 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
             for compose_key, annotations in temp_obj.items():
                 annotation_identifier, annotation_type, relation_type_tuple = compose_key
 
+                # Hash the composed identity to keep the Memgraph key compact
+                # and consistent with the shared tools._make_hash_key helper.
                 composite_key_str = (
                     f"{annotation_identifier}_"
                     f"{'_'.join(sorted(annotations))}_"
@@ -236,6 +255,7 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
 
 
     def _parse_relation_type(self, value: Any, pubmed_id: int) -> List[str]:
+        """Parse the stored relation_type JSON into a sorted list of strings."""
 
         if value is None or value == "":
             return []

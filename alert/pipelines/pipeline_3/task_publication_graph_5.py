@@ -19,13 +19,18 @@ For each new row in update_publication_article (is_new = 1), parse
 source_json.journalInfo.journal, create/merge the Journal node, and link the
 matching Article node to the Journal with published_in.
 """
+
 # Reference: C_publication/initializer/journal.py
 
 
 class NewPublicationJournalGraphTask(PipelineBase):
+    """Create Journal graph records for newly staged publication articles."""
 
     BATCH_SIZE = 100
 
+    # Journal identity follows the initializer logic: use title when ISSN/eISSN
+    # are missing, otherwise use the ISSN/eISSN pair so shared journals collapse
+    # to one node across many Article records.
     BATCH_CREATE = '''
         WITH $chunks AS chunks
         WHERE chunks IS NOT NULL AND size(chunks) > 0
@@ -55,6 +60,8 @@ class NewPublicationJournalGraphTask(PipelineBase):
         }
     '''
 
+    # Only new update rows are read here; source_json is required because the
+    # journal payload is nested under source_json.journalInfo.journal.
     FETCH_NEW_ARTICLES_QUERY = '''
         SELECT
             pubmed_id,
@@ -76,6 +83,7 @@ class NewPublicationJournalGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Stream new article rows, extract journal data, and submit graph batches."""
 
         fetch_cursor = None
         count = 0
@@ -98,6 +106,8 @@ class NewPublicationJournalGraphTask(PipelineBase):
                 chunks = []
 
                 for row in rows:
+                    # Convert each MySQL row into the compact shape expected by
+                    # the Cypher batch. Invalid or incomplete rows are skipped.
                     journal_chunk = self._create_journal_chunk(row)
 
                     if journal_chunk is None:
@@ -130,6 +140,7 @@ class NewPublicationJournalGraphTask(PipelineBase):
 
 
     def _create_journal_chunk(self, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Build one Article-Journal mapping from a staged publication row."""
 
         try:
             pubmed_id = int(row["pubmed_id"])
@@ -143,11 +154,14 @@ class NewPublicationJournalGraphTask(PipelineBase):
             self.logger.error(f"Error parsing source_json for pubmed_id={pubmed_id}: {e}")
             return None
 
+        # PubMed article metadata stores journal details in a nested object;
+        # articles without journal data cannot form a published_in relationship.
         journal = (source_obj.get("journalInfo") or {}).get("journal")
 
         if not journal:
             return None
 
+        # Normalize optional journal fields before they are used by MERGE.
         return {
             "pubmedId": pubmed_id,
             "journal": {

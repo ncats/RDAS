@@ -24,6 +24,7 @@ Step 2 validates only abbreviation rows whose is_valid value is still NULL.
 Valid abbreviations keep the publication/GARD relationship usable
 (is_valid = 1); false positives are marked as is_valid = 0.
 """
+
 # Reference: C_publication/init_8_publication-filter-out-false-positives-of-article.py
 
 
@@ -41,9 +42,18 @@ SEMANTIC_TYPE_LIST = {
 
 
 class PublicationFalsePositiveFilterTask(PipelineBase):
+    """
+    Validate abbreviation-based publication/GARD matches.
+
+    Abbreviations can create false-positive publication matches. This task marks
+    abbreviation rows, then checks whether the abbreviation appears in the
+    abstract as a disease-like expanded term before keeping the mapping valid.
+    """
 
     BATCH_SIZE = 100
 
+    # Mark current-run publication mappings whose search term is a GARD
+    # abbreviation label. Only new publication rows are touched.
     SET_ABBREVIATION_SQL = '''
         UPDATE publication_gard_searchterm_pubmed_mapping pgs
         JOIN gard g
@@ -55,6 +65,8 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
         AND upa.is_new = 1
     '''
 
+    # Validate only abbreviation mappings that have not already received an
+    # is_valid decision.
     FETCH_ABBREVIATION_ROWS_QUERY = '''
         SELECT
             gsp.id,
@@ -79,6 +91,7 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL access, UMLS endpoint config, and SpaCy NLP."""
         
         super().__init__(init_mysql=True, init_memgraph=False)
         self.api_key = os.getenv("UMLS_API_KEY")
@@ -94,6 +107,7 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Mark abbreviation mappings and validate them in batches."""
 
         fetch_cursor = None
         update_cursor = None
@@ -104,6 +118,8 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
             update_cursor = self.mysql.cursor(buffered=True)
 
+            # Step 1 from the module header: identify mappings created from
+            # GARD abbreviation labels.
             self.set_abbreviation_flag(update_cursor)
 
             fetch_cursor.execute(self.FETCH_ABBREVIATION_ROWS_QUERY)
@@ -126,6 +142,8 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
                     abstract = row.get("abstract_text")
 
                     try:
+                        # Step 2 from the module header: decide whether this
+                        # abbreviation resolves to a disease-like phrase.
                         is_valid = self.verify(search_term, abstract)
                     except Exception as e:
                         self.logger.error(
@@ -165,6 +183,7 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
 
 
     def set_abbreviation_flag(self, cursor) -> None:
+        """Set is_abbreviation for current-run mappings that use GARD abbreviations."""
 
         try:
             cursor.execute(self.SET_ABBREVIATION_SQL)
@@ -178,6 +197,7 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
 
 
     def update_is_valid(self, cursor, update_values) -> None:
+        """Persist validation decisions for abbreviation mappings."""
 
         if not update_values:
             return
@@ -193,12 +213,14 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
 
 
     def find_first_sentence(self, text: str, abbreviation: str) -> Optional[str]:
+        """Find the first abstract sentence containing the abbreviation."""
 
         if not text or not abbreviation:
             return None
 
         pattern = re.escape(abbreviation.strip())
 
+        # Some terms have common hyphenated variants that should still match.
         if abbreviation.strip().casefold() == "flnms":
             pattern = r"F[-]?LNMs"
 
@@ -212,6 +234,7 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
 
 
     def find_full_name_of_abbreviation(self, text: str, abbreviation: str) -> Optional[str]:
+        """Extract the phrase immediately before an abbreviation in parentheses."""
 
         if not text or not abbreviation:
             return None
@@ -228,11 +251,14 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
 
 
     def extract_noun_phrases(self, sentence: str) -> List[str]:
+        """Use SpaCy noun chunks to isolate candidate disease phrases."""
+
         doc = self.nlp(sentence)
         return [chunk.text for chunk in doc.noun_chunks]
 
 
     def get_cui(self, term: str) -> Optional[str]:
+        """Look up an exact UMLS CUI for a candidate expanded phrase."""
 
         if not term:
             return None
@@ -263,6 +289,7 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
 
 
     def get_semantic_types(self, cui: str) -> List[str]:
+        """Fetch UMLS semantic type names for a CUI."""
 
         if not cui:
             return []
@@ -294,6 +321,7 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
 
 
     def is_a_disease_by_spacy(self, term: str) -> bool:
+        """Fallback disease check when UMLS has no exact CUI match."""
 
         if not term:
             return False
@@ -308,6 +336,13 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
 
 
     def verify(self, search_term: str, abstract: str) -> bool:
+        """
+        Return True when an abbreviation appears to expand to a disease term.
+
+        The method checks the first sentence containing the abbreviation, pulls
+        the expanded phrase before the abbreviation, then prefers UMLS semantic
+        types and falls back to SpaCy entity labels.
+        """
 
         if not search_term or not abstract:
             return False
@@ -330,8 +365,11 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
         last_noun_phrase = noun_phrases[-1]
         cui = self.get_cui(last_noun_phrase)
 
+        # Prefer UMLS semantic types when available because they are more
+        # explicit than local NLP entity labels.
         if cui:
             semantic_types = self.get_semantic_types(cui)
             return any(semantic_type in SEMANTIC_TYPE_LIST for semantic_type in semantic_types)
 
+        # If UMLS has no exact match, use SpaCy as a softer local signal.
         return self.is_a_disease_by_spacy(last_noun_phrase)

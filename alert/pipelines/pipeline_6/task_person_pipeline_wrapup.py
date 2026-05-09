@@ -19,7 +19,10 @@ processed again in the next alert run.
 
 
 class PersonPipelineWrapUpTask(PipelineBase):
+    """Clear person staging flags after the person pipeline has consumed them."""
 
+    # Leave the person rows in place; only reset the alert-run marker so future
+    # person tasks process newly inserted rows instead of replaying old ones.
     RESET_PERSON_IS_NEW_SQL = '''
         UPDATE person_of_all_sources
         SET is_new = 0
@@ -35,11 +38,14 @@ class PersonPipelineWrapUpTask(PipelineBase):
 
 
     def process_new_data(self) -> None:
+        """Reset person_of_all_sources.is_new after extraction and graph sync."""
 
         cursor = None
 
         try:
             cursor = self.mysql.cursor()
+            # This wrap-up should be the final person pipeline task, after
+            # grouping and Agent graph creation have read the new rows.
             cursor.execute(self.RESET_PERSON_IS_NEW_SQL)
             self.mysql.commit()
 

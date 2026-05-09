@@ -20,12 +20,18 @@ Retrieve pubtator data from API and insert into table publication_pubtator
 # Reference: C_publication/init_7b_publication-pubtator-Parse.py
 
 class NewPublicationPubtatorRetrievalTask(PipelineBase):
+    """
+    Retrieve and parse PubTator annotations for newly staged publications.
+
+    The task first downloads PubTator JSON for new PubMed IDs, then parses the
+    stored JSON into normalized annotation rows for later graph loading.
+    """
 
 
     def __init__(self):
+        """Initialize MySQL access and the PubTator download helper."""
 
         super().__init__(init_mysql=True, init_memgraph=False) 
-
         self.worker = PubtatorWorker()
 
 
@@ -37,11 +43,16 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Run PubTator retrieval first, then parse newly stored source JSON."""
         
         ''' step 1 '''
+        # Store raw PubTator JSON before parsing so retrieval and parsing can be
+        # retried independently.
         self.retrieve_pubtator()
 
         ''' step 2 '''
+        # Parse only source JSON rows that have not already been expanded into
+        # publication_pubtator_parsed.
         self.parse_pubtator()
 
         ''' step 3  '''
@@ -52,6 +63,7 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
 
         
     def parse_pubtator(self):
+        """Parse stored PubTator JSON into publication_pubtator_parsed rows."""
 
         '''
         Select new PubMed IDs from update_publication_article that have PubTator
@@ -98,6 +110,8 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
                 batch_num += 1
                 self.logger.info(f'--- batch# = {batch_num} ---')
 
+                # val_list collects raw parsed annotations for the whole batch;
+                # duplicates are merged before insert.
                 val_list = []
 
                 for row in rows:
@@ -120,6 +134,8 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
                             self.logger.info(f'No PubTator3 or no passages found for pubmed_id: {pubmed_id}')
                             continue
 
+                        # PubTator passages contain both relation-level metadata
+                        # and nested entity annotations.
                         relation_type = None
 
                         for passage in passages:
@@ -147,6 +163,8 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
                         continue
 
 
+                # PubTator can repeat the same annotation across passages; merge
+                # before writing database rows.
                 merged_val_list = self.merge_json_items(val_list)
 
                 list_of_tuples = self.convert_to_tuples(merged_val_list)
@@ -178,6 +196,7 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
         
 
     def retrieve_pubtator(self):
+        """Download raw PubTator JSON for new PubMed IDs not already cached."""
 
         ''' Retrieve the pubmed_id's which are in update_publication_article table but not in publication_pubtator table '''
         fetch_query = '''
@@ -221,6 +240,8 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
 
                 for pubmed_id in pubmed_id_list:
                     
+                    # PubtatorWorker owns the API call and retry behavior; this
+                    # task stores whatever JSON comes back for the PMID.
                     pubmed_id, source_json  = self.worker.download_by_pmid(pubmed_id) 
  
                     if source_json:
@@ -274,6 +295,8 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
             infons_text = item.get('infons_text') or ''
             relation_type = item.get('relation_type')
 
+            # Case-insensitive text matching prevents duplicate rows when the
+            # same annotation appears with different casing.
             text_key = infons_text.casefold()
             key = (pubmed_id, infons_identifier, infons_type, text_key)
 

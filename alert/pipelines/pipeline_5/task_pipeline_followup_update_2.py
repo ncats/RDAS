@@ -18,15 +18,19 @@ from pipelines.pipeline_base import PipelineBase
 Mark Article nodes that are GeneReviews.
 This task should run after Article nodes have been written to Memgraph.
 """
+
 # Reference: G_update/updater/article_is_gene_review_updater.py
 
 
 class ArticleGeneReviewFlagUpdateTask(PipelineBase):
+    """Mark existing Article nodes as GeneReviews using the NCBI title file."""
 
     GENE_REVIEWS_TITLE_URL = os.getenv("GENE_REVIEWS_TITLE_URL")
-    
+
     BATCH_SIZE = 100
 
+    # The Article nodes already exist by this point; this follow-up task only
+    # sets the boolean flag for PMIDs that appear in the GeneReviews title file.
     BATCH_UPDATE_GENE_REVIEW_SQL = '''
         UNWIND $pmids AS pmid
         MATCH (a:Article {pubmedId: pmid})
@@ -45,8 +49,11 @@ class ArticleGeneReviewFlagUpdateTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch GeneReviews PMIDs and update matching Article nodes in batches."""
 
         try:
+            # The source file is external to RDAS, so fetch and parse it once
+            # before issuing Memgraph updates.
             pmids = self.fetch_gene_review_pmids()
 
             if not pmids:
@@ -59,6 +66,8 @@ class ArticleGeneReviewFlagUpdateTask(PipelineBase):
             total_batches = (len(pmids) + self.BATCH_SIZE - 1) // self.BATCH_SIZE
 
             for batch_num, start in enumerate(range(0, len(pmids), self.BATCH_SIZE), 1):
+                # Keep Memgraph writes small and continue with later batches if
+                # one batch fails.
                 batch = pmids[start:start + self.BATCH_SIZE]
 
                 try:
@@ -84,6 +93,7 @@ class ArticleGeneReviewFlagUpdateTask(PipelineBase):
 
 
     def fetch_gene_review_pmids(self) -> List[int]:
+        """Download the GeneReviews title TSV and return valid PMID integers."""
 
         if not self.GENE_REVIEWS_TITLE_URL:
             self.logger.error("GENE_REVIEWS_TITLE_URL is not configured.")
@@ -107,6 +117,8 @@ class ArticleGeneReviewFlagUpdateTask(PipelineBase):
             pmids = []
 
             for row in reader:
+                # NCBI title files can prefix the first header with '#'; strip it
+                # so '#PMID' and 'PMID' are handled the same way.
                 normalized_row = {
                     (key or "").lstrip("#"): value
                     for key, value in row.items()
@@ -125,6 +137,7 @@ class ArticleGeneReviewFlagUpdateTask(PipelineBase):
 
 
     def update_gene_review_articles(self, pmids: List[int]) -> int:
+        """Set isGeneReview on Article nodes and return Memgraph's update count."""
 
         if not pmids:
             return 0

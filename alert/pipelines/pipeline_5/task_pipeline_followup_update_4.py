@@ -28,10 +28,13 @@ exists, and creates:
 
 
 class OrganizationLocationGraphSyncTask(PipelineBase):
+    """Apply newly staged organization_location rows to the Memgraph graph."""
 
-    TABLE_NAME = "organization_location"
     BATCH_SIZE = 200
-
+    TABLE_NAME = "organization_location"
+    
+    # Step 1 stores found and not-found ROR lookups in organization_location.
+    # This task only consumes rows marked is_new=1 for the current alert run.
     FETCH_NEW_ORGANIZATION_LOCATIONS_QUERY = f'''
         SELECT
             ror_id,
@@ -55,6 +58,9 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         WHERE is_new = 1
     '''
 
+    # A chunk with location data updates the Organization and links it to a
+    # Location node. A chunk without location data marks the Organization as
+    # not found so it will not be repeatedly searched.
     BATCH_UPDATE_ORGANIZATIONS = '''
         UNWIND $chunks AS chunk
 
@@ -93,6 +99,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
 
     def process_new_data(self) -> None:
+        """Read staged location rows and sync Organization/Location graph data."""
 
         fetch_cursor = None
         total_updated = 0
@@ -113,6 +120,8 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                 batch_num += 1
                 batch_start = time.time()
 
+                # Convert raw MySQL rows into the exact payload shape expected
+                # by the Cypher batch update.
                 chunks = self.create_organization_location_chunks(rows)
 
                 if not chunks:
@@ -173,6 +182,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
 
     def create_organization_location_chunk(self, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Create one Organization sync chunk from an organization_location row."""
 
         org_idx_key = row.get("original_name_in_graph_db_idx_key")
 
@@ -183,6 +193,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         display_name = _clean(row.get("org_name", ""))
 
         if not display_name:
+            # Rows without org_name represent ROR not-found lookups from step 1.
             return {
                 "orgIdxKey": org_idx_key,
                 "hasLocation": False
@@ -192,6 +203,8 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         lng = self._to_float(row.get("lng"))
         types = self._parse_types(row.get("types"))
 
+        # Prefer coordinates for Location identity. If coordinates are missing,
+        # fall back to the organization name so a stable key is still produced.
         if lat is not None and lng is not None:
             location_idx_key = _make_hash_key(f"{lat}{lng}")
         else:
@@ -213,6 +226,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
 
     def _parse_types(self, value: Any) -> List[Any]:
+        """Parse ROR organization types from JSON or pass through list values."""
 
         if value is None:
             return []
@@ -229,6 +243,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
 
     def _to_float(self, value: Any):
+        """Convert nullable MySQL coordinate values to floats."""
 
         if value is None or value == "":
             return None

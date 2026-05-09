@@ -14,10 +14,18 @@ from utils.tools import _as_bool, _empty_if_none
 """
 Insert new Article nodes into Memgraph from update_publication_article.
 """
+
 # Reference: C_publication/initializer/article.py
 
 
 class NewPublicationArticleGraphTask(PipelineBase):
+    """
+    Create Article nodes in Memgraph for newly staged publications.
+
+    update_publication_article contains the current alert run's article rows.
+    This task converts those rows into Article node properties and creates nodes
+    keyed by PubMed ID.
+    """
 
     BATCH_SIZE = 300
 
@@ -50,6 +58,7 @@ class NewPublicationArticleGraphTask(PipelineBase):
             a.isGeneReview = false
     '''
 
+    # Load only current-run article rows that can be keyed in Memgraph by PubMed ID.
     FETCH_NEW_ARTICLES_QUERY = '''
         SELECT 
             pubmed_id, doi, title, abstract_text, first_publication_date,
@@ -62,6 +71,8 @@ class NewPublicationArticleGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for Article node loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -72,6 +83,7 @@ class NewPublicationArticleGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch staged publication rows and write Article nodes in batches."""
 
         fetch_cursor = None
         count = 0
@@ -94,6 +106,8 @@ class NewPublicationArticleGraphTask(PipelineBase):
                 chunks = []
 
                 for row in rows:
+                    # Convert MySQL column names/types into the Article node
+                    # property names expected by the graph schema.
                     article_node = self._create_article_node(row)
 
                     if article_node is None:
@@ -126,6 +140,7 @@ class NewPublicationArticleGraphTask(PipelineBase):
 
 
     def _create_article_node(self, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Build one Article node property dictionary from a database row."""
 
         try:
             pubmed_id = int(row["pubmed_id"])

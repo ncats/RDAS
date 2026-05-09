@@ -19,13 +19,23 @@ For each new row in update_publication_article (is_new = 1), read epi_extract,
 create a unique EpidemiologyAnnotation node, and link it to the matching Article
 node with has_epidemiological_annotation.
 """
+
 # Reference: C_publication/initializer/epidemiology.py
 
 
 class NewPublicationEpidemiologyGraphTask(PipelineBase):
+    """
+    Load extracted epidemiology facts from staged articles into Memgraph.
+
+    EPI extraction produces JSON fields such as rates, locations, and dates.
+    This task turns those fields into EpidemiologyAnnotation nodes and links
+    them to the Article nodes they came from.
+    """
 
     BATCH_SIZE = 200
 
+    # EpidemiologyAnnotation nodes are keyed by a hash of the extracted fields
+    # so the same annotation payload can be reused across reruns.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (a:Article {pubmedId: chunk.pubmedId})
@@ -42,6 +52,8 @@ class NewPublicationEpidemiologyGraphTask(PipelineBase):
         MERGE (a)-[:has_epidemiological_annotation {epidemiology_probability: chunk.epiProbability}]->(n)
     '''
 
+    # is_EPI has appeared as both numeric and string/boolean-like values, so the
+    # filter accepts the known truthy forms.
     FETCH_NEW_EPI_ARTICLES_QUERY = '''
         SELECT
             pubmed_id,
@@ -61,6 +73,8 @@ class NewPublicationEpidemiologyGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for epidemiology graph loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -71,6 +85,7 @@ class NewPublicationEpidemiologyGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch staged EPI rows and write EpidemiologyAnnotation mappings."""
 
         fetch_cursor = None
         count = 0
@@ -93,6 +108,8 @@ class NewPublicationEpidemiologyGraphTask(PipelineBase):
                 chunks = []
 
                 for row in rows:
+                    # Convert one staged article's epi_extract JSON into the
+                    # chunk shape expected by BATCH_CREATE.
                     epi_node = self._create_epidemiology_annotation(row)
 
                     if epi_node is None:
@@ -127,6 +144,7 @@ class NewPublicationEpidemiologyGraphTask(PipelineBase):
 
 
     def _create_epidemiology_annotation(self, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Parse one epi_extract payload into graph-ready annotation properties."""
 
         try:
             pubmed_id = int(row["pubmed_id"])
@@ -144,6 +162,8 @@ class NewPublicationEpidemiologyGraphTask(PipelineBase):
             self.logger.error(f"Error parsing epi_extract for pubmed_id={pubmed_id}: {e}")
             return None
 
+        # Each EPI field is normalized to a list so Cypher receives stable
+        # property types regardless of whether extraction returned one or many values.
         epidemiology_type = _as_list(epi_obj.get("EPI"))
         epidemiology_rate = _as_list(epi_obj.get("STAT"))
         study_date = _as_list(epi_obj.get("DATE"))
@@ -176,6 +196,8 @@ class NewPublicationEpidemiologyGraphTask(PipelineBase):
 
 
     def _make_composite_key(self, *values: List[str]) -> str:
+        """Build a stable hash key from all extracted epidemiology fields."""
+
         composite_key_str = "_".join(
             "_".join(sorted(value_list))
             for value_list in values

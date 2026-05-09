@@ -23,13 +23,17 @@ The mapping table does not have an is_new flag, so update_publication_article
 is the source of truth for deciding which article relationships are new for
 this alert pipeline run.
 """
+
 # Reference: C_publication/initializer/relationship_GARD.py
 
 
 class NewPublicationGardArticleRelationshipTask(PipelineBase):
+    """Link newly staged Article nodes to their matching GARD disease nodes."""
 
     BATCH_SIZE = 300
 
+    # MERGE keeps the relationship write idempotent when the same mapping is
+    # seen again in a later run.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (p:Article {pubmedId: chunk.pubmedId})
@@ -37,6 +41,8 @@ class NewPublicationGardArticleRelationshipTask(PipelineBase):
         MERGE (g)-[:mentioned_in]->(p)
     '''
 
+    # Newness comes from update_publication_article. The mapping table provides
+    # the GARD/pubmed pairs and may mark false-positive mappings with is_valid.
     FETCH_NEW_RELATIONS_QUERY = '''
         SELECT DISTINCT
             pgspm.gard_id,
@@ -61,6 +67,7 @@ class NewPublicationGardArticleRelationshipTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Read new GARD/pubmed mappings and write Article relationships."""
 
         fetch_cursor = None
         count = 0
@@ -83,6 +90,8 @@ class NewPublicationGardArticleRelationshipTask(PipelineBase):
                 chunks = []
 
                 for row in rows:
+                    # Normalize and validate IDs before sending them to
+                    # Memgraph; bad rows are logged and skipped.
                     relation_chunk = self._create_relation_chunk(row)
 
                     if relation_chunk is None:
@@ -118,6 +127,7 @@ class NewPublicationGardArticleRelationshipTask(PipelineBase):
 
 
     def _create_relation_chunk(self, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Build one GARD-to-Article relationship chunk from a MySQL row."""
 
         gard_id = row.get("gard_id")
 
@@ -131,6 +141,8 @@ class NewPublicationGardArticleRelationshipTask(PipelineBase):
             self.logger.error(f"Invalid pubmed_id found: {row.get('pubmed_id')}. Error: {e}")
             return None
 
+        # Keep gardId as the trimmed string used by GARD nodes, and pubmedId as
+        # an integer to match Article node identity.
         return {
             "gardId": str(gard_id).strip(),
             "pubmedId": pubmed_id,

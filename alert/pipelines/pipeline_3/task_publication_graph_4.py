@@ -19,13 +19,22 @@ For each new row in update_publication_article (is_new = 1), parse
 source_json.keywordList.keyword, create Keyword nodes, and link the matching
 Article node to each Keyword with has_keyword.
 """
+
 # Reference: C_publication/initializer/keyword.py
 
 
 class NewPublicationKeywordGraphTask(PipelineBase):
+    """
+    Create Keyword nodes and Article/Keyword relationships for new articles.
+
+    Keyword data comes from nested source_json metadata. This task normalizes
+    those keyword values and links them to the Article node identified by PubMed ID.
+    """
 
     BATCH_SIZE = 200
 
+    # Keyword nodes are reused by keyword text, so multiple articles can point
+    # to the same normalized Keyword node.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (a:Article {pubmedId: chunk.pubmedId})
@@ -35,6 +44,8 @@ class NewPublicationKeywordGraphTask(PipelineBase):
         MERGE (a)-[:has_keyword]->(k)
     '''
 
+    # source_json is required because keywordList is nested in the publication
+    # source payload.
     FETCH_NEW_ARTICLES_QUERY = '''
         SELECT
             pubmed_id, source_json
@@ -45,6 +56,8 @@ class NewPublicationKeywordGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for keyword graph loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -55,6 +68,7 @@ class NewPublicationKeywordGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch staged article JSON and write Keyword mappings in batches."""
 
         fetch_cursor = None
         count = 0
@@ -77,6 +91,8 @@ class NewPublicationKeywordGraphTask(PipelineBase):
                 chunks = []
 
                 for row in rows:
+                    # Build one article-to-keywords chunk from the nested
+                    # source_json keyword payload.
                     keyword_chunk = self._create_keyword_chunk(row)
 
                     if keyword_chunk is None:
@@ -113,6 +129,7 @@ class NewPublicationKeywordGraphTask(PipelineBase):
 
 
     def _create_keyword_chunk(self, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Parse and normalize keywords for one staged article row."""
 
         try:
             pubmed_id = int(row["pubmed_id"])
@@ -132,6 +149,8 @@ class NewPublicationKeywordGraphTask(PipelineBase):
             return None
 
         try:
+            # _normalize_keywords handles source payload variations such as a
+            # single keyword string versus a list of keyword values.
             keywords = _normalize_keywords(keyword_list.get("keyword", []))
         except Exception as e:
             self.logger.error(f"Error processing keywords for pubmed_id={pubmed_id}: {e}")

@@ -13,13 +13,21 @@ from pipelines.pipeline_base import PipelineBase
 Copy new publication rows from update_publication_article into publication_article.
 """
 
-
 class NewPublicationArticleImportTask(PipelineBase):
+    """
+    Promote newly staged publication rows into the main publication table.
+
+    Earlier publication tasks populate update_publication_article. This task
+    copies rows marked is_new = 1 into publication_article so downstream graph
+    tasks and historical queries can use the canonical article table.
+    """
 
     '''
     publication_article does not have is_new or alert_sent, so only copy the
     columns that exist in both tables.
     '''
+    # The staging-only is_new flag stays in update_publication_article; it is
+    # used only to decide which rows should be imported during this run.
     INSERT_NEW_PUBLICATIONS_SQL = '''
         INSERT INTO publication_article (
             pubmed_id,
@@ -71,6 +79,8 @@ class NewPublicationArticleImportTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL access for the publication import step."""
+
         super().__init__(init_mysql=True, init_memgraph=False)
 
 
@@ -81,12 +91,15 @@ class NewPublicationArticleImportTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Copy current-run staged articles into publication_article."""
 
         cursor = None
 
         try:
             cursor = self.mysql.cursor()
 
+            # The INSERT...SELECT performs the copy in one database operation so
+            # the row count matches the number of staged articles imported.
             cursor.execute(self.INSERT_NEW_PUBLICATIONS_SQL)
             self.mysql.commit()
 

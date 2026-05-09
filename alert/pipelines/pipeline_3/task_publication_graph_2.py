@@ -19,13 +19,23 @@ For each new publication row (is_new = 1), parse source_json and update the matc
 - issue from source_json.journalInfo.issue
 - volume from source_json.journalInfo.volume
 """
+
 # Reference: C_publication/initializer/article_attrs.py
 
 
 class NewPublicationArticleNodeAttrsUpdateTask(PipelineBase):
+    """
+    Update extra Article node attributes from staged publication metadata.
+
+    Article nodes are created first with core fields. This task parses
+    source_json from the staging table and fills in attributes that come from
+    nested publication metadata.
+    """
 
     BATCH_SIZE = 200
 
+    # This task updates existing Article nodes only; it does not create Article
+    # nodes if the PubMed ID is missing from Memgraph.
     BATCH_UPDATE = '''
         UNWIND $chunks AS chunk
         MATCH (a:Article {pubmedId: chunk.pubmedId})
@@ -34,6 +44,8 @@ class NewPublicationArticleNodeAttrsUpdateTask(PipelineBase):
             a.volume = chunk.volume
     '''
 
+    # source_json is required because full-text URLs and journal issue/volume
+    # are nested inside the original publication payload.
     FETCH_NEW_ARTICLES_QUERY = '''
         SELECT
             pubmed_id,
@@ -45,6 +57,8 @@ class NewPublicationArticleNodeAttrsUpdateTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for Article attribute updates."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -55,6 +69,7 @@ class NewPublicationArticleNodeAttrsUpdateTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch staged article JSON and update extra Article properties in batches."""
 
         fetch_cursor = None
         count = 0
@@ -77,6 +92,8 @@ class NewPublicationArticleNodeAttrsUpdateTask(PipelineBase):
                 chunks = []
 
                 for row in rows:
+                    # Convert one staged article row into the compact update
+                    # payload expected by BATCH_UPDATE.
                     article_attrs = self._create_article_attrs(row)
 
                     if article_attrs is None:
@@ -113,6 +130,7 @@ class NewPublicationArticleNodeAttrsUpdateTask(PipelineBase):
 
 
     def _create_article_attrs(self, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Parse source_json and return extra Article attributes for one PMID."""
 
         try:
             pubmed_id = int(row["pubmed_id"])
@@ -129,6 +147,7 @@ class NewPublicationArticleNodeAttrsUpdateTask(PipelineBase):
         full_text_url_list = source_obj.get("fullTextUrlList") or {}
         journal_info = source_obj.get("journalInfo") or {}
 
+        # Skip rows that do not contain any of the nested fields this task owns.
         if not full_text_url_list and not journal_info:
             return None
 

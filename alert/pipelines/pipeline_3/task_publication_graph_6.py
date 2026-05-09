@@ -18,13 +18,17 @@ For each new row in update_publication_article (is_new = 1), parse
 source_json.meshHeadingList.meshHeading[].descriptorName, create MeshTerm nodes,
 and link each MeshTerm to the matching Article with mesh_term_for.
 """
+
 # Reference: C_publication/initializer/mesh_term.py
 
 
 class NewPublicationMeshTermGraphTask(PipelineBase):
+    """Create MeshTerm nodes and Article relationships for new publications."""
 
     BATCH_SIZE = 200
 
+    # Each chunk represents one Article with zero or more MeSH descriptors.
+    # UNWIND expands those descriptors into individual MeshTerm nodes and links.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (p:Article {pubmedId: chunk.pubmedId})
@@ -34,6 +38,8 @@ class NewPublicationMeshTermGraphTask(PipelineBase):
         MERGE (m)-[:mesh_term_for]->(p)
     '''
 
+    # MeSH headings live inside source_json, so only rows with publication JSON
+    # can produce MeshTerm graph updates.
     FETCH_NEW_ARTICLES_QUERY = '''
         SELECT
             pubmed_id, source_json
@@ -54,6 +60,7 @@ class NewPublicationMeshTermGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Read new publications, extract MeSH terms, and batch graph updates."""
 
         fetch_cursor = None
         count = 0
@@ -76,6 +83,8 @@ class NewPublicationMeshTermGraphTask(PipelineBase):
                 chunks = []
 
                 for row in rows:
+                    # Convert the staged article row into the shape required by
+                    # BATCH_CREATE; rows with no MeSH terms are skipped.
                     mesh_chunk = self._create_mesh_term_chunk(row)
 
                     if mesh_chunk is None:
@@ -112,6 +121,7 @@ class NewPublicationMeshTermGraphTask(PipelineBase):
 
 
     def _create_mesh_term_chunk(self, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Build one Article-to-MeSH chunk from a staged publication row."""
 
         try:
             pubmed_id = int(row["pubmed_id"])
@@ -131,6 +141,7 @@ class NewPublicationMeshTermGraphTask(PipelineBase):
 
 
     def get_mesh_terms_list(self, pubmed_id: int, source_json: Any) -> List[str]:
+        """Parse source_json and return unique descriptor names for one article."""
 
         try:
             source_obj = json.loads(source_json or "{}")
@@ -138,6 +149,8 @@ class NewPublicationMeshTermGraphTask(PipelineBase):
             self.logger.error(f"Error parsing source_json for pubmed_id={pubmed_id}: {e}")
             return []
 
+        # PubMed may return one meshHeading object or a list of them depending
+        # on the article, so normalize to a list before iterating.
         mesh_heading_list = (source_obj.get("meshHeadingList") or {}).get("meshHeading", [])
 
         if not mesh_heading_list:
@@ -157,4 +170,5 @@ class NewPublicationMeshTermGraphTask(PipelineBase):
             if descriptor_name:
                 mesh_terms.append(str(descriptor_name))
 
+        # Deduplicate terms within the article so the Cypher batch stays small.
         return sorted(set(mesh_terms))

@@ -25,6 +25,7 @@ ClinicalTrial, Project, and Article nodes to those Agent nodes.
 
 
 class NewPersonAgentGraphTask(PipelineBase):
+    """Create Agent graph nodes for newly staged, grouped person rows."""
 
     BATCH_SIZE = 500
     PERSON_TABLE = "person_of_all_sources"
@@ -32,6 +33,8 @@ class NewPersonAgentGraphTask(PipelineBase):
     GRANT_PROJECT = "GrantProject"
     CLINICAL_TRIAL = "ClinicalTrial"
 
+    # Each chunk represents one RDAS person group. The Cypher creates/updates
+    # the Agent, then expands the grouped source relationships and affiliations.
     BATCH_CREATE = f'''
         UNWIND $chunks AS chunk
 
@@ -93,6 +96,8 @@ class NewPersonAgentGraphTask(PipelineBase):
         MERGE (a)-[:has_affiliation]->(o)
     '''
 
+    # Only new person rows are read, and only after grouping has assigned an
+    # rdas_group_id that can be used as the Agent identity.
     FETCH_NEW_PERSON_QUERY = f'''
         SELECT
             id,
@@ -121,6 +126,7 @@ class NewPersonAgentGraphTask(PipelineBase):
 
 
     def process_new_data(self) -> None:
+        """Read new grouped people and submit Agent graph chunks."""
 
         fetch_cursor = None
         total_agents = 0
@@ -139,6 +145,8 @@ class NewPersonAgentGraphTask(PipelineBase):
                     break
 
                 batch_num += 1
+                # Many person rows can collapse into fewer Agent chunks because
+                # rows with the same rdas_group_id represent the same person.
                 chunks = self.create_agent_chunks(rows)
 
                 if not chunks:
@@ -177,6 +185,7 @@ class NewPersonAgentGraphTask(PipelineBase):
 
 
     def create_agent_chunks(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Group person rows by RDAS group ID and build Agent chunks."""
 
         grouped_by_rdas_group_id = defaultdict(list)
 
@@ -200,6 +209,7 @@ class NewPersonAgentGraphTask(PipelineBase):
 
 
     def create_agent_chunk(self, rdas_group_id: Any, person_list: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Build one Agent payload from all rows in an RDAS person group."""
 
         relations = []
         relation_keys = set()
@@ -224,6 +234,7 @@ class NewPersonAgentGraphTask(PipelineBase):
                 self.logger.info(f"Skipping invalid last_name={original_last_name}")
                 continue
 
+            # Use the first valid name in the group as the Agent display name.
             first_name = str(original_first_name).strip().title()
             last_name = normalized_last_name.strip().title()
             full_name = f"{first_name} {last_name}"
@@ -233,6 +244,8 @@ class NewPersonAgentGraphTask(PipelineBase):
             relation = self.create_relation(person)
 
             if relation:
+                # The same Agent/source relation can appear from duplicate rows;
+                # keep one relationship payload per unique target.
                 relation_key = tuple(sorted(relation.items()))
 
                 if relation_key not in relation_keys:
@@ -252,6 +265,8 @@ class NewPersonAgentGraphTask(PipelineBase):
         if not full_name:
             return None
 
+        # Affiliations become Organization nodes linked from the Agent. Reuse
+        # the same normalized hash rule as the initializer.
         organizations = [
             {
                 "name": org,
@@ -276,6 +291,7 @@ class NewPersonAgentGraphTask(PipelineBase):
 
 
     def create_relation(self, person: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Create the source-specific relationship payload for one person row."""
 
         associate_id = _clean(person.get("associate_id"))
         associate_type = _clean(person.get("associate_type"))
@@ -286,6 +302,8 @@ class NewPersonAgentGraphTask(PipelineBase):
             return None
 
         if source == self.CLINICAL_TRIAL:
+            # Clinical trial PIs become investigators; all other clinical-trial
+            # person rows become contacts.
             relation_type = "has_investigator" if associate_type == "PI" else "has_contact"
 
             return {
@@ -295,6 +313,7 @@ class NewPersonAgentGraphTask(PipelineBase):
             }
 
         if source == self.GRANT_PROJECT:
+            # Grant rows use role to distinguish contacts from investigators.
             relation_type = "has_contact" if role == "contact" else "has_investigator"
 
             return {
@@ -304,6 +323,8 @@ class NewPersonAgentGraphTask(PipelineBase):
             }
 
         if source == self.PUBLICATION:
+            # Article relationships use integer PubMed IDs to match Article
+            # node identity in Memgraph.
             pubmed_id = self._to_int(associate_id)
 
             if pubmed_id is None:
@@ -366,6 +387,7 @@ class NewPersonAgentGraphTask(PipelineBase):
 
 
     def _to_int(self, value: Any) -> Optional[int]:
+        """Convert publication associate IDs to integer PubMed IDs."""
 
         try:
             return int(value)

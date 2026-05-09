@@ -51,6 +51,7 @@ def extract_name_title(value: Any) -> Tuple[Optional[str], Optional[str], Option
 
 
 class NewClinicalTrialPersonTask(PipelineBase):
+    """Extract person records from newly staged clinical trial JSON."""
 
     BATCH_SIZE = 100
     PERSON_TABLE = "person_of_all_sources"
@@ -59,6 +60,8 @@ class NewClinicalTrialPersonTask(PipelineBase):
     ASSOCIATE_TYPE_PI = "PI"
     ASSOCIATE_TYPE_CONTACT = "contact"
 
+    # Only process new clinical trials that do not already have ClinicalTrial
+    # person rows, which keeps repeated alert runs from duplicating people.
     FETCH_NEW_CLINICAL_TRIALS_QUERY = f'''
         SELECT DISTINCT
             ctu.nctid,
@@ -73,6 +76,8 @@ class NewClinicalTrialPersonTask(PipelineBase):
         AND p.associate_id IS NULL
     '''
 
+    # person_of_all_sources is the shared staging table that later grouping and
+    # graph tasks use to build unified Person records.
     INSERT_PERSON_SQL = f'''
         INSERT INTO {PERSON_TABLE}
         (
@@ -101,6 +106,7 @@ class NewClinicalTrialPersonTask(PipelineBase):
 
 
     def process_new_data(self) -> None:
+        """Read new trial JSON, extract people, and insert staging rows."""
 
         fetch_cursor = None
         insert_cursor = None
@@ -127,6 +133,8 @@ class NewClinicalTrialPersonTask(PipelineBase):
                     nctid = row.get("nctid")
                     studies = row.get("studies")
 
+                    # One trial may produce responsible-party, contact, and
+                    # official rows. Invalid study JSON returns an empty list.
                     clinical_trial_person_rows = self.create_clinical_trial_person_rows(nctid, studies)
 
                     if clinical_trial_person_rows:
@@ -137,6 +145,8 @@ class NewClinicalTrialPersonTask(PipelineBase):
                     continue
 
                 try:
+                    # Normalize tuple values before inserting so empty strings
+                    # and text fields match the original person pipeline style.
                     normalized_person_rows = [_normalize_tuple(person_row) for person_row in person_rows]
 
                     insert_cursor.executemany(self.INSERT_PERSON_SQL, normalized_person_rows)
@@ -197,6 +207,8 @@ class NewClinicalTrialPersonTask(PipelineBase):
             return []
 
         person_rows = []
+        # ClinicalTrials.gov stores people in multiple protocol modules, so
+        # combine each source into the shared insert tuple format.
         person_rows.extend(self.extract_responsible_party(nctid, protocol))
         person_rows.extend(self.extract_central_contacts(nctid, protocol))
         person_rows.extend(self.extract_overall_officials(nctid, protocol))
@@ -205,6 +217,7 @@ class NewClinicalTrialPersonTask(PipelineBase):
 
 
     def extract_responsible_party(self, nctid: Any, protocol: Dict[str, Any]) -> List[Tuple[Any, ...]]:
+        """Extract the sponsor/responsible party investigator, when present."""
 
         sponsor_module = protocol.get("sponsorCollaboratorsModule") or {}
 
@@ -221,6 +234,8 @@ class NewClinicalTrialPersonTask(PipelineBase):
         if not pi_name:
             return []
 
+        # investigatorFullName can include title suffixes, while
+        # investigatorTitle may provide a cleaner title field.
         first_name, last_name, parsed_title = extract_name_title(pi_name)
         title = responsible_party.get("investigatorTitle") or parsed_title
 
@@ -242,6 +257,7 @@ class NewClinicalTrialPersonTask(PipelineBase):
 
 
     def extract_central_contacts(self, nctid: Any, protocol: Dict[str, Any]) -> List[Tuple[Any, ...]]:
+        """Extract central contacts from the contacts/locations module."""
 
         contacts_module = protocol.get("contactsLocationsModule") or {}
 
@@ -262,6 +278,8 @@ class NewClinicalTrialPersonTask(PipelineBase):
 
             person_rows.append(
                 (
+                    # Central contacts are stored as contact rows and keep the
+                    # phone/email fields when ClinicalTrials.gov provides them.
                     nctid,
                     self.ASSOCIATE_TYPE_CONTACT,
                     self.SOURCE,
@@ -280,6 +298,7 @@ class NewClinicalTrialPersonTask(PipelineBase):
 
 
     def extract_overall_officials(self, nctid: Any, protocol: Dict[str, Any]) -> List[Tuple[Any, ...]]:
+        """Extract study officials, such as principal investigators or chairs."""
 
         contacts_module = protocol.get("contactsLocationsModule") or {}
 
@@ -300,6 +319,8 @@ class NewClinicalTrialPersonTask(PipelineBase):
 
             person_rows.append(
                 (
+                    # Overall officials usually have affiliation/role data but
+                    # no direct contact details in the source payload.
                     nctid,
                     self.ASSOCIATE_TYPE_CONTACT,
                     self.SOURCE,
@@ -318,6 +339,7 @@ class NewClinicalTrialPersonTask(PipelineBase):
 
 
     def _as_list(self, value: Any) -> List[Any]:
+        """Normalize optional singleton/list JSON fields to a list."""
 
         if value is None:
             return []
@@ -329,6 +351,7 @@ class NewClinicalTrialPersonTask(PipelineBase):
 
 
     def _truncate(self, value: Any, max_length: int) -> Optional[str]:
+        """Normalize text and cap it to the target MySQL column length."""
 
         if value is None:
             return None

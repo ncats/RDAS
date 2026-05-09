@@ -25,6 +25,7 @@ with is_new = 1.
 
 
 class NewPublicationPersonTask(PipelineBase):
+    """Extract author person records from newly staged publication articles."""
 
     BATCH_SIZE = 100
     PERSON_TABLE = "person_of_all_sources"
@@ -33,6 +34,8 @@ class NewPublicationPersonTask(PipelineBase):
     SOURCE = "Publication"
     ROLE = "author"
 
+    # Only process new publication rows that do not already have Publication
+    # person records, which keeps repeated alert runs from duplicating authors.
     FETCH_NEW_PUBLICATIONS_QUERY = f'''
         SELECT DISTINCT
             upa.pubmed_id,
@@ -47,6 +50,8 @@ class NewPublicationPersonTask(PipelineBase):
         AND p.associate_id IS NULL
     '''
 
+    # person_of_all_sources is the shared staging table for publication,
+    # clinical trial, grant, and other person sources.
     INSERT_PERSON_SQL = f'''
         INSERT INTO {PERSON_TABLE}
         (
@@ -74,6 +79,7 @@ class NewPublicationPersonTask(PipelineBase):
 
 
     def process_new_data(self) -> None:
+        """Read new publication JSON, extract authors, and insert person rows."""
 
         fetch_cursor = None
         insert_cursor = None
@@ -100,6 +106,8 @@ class NewPublicationPersonTask(PipelineBase):
                     pubmed_id = row.get("pubmed_id")
                     source_json = row.get("source_json")
 
+                    # One article can produce many author rows; malformed JSON
+                    # or articles without authors simply return an empty list.
                     article_person_rows = self.create_publication_person_rows(pubmed_id, source_json)
 
                     if article_person_rows:
@@ -110,6 +118,8 @@ class NewPublicationPersonTask(PipelineBase):
                     continue
 
                 try:
+                    # Normalize tuple values before MySQL insert so empty text
+                    # is handled consistently with the original person scripts.
                     normalized_person_rows = [_normalize_tuple(person_row) for person_row in person_rows]
 
                     insert_cursor.executemany(self.INSERT_PERSON_SQL, normalized_person_rows)
@@ -184,6 +194,7 @@ class NewPublicationPersonTask(PipelineBase):
 
 
     def create_author_person_row(self, pubmed_id: Any, author: Any) -> Optional[Tuple[Any, ...]]:
+        """Convert one Europe PMC author object into a person insert tuple."""
 
         if not isinstance(author, dict):
             return None
@@ -194,6 +205,7 @@ class NewPublicationPersonTask(PipelineBase):
         affiliation = self.extract_affiliation(author)
 
         if first_name is not None or last_name is not None:
+            # Prefer individual author names when first or last name is present.
             return (
                 pubmed_id,
                 self.ASSOCIATE_TYPE,
@@ -210,6 +222,7 @@ class NewPublicationPersonTask(PipelineBase):
         collective_name = _normalize_txt(author.get("collectiveName"))
 
         if collective_name:
+            # Some records use a group author instead of individual names.
             return (
                 pubmed_id,
                 self.ASSOCIATE_TYPE,
@@ -227,6 +240,7 @@ class NewPublicationPersonTask(PipelineBase):
 
 
     def extract_orcid(self, author: Dict[str, Any]) -> Optional[str]:
+        """Return the ORCID author identifier when Europe PMC provides one."""
 
         author_id = author.get("authorId") or {}
 
@@ -240,6 +254,7 @@ class NewPublicationPersonTask(PipelineBase):
 
 
     def extract_affiliation(self, author: Dict[str, Any]) -> Optional[str]:
+        """Return the first author affiliation from the Europe PMC payload."""
 
         affiliation_list = (author.get("authorAffiliationDetailsList") or {}).get("authorAffiliation", [])
 
@@ -258,6 +273,7 @@ class NewPublicationPersonTask(PipelineBase):
 
 
     def _truncate(self, value: Any, max_length: int) -> Optional[str]:
+        """Normalize text and cap it to the target MySQL column length."""
 
         if value is None:
             return None

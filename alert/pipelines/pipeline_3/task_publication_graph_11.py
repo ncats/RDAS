@@ -28,6 +28,7 @@ Article nodes with:
 
 
 class NewPublicationOmimRefGraphTask(PipelineBase):
+    """Create OMIMRef graph records from newly retrieved OMIM entry JSON."""
 
     BATCH_SIZE = 20
 
@@ -108,6 +109,7 @@ class NewPublicationOmimRefGraphTask(PipelineBase):
 
 
     def process_new_data(self) -> None:
+        """Parse new OMIM entries, map PubMed references, and submit graph chunks."""
 
         fetch_cursor = None
         count = 0
@@ -130,6 +132,8 @@ class NewPublicationOmimRefGraphTask(PipelineBase):
                 chunks = []
 
                 for row in rows:
+                    # Convert the raw OMIM JSON into normalized text sections
+                    # and reference rows before building Article graph chunks.
                     result_obj = self.parse_entry_json(
                         row.get("id"),
                         row.get("omim_id"),
@@ -185,6 +189,8 @@ class NewPublicationOmimRefGraphTask(PipelineBase):
 
         omimref_obj_list = []
 
+        # First collect every OMIM section and the reference numbers cited in
+        # that section. The reference numbers are matched to PubMed IDs below.
         for obj in text_section_obj_list:
             omimref_obj_list.append({
                 "omimId": result_obj.get("omim_id", ""),
@@ -209,6 +215,8 @@ class NewPublicationOmimRefGraphTask(PipelineBase):
             if not target_refs:
                 continue
 
+            # Each output chunk represents one Article and all OMIMRef nodes
+            # that should be linked to it.
             pubmed_omimrefs_mapping_list.append({
                 "pubmedId": self._to_int(pubmed_id),
                 "targetRefs": self.transform_target_refs(target_refs),
@@ -309,6 +317,8 @@ class NewPublicationOmimRefGraphTask(PipelineBase):
             if omim_section and omim_section not in omim_dict[omim_id]["omimSections"]:
                 omim_dict[omim_id]["omimSections"].append(omim_section)
 
+        # The section list participates in the key, so the same OMIM entry can
+        # produce distinct OMIMRef nodes for different cited-section sets.
         for omim_id in omim_dict:
             omim_dict[omim_id]["omimSections"].sort()
 
@@ -470,6 +480,8 @@ class NewPublicationOmimRefGraphTask(PipelineBase):
         if not isinstance(entry_list, list) or not entry_list:
             return result_obj
 
+        # OMIM responses are expected to contain one entry for this task; use
+        # the first entry and normalize the pieces needed by later methods.
         first_entry_item = entry_list[0] if isinstance(entry_list[0], dict) else {}
         entry = (first_entry_item.get("entry") or {}) if isinstance(first_entry_item, dict) else {}
 
@@ -505,6 +517,8 @@ class NewPublicationOmimRefGraphTask(PipelineBase):
 
             text_section = item.get("textSection") or {}
             text_section_content = text_section.get("textSectionContent", "")
+            # Reference markers look like {8:Gerber et al., 2016}; keep only
+            # the numeric reference number so it can join to referenceList.
             ref_nums = re.findall(pattern, text_section_content)
 
             sections.append({
@@ -544,6 +558,7 @@ class NewPublicationOmimRefGraphTask(PipelineBase):
 
 
     def _to_int(self, value: Any):
+        """Convert PubMed IDs from OMIM references to integers."""
 
         try:
             return int(value)

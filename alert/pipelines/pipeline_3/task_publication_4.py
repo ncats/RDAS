@@ -18,9 +18,17 @@ from utils.https_request import HTTPSUtils as HttpsUtil
 # Reference: C_publication/init_6_publication-retrieve-omim.py
 
 class PublicationOminDataRetrievalTask(PipelineBase):
+    """
+    Retrieve OMIM entry JSON for publication-linked OMIM IDs.
+
+    The previous publication task maps GARD/search terms to OMIM IDs. This task
+    finds OMIM IDs that are not yet stored in publication_omim, calls the OMIM
+    entry API, and stages the JSON response for downstream publication graph work.
+    """
 
 
     def __init__(self):
+        """Initialize MySQL access and OMIM API configuration."""
 
         super().__init__(init_mysql=True, init_memgraph=False)
 
@@ -35,6 +43,7 @@ class PublicationOminDataRetrievalTask(PipelineBase):
    
 
     def get_omim(self, url):
+        """Call the OMIM API and return the parsed JSON response."""
 
         def parse_api_response(response): 
             try: 
@@ -49,12 +58,15 @@ class PublicationOminDataRetrievalTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch missing OMIM entries and insert them into publication_omim."""
 
         if not self.omim_entry_api:
             self.logger.error("OMIM_ENTRY_API is not configured.")
             self.close()
             return
         
+        # Select only OMIM IDs found by the GARD/OMIM mapping task that have
+        # not already been inserted into publication_omim.
         fetch_query = '''
             SELECT DISTINCT pgom.omim_id
             FROM publication_gard_omim_mapping pgom
@@ -100,12 +112,16 @@ class PublicationOminDataRetrievalTask(PipelineBase):
 
                     omim_id = row['omim_id'] 
     
+                    # The API key stays in env; this URL only adds the OMIM ID
+                    # and response-shaping parameters needed by the endpoint.
                     url = f'{self.omim_entry_api}?mimNumber={omim_id}&include=all&format=json&apiKey={self.api_key}'
 
                     entry_json = self.get_omim(url)
 
                     # Error: Failed executing the operation; Python type dict cannot be converted
                     ''' Solution: json.dumps(entry_json) '''
+                    # Store the raw OMIM JSON string so later tasks can parse
+                    # references, phenotype maps, and other entry sections.
                     val = (omim_id, json.dumps(entry_json))
                     val_list.append(val)
                 

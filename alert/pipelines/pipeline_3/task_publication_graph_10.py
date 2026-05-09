@@ -21,13 +21,17 @@ the matching Article nodes with:
 
     (Article)-[:has_substance]->(Substance)
 """
+
 # Reference: C_publication/initializer/substance.py
 
 
 class NewPublicationSubstanceGraphTask(PipelineBase):
+    """Create Substance nodes and link them to newly staged Article nodes."""
 
     BATCH_SIZE = 100
 
+    # One Substance chunk can point to multiple Article nodes. MERGE keeps the
+    # Substance node stable, while ON MATCH only fills missing name/registry data.
     BATCH_CREATE = '''
         UNWIND $substances AS subs
         MERGE (s:Substance {_composite_key: subs._composite_key})
@@ -60,6 +64,8 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
         MERGE (a)-[:has_substance]->(s)
     '''
 
+    # Start from distinct substance hashes so all article links for the same
+    # substance are grouped before writing to Memgraph.
     FETCH_NEW_HASH_IDS_QUERY = '''
         SELECT DISTINCT ps.hash_id
         FROM publication_substance AS ps
@@ -82,6 +88,7 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Read new substance hashes, gather their articles, and update the graph."""
 
         hash_cursor = None
         data_cursor = None
@@ -114,6 +121,8 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
                     self.logger.info("No valid substance hash IDs found in this batch.")
                     continue
 
+                # Load the full substance rows for this hash batch and collapse
+                # them into graph chunks keyed by one composite Substance ID.
                 substances = self._get_substance_chunks(data_cursor, hash_ids)
 
                 if not substances:
@@ -148,9 +157,12 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
 
 
     def _get_substance_chunks(self, cursor, hash_ids: List[str]) -> List[Dict[str, Any]]:
+        """Build Substance chunks with all new Article links for each hash ID."""
 
         placeholders = ",".join(["%s"] * len(hash_ids))
 
+        # Rejoin to update_publication_article so the graph update only uses
+        # substance rows tied to newly staged publications.
         substance_query = f'''
             SELECT DISTINCT 
                 ps.pubmed_id, ps.substance_name, ps.registry_number, ps.hash_id
@@ -170,6 +182,8 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
         for row in rows:
             rows_by_hash_id.setdefault(row.get("hash_id"), []).append(row)
 
+        # Preserve the original hash order from the driving query while
+        # gathering the Article IDs and best available Substance properties.
         substances = []
 
         for hash_id in hash_ids:
@@ -187,6 +201,7 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
                 row_registry_number = _to_stripped_string(row.get("registry_number"))
                 row_registry_number = None if row_registry_number == "0" else row_registry_number
 
+                # Use the first non-empty values seen for the shared Substance.
                 substance_name = substance_name or row_substance_name
                 registry_number = registry_number or row_registry_number
 
@@ -209,6 +224,7 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
 
 
     def _make_composite_key(self, substance_name: Any, registry_number: Any) -> str:
+        """Create the Substance identity hash, preferring registry number."""
 
         if registry_number:
             composite_str = str(registry_number).lower()
@@ -220,6 +236,7 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
 
 
     def _to_int(self, value: Any):
+        """Convert PubMed IDs from MySQL values to integers."""
         try:
             return int(value)
         except (TypeError, ValueError) as e:

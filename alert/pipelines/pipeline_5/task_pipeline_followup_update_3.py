@@ -46,6 +46,7 @@ def _clean_org_name(text: Any) -> Any:
 
 
 def _to_float(value: Any):
+    """Convert nullable API values to floats for location coordinates."""
     if value is None or value == "":
         return None
 
@@ -56,6 +57,7 @@ def _to_float(value: Any):
 
 
 def _to_int(value: Any):
+    """Convert nullable API values to integers for geonames IDs."""
     if value is None or value == "":
         return None
 
@@ -102,6 +104,7 @@ def lookup_ror_static(org_name: str, idx_key: str, timeout: int = 20):
 
         org = first_item.get("organization") or {}
 
+        # Pull only the fields the downstream organization_location table needs.
         ror_id = org.get("id")
         names = org.get("names") or []
         org_display_name = next(
@@ -165,18 +168,23 @@ def lookup_ror_static(org_name: str, idx_key: str, timeout: int = 20):
 
 
 class OrganizationLocationRorLookupTask(PipelineBase):
+    """Fetch missing Organization ROR/location data and stage it in MySQL."""
 
     TABLE_NAME = "organization_location"
     BATCH_SIZE = 100
     MAX_WORKERS = 20
     ROR_TIMEOUT = 20
 
+    # If ROR has no match, mark the Organization node so future runs do not keep
+    # querying the API for the same graph record.
     MARK_NOT_FOUND_IN_GRAPH = '''
         UNWIND $chunks AS idx_key
         MATCH (org:Organization {_idx_key: idx_key})
         SET org.ror_id = 'N/A'
     '''
 
+    # Found rows are upserted and marked is_new=1 so the next follow-up task can
+    # update Organization nodes from these staged location records.
     INSERT_FOUND_ORGANIZATION_SQL = f'''
         INSERT INTO {TABLE_NAME}
         (
@@ -206,6 +214,8 @@ class OrganizationLocationRorLookupTask(PipelineBase):
             is_new = 1
     '''
 
+    # Not-found rows are also stored. This records that a lookup was attempted
+    # and lets downstream steps work from the same is_new flag.
     INSERT_NOT_FOUND_ORGANIZATION_SQL = f'''
         INSERT INTO {TABLE_NAME}
         (original_name_in_graph_db, original_name_in_graph_db_idx_key, is_new)
@@ -224,6 +234,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
 
 
     def process_new_data(self) -> None:
+        """Find Organization nodes needing ROR data and stage lookup results."""
 
         total_processed = 0
         total_found = 0
@@ -239,6 +250,8 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                     self.logger.info(f"Batch #{batch_num}: empty batch, skipped.")
                     continue
 
+                # Only call ROR for graph organizations that are not already in
+                # organization_location; existing rows are re-marked as new.
                 batch_idx_keys = [org["_idx_key"] for org in batch if org.get("_idx_key")]
                 idx_keys_to_process = set(self.find_idx_keys_not_in_db(batch_idx_keys))
                 existing_idx_keys = [
@@ -267,6 +280,8 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                 if not org_list_to_process:
                     continue
 
+                # Split the API results into found and not-found lists so both
+                # outcomes are saved and the graph can suppress future misses.
                 found_orgs, not_found_orgs, not_found_idx_keys = self.lookup_organizations(org_list_to_process)
 
                 saved_found_count = self.save_found_organizations(found_orgs)
@@ -469,6 +484,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
 
 
     def save_found_organizations(self, org_info_tuple_list: List[Tuple[Any, ...]]) -> int:
+        """Save successful ROR lookup rows into organization_location."""
 
         if not org_info_tuple_list:
             return 0
@@ -497,6 +513,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
 
 
     def save_not_found_organizations(self, not_found_list: List[Tuple[str, str]]) -> int:
+        """Save failed ROR lookups so they are not repeatedly queried."""
 
         if not not_found_list:
             return 0
@@ -525,6 +542,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
 
 
     def mark_not_found_in_graph(self, idx_keys: List[str]) -> None:
+        """Mark Organization nodes with no ROR match as ror_id='N/A'."""
 
         if not idx_keys:
             return

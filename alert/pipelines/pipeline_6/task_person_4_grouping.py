@@ -26,6 +26,7 @@ but disambiguation uses all people with those last names.
 
 
 class NewPersonGroupingTask(PipelineBase):
+    """Regenerate RDAS person groups for last names touched by new rows."""
 
     PERSON_TABLE = "person_of_all_sources"
     GRANT_PROJECT_TABLE = "grant_project"
@@ -42,6 +43,7 @@ class NewPersonGroupingTask(PipelineBase):
 
 
     def process_new_data(self) -> None:
+        """Find affected last names, disambiguate people, and update group IDs."""
 
         total_last_names = 0
         total_people_updated = 0
@@ -102,6 +104,8 @@ class NewPersonGroupingTask(PipelineBase):
         uppercase.append("/")
         uppercase.extend(lowercase)
 
+        # The second character list includes common punctuation seen in names,
+        # keeping prefix scans indexed while covering names like O'Neil.
         lowercase.append(" ")
         lowercase.append("'")
         lowercase.append(".")
@@ -114,7 +118,10 @@ class NewPersonGroupingTask(PipelineBase):
 
 
     def get_last_names_by_prefix_for_group_id_update(self, prefix: str) -> List[str]:
+        """Return new-row last names under one prefix for regrouping."""
 
+        # is_new only chooses which last names were affected by this alert run.
+        # The full person set for each returned last name is loaded later.
         query = f'''
             SELECT DISTINCT last_name
             FROM {self.PERSON_TABLE}
@@ -266,6 +273,7 @@ class NewPersonGroupingTask(PipelineBase):
 
 
     def process_last_name_group(self, last_name: str, person_list: List[Dict[str, Any]]) -> int:
+        """Run disambiguation for one last name and persist updated group IDs."""
 
         grouped_by_letter = self.group_people_for_disambiguation(person_list)
         total_updated = 0
@@ -286,10 +294,13 @@ class NewPersonGroupingTask(PipelineBase):
 
 
     def group_people_for_disambiguation(self, person_list: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+        """Split very large last-name groups by first initial before grouping."""
 
         if len(person_list) < self.LARGE_LAST_NAME_GROUP_SIZE:
             return {"A-Z": person_list}
 
+        # Large last-name groups are expensive to compare all at once, so split
+        # by first initial while keeping missing first names together.
         grouped_by_letter = {}
         lowerchars = list(string.ascii_lowercase)
         lowerchars.append(self.EMPTY_FIRST_NAME)
@@ -310,6 +321,7 @@ class NewPersonGroupingTask(PipelineBase):
 
 
     def disambiguate(self, last_name: str, person_list: List[Dict[str, Any]]):
+        """Delegate person matching to the shared PersonDisambiguator."""
 
         disambiguator = PersonDisambiguator(last_name, person_list)
         df = disambiguator.process()
@@ -318,6 +330,7 @@ class NewPersonGroupingTask(PipelineBase):
 
 
     def update_rdas_group_id(self, df_subset, last_name: str) -> int:
+        """Persist the final RDAS group ID for each person row."""
 
         if df_subset is None or df_subset.empty:
             return 0
@@ -325,6 +338,8 @@ class NewPersonGroupingTask(PipelineBase):
         df = df_subset[["id", "final"]].copy()
 
         normalized_last_name = re.sub(r"\W+", "", last_name or "")
+        # If the disambiguator leaves a row ungrouped, assign a deterministic
+        # fallback ID under this last name so every processed row has a group.
         df.loc[df["final"].isna(), "final"] = (
             normalized_last_name + "_x_" + df.index[df["final"].isna()].astype(str)
         )

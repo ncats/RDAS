@@ -17,7 +17,9 @@ Final Memgraph statistics update.
 This task should run after the alert pipelines finish writing graph data. 
 It recomputes the GARD/Disease relationship count properties used by the UI and downstream alert views.
 """
+
 # Reference: G_update/updater/GARD_relationships_statistics_updater.py
+
 
 class GardRelationshipCountRefreshTask(PipelineBase):
 

@@ -16,10 +16,12 @@ For each GARD ID that has newly staged publication articles, count the new
 EPI/NHS rows from update_publication_article (is_new = 1) and add those counts
 to the existing GARD node countEpiArticles and countNhsArticles properties.
 """
+
 # Reference: C_publication/initializer/x_epi_nhs_count.py
 
 
 class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
+    """Increment GARD EPI/NHS publication counters from newly staged articles."""
 
     BATCH_SIZE = 300
 
@@ -32,6 +34,8 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
             d.countNhsArticles = coalesce(d.countNhsArticles, 0) + chunk.countNhsArticles
     '''
 
+    # Start from the mapping table so only GARD nodes touched by new PubMed
+    # articles are counted and updated.
     FETCH_GARD_IDS_QUERY = '''
         SELECT DISTINCT pgspm.gard_id
         FROM publication_gard_searchterm_pubmed_mapping AS pgspm
@@ -51,6 +55,7 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Find affected GARD IDs, calculate new article counts, and update graph nodes."""
 
         gard_cursor = None
         count_cursor = None
@@ -75,6 +80,8 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
                     self.logger.info("No valid GARD IDs found in this batch.")
                     continue
 
+                # Count EPI/NHS flags for this batch of GARD IDs before sending
+                # the compact counter deltas to Memgraph.
                 chunks = self._get_epi_nhs_count_chunks(count_cursor, gard_ids)
 
                 if not chunks:
@@ -105,9 +112,12 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
 
 
     def _get_epi_nhs_count_chunks(self, cursor, gard_ids):
+        """Aggregate new EPI/NHS article counts for a batch of GARD IDs."""
 
         placeholders = ",".join(["%s"] * len(gard_ids))
 
+        # The flags can arrive as numbers or strings, so the SUM expressions
+        # normalize common truthy values while grouping by GARD ID.
         count_query = f'''
             SELECT
                 pgspm.gard_id,
@@ -128,6 +138,8 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
         chunks = []
 
         for result in results:
+            # Each chunk is an incremental delta that BATCH_UPDATE adds to the
+            # existing GARD node counters.
             gard_id = result.get("gard_id")
             total_articles = result.get("total_articles")
             count_epi_articles = int(result.get("countEpiArticles") or 0)
