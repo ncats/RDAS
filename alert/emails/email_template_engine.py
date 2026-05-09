@@ -3,12 +3,22 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 
+# Templates live beside this module, so email rendering works no matter which
+# pipeline file calls the engine.
 TEMPLATE_DIR = Path(__file__).resolve().parent
 DEFAULT_TEMPLATE_NAME = "alert_email_template.html"
 
 
 class EmailTemplateEngine:
+    """
+    Render RDAS email payloads with Jinja templates.
 
+    The engine keeps a shared Jinja environment so callers only need to pass a
+    payload and, optionally, a template name.
+    """
+
+    # Autoescaping is enabled for HTML/XML templates because payload values come
+    # from pipeline output and may contain user-facing text.
     _environment = Environment(
         loader = FileSystemLoader(str(TEMPLATE_DIR)),
         autoescape = select_autoescape(["html", "xml"]),
@@ -17,10 +27,17 @@ class EmailTemplateEngine:
 
     @classmethod
     def json_to_html_email_body(cls, payload, title: str = "RDAS Notification", template_name: str = DEFAULT_TEMPLATE_NAME):
+        """
+        Convert a JSON-like payload into an HTML email body.
+
+        The payload dictionary is copied before adding a default title, so the
+        caller's original object is not modified.
+        """
 
         template = cls._environment.get_template(template_name)
 
         render_payload = dict(payload or {})
+        # Templates expect a title value; callers can override it explicitly.
         render_payload.setdefault("title", title)
 
         return template.render(render_payload)

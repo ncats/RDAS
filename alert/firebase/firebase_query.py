@@ -5,6 +5,7 @@ from pathlib import Path
 import firebase_admin
 from firebase_admin import auth, credentials, firestore
 
+# The Firebase service account file is stored beside this query helper.
 BASE_DIR = Path(__file__).resolve().parent
 SERVICE_ACCOUNT_PATH = BASE_DIR / "firebase_service_Sccount_key.json"
 DEFAULT_COLLECTION = "users"
@@ -12,8 +13,16 @@ DEFAULT_LIMIT = 5
 
 
 class FirebaseAgent:
+    """
+    Query Firebase Auth and Firestore user subscription data.
+
+    Firebase Auth stores account-level data such as email and verification
+    status. Firestore stores RDAS subscription details. Most methods join those
+    two sources by UID and return alert-ready user/subscription records.
+    """
 
     def __init__(self, service_account_path: Path = SERVICE_ACCOUNT_PATH):
+        """Create a Firestore client, initializing Firebase Admin if needed."""
 
         self.service_account_path = service_account_path
         self.firebase_app = None
@@ -22,6 +31,12 @@ class FirebaseAgent:
 
 
     def _create_firestore_client(self):
+        """
+        Reuse an existing Firebase app when one is already registered.
+
+        This prevents duplicate-app errors when tests or other pipeline code
+        have already initialized firebase_admin in the same Python process.
+        """
 
         try:
             self.firebase_app = firebase_admin.get_app()
@@ -39,11 +54,14 @@ class FirebaseAgent:
 
 
     def close(self):
+        """Close the Firestore client and delete only the app created here."""
 
         if self.firestore_client is None:
             return
 
         try:
+            # Newer Firestore clients expose close(); older clients require
+            # reaching the transport object directly.
             close_client = getattr(self.firestore_client, "close", None)
             if callable(close_client):
                 close_client()
@@ -63,6 +81,7 @@ class FirebaseAgent:
 
 
     def get_firebase_auth_users(self):
+        """Return all Firebase Auth users with the fields needed by alerts."""
 
         users = []
         # The 'auth' is initialized by firebase_admin.initialize_app(...)
@@ -85,6 +104,7 @@ class FirebaseAgent:
  
 
     def get_firestore_users_collection(self, collection_name: str = DEFAULT_COLLECTION, limit: int = DEFAULT_LIMIT):
+        """Return Firestore user documents as plain dictionaries."""
 
         query = self.firestore_client.collection(collection_name)
 
@@ -96,6 +116,7 @@ class FirebaseAgent:
 
 
     def _iter_firestore_user_subscriptions(self, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
+        """Yield each valid subscription together with its parent Firestore user."""
 
         firestore_users = self.get_firestore_users_collection(
             collection_name=collection_name,
@@ -113,6 +134,12 @@ class FirebaseAgent:
 
 
     def get_firebase_auth_users_by_firestore_disease_name(self, disease_name: str, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
+        """
+        Return authenticated users subscribed to a Firestore disease name.
+
+        Firestore supplies the subscription list; Firebase Auth supplies the
+        canonical email/display-name account data.
+        """
 
         firestore_users = self.get_firestore_users_collection(
             collection_name=collection_name,
@@ -135,6 +162,8 @@ class FirebaseAgent:
             if disease_name not in disease_names:
                 continue
 
+            # Firestore user documents may store the UID explicitly; otherwise
+            # the document ID is treated as the UID.
             uid = firestore_data.get("uid") or firestore_user.get("id")
             auth_user = auth_users_by_uid.get(uid)
             if not auth_user:
@@ -151,6 +180,7 @@ class FirebaseAgent:
 
 
     def get_firebase_auth_users_by_firestore_gard_id(self, gard_id: str, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
+        """Return authenticated users subscribed to a specific GARD ID."""
 
         auth_users = self.get_firebase_auth_users()
         auth_users_by_uid = {user["uid"]: user for user in auth_users}
@@ -164,6 +194,8 @@ class FirebaseAgent:
             if subscription.get("gardID") != gard_id:
                 continue
 
+            # Avoid returning the same user more than once if multiple
+            # subscriptions contain the same GARD ID.
             uid = firestore_data.get("uid") or firestore_user.get("id")
             if not uid or uid in matched_uids:
                 continue
@@ -184,6 +216,12 @@ class FirebaseAgent:
 
 
     def get_firebase_authed_users_with_firestore_gard_ids_list(self, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
+        """
+        Return active, verified Auth users with their Firestore GARD subscriptions.
+
+        The returned structure is what alert summary generation needs: user
+        identity, an ordered GARD ID list, and a GARD ID to disease-name map.
+        """
 
         # return result
         '''
@@ -248,6 +286,8 @@ class FirebaseAgent:
                 if gard_id and disease_name:
                     subscription_map[gard_id] = disease_name
 
+            # Keep the email payload compact: only alert routing fields and
+            # subscription identifiers are returned.
             matched_users.append(
                 {
                     "display_name": auth_user.get("display_name"),
@@ -261,6 +301,7 @@ class FirebaseAgent:
 
 
     def get_firestore_registered_disease_names(self, collection_name: str = DEFAULT_COLLECTION, limit: int = None):
+        """Return unique disease names registered in Firestore subscriptions."""
 
         firestore_users = self.get_firestore_users_collection(
             collection_name=collection_name,
@@ -284,6 +325,7 @@ class FirebaseAgent:
 
 
     def get_firestore_registered_disease_names_with_counts(self, collection_name: str = DEFAULT_COLLECTION):
+        """Return subscription counts grouped by Firestore disease name."""
 
         disease_counter = Counter()
 

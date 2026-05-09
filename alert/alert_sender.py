@@ -19,8 +19,16 @@ from utils.tools import _recipient_list
 load_dotenv()
 
 class AlertSender(PipelineBase):
+    """
+    Build and send alert emails for newly staged RDAS updates.
+
+    The sender connects three pieces of data: Firebase user subscriptions,
+    newly staged clinical trial/publication rows in MySQL, and the HTML email
+    client used to notify users and administrators.
+    """
 
     def __init__(self, look_back_days=7):
+        """Initialize database access and alert window settings."""
 
         super().__init__(init_mysql=True, init_memgraph=False)
 
@@ -42,8 +50,18 @@ class AlertSender(PipelineBase):
     Find new clinical trail & publication and send alert to users which suscribe to them.
     '''
     def find_new_and_send_alert(self):
+        """
+        Match new update rows to Firebase subscriptions and send alert emails.
+
+        A per-user alert is sent only when at least one subscribed GARD ID has
+        new staged data. A summary email is sent to admins after all users are
+        processed.
+        """
  
         try: 
+            # For a single GARD ID, return counts of unsent new clinical trials
+            # and unsent new publications. The UNION keeps both datasets in one
+            # small result set for payload construction.
             find_new_items_query = '''
                 SELECT
                     gardId,
@@ -68,6 +86,8 @@ class AlertSender(PipelineBase):
                 GROUP BY m.gard_id
             '''
 
+            # EmailClient handles rendering/delivery; FirebaseAgent provides
+            # active, verified users and their Firestore subscriptions.
             emailClient = EmailClient()
             firebaseAgent = FirebaseAgent()
 
@@ -143,6 +163,8 @@ class AlertSender(PipelineBase):
                     finally:
                         cursor.close()
 
+                    # No rows means this subscribed disease has no new alertable
+                    # trials or articles in the current staging tables.
                     if not rows:
                         continue
 
@@ -166,6 +188,8 @@ class AlertSender(PipelineBase):
                 payload["data"]["total"] = subscription_count
                  
                 ''' 4. Send alert email to user '''
+                # The payload contains only subscriptions that actually had new
+                # content, so users do not receive empty disease sections.
                 emailClient.send_html_alert_email(
                     subject = self.subject,
                     payload = payload,                            
@@ -180,6 +204,8 @@ class AlertSender(PipelineBase):
                 all_updates_summary.append({"email": email, "display_name": display_name, "payload": payload})
 
             ''' 5. Send summary email to admins '''
+            # The summary email is an operational audit of all user alerts sent
+            # during this run. It is skipped when no user had new updates.
             if all_updates_summary:
                 try:
                     summary_recipients = _recipient_list(os.getenv("ALERT_SUMMARY_EMAIL_RECIPIENTS"))

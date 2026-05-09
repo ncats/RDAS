@@ -5,11 +5,26 @@ from pathlib import Path
 from .email_template_engine import EmailTemplateEngine
 from utils.tools import _format_recipients, _load_json_file, _recipient_list
 
+# Email defaults and SMTP settings live next to this client so alert email
+# behavior can be changed without touching pipeline code.
 CONFIG_PATH = Path(__file__).resolve().with_name("email_config.json")
 
 class EmailClient:
+    """
+    Build and send RDAS alert emails.
+
+    The client supports plain-text messages, generic HTML alert messages, and
+    summary HTML messages. Sender, recipients, and SMTP connection settings are
+    loaded from email_config.json, but callers may override recipients per send.
+    """
 
     def __init__(self, mail_to: str = None, mail_from: str = None, mail_cc: str = None):
+        """
+        Initialize email defaults and SMTP connection settings.
+
+        Optional constructor values override the configured default sender,
+        recipient, and CC list for this EmailClient instance.
+        """
 
         config = _load_json_file(CONFIG_PATH)
 
@@ -26,6 +41,11 @@ class EmailClient:
 
 
     def _build_message(self, subject: str, body: str, mail_to: str = None, mail_cc: str = None):
+        """
+        Create a plain-text EmailMessage with To/Cc headers.
+
+        Per-message recipient arguments override the instance defaults.
+        """
 
         message = EmailMessage()
         message["Subject"] = subject
@@ -39,9 +59,15 @@ class EmailClient:
         message.set_content(body)
 
         return message
-    
+
 
     def _build_html_message(self, subject: str, html_body: str, mail_to: str = None, mail_cc: str = None):
+        """
+        Create a multipart EmailMessage containing an HTML alternative body.
+
+        A short plain-text fallback is included for mail clients that do not
+        render HTML.
+        """
 
         message = EmailMessage()
         message["Subject"] = subject
@@ -59,13 +85,20 @@ class EmailClient:
 
 
     def send_email(self, subject: str, body: str, mail_to: str = None, mail_cc: str = None):
+        """
+        Send a plain-text email through the configured SMTP server.
+        """
 
         message = self._build_message(subject, body, mail_to=mail_to, mail_cc=mail_cc)
 
+        # SMTP send_message needs the full envelope recipient list, including
+        # CC recipients, not just the visible To header.
         recipients = [message["To"]]
         if message.get("Cc"):
             recipients.extend([email.strip() for email in message["Cc"].split(",") if email.strip()])
 
+        # Use a connection timeout for opening SMTP and a separate operation
+        # timeout for later SMTP commands.
         with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=self.smtp_connection_timeout) as server:
             server.timeout = self.smtp_timeout
             if self.smtp_starttls_enable:
@@ -74,11 +107,15 @@ class EmailClient:
 
 
     def send_html_alert_email(self, subject: str, payload, title: str = "RDAS Notification", mail_to: str = None, mail_cc: str = None):
+        """
+        Render a JSON-like payload into the default HTML alert template and send it.
+        """
 
         html_body = EmailTemplateEngine.json_to_html_email_body(payload, title=title)
 
         message = self._build_html_message(subject, html_body, mail_to=mail_to, mail_cc=mail_cc)
 
+        # Keep this path compatible with string recipients from email_config.json.
         recipients = [message["To"]]
         if message.get("Cc"):
             recipients.extend([email.strip() for email in message["Cc"].split(",") if email.strip()])
@@ -91,6 +128,12 @@ class EmailClient:
 
 
     def send_html_summary_email(self, subject: str, all_updates_summary, title: str = "RDAS Alert Summary", mail_to: list = None, mail_cc: list = None):
+        """
+        Render and send the RDAS summary email.
+
+        mail_to and mail_cc may be strings or lists. They are normalized before
+        creating the message headers and SMTP envelope recipient list.
+        """
 
         payload = {
             "all_updates_summary": all_updates_summary or []
@@ -106,6 +149,7 @@ class EmailClient:
         cc_value = _format_recipients(mail_cc if mail_cc is not None else self.mail_cc)
         message = self._build_html_message(subject, html_body, mail_to=to_value, mail_cc=cc_value)
 
+        # Build a deduplicated list of To and Cc recipients for SMTP delivery.
         recipients = _recipient_list(to_value, cc_value)
 
         with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=self.smtp_connection_timeout) as server:
