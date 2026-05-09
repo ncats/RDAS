@@ -18,11 +18,9 @@ import time
 import mysql.connector
 from gqlalchemy.exceptions import GQLAlchemyDatabaseError
 from datetime import datetime
-from baseclass.conn import DBConnection as db 
+from baseclass.conn import DBConnection as db
 from utils.minmaxid import MinMaxIdLoader
-from utils.file_appender import FileAppender
-from utils.tools import  _date_string
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 class InitBase:
 
@@ -33,9 +31,7 @@ class InitBase:
         self.label_name = label_name
         self.processed_flag = ''
         self.no_column_named_processed = False
-        
-
-        self.mysql = db().mysql_conn() 
+        self.mysql = db().mysql_conn()
         self.update_cursor = self.mysql.cursor(buffered=True)
         self.dict_cursor = self.mysql.cursor(dictionary=True, buffered=True)
 
@@ -43,12 +39,6 @@ class InitBase:
 
         self.table_name = table_name
         self.formatted_today = datetime.today().strftime("%Y-%m-%d") # Format as YYYY-MM-DD
-
-        '''
-        class_name = type(self).__name__
-        self.log_file = f'{self.log_dir}/0-{class_name}-{_date_string()}.log'
-        self.appender = FileAppender(self.log_file)
-        '''
 
     @abstractmethod
     def init_nodes(self):
@@ -74,7 +64,7 @@ class InitBase:
         command = f"CREATE INDEX ON :{label}({field});"
         self.memgraph.execute(command)
 
-        self.appender.log_stdout(f'\n*** Created index:\n{command}')
+        print(f'\n*** Created index:\n{command}')
  
 
     def _get_index_info(self):
@@ -107,7 +97,7 @@ class InitBase:
     def populate_all_nodes(self):
         
         min_id, max_id = MinMaxIdLoader().get_min_max_ids(self.table_name) 
-        self.appender.log_stdout(f'populate_all_nodes: id range: {min_id} - {max_id}')
+        print(f'populate_all_nodes: id range: {min_id} - {max_id}')
         
         self.populate_nodes(min_id, max_id)
          
@@ -128,6 +118,22 @@ class InitBase:
         
         self.update_cursor.execute(update) 
         self.mysql.commit()  # Commit each chunk
+
+
+    def update_processed_flag_fulltext_idx(self, start_id, end_id, flag):
+        """
+        Update processed flags for tables that use a full-text index on the
+        processed column.
+        """
+
+        update = f'''
+            UPDATE  {self.table_name}
+            SET processed = CONCAT(IFNULL(processed, \'zzzzz\'), \'{flag}\')
+            WHERE id BETWEEN {start_id} AND {end_id}
+        '''
+
+        self.update_cursor.execute(update)
+        self.mysql.commit()
 
 
     def get_current_processed_flag(self):
@@ -164,21 +170,27 @@ class InitBase:
             try:
                 self.update_cursor.close()
             except mysql.connector.Error as e:
-                self.appender.log_stdout(f"{Fore.RED}Error closing MySQL update cursor: {e}{Style.RESET_ALL}")
+                print(f"{Fore.RED}Error closing MySQL update cursor: {e}{Style.RESET_ALL}")
 
         # Close dictionary cursor if it exists
         if hasattr(self, 'dict_cursor') and self.dict_cursor is not None:
             try:
                 self.dict_cursor.close()
             except mysql.connector.Error as e:
-                self.appender.log_stdout(f"{Fore.RED}Error closing MySQL dict cursor: {e}{Style.RESET_ALL}")
+                print(f"{Fore.RED}Error closing MySQL dict cursor: {e}{Style.RESET_ALL}")
 
         # Close MySQL connection if it exists
         if hasattr(self, 'mysql') and self.mysql is not None:
             try:
                 self.mysql.close()
             except mysql.connector.Error as e:
-                self.appender.log_stdout(f"{Fore.RED}Error closing MySQL connection: {e}{Style.RESET_ALL}")
+                print(f"{Fore.RED}Error closing MySQL connection: {e}{Style.RESET_ALL}")
+
+
+    def _close_conn(self):
+        """Backward-compatible alias for legacy initializers."""
+
+        self.close_mysql_conn()
 
 
     def memgraph_execute_with_retry(self, cypher_query, params, max_retries=3, delay=2):
@@ -210,20 +222,20 @@ class InitBase:
                     
                     if attempt < max_retries - 1:
 
-                        self.appender.log_stdout(f"{Fore.RED}Memgraph connection failed: {e}{Style.RESET_ALL}")
-                        self.appender.log_stdout(f"Retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
+                        print(f"{Fore.RED}Memgraph connection failed: {e}{Style.RESET_ALL}")
+                        print(f"Retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
                         time.sleep(delay)
                         
                         # Try to reconnect
                         try:
                             self.memgraph = db().memgraph_conn()
-                            self.appender.log_stdout("Reconnected successfully")
+                            print("Reconnected successfully")
                         except Exception as conn_error:
-                            self.appender.log_stdout(f"{Fore.RED}Memgraph reconnection failed: {conn_error}{Style.RESET_ALL}")
+                            print(f"{Fore.RED}Memgraph reconnection failed: {conn_error}{Style.RESET_ALL}")
                             # Continue to next retry attempt
                         continue
                     else:
-                        self.appender.log_stdout(f"{Fore.RED}\n!!! Max retries ({max_retries}) reached. Giving up. !!!\n{Style.RESET_ALL}")
+                        print(f"{Fore.RED}\n!!! Max retries ({max_retries}) reached. Giving up. !!!\n{Style.RESET_ALL}")
                 
                 # Re-raise if it's not a connection error or we're out of retries
                 raise
@@ -231,5 +243,3 @@ class InitBase:
         # If we exit the loop without success, raise the last exception
         if last_exception:
             raise last_exception
-        
-    

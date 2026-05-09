@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import json
 import hashlib
-from utils.base import BaseClass
+from baseclass.init_base import InitBase
 from utils.tools import  _clean, _id_range_generator
 '''
 
@@ -15,7 +15,7 @@ from utils.tools import  _clean, _id_range_generator
 '''
     The InvestigatorInitializer must be later than ContactInitializer, since the Investigator need create a relation with Contact
 '''
-class InvestigatorInitializer(BaseClass):
+class InvestigatorInitializer(InitBase):
 
     def __init__(self): 
 
@@ -93,4 +93,3 @@ class InvestigatorInitializer(BaseClass):
 
 
         self._close_conn()
-

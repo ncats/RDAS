@@ -8,10 +8,10 @@ from dotenv import load_dotenv
 load_dotenv()
   
 from utils.tools import _id_range_generator, _append_to_file, _format_dollars, _val, _arr, _curr_timestamp
-from utils.base import BaseClass
+from baseclass.init_base import InitBase
 
 # 1. Create Project
-class PrincipalInvestigatorInitializer(BaseClass):
+class PrincipalInvestigatorInitializer(InitBase):
 
     def __init__(self): 
 
@@ -158,5 +158,3 @@ class PrincipalInvestigatorInitializer(BaseClass):
             _append_to_file('logs/PrincipalInvestigatorInitializer.log', f'{message}')
 
         self._close_conn()
-
-            

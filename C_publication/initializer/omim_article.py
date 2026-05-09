@@ -4,7 +4,7 @@ import json
 # Add the project root to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from utils.base import BaseClass
+from baseclass.init_base import InitBase
 from utils.minmaxid import MinMaxIdLoader
 from .FetchArticle import ArticleFetcher
 from utils.tools import ask_to_continue, _id_range_generator
@@ -21,10 +21,10 @@ publication_article = 'publication_article'
 publication_omim = 'publication_omim'
 
 
-class OMIMArticleInitializer(BaseClass):
+class OMIMArticleInitializer(InitBase):
 
     def __init__(self):
-        pass
+        super().__init__(publication_omim, 'OMIMArticle')
  
     
     def get_unique_pubmed_id_from_publication_article(self):
@@ -177,4 +177,3 @@ if __name__ == '__main__':
     
 
     print('\n--------------------- All Done ---------------------------------------')
-

@@ -4,7 +4,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import json
-from utils.base import BaseClass
+from baseclass.init_base import InitBase
 from utils.tools import  _clean, _id_range_generator
 from utils.file_appender import FileAppender
 
@@ -14,7 +14,7 @@ from utils.file_appender import FileAppender
     Just use reference as the edge name linking the trial node to the publication node
 
 '''
-class ReferenceInitializer(BaseClass):
+class ReferenceInitializer(InitBase):
 
     def __init__(self): 
 
@@ -85,10 +85,5 @@ class ReferenceInitializer(BaseClass):
 
 
         self._close_conn()
-        self.appender.append_and_print(f'ReferenceInitializer:: Done total = {total}')  
+        self.appender.append_and_print(f'ReferenceInitializer:: Done total = {total}')
         self.appender.close()
-            
-
-
-
-            
