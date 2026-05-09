@@ -20,9 +20,17 @@ Create PrimaryOutcome nodes and ClinicalTrial/PrimaryOutcome mappings for new cl
 
 
 class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
+    """
+    Create PrimaryOutcome nodes for newly imported clinical trials.
+
+    ClinicalTrials.gov stores primary outcomes under outcomesModule. This task
+    extracts those records and links each outcome back to its ClinicalTrial.
+    """
 
     BATCH_SIZE = 200
 
+    # Primary outcomes are created per trial outcome record because measures,
+    # descriptions, and time frames belong to a specific study context.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
@@ -43,6 +51,8 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for outcome graph loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -53,6 +63,7 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch new clinical trial JSON and write primary outcome graph chunks."""
 
         count = 0
         batch_num = 0
@@ -85,6 +96,7 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
                         self.logger.error(f"Invalid JSON for nctId {nctid}: {e}")
                         continue
 
+                    # One clinical trial may include multiple primary outcomes.
                     chunks.extend(self._create_primary_outcome_chunks(nctid, study))
 
                 if chunks:
@@ -107,6 +119,7 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
 
 
     def _create_primary_outcome_chunks(self, nctid: str, study: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Convert primary outcome records into Cypher chunk dictionaries."""
 
         chunks = []
         primary_outcomes = self._extract_primary_outcomes(study)
@@ -126,6 +139,7 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
 
 
     def _extract_primary_outcomes(self, study: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Read primaryOutcomes from protocolSection.outcomesModule."""
 
         if not isinstance(study, dict):
             return []

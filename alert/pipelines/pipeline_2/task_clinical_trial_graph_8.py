@@ -12,7 +12,6 @@ sys.path.extend([
 from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean
 
-
 """
 Create StudyDesign nodes and ClinicalTrial/StudyDesign mappings for new clinical trials.
 """
@@ -20,9 +19,18 @@ Create StudyDesign nodes and ClinicalTrial/StudyDesign mappings for new clinical
 
 
 class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
+    """
+    Create StudyDesign nodes for newly imported clinical trials.
+
+    Study design data is split across ClinicalTrials.gov design, description,
+    and status modules. This task gathers those fields into one StudyDesign
+    node and links it to the trial.
+    """
 
     BATCH_SIZE = 200
 
+    # StudyDesign nodes are created per trial because design details describe a
+    # specific study, even when some properties look similar across studies.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
@@ -50,6 +58,8 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for study-design graph loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -60,6 +70,7 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch new trial JSON and write study-design graph chunks."""
 
         count = 0
         batch_num = 0
@@ -92,6 +103,7 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
                         self.logger.error(f"Invalid JSON for nctId {nctid}: {e}")
                         continue
 
+                    # One clinical trial produces at most one StudyDesign chunk.
                     study_design_chunk = self._create_study_design_chunk(nctid, study)
                     if study_design_chunk:
                         chunks.append(study_design_chunk)
@@ -116,6 +128,7 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
 
 
     def _create_study_design_chunk(self, nctid: str, study: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract design, description, and expanded-access fields from a study."""
 
         if not isinstance(study, dict):
             return {}
@@ -148,9 +161,11 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
         if not isinstance(expanded_access_info, dict):
             expanded_access_info = {}
 
+        # Skip trials with no design-related details to avoid empty graph nodes.
         if not (design_info or masking_info or expanded_access_info):
             return {}
 
+        # The returned keys match the Cypher chunk properties used by BATCH_CREATE.
         return {
             "nctId": nctid,
             "studyType": design_module.get('studyType', ''),

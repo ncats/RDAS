@@ -13,6 +13,13 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _is_english, _is_under_char_threshold
 
 class GardNodeNamesTask(PipelineBase):
+    """
+    Read GARD disease names that should drive downstream alert searches.
+
+    This task is the first discovery step: it pulls GARD IDs, preferred names,
+    and synonyms from MySQL, filters the names into search-friendly terms, and
+    marks the processed GARD rows as updated.
+    """
 
  
     def __init__(self):
@@ -41,6 +48,8 @@ class GardNodeNamesTask(PipelineBase):
 
         total = 0
         # Remove 'updated IS NULL' for PRODUCTION
+        # The query returns one row per GARD/MONDO/source group and combines
+        # synonym labels into a single separated string for local filtering.
         GARD_QUERY = """
             SELECT 
                 GardID, MONDO_ID, 
@@ -66,6 +75,8 @@ class GardNodeNamesTask(PipelineBase):
 
         while True:
 
+            # Each loop returns one batch of GARD rows, then marks those GardIDs
+            # as updated before yielding to the caller.
             cursor = self.mysql.cursor(dictionary=True)
             cursor.execute(GARD_QUERY, (batch_size,))
             rows = cursor.fetchall()
@@ -86,6 +97,8 @@ class GardNodeNamesTask(PipelineBase):
                 gardName = row["gardName"]
                 synonyms = self._split_values(row["synonyms"], self.SYNONYM_SEPARATOR)
 
+                # filtered_names is the disease-name list used by clinical trial
+                # and publication discovery.
                 batch.append({
                     "gardId": gardId,
                     "gardName": gardName,
@@ -114,6 +127,8 @@ class GardNodeNamesTask(PipelineBase):
     def _get_filtered_gard_names(self, name, synonyms) -> list:
         """Build the disease search names used by the first trial/publication tasks."""
 
+        # Keep English synonyms, but skip very short synonym strings because
+        # they tend to create noisy publication/trial searches.
         english_synonyms = [syn for syn in synonyms if _is_english(syn)]
         short_synonyms = [syn for syn in synonyms if _is_under_char_threshold(syn)]
 
@@ -148,6 +163,8 @@ class GardNodeNamesTask(PipelineBase):
 
     ''' utility method '''    
     def _split_values(self, value: str, separator: str = ",") -> List[str]:
+        """Split grouped database values and discard empty parts."""
+
         if not value:
             return []
 

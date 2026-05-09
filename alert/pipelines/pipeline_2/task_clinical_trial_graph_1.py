@@ -12,16 +12,24 @@ sys.path.extend([
 from utils.tools import _clean, _safe_get
 from pipelines.pipeline_base import PipelineBase
 
-
 """
-Insert NEW Clinical Trail nodes
+Insert NEW Clinical Trial nodes
 """
 # Reference: alert/pipelines/pipeline_2/task_clinical_trial_2.py
 # Reference: B_clinical_trial/initializer/clinicaltrial.py
 
 class NewClinicalTrialGraphTask(PipelineBase):
+    """
+    Create ClinicalTrial nodes in Memgraph for newly imported trials.
+
+    The task reads staged clinical_trial_unique rows, converts each stored
+    ClinicalTrials.gov study JSON into graph-ready properties, and creates the
+    node only when its nctId does not already exist.
+    """
 
     def __init__(self):
+        """Initialize both MySQL and Memgraph connections for graph loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -32,14 +40,19 @@ class NewClinicalTrialGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch new clinical trials from MySQL and submit ClinicalTrial nodes in batches."""
 
         ''' create the node only when nctId does not exist; if it already exists, do nothing. '''
+        # MERGE is keyed by nctId. ON CREATE SET intentionally avoids updating
+        # existing ClinicalTrial nodes during this incremental graph step.
         batch_create = '''
             UNWIND $chunks AS props
             MERGE (n: ClinicalTrial {nctId: props.nctId})
             ON CREATE SET n = props
         ''' 
         
+        # clinical_trial_unique has one row per NCT ID; is_new limits the graph
+        # load to records discovered in the current alert run.
         fetch_new_clinical_query = '''
             SELECT id, nctid, studies 
             FROM clinical_trial_unique
@@ -70,6 +83,8 @@ class NewClinicalTrialGraphTask(PipelineBase):
                 nctid = row['nctid']
                 full_study = json.loads(row['studies'])
 
+                # Convert the full ClinicalTrials.gov payload into the compact
+                # property dictionary used by the ClinicalTrial node.
                 clinicalTrailObj = self._create_ClinicalTrial_node(nctid, full_study)
 
                 if clinicalTrailObj is None:
@@ -97,13 +112,16 @@ class NewClinicalTrialGraphTask(PipelineBase):
 
     def _create_ClinicalTrial_node(self, nctid: str, study: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
-        Create a clinical trial node from study data with comprehensive validation and error handling.
+        Create ClinicalTrial node properties from one study JSON payload.
+
         Args:
             nctid: NCT identifier for the clinical trial
             study: Study data dictionary from API response            
         Returns:
             A node containing clinical trial properties or None if essential data is missing
         """
+        # Stop early when the NCT ID or study payload is unusable; downstream
+        # Cypher expects a valid nctId property for MERGE.
         if not isinstance(nctid, str) or not nctid:
             return None
 
@@ -114,6 +132,8 @@ class NewClinicalTrialGraphTask(PipelineBase):
         if not isinstance(protocol, dict) or not protocol:
             return None
 
+        # ClinicalTrials.gov modules are optional. These helpers keep nested
+        # access consistent and prevent non-dict values from leaking into the node.
         def _module(key: str) -> Dict[str, Any]:
             value = protocol.get(key, {})
             return value if isinstance(value, dict) else {}

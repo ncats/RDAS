@@ -19,9 +19,18 @@ Create Condition nodes and ClinicalTrial/Condition/GARD mappings for new clinica
 
 
 class NewClinicalTrialConditionGraphTask(PipelineBase):
+    """
+    Create Condition nodes and link them to ClinicalTrial and GARD nodes.
+
+    New clinical-trial JSON provides condition strings. This task normalizes
+    those strings, matches them against known GARD names/synonyms, and writes
+    the ClinicalTrial -> Condition -> GARD graph pattern.
+    """
 
     BATCH_SIZE = 200
 
+    # For each trial, create or reuse normalized Condition nodes, connect the
+    # trial to each condition, then connect matched conditions to existing GARDs.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (ct: ClinicalTrial {nctId: chunk.nctId})
@@ -48,6 +57,8 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for condition graph loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -58,12 +69,15 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Build condition graph mappings for new clinical trials."""
 
         count = 0
         batch_num = 0 
         fetch_cursor = None
 
         try:
+            # Preload normalized GARD names/synonyms once so each condition can
+            # be mapped without repeatedly querying Memgraph.
             term_to_gard_ids = self._get_term_to_gard_ids()
 
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
@@ -96,6 +110,8 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
                     if not conditions:
                         continue
 
+                    # Each mapping keeps the normalized condition text and any
+                    # matching GARD IDs found from the preloaded term index.
                     condition_gard_mappings = self._map_conditions_to_gard_ids(conditions, term_to_gard_ids)
                     if not condition_gard_mappings:
                         continue
@@ -125,6 +141,7 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
 
     def _extract_conditions(self, study: Dict[str, Any]) -> List[str]:
+        """Read the ClinicalTrials.gov conditions list from a study payload."""
 
         if not isinstance(study, dict):
             return []
@@ -142,6 +159,7 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
 
     def _map_conditions_to_gard_ids(self, conditions: List[str], term_to_gard_ids: Dict[str, List[str]] ) -> List[Dict[str, Any]]:
+        """Normalize trial conditions and attach matching GARD IDs when available."""
 
         mappings = []
         seen_conditions = set()
@@ -164,6 +182,7 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
 
     def _get_term_to_gard_ids(self) -> Dict[str, List[str]]:
+        """Invert the GARD term dictionary into normalized term -> GARD IDs."""
 
         term_to_gard_ids = {}
         gard_id_names_dict = self._get_GARD_names_syns()
@@ -176,6 +195,7 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
 
     def _get_GARD_names_syns(self) -> Dict[str, List[str]]:
+        """Load GARD names/synonyms from Memgraph and normalize search terms."""
 
         gard_terms = {}
         response = self.memgraph.execute_and_fetch(
@@ -196,6 +216,8 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
             gardsyns_eng = [syn for syn in gardsyns if _is_english(syn)]
             gardsyns_char_threshold = [syn for syn in gardsyns if _is_under_char_threshold(syn)]
 
+            # Keep the same synonym filtering style used by GARD discovery:
+            # avoid short abbreviations and terms that are less useful for exact matching.
             filtered_syns = [syn for syn in gardsyns if syn not in gardsyns_eng]
             filtered_syns = [syn for syn in filtered_syns if syn not in gardsyns_char_threshold]
 

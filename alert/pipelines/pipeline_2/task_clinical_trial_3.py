@@ -27,8 +27,17 @@ Store Clinical-Trial Intervertion-Drug properties into clinical_trial_interventi
 # Reference: B_clinical_trial/init_3_clinical_trial_step_3.py
 
 class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
+    """
+    Map new clinical-trial drug interventions to RxNorm properties.
+
+    The task reads newly imported clinical trials, extracts interventions whose
+    type is DRUG, looks them up through RxNav, and stores the resulting RxNorm
+    IDs/properties in clinical_trial_intervention_drug for later graph loading.
+    """
 
     def __init__(self):
+        """Initialize MySQL access and RxNav endpoint configuration."""
+
         super().__init__(init_mysql=True, init_memgraph=False)
         self.rxnav_rxcui_api = os.getenv("RXNAV_RXCUI_API")
         self.rxnav_all_properties_api_template = os.getenv("RXNAV_ALL_PROPERTIES_API_TEMPLATE")
@@ -40,7 +49,10 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
 
     def process_new_data(self) -> None:
+        """Process new clinical trials and map each drug intervention to RxNorm."""
 
+        # Only newly imported clinical trials need drug-intervention extraction
+        # in this incremental alert pipeline.
         select_new_clinic_trial_sql = '''
             SELECT gardid, disease, nctid, studies, id
             FROM clinical_trial
@@ -75,6 +87,9 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
                     self.logger.info(f"# Id: {id}, Gard_ID: {gardid}, NCTID: {nctid}, Disease: {disease}")
 
+                    # ClinicalTrials.gov stores interventions inside the
+                    # protocolSection; this task only keeps intervention records
+                    # explicitly marked as DRUG.
                     intervention_module = study.get('protocolSection', dict()).get('armsInterventionsModule', dict())
                     interventions = intervention_module.get('interventions', list())
 
@@ -102,6 +117,13 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
 
     def rxnorm_map(self, gardid, disease, nctid, intervention_name):
+        """
+        Resolve one intervention name to RxNorm data and insert property rows.
+
+        The first lookup uses the full normalized intervention name. If that
+        does not map cleanly, SpaCy extracts chemical entities and each detected
+        drug mention is retried against RxNav.
+        """
 
         cursor = self.mysql.cursor()
 
@@ -111,6 +133,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
         '''
 
         def add_to_db(rxdata, intervention, drug_name, wspacy):
+            """Insert one row per RxNorm property for a mapped drug."""
 
             rxnormid = rxdata['RxNormID']
 
@@ -130,6 +153,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
 
         def nlp_to_drug(intervention, matches):
+            """Use SpaCy chemical entities as fallback drug names."""
 
             for match_id, start, end in matches:
                 drug = doc[start:end].text
@@ -160,6 +184,8 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
         drug = drug_normalize(intervention_name)
         the_drug = drug.replace(' ','+')
 
+        # Try the full intervention name first because it preserves the trial's
+        # original drug context.
         '''  Retrieve RxNorm data for the drug name '''
         rxdata = self.get_rxnorm_data(the_drug)
 
@@ -182,6 +208,12 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
 
     def get_rxnorm_data(self, drug_name):
+            """
+            Fetch the RxNorm ID and expanded RxNorm properties for a drug name.
+
+            RxNav requires two calls: one to resolve a name to an RxCUI, then a
+            second call to fetch properties for that RxCUI.
+            """
 
             if not self.rxnav_rxcui_api or not self.rxnav_all_properties_api_template:
                 self.logger.error("RXNAV_RXCUI_API or RXNAV_ALL_PROPERTIES_API_TEMPLATE is not configured.")

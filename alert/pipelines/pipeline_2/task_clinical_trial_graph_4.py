@@ -12,7 +12,6 @@ sys.path.extend([
 from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean, _make_hash_key
 
-
 """
 Create Intervention nodes and ClinicalTrial/Intervention mappings for new clinical trials.
 """
@@ -20,9 +19,18 @@ Create Intervention nodes and ClinicalTrial/Intervention mappings for new clinic
 
 
 class NewClinicalTrialInterventionGraphTask(PipelineBase):
+    """
+    Create Intervention nodes and link them to new ClinicalTrial nodes.
+
+    ClinicalTrials.gov stores interventions under armsInterventionsModule. This
+    task turns each intervention into a stable graph node and connects it to the
+    trial that declared it.
+    """
 
     BATCH_SIZE = 200
 
+    # Intervention nodes are keyed by a hash of name/type/description so the
+    # same intervention payload reuses one node across reruns.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
@@ -43,6 +51,8 @@ class NewClinicalTrialInterventionGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for intervention graph loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -53,6 +63,7 @@ class NewClinicalTrialInterventionGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch new trial JSON and write intervention graph mappings in batches."""
 
         count = 0
         batch_num = 0
@@ -85,6 +96,8 @@ class NewClinicalTrialInterventionGraphTask(PipelineBase):
                         self.logger.error(f"Invalid JSON for nctId {nctid}: {e}")
                         continue
 
+                    # One clinical trial may produce multiple intervention
+                    # relationship chunks.
                     intervention_chunks = self._create_intervention_chunks(nctid, study)
 
                     if not intervention_chunks:
@@ -112,6 +125,7 @@ class NewClinicalTrialInterventionGraphTask(PipelineBase):
 
 
     def _create_intervention_chunks(self, nctid: str, study: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Convert one study payload into Cypher chunks for intervention nodes."""
 
         chunks = []
         interventions = self._extract_interventions(study)
@@ -127,6 +141,8 @@ class NewClinicalTrialInterventionGraphTask(PipelineBase):
             if not any([name, intervention_type, description]):
                 continue
 
+            # The graph uses hashes for stable matching keys while preserving
+            # the original readable values as properties.
             composite_key = f'{name}_{intervention_type}_{description}'
 
             chunks.append({
@@ -142,6 +158,7 @@ class NewClinicalTrialInterventionGraphTask(PipelineBase):
 
 
     def _extract_interventions(self, study: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Read intervention records from protocolSection.armsInterventionsModule."""
 
         if not isinstance(study, dict):
             return []

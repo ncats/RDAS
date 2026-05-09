@@ -12,15 +12,23 @@ sys.path.extend([
 from utils.tools import _clean, _safe_get
 from pipelines.pipeline_base import PipelineBase
 
-
 """
 Create the clinical trial nodes to GARD nodes mapping
 """
 # Reference: B_clinical_trial/initializer/clinicaltrial_gard_mapping.py
 
 class NewClinicalTrialGardRelationshipTask(PipelineBase):
+    """
+    Create relationships from new ClinicalTrial nodes to GARD nodes.
+
+    update_clinical_trial records preserve the disease search term that matched
+    each trial. This task uses that term as matchedTermRDAS on the Memgraph
+    relationship.
+    """
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for relationship loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -31,6 +39,7 @@ class NewClinicalTrialGardRelationshipTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch new trial/GARD mappings and merge them into Memgraph."""
 
         ''' 
         Creates the edge only if that exact pattern does not already exist.
@@ -43,6 +52,8 @@ class NewClinicalTrialGardRelationshipTask(PipelineBase):
             MERGE (x)<-[:mapped_to_gard {matchedTermRDAS: chunk.disease}]-(y)
         '''
 
+        # update_clinical_trial can contain multiple GARD matches per NCT ID;
+        # is_new keeps this incremental task scoped to the current alert run.
         fetch_new_clinical_query = '''
                 SELECT id, gardid, disease, nctid
                 FROM update_clinical_trial
@@ -74,6 +85,8 @@ class NewClinicalTrialGardRelationshipTask(PipelineBase):
                     disease = row['disease']
                     nctid = row['nctid']  
 
+                    # These keys match the Cypher query above: source trial,
+                    # target GARD node, and the matched disease term.
                     chunks.append({"nctId": nctid, "gardId": gard_id, "disease": disease})
 
                 if len(chunks) > 0:

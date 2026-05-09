@@ -11,7 +11,6 @@ sys.path.extend([
 from pipelines.pipeline_base import PipelineBase
 from utils.tools import _arr, _val
 
-
 """
 Create Annotation nodes and ClinicalTrial/Annotation mappings for new clinical trials.
 """
@@ -20,9 +19,18 @@ Create Annotation nodes and ClinicalTrial/Annotation mappings for new clinical t
 
 
 class NewClinicalTrialAnnotationGraphTask(PipelineBase):
+    """
+    Create Annotation nodes and link them to new ClinicalTrial nodes.
+
+    Upstream annotation extraction stores UMLS concepts for clinical trials in
+    MySQL. This task loads those concepts into Memgraph and connects each
+    annotated trial to its UMLS Annotation nodes.
+    """
 
     BATCH_SIZE = 200
 
+    # Annotation nodes are keyed by UMLS CUI so the same biomedical concept is
+    # reused across trials.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
 
@@ -37,6 +45,8 @@ class NewClinicalTrialAnnotationGraphTask(PipelineBase):
         MERGE (ct)-[:annotated]->(a)
     '''
 
+    # Join to clinical_trial_unique so graph loading is scoped to newly imported
+    # clinical trials in the current alert run.
     FETCH_NEW_ANNOTATION_QUERY = '''
         SELECT
             cta.nctid,
@@ -52,6 +62,8 @@ class NewClinicalTrialAnnotationGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for annotation graph loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -62,6 +74,7 @@ class NewClinicalTrialAnnotationGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch new trial annotations and write Annotation graph chunks."""
 
         count = 0
         batch_num = 0
@@ -108,10 +121,13 @@ class NewClinicalTrialAnnotationGraphTask(PipelineBase):
 
 
     def _create_annotation_chunk(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert one MySQL annotation row into the Cypher chunk shape."""
 
         nctid = row.get('nctid')
         umls_cui = _val(row.get('umls_cui'))
 
+        # Both nctId and CUI are required: nctId finds the trial, and CUI keys
+        # the Annotation node.
         if not nctid or not umls_cui:
             return {}
 

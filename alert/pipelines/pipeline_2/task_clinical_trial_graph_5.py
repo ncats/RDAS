@@ -12,7 +12,6 @@ sys.path.extend([
 from pipelines.pipeline_base import PipelineBase
 from utils.tools import _make_hash_key
 
-
 """
 Create Drug nodes and Intervention/Drug mappings for new clinical trials.
 """
@@ -20,9 +19,19 @@ Create Drug nodes and Intervention/Drug mappings for new clinical trials.
 
 
 class NewClinicalTrialDrugGraphTask(PipelineBase):
+    """
+    Create Drug nodes and link them to Intervention nodes for new trials.
+
+    Upstream MySQL work maps clinical-trial interventions to RxNorm IDs and
+    stores RxNorm properties one row at a time. This task groups those property
+    rows, builds graph-ready Drug properties, and connects matching Intervention
+    nodes to Drug nodes.
+    """
 
     BATCH_SIZE = 200
 
+    # Drug nodes are keyed by RxNorm ID. The optional Intervention match uses
+    # the same hashed intervention-name key created by the intervention graph task.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
 
@@ -42,6 +51,8 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
     '''<=> is MySQL’s null-safe equality operator.
     So: uct.disease <=> cid.disease matches when both diseases are equal, and also matches when both are NULL.
     '''
+    # GROUP_CONCAT folds many RxNorm property rows into one JSON-like property
+    # string per RxNorm/intervention/spaCy combination.
     FETCH_NEW_DRUG_QUERY = '''
         SELECT
             cid.RxNormID,
@@ -87,6 +98,8 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
     }
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for drug graph loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -97,6 +110,7 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch grouped RxNorm data and submit Drug graph chunks in batches."""
 
         count = 0
         batch_num = 0
@@ -104,6 +118,8 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
 
         try:
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
+            # RxNorm properties can be large; increase GROUP_CONCAT so MySQL
+            # does not truncate the generated property payload.
             fetch_cursor.execute("SET SESSION group_concat_max_len = 10000000")
             fetch_cursor.execute(self.FETCH_NEW_DRUG_QUERY)
 
@@ -144,6 +160,7 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
 
 
     def _create_drug_chunk(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert one grouped MySQL row into the Cypher chunk shape."""
 
         rxnorm_id = row.get('RxNormID')
         props = row.get('props')
@@ -154,6 +171,8 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
             return {}
 
         try:
+            # FETCH_NEW_DRUG_QUERY returns comma-separated JSON properties; wrap
+            # them in braces before parsing into a Python dict.
             props_obj = json.loads('{' + props + '}')
         except (json.JSONDecodeError, TypeError) as e:
             self.logger.error(f"Error parsing drug props for RxNormID {rxnorm_id}: {e}")
@@ -169,6 +188,7 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
 
 
     def transform_json_object(self, json_obj: Dict[str, Any]) -> Dict[str, Any]:
+        """Rename RxNorm property keys to the Drug node property schema."""
 
         transformed = {}
 
@@ -176,6 +196,8 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
             if old_key in self.KEY_MAP:
                 transformed[self.KEY_MAP[old_key]] = value
 
+        # Ensure every expected Drug property exists, even when RxNav did not
+        # provide that property for this RxNorm ID.
         for old_key, new_key in self.KEY_MAP.items():
             if new_key not in transformed:
                 transformed[new_key] = []

@@ -12,7 +12,6 @@ sys.path.extend([
 from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean
 
-
 """
 Create IndividualPatientData nodes and ClinicalTrial/IndividualPatientData mappings for new clinical trials.
 """
@@ -20,9 +19,18 @@ Create IndividualPatientData nodes and ClinicalTrial/IndividualPatientData mappi
 
 
 class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
+    """
+    Create IndividualPatientData nodes for newly imported clinical trials.
+
+    ClinicalTrials.gov stores individual patient data sharing statements in
+    ipdSharingStatementModule. This task extracts that statement and links it
+    back to the trial.
+    """
 
     BATCH_SIZE = 200
 
+    # IPD sharing details belong to a specific trial, so this creates one
+    # IndividualPatientData node per study payload that has IPD information.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
@@ -45,6 +53,8 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for IPD graph loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -55,6 +65,7 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch new trial JSON and write individual-patient-data graph chunks."""
 
         count = 0
         batch_num = 0
@@ -87,6 +98,7 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
                         self.logger.error(f"Invalid JSON for nctId {nctid}: {e}")
                         continue
 
+                    # One clinical trial produces at most one IPD sharing node.
                     patient_data_chunk = self._create_patient_data_chunk(nctid, study)
                     if patient_data_chunk:
                         chunks.append(patient_data_chunk)
@@ -111,6 +123,7 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
 
 
     def _create_patient_data_chunk(self, nctid: str, study: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract IPD sharing fields from one study payload."""
 
         if not isinstance(study, dict):
             return {}
@@ -127,6 +140,7 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
         if not isinstance(info_types, list):
             info_types = []
 
+        # The returned keys match the Cypher chunk properties used by BATCH_CREATE.
         return {
             "nctId": nctid,
             "IPDSharing": _clean(ipd_module.get('ipdSharing', '')),

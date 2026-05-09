@@ -16,6 +16,13 @@ Save new Clinical-Trial {nctid - pubmed_id} pairs into clinical_trial_nctid_pmid
 # Reference: B_clinical_trial/init_5_clinical_trial_retrieve_pmids_umlti.py
 
 class ClinicalTrialPublicationMappingTask(PipelineBase):
+    """
+    Extract PubMed references from new clinical trials.
+
+    ClinicalTrials.gov study JSON may include publication references under
+    protocolSection.referencesModule. This task stores each NCT ID to PMID pair
+    once so later steps can import or link the related articles.
+    """
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=False)
@@ -28,7 +35,9 @@ class ClinicalTrialPublicationMappingTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Insert new NCT ID to PMID mappings in batches."""
 
+        # The NOT EXISTS guard keeps the mapping table idempotent across reruns.
         insert_sql = '''
             INSERT INTO clinical_trial_nctid_pmids_mapping (nctid, pmid, is_new)
             SELECT %s, %s, 1
@@ -60,8 +69,11 @@ class ClinicalTrialPublicationMappingTask(PipelineBase):
 
 
     def _nctid_pmids_generator(self):
+        """Yield batches of NCT ID / PMID tuples from newly imported studies."""
 
         ''' This will not be an infinite loop within one run. It will stop when the cursor result set is exhausted.  '''
+        # clinical_trial_unique contains one row per NCT ID; is_new limits this
+        # incremental pipeline to current update rows.
         query = f'''
             SELECT id, nctid, studies  FROM clinical_trial_unique
             WHERE
@@ -95,6 +107,8 @@ class ClinicalTrialPublicationMappingTask(PipelineBase):
                 nctid = row['nctid']
                 study = json.loads(row['studies'])
 
+                # PubMed IDs are stored in the references module when a trial
+                # cites related publications.
                 ref_module = study.get('protocolSection', dict()).get('referencesModule', {})
                 references = ref_module.get('references', [])
 

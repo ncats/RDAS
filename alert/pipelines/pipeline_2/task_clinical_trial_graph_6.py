@@ -12,7 +12,6 @@ sys.path.extend([
 from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean
 
-
 """
 Create Participant nodes and ClinicalTrial/Participant mappings for new clinical trials.
 """
@@ -20,9 +19,18 @@ Create Participant nodes and ClinicalTrial/Participant mappings for new clinical
 
 
 class NewClinicalTrialParticipantGraphTask(PipelineBase):
+    """
+    Create Participant nodes for newly imported clinical trials.
+
+    Participant data comes from the ClinicalTrials.gov eligibility and design
+    modules. This task extracts those fields and links each Participant node to
+    its ClinicalTrial.
+    """
 
     BATCH_SIZE = 200
 
+    # Participant nodes are created per trial record because participant
+    # eligibility/enrollment data belongs to a specific study.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
@@ -47,6 +55,8 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+        """Initialize MySQL and Memgraph connections for participant graph loading."""
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
@@ -57,6 +67,7 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        """Fetch new clinical trials and write participant-info graph chunks."""
 
         count = 0
         batch_num = 0
@@ -89,6 +100,7 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
                         self.logger.error(f"Invalid JSON for nctId {nctid}: {e}")
                         continue
 
+                    # One trial produces at most one participant-info node.
                     participant_chunk = self._create_participant_chunk(nctid, study)
                     if participant_chunk:
                         chunks.append(participant_chunk)
@@ -113,6 +125,7 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
 
 
     def _create_participant_chunk(self, nctid: str, study: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract eligibility and enrollment fields from one study payload."""
 
         if not isinstance(study, dict):
             return {}
@@ -132,6 +145,8 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
         if not (eligibility_module or design_module):
             return {}
 
+        # Enrollment lives in designModule, while age/volunteer/criteria fields
+        # live in eligibilityModule.
         enrollment_info = design_module.get('enrollmentInfo', {})
         if not isinstance(enrollment_info, dict):
             enrollment_info = {}
@@ -140,6 +155,7 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
         if not isinstance(std_ages, list):
             std_ages = []
 
+        # The returned keys match the Cypher chunk properties used by BATCH_CREATE.
         return {
             "nctId": nctid,
             "eligibilityCriteria": _clean(eligibility_module.get('eligibilityCriteria', '')),
