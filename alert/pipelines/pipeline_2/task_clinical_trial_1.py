@@ -31,6 +31,10 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
         super().__init__(init_mysql=True, init_memgraph=False)
 
         self.LOOKBACK_DAYS =7
+        self.clinical_trials_studies_api = (
+            os.getenv("CLINICAL_TRIAL_STUDIES_API")
+            or os.getenv("CLINICAL_TRAIL_STUDY_URL")
+        )
 
 
     # Not implemented
@@ -51,6 +55,12 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
 
     def _generate_GARD_ID_and_nctId(self, gardId, names, last_update_date):
 
+        if not self.clinical_trials_studies_api:
+            self.logger.error("CLINICAL_TRIAL_STUDIES_API is not configured.")
+            return
+
+        studies_api = self.clinical_trials_studies_api.rstrip("/")
+
         mycursor = self.mysql.cursor()
 
         for name in names:
@@ -67,7 +77,7 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
 
             # Search for studies whose condition, detailed description, or brief summary
             # match this disease name and whose last update is newer than the GARD update.
-            initial_query = f'https://clinicaltrials.gov/api/v2/studies?query.cond=(EXPANSION[Term]{name} OR AREA[DetailedDescription]EXPANSION[Term]{name} OR AREA[BriefSummary]EXPANSION[Term]{name}) AND AREA[LastUpdatePostDate]RANGE[{last_update_date},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
+            initial_query = f'{studies_api}?query.cond=(EXPANSION[Term]{name} OR AREA[DetailedDescription]EXPANSION[Term]{name} OR AREA[BriefSummary]EXPANSION[Term]{name}) AND AREA[LastUpdatePostDate]RANGE[{last_update_date},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
 
             # Stage each new NCT ID only if it is absent from both the historical
             # clinical_trial table and the current update_clinical_trial staging table.
@@ -117,7 +127,7 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
 
                             while retries < max_retries:
                                 try:
-                                    response = requests.get(f'https://clinicaltrials.gov/api/v2/studies/{nctid}', timeout=10)
+                                    response = requests.get(f'{studies_api}/{nctid}', timeout=10)
 
                                     if response.status_code >= 400:
                                         print(f"Request failed for {nctid}: status={response.status_code}")

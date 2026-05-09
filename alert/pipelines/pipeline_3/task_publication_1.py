@@ -56,6 +56,7 @@ class NewPublicationDiscoveryTask(PipelineBase):
         super().__init__(init_mysql=True, init_memgraph=False)
 
         self.api_key = os.getenv("NCBI_KEY") 
+        self.pubmed_esearch_api = os.getenv("PUBMED_ESEARCH_API")
         self.publication_worker = PublicationWorker()
 
 
@@ -89,7 +90,11 @@ class NewPublicationDiscoveryTask(PipelineBase):
         count = None  
         search_term = search_term.lower() # lower case in database
  
-        #x# Exact match: https://www.ncbi.nlm.nih.gov/books/NBK25499/#_chapter4_ESearch_
+        if not self.pubmed_esearch_api:
+            self.logger.error("PUBMED_ESEARCH_API is not configured.")
+            return None
+
+        #x# Exact match uses the PubMed ESearch Title/Abstract syntax.
         search_term_normalized = re.sub(r'\s+', '+', search_term) # replace whitespace with + sign
         term_search_query = f'"{search_term_normalized}"[Title/Abstract:~0]'
         #x#
@@ -97,9 +102,8 @@ class NewPublicationDiscoveryTask(PipelineBase):
         retries = 0
         max_retries=10
     
-        url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={term_search_query}&mindate={mindate}&maxdate={maxdate}&retmode=json&retmax=10000&api_key={self.api_key}" 
+        url = f"{self.pubmed_esearch_api}?db=pubmed&term={term_search_query}&mindate={mindate}&maxdate={maxdate}&retmode=json&retmax=10000&api_key={self.api_key}"
         #print(url)
-        #x#https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term="momo+syndrome"[Title/Abstract:~0]&mindate=1970&maxdate=2025&retmode=json&retmax=10000&api_key=83921ee6740b5b55962599605076c1427807
         
         while retries < max_retries:
             try:                

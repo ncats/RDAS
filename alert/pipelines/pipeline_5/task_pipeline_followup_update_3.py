@@ -77,9 +77,16 @@ def lookup_ror_static(org_name: str, idx_key: str, timeout: int = 20):
     if not cleaned_org_name or not idx_key:
         return None
 
+    ror_organizations_api = os.getenv("ROR_ORGANIZATIONS_API")
+    if not ror_organizations_api:
+        return None
+
     try:
-        url = f"https://api.ror.org/v2/organizations?affiliation={cleaned_org_name}"
-        response = requests.get(url, timeout=timeout)
+        response = requests.get(
+            ror_organizations_api,
+            params={"affiliation": cleaned_org_name},
+            timeout=timeout,
+        )
         response.raise_for_status()
         data = response.json()
 

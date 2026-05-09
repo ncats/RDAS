@@ -25,6 +25,7 @@ class PublicationOminDataRetrievalTask(PipelineBase):
         super().__init__(init_mysql=True, init_memgraph=False)
 
         self.api_key = os.getenv('OMIM_API_KEY')
+        self.omim_entry_api = os.getenv('OMIM_ENTRY_API')
 
 
     # Not implemented
@@ -48,6 +49,11 @@ class PublicationOminDataRetrievalTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+
+        if not self.omim_entry_api:
+            self.logger.error("OMIM_ENTRY_API is not configured.")
+            self.close()
+            return
         
         fetch_query = '''
             SELECT DISTINCT pgom.omim_id
@@ -94,8 +100,7 @@ class PublicationOminDataRetrievalTask(PipelineBase):
 
                     omim_id = row['omim_id'] 
     
-                    url = f'https://api.omim.org/api/entry?mimNumber={omim_id}&include=all&format=json&apiKey={self.api_key}'
-                    ''' https://api.omim.org/api/entry?mimNumber=611126&include=all&format=json&apiKey=TV0j9GgAT3K4T8nyzOCQJw '''
+                    url = f'{self.omim_entry_api}?mimNumber={omim_id}&include=all&format=json&apiKey={self.api_key}'
 
                     entry_json = self.get_omim(url)
 

@@ -23,7 +23,7 @@ This task should run after Article nodes have been written to Memgraph.
 
 class ArticleGeneReviewFlagUpdateTask(PipelineBase):
 
-    GENE_REVIEWS_TITLE_URL = "https://ftp.ncbi.nih.gov/pub/GeneReviews/GRtitle_shortname_NBKid.txt"
+    GENE_REVIEWS_TITLE_URL = os.getenv("GENE_REVIEWS_TITLE_URL")
     
     BATCH_SIZE = 100
 
@@ -84,6 +84,10 @@ class ArticleGeneReviewFlagUpdateTask(PipelineBase):
 
 
     def fetch_gene_review_pmids(self) -> List[int]:
+
+        if not self.GENE_REVIEWS_TITLE_URL:
+            self.logger.error("GENE_REVIEWS_TITLE_URL is not configured.")
+            return []
 
         try:
             response = requests.get(self.GENE_REVIEWS_TITLE_URL, timeout=30)

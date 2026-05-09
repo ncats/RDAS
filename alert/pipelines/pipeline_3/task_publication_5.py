@@ -230,7 +230,7 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
                      
                     count += 1
                      
-                    ''' https://www.ncbi.nlm.nih.gov/research/pubtator3/api '''
+                    ''' PubTator3 API usage guidance: do not exceed three requests per second. '''
                     ''' In order not to overload the PubTator3 server, we ask that users post no more than three requests per second. '''
                     time.sleep(0.5)
 

@@ -30,6 +30,8 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=False)
+        self.rxnav_rxcui_api = os.getenv("RXNAV_RXCUI_API")
+        self.rxnav_all_properties_api_template = os.getenv("RXNAV_ALL_PROPERTIES_API_TEMPLATE")
 
 
     # Not implemented
@@ -181,6 +183,10 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
     def get_rxnorm_data(self, drug_name):
 
+            if not self.rxnav_rxcui_api or not self.rxnav_all_properties_api_template:
+                self.logger.error("RXNAV_RXCUI_API or RXNAV_ALL_PROPERTIES_API_TEMPLATE is not configured.")
+                return None
+
             ''' Initialize retry counter '''
             retries = 0
             rxnormid = None
@@ -190,7 +196,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
             while retries < max_retries:
                 try:
                     ''' Form RxNav API request to get RxNormID based on drug name '''
-                    rq = f'https://rxnav.nlm.nih.gov/REST/rxcui.json?name={drug_name}&search=2'
+                    rq = f'{self.rxnav_rxcui_api}?name={drug_name}&search=2'
                     response = requests.get(rq)
 
                     if response.status_code >= 400:
@@ -232,7 +238,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
                 try:
 
                     ''' Form RxNav API request to get all properties of the drug using RxNormID '''
-                    rq2 = f'https://rxnav.nlm.nih.gov/REST/rxcui/{rxnormid}/allProperties.json?prop=codes+attributes+names+sources'
+                    rq2 = f'{self.rxnav_all_properties_api_template.format(rxnormid=rxnormid)}?prop=codes+attributes+names+sources'
                     response = requests.get(rq2)
                     results = response.json()['propConceptGroup']['propConcept']
 

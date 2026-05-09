@@ -81,7 +81,9 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
     def __init__(self):
         
         super().__init__(init_mysql=True, init_memgraph=False)
-        self.api_key = os.getenv("UMLS_API_KEY") or "506f8603-e6ea-48c1-8a70-9fb26f7a7f48"
+        self.api_key = os.getenv("UMLS_API_KEY")
+        self.umls_search_api = os.getenv("UMLS_SEARCH_API")
+        self.umls_cui_api_template = os.getenv("UMLS_CUI_API_TEMPLATE")
         self.nlp = spacy.load("en_core_web_sm")
 
 
@@ -235,10 +237,11 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
         if not term:
             return None
 
-        search_url = (
-            "https://uts-ws.nlm.nih.gov/rest/search/current"
-            f"?string={term}&searchType=exact&apiKey={self.api_key}"
-        )
+        if not self.api_key or not self.umls_search_api:
+            self.logger.error("UMLS_API_KEY or UMLS_SEARCH_API is not configured.")
+            return None
+
+        search_url = f"{self.umls_search_api}?string={term}&searchType=exact&apiKey={self.api_key}"
 
         try:
             response = requests.get(search_url, timeout=30)
@@ -264,10 +267,11 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
         if not cui:
             return []
 
-        semantic_type_url = (
-            "https://uts-ws.nlm.nih.gov/rest/content/current/CUI/"
-            f"{cui}?apiKey={self.api_key}"
-        )
+        if not self.api_key or not self.umls_cui_api_template:
+            self.logger.error("UMLS_API_KEY or UMLS_CUI_API_TEMPLATE is not configured.")
+            return []
+
+        semantic_type_url = f"{self.umls_cui_api_template.format(cui=cui)}?apiKey={self.api_key}"
 
         try:
             response = requests.get(semantic_type_url, timeout=30)
