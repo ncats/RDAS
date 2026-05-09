@@ -106,7 +106,7 @@ class NewPublicationArticleNodeAttrsUpdateTask(PipelineBase):
                     continue
 
                 try:
-                    #self.memgraph.execute(self.BATCH_UPDATE, {"chunks": chunks})
+                    self.memgraph.execute(self.BATCH_UPDATE, {"chunks": chunks})
 
                     count += len(chunks)
                     total_urls = sum(len(item["fullTextUrls"]) for item in chunks)

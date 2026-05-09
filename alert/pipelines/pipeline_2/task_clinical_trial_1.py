@@ -177,8 +177,8 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
 
                     else:
                         #print(f'No nctid for: {gardId}')
-                        #val = (gardId, name, None, None, initial_query)
-                        #mycursor.execute(insert_sql, val)
+                        val = (gardId, name, None, None, initial_query)
+                        mycursor.execute(insert_sql, val)
 
                         break
 

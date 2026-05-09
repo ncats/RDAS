@@ -89,7 +89,7 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
                     continue
 
                 try:
-                    #self.memgraph.execute(self.BATCH_UPDATE, {"chunks": chunks})
+                    self.memgraph.execute(self.BATCH_UPDATE, {"chunks": chunks})
 
                     total += len(chunks)
                     self.logger.info(f"Submitted {len(chunks)} GARD EPI/NHS count updates to Memgraph. Total = {total}")

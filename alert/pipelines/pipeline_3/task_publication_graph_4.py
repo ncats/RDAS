@@ -105,7 +105,7 @@ class NewPublicationKeywordGraphTask(PipelineBase):
                     continue
 
                 try:
-                    #self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                    self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
                     keyword_count = sum(len(item["keywords"]) for item in chunks)

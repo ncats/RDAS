@@ -97,7 +97,7 @@ class NewPublicationMeshTermGraphTask(PipelineBase):
                     continue
 
                 try:
-                    #self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                    self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
                     mesh_term_count = sum(len(item["meshTerms"]) for item in chunks)

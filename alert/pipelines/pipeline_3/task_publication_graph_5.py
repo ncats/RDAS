@@ -120,7 +120,7 @@ class NewPublicationJournalGraphTask(PipelineBase):
                     continue
 
                 try:
-                    #self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                    self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
                     self.logger.info(f"Submitted {len(chunks)} Article-Journal mappings to Memgraph. Total = {count}")

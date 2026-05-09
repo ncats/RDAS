@@ -154,7 +154,7 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
             return count
 
         try:
-            #self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+            self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
             count += len(chunks)
             annotation_count = sum(len(chunk["pubtators"]) for chunk in chunks)

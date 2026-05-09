@@ -95,7 +95,7 @@ class NewClinicalTrialGraphTask(PipelineBase):
 
             if len(chunks) > 0:
                 try:
-                    #self.memgraph.execute(batch_create, {"chunks": chunks}) 
+                    self.memgraph.execute(batch_create, {"chunks": chunks})
 
                     count += len(chunks)
                     self.logger.info(f'Inserted {len(chunks)} nodes into memgraph. Total = {count}')

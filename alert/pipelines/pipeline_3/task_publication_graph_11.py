@@ -151,7 +151,7 @@ class NewPublicationOmimRefGraphTask(PipelineBase):
 
                 try:
                     
-                    #self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                    self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
                     ref_count = sum(len(chunk["targetRefs"]) for chunk in chunks)

@@ -122,7 +122,7 @@ class NewPublicationEpidemiologyGraphTask(PipelineBase):
                     continue
 
                 try:
-                    #self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                    self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
                     self.logger.info(

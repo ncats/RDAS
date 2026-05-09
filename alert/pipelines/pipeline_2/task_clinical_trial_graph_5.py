@@ -141,7 +141,7 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
                         chunks.append(chunk)
 
                 if chunks:
-                    #self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                    self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
                     self.logger.info(f'Created {len(chunks)} drug mappings in memgraph. Total = {count}')

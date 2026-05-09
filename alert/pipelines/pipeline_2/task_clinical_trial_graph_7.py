@@ -100,7 +100,7 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
                     chunks.extend(self._create_primary_outcome_chunks(nctid, study))
 
                 if chunks:
-                    #self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                    self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
                     self.logger.info(f'Created {len(chunks)} primary outcome mappings in memgraph. Total = {count}')

@@ -109,7 +109,7 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
                         chunks.append(study_design_chunk)
 
                 if chunks:
-                    #self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                    self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
                     self.logger.info(f'Created {len(chunks)} study design mappings in memgraph. Total = {count}')

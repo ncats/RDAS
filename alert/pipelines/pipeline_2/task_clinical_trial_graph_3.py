@@ -122,7 +122,7 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
                     })
 
                 if chunks:
-                    #self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                    self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
                     self.logger.info(f'Created {len(chunks)} condition mappings in memgraph. Total = {count}')

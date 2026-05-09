@@ -130,7 +130,7 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
                     continue
 
                 try:
-                    #self.memgraph.execute(self.BATCH_CREATE, {"substances": substances})
+                    self.memgraph.execute(self.BATCH_CREATE, {"substances": substances})
 
                     count += len(substances)
                     relation_count = sum(len(substance["pubmedIdList"]) for substance in substances)
