@@ -29,13 +29,13 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
-    # StudyDesign nodes are created per trial because design details describe a
-    # specific study, even when some properties look similar across studies.
+    # StudyDesign nodes are keyed per trial so the same study design is not
+    # created again if this task is rerun for the same NCT ID.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
-        CREATE (y:StudyDesign)
-        SET
+        MERGE (y:StudyDesign {nctId: chunk.nctId})
+        ON CREATE SET
             y.designAllocation = chunk.allocation,
             y.designInterventionModel = chunk.interventionModel,
             y.designInterventionModelDescription = chunk.interventionModelDescription,

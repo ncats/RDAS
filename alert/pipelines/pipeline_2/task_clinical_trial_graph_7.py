@@ -29,16 +29,17 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
-    # Primary outcomes are created per trial outcome record because measures,
-    # descriptions, and time frames belong to a specific study context.
+    # PrimaryOutcome nodes are keyed by trial and outcome fields so identical
+    # outcome rows are reused instead of duplicated on rerun.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
-        CREATE (y: PrimaryOutcome)
-        SET
-            y.primaryOutcomeMeasure = chunk.measure,
-            y.primaryOutcomeTimeFrame = chunk.timeFrame,
-            y.primaryOutcomeDescription = chunk.description
+        MERGE (y: PrimaryOutcome {
+            nctId: chunk.nctId,
+            primaryOutcomeMeasure: chunk.measure,
+            primaryOutcomeTimeFrame: chunk.timeFrame,
+            primaryOutcomeDescription: chunk.description
+        })
 
         MERGE (x)-[:has_outcome]->(y)
     '''

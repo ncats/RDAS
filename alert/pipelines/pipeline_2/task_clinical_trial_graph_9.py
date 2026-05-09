@@ -29,13 +29,13 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
-    # IPD sharing details belong to a specific trial, so this creates one
-    # IndividualPatientData node per study payload that has IPD information.
+    # IPD sharing nodes are keyed per trial so rerunning the task reuses the
+    # existing IndividualPatientData node for that NCT ID.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
-        CREATE (y:IndividualPatientData)
-        SET
+        MERGE (y:IndividualPatientData {nctId: chunk.nctId})
+        ON CREATE SET
             y.ipdSharing = chunk.IPDSharing,
             y.ipdSharingInfoType = chunk.IPDSharingInfoType,
             y.ipdSharingTimeFrame = chunk.IPDSharingTimeFrame,

@@ -29,13 +29,13 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
-    # Participant nodes are created per trial record because participant
-    # eligibility/enrollment data belongs to a specific study.
+    # Participant nodes are keyed per trial so rerunning the alert task reuses
+    # the existing participant-info node instead of creating a duplicate.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
-        CREATE (y: Participant)
-        SET
+        MERGE (y: Participant {nctId: chunk.nctId})
+        ON CREATE SET
             y.eligibilityCriteria = chunk.eligibilityCriteria,
             y.healthyVolunteers = chunk.healthyVolunteers,
             y.stdAges = chunk.stdAges,
