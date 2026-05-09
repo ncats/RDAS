@@ -11,7 +11,7 @@ sys.path.extend([
 ])
 
 from utils.applogger import AppLogger
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 from utils.tools import _date_string
 
 class PipelineBase(ABC):

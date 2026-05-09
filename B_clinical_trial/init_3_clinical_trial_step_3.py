@@ -18,7 +18,7 @@ matcher = Matcher(nlp.vocab)
 matcher.add('DRUG',[pattern])
 
 import requests
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 from utils.tools import  _clean, _id_range_generator, ask_to_continue
 
 from utils.applogger import AppLogger

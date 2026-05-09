@@ -13,7 +13,7 @@ from colorama import init, Fore, Style
 init()
 
 from multiprocessing import Pool, cpu_count
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 from utils.minmaxid import MinMaxIdLoader
 from utils.tools import ask_to_continue, _id_range_generator, _normalize_txt, _clean
 from utils.pubtator_worker import PubtatorWorker

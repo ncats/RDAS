@@ -5,7 +5,7 @@ from collections import defaultdict
 import os
 # Add the project root to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 from utils.tools import _try_parse_int, _na
 
 #GARD data file & MySQL

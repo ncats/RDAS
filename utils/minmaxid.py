@@ -3,9 +3,9 @@
 # Add the project root to the Python path
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from utils.conn import DBConnection as db 
+from baseclass.conn import DBConnection as db
 
 class MinMaxIdLoader:
 
@@ -36,20 +36,20 @@ class MinMaxIdLoader:
                 except Exception as e:
                     print(f"Error closing connection: {e}")
         return None, None
-    
-    
+
+
 
     def get_min_max_ids(self, table_name):
         """Get the minimum and maximum ID values from a table."""
 
         query = f"SELECT MIN(id), MAX(id) FROM {table_name}"
         return self._fetch_min_max_ids(query)
-    
+
 
 
     def get_min_max_ids_by_flag(self, table_name, flag):
         """Get min/max IDs from rows where processed != flag or processed IS NULL."""
-        
+
         query = (
             f"SELECT MIN(id), MAX(id) FROM {table_name} "
             f"WHERE processed != '{flag}' OR processed IS NULL"

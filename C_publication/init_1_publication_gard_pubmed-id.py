@@ -10,7 +10,7 @@ import re
 from dotenv import load_dotenv
 load_dotenv()
  
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 from utils.tools import _is_english, _len_greater_than_threshold, ask_to_continue
 from utils.applogger import AppLogger
 logger = AppLogger().get_logger()

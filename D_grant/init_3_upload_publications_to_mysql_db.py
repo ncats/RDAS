@@ -8,7 +8,7 @@ load_dotenv()
  
 import csv
 from pathlib import Path 
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 from utils.tools import ask_to_continue, detect_file_encoding,  _normalize_tuple
 
 from datetime import datetime

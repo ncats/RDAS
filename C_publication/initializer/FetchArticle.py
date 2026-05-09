@@ -9,7 +9,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
 
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 from utils.https_request import HTTPSUtils
 
 #MySQL

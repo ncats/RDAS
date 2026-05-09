@@ -21,16 +21,12 @@ class DBConnection:
             ) 
         except ValueError as ve:
             print(f"ValueError during port conversion: {ve}. Ensure MEMGRAPH_PORT is a valid integer.")
-            raise  # Re-raise to prevent silent failures
         except ConnectionRefusedError as cre:
             print(f"Connection refused: {cre}. Check if Memgraph is running on {os.getenv('MEMGRAPH_HOST')}:{os.getenv('MEMGRAPH_PORT')}.")
-            raise
         except OSError as ose:
             print(f"OS Error: {ose}. This might indicate network issues or an incorrect host.")
-            raise
         except Exception as e:
             print(f"An unexpected error occurred during Memgraph connection: {e}")
-            raise
 
 
     def mysql_conn(self):

@@ -14,7 +14,7 @@ from scispacy.linking import EntityLinker
 # pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_ner_bc5cdr_md-0.5.3.tar.gz
 
 
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 from utils.tools import ask_to_continue, _val, _normalize_txt, _id_range_generator, _append_to_file
 import mysql.connector # Make sure this import is present at the top of your file
 

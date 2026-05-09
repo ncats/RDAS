@@ -11,10 +11,10 @@ from colorama import init, Fore, Style
 # Initialize colorama for Windows compatibility
 init()
 
-from utils.conn import DBConnection as db 
-from utils.tools import ask_to_continue, _id_range_generator 
+from baseclass.conn import DBConnection as db
+from utils.tools import ask_to_continue, _id_range_generator
 from utils.minmaxid import MinMaxIdLoader
- 
+
 # --- Delete duplicate rows ---
 '''
 use rdas_db;
@@ -65,7 +65,7 @@ def merge_json_items(json_list):
 def convert_to_tuples(merged_val_list):
 
     list_of_tuples = []
-    
+
     for item in merged_val_list:
 
         list_of_tuples.append((
@@ -75,11 +75,11 @@ def convert_to_tuples(merged_val_list):
                 item['infons_text'],
                 json.dumps(item['relation_type'])
             ))
-        
+
     return list_of_tuples
 
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
 
     publication_pubtator = 'publication_pubtator'
     publication_pubtator_parsed = 'publication_pubtator_parsed'
@@ -87,9 +87,9 @@ if __name__ == "__main__":
     ok = ask_to_continue(f'Parse pubtator data from table {publication_pubtator} and and insert into table {publication_pubtator_parsed}?')
     if not ok:
         sys.exit('------Stopped ------')
-  
+
     # Deduplicate -- just run once
-    deduplicate_sql = f'''       
+    deduplicate_sql = f'''
         DELETE t1 FROM rdas_db.{publication_pubtator} AS t1
         WHERE EXISTS (
             SELECT 1
@@ -98,22 +98,22 @@ if __name__ == "__main__":
             AND t2.id < t1.id
         )
     '''
- 
+
     insert_sql = f'INSERT INTO {publication_pubtator_parsed} (pubmed_id, infons_identifier, infons_type, infons_text, relation_type) VALUES (%s, %s, %s, %s, %s)'
-    
+
     _count = 0
-    batch_num = 0   
-    # Set a very long timeout (e.g., 8 hours = 28800 seconds) 
+    batch_num = 0
+    # Set a very long timeout (e.g., 8 hours = 28800 seconds)
     timeout_in_seconds = 28800
 
-    min_id, max_id = MinMaxIdLoader().get_min_max_ids(publication_pubtator)    
+    min_id, max_id = MinMaxIdLoader().get_min_max_ids(publication_pubtator)
     min_id = 433001
-    
+
     step = 1
     batch_size = 1000
     id_ranges = _id_range_generator(min_id, max_id, step, batch_size)
-    
-    try: 
+
+    try:
         with db().mysql_conn() as fetch_conn, \
             fetch_conn.cursor(dictionary=True, buffered=True) as fetch_cursor, \
             db().mysql_conn() as insert_conn, \
@@ -121,22 +121,22 @@ if __name__ == "__main__":
             db().mysql_conn() as update_conn, \
             update_conn.cursor(buffered=True) as update_cursor:
 
-            # 1.  Deduplicate    
+            # 1.  Deduplicate
             ''' Just run once '''
             '''
-            try:        
+            try:
                 update_cursor.execute(f"SET SESSION wait_timeout = {timeout_in_seconds}")
                 update_cursor.execute(deduplicate_sql)
                 update_conn.commit()
             except Exception as e:
-                print(e) 
+                print(e)
             '''
-             
-             
+
+
             for start_id, end_id in id_ranges:
 
                 fetch_query = f"""
-                    WITH BatchToProcess AS ( 
+                    WITH BatchToProcess AS (
                     SELECT pubmed_id, source_json
                     FROM rdas_db.{publication_pubtator}
                     WHERE id BETWEEN {start_id} AND {end_id} AND source_json IS NOT NULL
@@ -144,33 +144,33 @@ if __name__ == "__main__":
                 SELECT btp.pubmed_id, btp.source_json
                 FROM BatchToProcess btp
                 WHERE NOT EXISTS (
-                    SELECT 1 
-                    FROM rdas_db.{publication_pubtator_parsed} parsed2 
+                    SELECT 1
+                    FROM rdas_db.{publication_pubtator_parsed} parsed2
                     WHERE btp.pubmed_id = parsed2.pubmed_id
-                ) 
-                """               
-                # 2. 
+                )
+                """
+                # 2.
                 batch_num += 1
                 print(f'\nBatch#: {batch_num}, fetched Id range [{start_id} - {end_id}]')
 
                 fetch_cursor.execute(fetch_query)
-                rows = fetch_cursor.fetchall() 
+                rows = fetch_cursor.fetchall()
 
                 if not rows:
-                    print('rows.length = 0') 
+                    print('rows.length = 0')
                     continue
-                       
-                val_list = []                
+
+                val_list = []
 
                 for row in rows:
 
                     pubmed_id = row['pubmed_id']
-                    source_json = row['source_json'] 
+                    source_json = row['source_json']
 
-                    try: 
+                    try:
                         # This will raise a TypeError if row['source_json'] is None, or a JSONDecodeError if it's an empty string or invalid JSON.
                         data = json.loads(row.get('source_json') or '{}')
-                            
+
                         if not data:
                             print(f'No valid content found for pubmed_id: {pubmed_id}')
                             continue
@@ -179,25 +179,25 @@ if __name__ == "__main__":
                         print(f'Error processing JSON for pubmed_id: {pubmed_id}. Error: {e}')
                         continue
 
-                        
+
                     pubTator3_content = data.get('PubTator3', [{}])
                     # Safely get the passages list from the first element, defaulting to an empty list
                     passages = pubTator3_content[0].get('passages', [])
-                    
+
                     if not passages:
                         print(f'No PubTator3 or no passages found for pubmed_id: {pubmed_id}')
                         continue
-                    
+
                     relation_type = None
 
                     for passage in passages:
                         # Use .get() with a default empty dict to prevent errors if 'infons' is missing
                         relation_type = passage.get('infons', {}).get('type')
 
-                        for ann in passage.get('annotations', []): 
+                        for ann in passage.get('annotations', []):
                             # Use .get() with default empty dictionary {} for safe nested access
                             ann_infons = ann.get('infons', {})
-                            
+
                             obj = {
                                 'pubmed_id': pubmed_id,
                                 # Safely extract from nested dicts, defaulting to None if key is absent
@@ -205,28 +205,28 @@ if __name__ == "__main__":
                                 'infons_type': ann_infons.get('type'),
                                 'infons_text': ann.get('text'),
                                 'relation_type': relation_type
-                            } 
+                            }
 
                             val_list.append(obj)
 
-                # 3.  
+                # 3.
                 merged_val_list = merge_json_items(val_list)
                 list_of_tuples = convert_to_tuples(merged_val_list)
 
-                try: 
+                try:
                     if len(list_of_tuples) > 0:
                         insert_cursor.executemany(insert_sql, list_of_tuples)
                         insert_conn.commit()
-                    
+
                         _count += len(list_of_tuples)
                         print(f'Total count = {_count}, insert size = {len(list_of_tuples)}')
 
                 except Exception as e:
-                    print(e) 
- 
+                    print(e)
+
     except Exception as e:
         print(e)
- 
+
     print(f'\n\n -------------- Total count = {_count} -------------- \n\n')
 
-    
+

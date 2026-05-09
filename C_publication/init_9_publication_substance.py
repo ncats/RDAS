@@ -11,31 +11,31 @@ from colorama import init, Fore, Style
 # Initialize colorama for Windows compatibility
 init()
 
-from utils.conn import DBConnection as db 
+from baseclass.conn import DBConnection as db
 from utils.tools import ask_to_continue, _id_range_generator, _hash, _normalize_txt, _to_txt
-from utils.minmaxid import MinMaxIdLoader 
+from utils.minmaxid import MinMaxIdLoader
 
 
 _FLAG = 'ASD-0' #ASD means after shutdown
 publication_article = 'publication_article'
 publication_substance = 'publication_substance'
 publication_substance_unique = 'publication_substance_unique'
- 
-if __name__ == "__main__": 
+
+if __name__ == "__main__":
 
     ok = ask_to_continue(f'Retrieve chemical substances from {publication_article} and insert into table {publication_substance}?')
     if not ok:
         sys.exit('------Stopped ------')
- 
-    mysql = db().mysql_conn()
-    insert_cursor = mysql.cursor(buffered=True) 
-    update_cursor = mysql.cursor(buffered=True) 
-    fetch_cursor = mysql.cursor(dictionary=True, buffered=True) 
 
-  
-    min_id, max_id = MinMaxIdLoader().get_min_max_ids_by_flag(publication_article, _FLAG)    
+    mysql = db().mysql_conn()
+    insert_cursor = mysql.cursor(buffered=True)
+    update_cursor = mysql.cursor(buffered=True)
+    fetch_cursor = mysql.cursor(dictionary=True, buffered=True)
+
+
+    min_id, max_id = MinMaxIdLoader().get_min_max_ids_by_flag(publication_article, _FLAG)
     print(f'min_id: {min_id}, max_id: {max_id}')
- 
+
     #2
     step = 3
     batch_size = 200
@@ -72,9 +72,9 @@ if __name__ == "__main__":
                         registryNumber = None
 
                     if registryNumber or substance_name:
-                        hash_id = _hash(_to_txt(registryNumber) + _to_txt(substance_name)) 
+                        hash_id = _hash(_to_txt(registryNumber) + _to_txt(substance_name))
 
-                        chemicals.append((pubmed_id, substance_name, registryNumber,hash_id)) 
+                        chemicals.append((pubmed_id, substance_name, registryNumber,hash_id))
 
 
         if len(chemicals) > 0:
@@ -90,8 +90,8 @@ if __name__ == "__main__":
         print(f'Total chemical substance: {_count}, Id range: {start_id} - {end_id}, #chemicals = {len(chemicals)}')
 
 
-    print(f'\n\n{Fore.BLUE}========= Upload data to {publication_substance} done ========={Fore.RESET}\n\n') 
-     
+    print(f'\n\n{Fore.BLUE}========= Upload data to {publication_substance} done ========={Fore.RESET}\n\n')
+
 
     # Create indexes
     print('------ Created indexes ------')
@@ -109,7 +109,7 @@ if __name__ == "__main__":
         update_cursor.execute(query)
         mysql.commit()
 
-    
+
     # Close the cursors and the connection
     for resource in (fetch_cursor, insert_cursor, update_cursor, mysql):
         if resource:
@@ -130,17 +130,17 @@ if __name__ == "__main__":
 
     insert_new_sbustance = f'''
         INSERT IGNORE INTO rdas_db.{publication_substance_unique} (registry_number, substance_name, hash_id)
-        SELECT 
+        SELECT
             ps.registry_number,
             ps.substance_name,
             ps.hash_id
         FROM rdas_db.{publication_substance} ps
         GROUP BY ps.registry_number, ps.substance_name, ps.hash_id
-    
+
     '''
     print(insert_new_sbustance)
-            
 
-    
-                            
-    
+
+
+
+

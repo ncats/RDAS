@@ -12,14 +12,14 @@ from dotenv import load_dotenv
 load_dotenv()
 import mysql.connector
 from datetime import datetime
-from utils.conn import DBConnection as db 
+from baseclass.conn import DBConnection as db
 from utils.minmaxid import MinMaxIdLoader
 from utils.tools import ask_to_continue
 
 class BaseClass:
 
     def __init__(self, table_name, label_name='Data'):
-        
+
         self.log_dir = 'logs'
         self.label_name = label_name
 
@@ -29,7 +29,7 @@ class BaseClass:
             sys.exit('------Stopped ------')
         '''
 
-        self.mysql = db().mysql_conn() 
+        self.mysql = db().mysql_conn()
         self.update_cursor = self.mysql.cursor(buffered=True)
         self.dict_cursor = self.mysql.cursor(dictionary=True, buffered=True)
 
@@ -43,12 +43,12 @@ class BaseClass:
     def create_indexes(self, label, fields: list):
 
         for field in fields:
-           
-           if not self._is_index_field_exists(label, field): 
+
+           if not self._is_index_field_exists(label, field):
                self._create_index(label, field)
 
 
-         
+
     def _create_indexes(self, label, fields_list: list):
        for field in fields_list:
            self._create_index(label, field)
@@ -60,70 +60,70 @@ class BaseClass:
         self.memgraph.execute(command)
 
         print(f'\n*** Created index:\n{command}')
- 
+
 
 
     def _get_index_info(self):
         return list(self.memgraph.execute_and_fetch("SHOW INDEX INFO"))
-    
 
-    def _is_index_exists(self, lable_name):   
+
+    def _is_index_exists(self, lable_name):
 
         results = self._get_index_info()
         '''
         [
-            {'index type': 'label+property', 'label': 'Article', 'property': 'pubmed_id', 'count': 300002}, 
-            {'index type': 'label+property', 'label': 'ClinicalTrial', 'property': 'NCTId', 'count': 125033}, 
+            {'index type': 'label+property', 'label': 'Article', 'property': 'pubmed_id', 'count': 300002},
+            {'index type': 'label+property', 'label': 'ClinicalTrial', 'property': 'NCTId', 'count': 125033},
             {'index type': 'label+property', 'label': 'Contact', 'property': 'ContactName', 'count': 0}
         ]
         '''
-        return any(row['label'] == lable_name for row in results) 
-    
+        return any(row['label'] == lable_name for row in results)
 
 
-    def _is_index_field_exists(self, label_name, field):   
 
-        results = self._get_index_info() 
+    def _is_index_field_exists(self, label_name, field):
+
+        results = self._get_index_info()
         '''
         [
-            {'index type': 'label+property', 'label': 'Article', 'property': 'pubmed_id', 'count': 300002}, 
-            {'index type': 'label+property', 'label': 'ClinicalTrial', 'property': 'NCTId', 'count': 125033}, 
+            {'index type': 'label+property', 'label': 'Article', 'property': 'pubmed_id', 'count': 300002},
+            {'index type': 'label+property', 'label': 'ClinicalTrial', 'property': 'NCTId', 'count': 125033},
             {'index type': 'label+property', 'label': 'Contact', 'property': 'ContactName', 'count': 0}
         ]
         '''
         return any(row['label'] == label_name and row['property'] == field for row in results)
-    
-    
-        
+
+
+
     def populate_all_nodes(self):
-        
-        min_id, max_id = MinMaxIdLoader().get_min_max_ids(self.table_name) 
+
+        min_id, max_id = MinMaxIdLoader().get_min_max_ids(self.table_name)
         print(f'populate_all_nodes: id range: {min_id} - {max_id}')
-        
+
         self.populate_nodes(min_id, max_id)
-         
- 
-    def populate_nodes(self, min_id, max_id, step=3, batch_size = 200): 
+
+
+    def populate_nodes(self, min_id, max_id, step=3, batch_size = 200):
         print(f'populate_nodes: id range: {min_id} - {max_id}, step = {step}, batch_size = {batch_size}')
 
 
 
     # Not for ClincialTrial, for Publication
-    def update_processed_flag(self, start_id, end_id, flag): 
+    def update_processed_flag(self, start_id, end_id, flag):
         update_v0 = f'''
             UPDATE  {self.table_name}
             SET processed = \'{flag}\',
                 processed_flags = CONCAT(IFNULL(processed_flags, \'\'), \'{flag}\')
             WHERE id BETWEEN {start_id} AND {end_id}
-        ''' 
+        '''
 
         update = f'''
             UPDATE  {self.table_name}
             SET processed = \'{flag}\'
             WHERE id BETWEEN {start_id} AND {end_id}
-        ''' 
-        
-        self.update_cursor.execute(update) 
+        '''
+
+        self.update_cursor.execute(update)
         self.mysql.commit()  # Commit each chunk
 
 
@@ -142,9 +142,9 @@ class BaseClass:
             UPDATE  {self.table_name}
             SET processed = CONCAT(IFNULL(processed, \'zzzzz\'), \'{flag}\')
             WHERE id BETWEEN {start_id} AND {end_id}
-        ''' 
-         
-        self.update_cursor.execute(update) 
+        '''
+
+        self.update_cursor.execute(update)
         self.mysql.commit()  # Commit each chunk
 
 

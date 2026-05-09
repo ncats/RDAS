@@ -12,7 +12,7 @@ from colorama import init, Fore, Style
 # Initialize colorama for Windows compatibility
 init()
 
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 from utils.https_request import HTTPSUtils as HttpsUtil
 from utils.tools import ask_to_continue, _elapsed_time
 from utils.pubtator_worker import PubtatorWorker 

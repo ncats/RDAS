@@ -29,7 +29,7 @@ from colorama import init, Fore, Style
 init()
 
 from itertools import permutations
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 from utils.tools import ask_to_continue, _normalize_txt, _normalize_tuple, _stem_text, _remove_stop_words
 
 

@@ -11,7 +11,7 @@ import csv
 from pathlib import Path
 from utils.tools import parse_date
 from utils.tools import ask_to_continue, detect_file_encoding, _normalize_tuple
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 
 from colorama import init, Fore, Style
 # Initialize colorama for Windows compatibility

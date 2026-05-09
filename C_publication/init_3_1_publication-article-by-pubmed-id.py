@@ -13,7 +13,7 @@ from colorama import init, Fore, Style
 # Initialize colorama for Windows compatibility
 init()
 
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 
 #MySQL
 """

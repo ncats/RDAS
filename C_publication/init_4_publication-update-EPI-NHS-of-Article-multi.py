@@ -9,7 +9,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
 
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 from multiprocessing import Pool, cpu_count
 from utils.https_request import HTTPSUtils as HttpsUtil
 from utils.tools import ask_to_continue, elapsed_time, _to_txt

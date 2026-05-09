@@ -41,7 +41,7 @@ import itertools
 
 import ast
 import math
-from utils.conn import DBConnection as db
+from baseclass.conn import DBConnection as db
 from utils.tools import ask_to_continue, _val, _normalize_tuple, _stem_text, _remove_stop_words, _id_range_generator, _append_to_file
 
 """

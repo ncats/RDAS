@@ -9,8 +9,8 @@ load_dotenv()
 
 from colorama import init, Fore, Style
 # Initialize colorama for Windows compatibility
-init() 
-from utils.conn import DBConnection as db 
+init()
+from baseclass.conn import DBConnection as db
 from utils.tools import _id_range_generator, ask_to_continue
 
 from initializer.omim_article import OMIMArticleInitializer
@@ -22,24 +22,24 @@ from initializer.relationship_GARD import GARDToArticleRelationshipInitializer
 from initializer.mesh_term import MeshTermInitializer
 from initializer.journal import JournalInitializer
 from initializer.keyword import KeywordInitializer
-from initializer.article_attrs import ArticleExtraAttributesInitializer 
+from initializer.article_attrs import ArticleExtraAttributesInitializer
 from initializer.substance import SubstanceInitializer
 
 # NOT used, see x-do-not-delete-substance_and_merge.py
 #from initializer.substance_and_merge import SubstanceInitializer2
 
-from initializer.relationship_clinical_trial import ClinicalTrialToPublicationRelationshipInitializer 
+from initializer.relationship_clinical_trial import ClinicalTrialToPublicationRelationshipInitializer
 
 """
-    SELECT CONCAT('\'',  GROUP_CONCAT(COLUMN_NAME ORDER BY ORDINAL_POSITION SEPARATOR '\',\''), '\'') 
-    FROM INFORMATION_SCHEMA.COLUMNS 
-    WHERE TABLE_SCHEMA = 'rdas_db' 
+    SELECT CONCAT('\'',  GROUP_CONCAT(COLUMN_NAME ORDER BY ORDINAL_POSITION SEPARATOR '\',\''), '\'')
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = 'rdas_db'
     AND TABLE_NAME = 'publication_article';
 """
 """
-    SELECT CONCAT( GROUP_CONCAT(COLUMN_NAME ORDER BY ORDINAL_POSITION SEPARATOR ',')) 
-    FROM INFORMATION_SCHEMA.COLUMNS 
-    WHERE TABLE_SCHEMA = 'rdas_db' 
+    SELECT CONCAT( GROUP_CONCAT(COLUMN_NAME ORDER BY ORDINAL_POSITION SEPARATOR ','))
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = 'rdas_db'
     AND TABLE_NAME = 'publication_article';
 """
 
@@ -55,20 +55,20 @@ class PublicationDatabaseInitializer:
         print(f'\n### This process already done, do not need to run it again ###\n\n{Fore.RED}Input \'n\' for the following prompt{Style.RESET_ALL}\n')
         ok = ask_to_continue('Find pubmed_id which are in OMIM but NOT in Article, fetch by pubmed_id and save to publication_article table?')
 
-        if ok: 
+        if ok:
             initlzr = OMIMArticleInitializer()
 
             initlzr.add_omim_pubmed_mappings_to_db()
-            initlzr.add_omim_articles() 
+            initlzr.add_omim_articles()
         else:
             print('------Skip the OMIMArticleInitializer ------')
 
 
-  
+
     def init_all_nodes(self):
 
-        # List of initializer classes in execution order         
-        initializers = [ 
+        # List of initializer classes in execution order
+        initializers = [
             ArticleInitializer,
             ArticleExtraAttributesInitializer,
             EpidemiologyAnnotationInitializer,
@@ -76,16 +76,16 @@ class PublicationDatabaseInitializer:
             JournalInitializer,
             MeshTermInitializer,
             GARDToArticleRelationshipInitializer,
-            PubtatorInitializer,     
+            PubtatorInitializer,
             SubstanceInitializer,
 
             # Do this first: 3_publication/initializer/omim_article.py before doing the OMIMRefInitializer
             OMIMRefInitializer
         ]
- 
+
         # Execute all initializers
         for index, InitializerClass in enumerate(initializers):
-            
+
             initializer = InitializerClass()
 
             # check whether the initializer was executed or not
@@ -98,15 +98,15 @@ class PublicationDatabaseInitializer:
                 if idx > index and self.stage in processed_flag:
                     # Already processed
                     continue
-                
-            initializer.processed_flag = str(index)+ f"_{self.stage}_"+ "".join(initializer.label_name.split()) 
+
+            initializer.processed_flag = str(index)+ f"_{self.stage}_"+ "".join(initializer.label_name.split())
 
             initializer.init_nodes ()
- 
-  
 
-if __name__ == '__main__': 
-    
+
+
+if __name__ == '__main__':
+
     print('\nPublicationDatabaseInitializer\n')
 
     ok = ask_to_continue(f'*** Did you update the .env and clean up the indexes on the memgrap database? *** ')
@@ -117,10 +117,9 @@ if __name__ == '__main__':
 
     initlzer = PublicationDatabaseInitializer()
 
-    #min_id, max_id = initlzer.min_max_id() 
+    #min_id, max_id = initlzer.min_max_id()
     #initlzer.first_step_run_omim_article_initlzr()
 
     initlzer.init_all_nodes()
- 
-    print(f'\n{Fore.BLUE+Style.BRIGHT}{"="*50}  All Done {"="*50}{Style.RESET_ALL}\n\n')  
-    
+
+    print(f'\n{Fore.BLUE+Style.BRIGHT}{"="*50}  All Done {"="*50}{Style.RESET_ALL}\n\n')

@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from datetime import date
 from utils.tools import ask_to_continue,read_csv_as_dict
-from utils.conn import DBConnection
+from baseclass.conn import DBConnection
 
 from utils.applogger import AppLogger
 logger = AppLogger().get_logger()
