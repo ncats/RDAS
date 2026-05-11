@@ -58,11 +58,11 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
         UPDATE publication_gard_searchterm_pubmed_mapping pgs
         JOIN gard g
             ON pgs.search_term = g.Label
-        JOIN update_publication_article upa
-            ON upa.pubmed_id = pgs.pubmed_id
+        JOIN publication_article pa
+            ON pa.pubmed_id = pgs.pubmed_id
         SET pgs.is_abbreviation = 1
         WHERE g.Label_Predicate_Mapping LIKE 'ABBRE%'
-        AND upa.is_new = 1
+        AND pa.is_new = 1
     '''
 
     # Validate only abbreviation mappings that have not already received an
@@ -77,11 +77,9 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
         FROM publication_gard_searchterm_pubmed_mapping AS gsp
         INNER JOIN publication_article AS a
             ON gsp.pubmed_id = a.pubmed_id
-        INNER JOIN update_publication_article AS upa
-            ON upa.pubmed_id = gsp.pubmed_id
         WHERE gsp.is_abbreviation = 1
         AND gsp.is_valid IS NULL
-        AND upa.is_new = 1
+        AND a.is_new = 1
     '''
 
     UPDATE_IS_VALID_SQL = '''

@@ -14,13 +14,12 @@ sys.path.extend([
 from pipelines.pipeline_base import PipelineBase
 
 """
-Find and stage newly updated clinical trials for GARD diseases.
+Find newly updated clinical trials for GARD diseases.
 
 For each updated GARD node, this pipeline searches ClinicalTrials.gov with the
 node's filtered disease names and last update date. It fetches each matching
 study by NCT ID, then stores only trials that are not already present in
-clinical_trial or update_clinical_trial into update_clinical_trial for later
-pipeline steps.
+clinical_trial. New rows are marked with is_new = 1 for later pipeline steps.
 """
 # Reference: B_clinical_trial/init_1_clinical_trial_step_1.py
 
@@ -79,20 +78,16 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
             # match this disease name and whose last update is newer than the GARD update.
             initial_query = f'{studies_api}?query.cond=(EXPANSION[Term]{name} OR AREA[DetailedDescription]EXPANSION[Term]{name} OR AREA[BriefSummary]EXPANSION[Term]{name}) AND AREA[LastUpdatePostDate]RANGE[{last_update_date},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
 
-            # Stage each new NCT ID only if it is absent from both the historical
-            # clinical_trial table and the current update_clinical_trial staging table.
+            # Insert each new NCT ID only if it is absent from clinical_trial.
+            # clinical_trial.is_new defaults to 0, so new discovery rows set it
+            # explicitly to 1 for the downstream alert workflow.
             insert_sql = """
-                INSERT INTO update_clinical_trial (gardId, disease, nctid, studies, url)
-                SELECT %s, %s, %s, %s, %s
+                INSERT INTO clinical_trial (gardId, disease, nctid, studies, url, is_new)
+                SELECT %s, %s, %s, %s, %s, 1
                 WHERE NOT EXISTS (
                     SELECT 1
                     FROM clinical_trial ct
                     WHERE ct.nctid = %s
-                )
-                AND NOT EXISTS (
-                    SELECT 1
-                    FROM update_clinical_trial uct
-                    WHERE uct.nctid = %s
                 )
             """
 
@@ -156,7 +151,6 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
                                         json.dumps(response_txt),
                                         initial_query,
                                         nctid,
-                                        nctid,
                                     )
 
                                     mycursor.execute(insert_sql, val)
@@ -176,14 +170,11 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
                             pageToken = response_txt['nextPageToken']
 
                     else:
-                        #print(f'No nctid for: {gardId}')
-                        val = (gardId, name, None, None, initial_query)
-                        mycursor.execute(insert_sql, val)
-
+                        self.logger.info(f'No new NCTIDs found for: {gardId}')
                         break
 
             except Exception as e:
-                print(e)
+                self.logger.error(e)
 
         self.mysql.commit()
 

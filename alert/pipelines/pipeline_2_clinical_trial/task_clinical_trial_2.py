@@ -10,10 +10,10 @@ sys.path.extend([
 from pipelines.pipeline_base import PipelineBase
 
 """
-1. Find new Clinical Trail in table update_clinical_trial
-2. Insert new Clinical Trail into  clinical_trial_unique table
+1. New Clinical Trial rows are already stored in clinical_trial by the discovery task.
+2. Insert unique new Clinical Trial records into clinical_trial_unique.
 
-3. clinical_trial_unique table holds UNIQUE Clinical Trails
+3. clinical_trial_unique table holds UNIQUE Clinical Trials.
 
 CREATE TABLE clinical_trial_unique (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -47,46 +47,10 @@ class NewClinicalTrialImportTask(PipelineBase):
 
 
 
-    ''' Insert new Clinical Trail into  clinical_trial table '''
+    ''' Clinical Trial discovery now writes directly to clinical_trial. '''
     def step_1_add_new_nctid_to_clinical_trial(self)-> None:
 
-        add_new_nctid_sql = '''
-            INSERT INTO clinical_trial (
-                gardId,
-                disease,
-                nctid,
-                brief_title,
-                brief_summary,
-                url,
-                created,
-                studies,
-                processed,
-                is_new
-            )
-            SELECT DISTINCT
-                uct.gardId,
-                uct.disease,
-                uct.nctid,
-                uct.brief_title,
-                uct.brief_summary,
-                uct.url,
-                uct.created,
-                uct.studies,
-                uct.processed,
-                uct.is_new
-            FROM update_clinical_trial AS uct
-            LEFT JOIN clinical_trial AS ct
-                ON ct.nctid = uct.nctid
-            WHERE uct.nctid IS NOT NULL
-            AND uct.nctid <> ''
-            AND ct.nctid IS NULL
-        '''
-
-        cursor = self.mysql.cursor()
-        cursor.execute(add_new_nctid_sql)
-        self.logger.info(f"\n{cursor.rowcount} rows form update_clinical_trial have been added into clinical_trial table.\n")
-
-        self.mysql.commit()
+        self.logger.info("New clinical trial rows are inserted directly into clinical_trial by the discovery task.")
 
 
     ''' Insert new Clinical Trail into  clinical_trial_unique table '''
@@ -95,30 +59,30 @@ class NewClinicalTrialImportTask(PipelineBase):
         add_new_nctid_sql = '''
             INSERT INTO clinical_trial_unique (nctid, studies, is_new)
             SELECT
-                uct.nctid,
-                uct.studies,
+                ct.nctid,
+                ct.studies,
                 1 AS is_new
-            FROM update_clinical_trial AS uct
+            FROM clinical_trial AS ct
             INNER JOIN (
                 SELECT
                     nctid,
                     MAX(id) AS id
-                FROM update_clinical_trial
+                FROM clinical_trial
                 WHERE nctid IS NOT NULL
                 AND nctid <> ''
                 AND is_new = 1
                 GROUP BY nctid
-            ) AS latest_uct
-                ON latest_uct.id = uct.id
+            ) AS latest_ct
+                ON latest_ct.id = ct.id
             LEFT JOIN clinical_trial_unique AS ctu
-                ON ctu.nctid = uct.nctid
+                ON ctu.nctid = ct.nctid
             WHERE ctu.nctid IS NULL
         '''
 
         cursor = self.mysql.cursor()
         cursor.execute(add_new_nctid_sql)
 
-        self.logger.info(f"\n{cursor.rowcount} rows form update_clinical_trial have been added into clinical_trial_unique table.\n")
+        self.logger.info(f"\n{cursor.rowcount} rows from clinical_trial have been added into clinical_trial_unique table.\n")
 
         self.mysql.commit()
 
@@ -171,7 +135,7 @@ class NewClinicalTrialImportTask(PipelineBase):
 
                         chunks.append((brief_title, brief_summary, nctid))
 
-                        self.logger.info(f'NCTID = {nctid}')
+                        self.logger.info(f'Updated brief_summary for NCTID = {nctid}')
 
                     except json.JSONDecodeError as e:
                         self.logger.error(f"Error parsing JSON for ID {nctid}:\n {e}")
@@ -218,4 +182,3 @@ class NewClinicalTrialImportTask(PipelineBase):
         except Exception as e:
             self.logger.error(e)
             self.mysql.rollback()
-

@@ -20,11 +20,11 @@ load_dotenv()
 
 class AlertSender(PipelineBase):
     """
-    Build and send alert emails for newly staged RDAS updates.
+    Build and send alert emails for new RDAS updates.
 
     The sender connects three pieces of data: Firebase user subscriptions,
-    newly staged clinical trial/publication rows in MySQL, and the HTML email
-    client used to notify users and administrators.
+    new clinical trial/publication rows in MySQL, and the HTML email client
+    used to notify users and administrators.
     """
 
     def __init__(self, look_back_days=7):
@@ -54,23 +54,24 @@ class AlertSender(PipelineBase):
         Match new update rows to Firebase subscriptions and send alert emails.
 
         A per-user alert is sent only when at least one subscribed GARD ID has
-        new staged data. A summary email is sent to admins after all users are
+        new data. A summary email is sent to admins after all users are
         processed.
         """
  
         try: 
             # For a single GARD ID, return counts of unsent new clinical trials
-            # and unsent new publications. The UNION keeps both datasets in one
-            # small result set for payload construction.
+            # and new publications. clinical_trial has alert_sent; publication_article
+            # does not, so publication alerts are selected by is_new only.
             find_new_items_query = '''
                 SELECT
-                    gardId,
+                    ct.gardId,
                     'trials'        AS item_name,
                     COUNT(*)        AS new_items_count
-                FROM update_clinical_trial
-                WHERE gardId    = %s
-                AND is_new    = 1 AND alert_sent = 0
-                GROUP BY gardId
+                FROM clinical_trial AS ct
+                WHERE ct.gardId = %s
+                AND ct.is_new = 1
+                AND COALESCE(ct.alert_sent, '0') = '0'
+                GROUP BY ct.gardId
 
                 UNION ALL
 
@@ -78,11 +79,11 @@ class AlertSender(PipelineBase):
                     m.gard_id,
                     'articles'      AS item_name,
                     COUNT(*)        AS new_items_count
-                FROM update_publication_article a
+                FROM publication_article a
                 INNER JOIN publication_gard_searchterm_pubmed_mapping m
                     ON  a.pubmed_id   = m.pubmed_id
                     AND  m.gard_id     = %s 
-                WHERE a.is_new    = 1 AND a.alert_sent = 0 
+                WHERE a.is_new    = 1
                 GROUP BY m.gard_id
             '''
 
@@ -129,15 +130,11 @@ class AlertSender(PipelineBase):
 
                 email = user['email']
                 display_name = user['display_name']
-               
+
                 user_subscriptions = user.get("subscriptions", {})
                 update_date_end = date.today()
-    
-                # PRODUCTION
-                update_date_start = update_date_end - timedelta(days = self.LOOK_BACK_DAYS)
 
-                #  Remove for PRODUCTION
-                update_date_start = '2025-01-01'
+                update_date_start = update_date_end - timedelta(days = self.LOOK_BACK_DAYS)
 
                 ''' A payload template / initial payload structure'''
                 payload = {
@@ -145,7 +142,7 @@ class AlertSender(PipelineBase):
                         "total": 0,
                         "datasets": [],
                         "subscriptions": dict(user_subscriptions),
-                        "update_date_start": '2025-01-01', #update_date_start.strftime("%Y-%m-%d"), #change for PRODUCTION
+                        "update_date_start": update_date_start.strftime("%Y-%m-%d"),
                         "update_date_end": update_date_end.strftime("%Y-%m-%d"),
                     }
                 }
@@ -215,7 +212,7 @@ class AlertSender(PipelineBase):
                         emailClient.send_html_summary_email(
                             subject = f"{self.subject} Summary",
                             all_updates_summary = all_updates_summary,
-                            title = "RDAS Alert Summary",
+                            title = "RDAS Alerts Summary for Admins",
                             mail_to = summary_recipients,
                             mail_cc = [],
                         )

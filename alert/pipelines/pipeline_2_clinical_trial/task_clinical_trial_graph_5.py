@@ -49,7 +49,7 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
 
 
     '''<=> is MySQL’s null-safe equality operator.
-    So: uct.disease <=> cid.disease matches when both diseases are equal, and also matches when both are NULL.
+    So: ct.disease <=> cid.disease matches when both diseases are equal, and also matches when both are NULL.
     '''
     # GROUP_CONCAT folds many RxNorm property rows into one JSON-like property
     # string per RxNorm/intervention/spaCy combination.
@@ -63,11 +63,11 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
                 ORDER BY cid.property_key, cid.property_val SEPARATOR ','
             ) AS props
         FROM clinical_trial_intervention_drug AS cid
-        INNER JOIN update_clinical_trial AS uct
-            ON uct.gardId = cid.gardId
-            AND uct.disease <=> cid.disease
-            AND uct.nctid = cid.nctid
-        WHERE uct.is_new = 1
+        INNER JOIN clinical_trial AS ct
+            ON ct.gardId = cid.gardId
+            AND ct.disease <=> cid.disease
+            AND ct.nctid = cid.nctid
+        WHERE ct.is_new = 1
         AND cid.RxNormID IS NOT NULL
         GROUP BY
             cid.RxNormID,

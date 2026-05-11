@@ -14,7 +14,7 @@ from pipelines.pipeline_base import PipelineBase
 """
 Create MeshTerm nodes for new publication articles.
 
-For each new row in update_publication_article (is_new = 1), parse
+For each new row in publication_article (is_new = 1), parse
 source_json.meshHeadingList.meshHeading[].descriptorName, create MeshTerm nodes,
 and link each MeshTerm to the matching Article with mesh_term_for.
 """
@@ -43,7 +43,7 @@ class NewPublicationMeshTermGraphTask(PipelineBase):
     FETCH_NEW_ARTICLES_QUERY = '''
         SELECT
             pubmed_id, source_json
-        FROM update_publication_article
+        FROM publication_article
         WHERE is_new = 1
         AND pubmed_id IS NOT NULL
         AND source_json IS NOT NULL

@@ -30,7 +30,6 @@ class ClinicalTrialPipelineWrapUpTask(PipelineBase):
         'clinical_trial_intervention_drug',
         'clinical_trial_nctid_pmids_mapping',
         'clinical_trial_annotation',
-        'update_clinical_trial',
     )
 
     def __init__(self):

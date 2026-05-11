@@ -12,8 +12,8 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _hash, _normalize_txt, _to_txt
 
 '''
-Retrieve chemical substances from update_publication_article and insert them
-into publication_substance and publication_substance_unique tables.
+Retrieve chemical substances from publication_article and insert them into
+publication_substance and publication_substance_unique tables.
 '''
 # Reference: C_publication/init_9_publication_substance.py
 
@@ -30,7 +30,7 @@ class NewPublicationChemicalSubstanceTask(PipelineBase):
     '''
     FETCH_QUERY = '''
         SELECT pubmed_id, source_json
-        FROM update_publication_article
+        FROM publication_article
         WHERE is_new = 1
     '''
 
@@ -53,9 +53,9 @@ class NewPublicationChemicalSubstanceTask(PipelineBase):
             ps.substance_name,
             ps.hash_id
         FROM publication_substance ps
-        INNER JOIN update_publication_article upa
-            ON upa.pubmed_id = ps.pubmed_id
-        WHERE upa.is_new = 1
+        INNER JOIN publication_article pa
+            ON pa.pubmed_id = ps.pubmed_id
+        WHERE pa.is_new = 1
         AND NOT EXISTS (
             SELECT 1
             FROM publication_substance_unique psu

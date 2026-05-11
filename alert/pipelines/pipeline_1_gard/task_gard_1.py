@@ -46,26 +46,36 @@ class GardNodeNamesTask(PipelineBase):
         Fetch GARD names and synonyms from MySQL in batches.
         """ 
 
-        total = 0
-        # Remove 'updated IS NULL' for PRODUCTION
-        # The query returns one row per GARD/MONDO/source group and combines
-        # synonym labels into a single separated string for local filtering.
+        # check the Label_Predicate_Mapping values
+        '''
+        SELECT
+            ROW_NUMBER() OVER (ORDER BY Label) AS `#`,
+            g.*
+        FROM rdas_db.gard AS g
+        WHERE LENGTH(g.Label) <= 4
+        AND g.Label_Predicate_Mapping != 'ABBREVIATION'
+        AND g.Label_Predicate_Mapping != 'DEPRECATED'
+        AND g.Label_Predicate_Mapping != 'AMBIGUOUS'
+        ORDER BY g.Label
+        LIMIT 0, 1000;
+        '''
+        total = 0 
+ 
+        #The query returns one row per GARD/MONDO/source group and combines all synonym labels into a single separated string for local filtering. 
+
         GARD_QUERY = """
-            SELECT 
+            SELECT id,
                 GardID, MONDO_ID, 
                 MAX(CASE WHEN Label_Predicate_Type = 'Name' THEN Label END) AS gardName,
                 GROUP_CONCAT(CASE WHEN Label_Predicate_Type = 'Synonym' THEN Label END SEPARATOR '$$$') AS `synonyms`,
                 Label_Source, 
                 MIN(updated) AS min_updated
             FROM  gard
-            WHERE 
-                -- for PRODUCTION
-                -- (updated IS NULL OR updated != CURDATE())
-
-                -- For testing/init, remove for production
-                updated IS NULL
+            WHERE  
+                (updated IS NULL OR updated != CURDATE())
 
                 AND Label_Predicate_Mapping != 'DEPRECATED' 
+                AND Label_Predicate_Mapping != 'AMBIGUOUS'
                 AND LENGTH(Label) > 3
             GROUP BY 
                 GardID, MONDO_ID, Label_Source
@@ -75,8 +85,7 @@ class GardNodeNamesTask(PipelineBase):
 
         while True:
 
-            # Each loop returns one batch of GARD rows, then marks those GardIDs
-            # as updated before yielding to the caller.
+            # Each loop returns one batch of GARD rows, then marks those GardIDs as updated before yielding to the caller.
             cursor = self.mysql.cursor(dictionary=True)
             cursor.execute(GARD_QUERY, (batch_size,))
             rows = cursor.fetchall()
@@ -91,15 +100,16 @@ class GardNodeNamesTask(PipelineBase):
             total += len(rows)
 
             for row in rows:
+                id = row["id"]                
                 gardId = row["GardID"] 
                 gard_id_set.add(gardId) 
 
                 gardName = row["gardName"]
                 synonyms = self._split_values(row["synonyms"], self.SYNONYM_SEPARATOR)
 
-                # filtered_names is the disease-name list used by clinical trial
-                # and publication discovery.
+                # filtered_names is the disease-name list used by clinical trial and publication discovery.
                 batch.append({
+                    "id": id,
                     "gardId": gardId,
                     "gardName": gardName,
                     "synonyms": synonyms,
@@ -127,8 +137,7 @@ class GardNodeNamesTask(PipelineBase):
     def _get_filtered_gard_names(self, name, synonyms) -> list:
         """Build the disease search names used by the first trial/publication tasks."""
 
-        # Keep English synonyms, but skip very short synonym strings because
-        # they tend to create noisy publication/trial searches.
+        # Keep English synonyms, but skip very short synonym strings because they tend to create noisy publication/trial searches.
         english_synonyms = [syn for syn in synonyms if _is_english(syn)]
         short_synonyms = [syn for syn in synonyms if _is_under_char_threshold(syn)]
 

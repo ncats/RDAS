@@ -17,7 +17,7 @@ Find clinical-trial PMIDs that exist in clinical_trial_nctid_pmids_mapping but
 are not present in PUBLICATION_ARTICLE table.
 
 For each missing PMID, download the publication metadata from Europe PMC and
-store the article row in UPDATE_publication_article for the alert workflow.
+store the article row in publication_article for the alert workflow.
 """
 # Reference: B_clinical_trial/init_6_clinical_trial_pmids_not_in_Article_umlti.py
 
@@ -40,9 +40,9 @@ class ClinicalTrialPmidArticleImportTask(PipelineBase):
         ''' 1 '''
         query = '''
             SELECT DISTINCT ctnp.pmid
-            FROM  rdas_db.clinical_trial_nctid_pmids_mapping ctnp
+            FROM  clinical_trial_nctid_pmids_mapping ctnp
 
-            LEFT JOIN rdas_db.publication_article pa
+            LEFT JOIN publication_article pa
             ON ctnp.pmid = pa.pubmed_id
 
             WHERE ctnp.is_new = 1
@@ -50,11 +50,24 @@ class ClinicalTrialPmidArticleImportTask(PipelineBase):
         '''
 
         ''' 2 '''
-        insert_new_article_sql = self.publication_worker.get_insert_sql("update_publication_article")
+        insert_new_article_sql = '''
+            INSERT INTO publication_article (
+                pubmed_id, doi, title, abstract_text, affiliation,
+                first_publication_date, publication_year, cited_by_count, is_open_access, in_EPMC,
+                in_PMC, has_PDF, pub_type, source_json, is_new)
+            SELECT %s,%s,%s,%s,%s, %s,%s,%s,%s,%s, %s,%s,%s,%s, 1
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM publication_article
+                WHERE pubmed_id = %s
+            )
+        '''
 
         count = 0
         batch_num = 0
         batch_size = 100
+        insert_article_cursor = None
+        fetch_cursor = None
 
         try:
             insert_article_cursor = self.mysql.cursor(buffered=True)
@@ -75,22 +88,35 @@ class ClinicalTrialPmidArticleImportTask(PipelineBase):
                 pubmed_ids = [row['pmid'] for row in rows]
 
                 count += len(pubmed_ids)
-                self.logger.info(f'Total count = {count}')
+                self.logger.info(f'Total pubmed_id count = {count}')
 
+                article_list = []
                 for pubmed_id in pubmed_ids:
 
                     '''the pubmed_id is NOT in publication_article, download article '''
                     article_val = self.publication_worker.download_by_pmid(pubmed_id)
 
                     if not article_val:
-                        self.logger.error(f"Unable to download Article of pubmed_id = {pubmed_id}" )
+                        self.logger.warning(f"Unable to download Article of pubmed_id = {pubmed_id}" )
                         continue
 
-                    ''' save the new article into update_publication_article table '''
-                    insert_article_cursor.execute(insert_new_article_sql, article_val)
+                    ''' Queue the row for one batch insert after all downloads finish. '''
+                    article_list.append((*article_val, pubmed_id))
 
-                    self.mysql.commit()
-                    self.logger.info(f"Insert into update_publication_article :: pubmed_id: {pubmed_id}")
+                if not article_list:
+                    self.logger.info("No valid Article rows downloaded for this batch.")
+                    continue
+
+                ''' save the new articles into publication_article table '''
+                insert_article_cursor.executemany(insert_new_article_sql, article_list)
+                self.mysql.commit()
+
+                inserted_count = max(insert_article_cursor.rowcount, 0)
+                skipped_count = len(article_list) - inserted_count
+                self.logger.info(
+                    f"Submitted {len(article_list)} rows to publication_article. "
+                    f"Inserted = {inserted_count}, skipped existing = {skipped_count}."
+                )
 
         except Exception as err:
             self.logger.error(f"Error: {err}")
@@ -98,6 +124,9 @@ class ClinicalTrialPmidArticleImportTask(PipelineBase):
         finally:
             if fetch_cursor:
                 fetch_cursor.close()
+
+            if insert_article_cursor:
+                insert_article_cursor.close()
 
             # Explicitly close the all the db connections
             self.close()

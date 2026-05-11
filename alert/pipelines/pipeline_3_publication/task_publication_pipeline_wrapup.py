@@ -25,8 +25,9 @@ class PublicationPipelineWrapUpTask(PipelineBase):
     Publication pipeline tables that are expected to participate in the
     is_new workflow.
 
-    update_publication_article:
-        Main staging table for newly discovered PubMed articles.
+    publication_article:
+        Main publication table. Rows discovered during the current alert run
+        are marked is_new = 1 until the publication pipeline finishes.
 
     publication_gard_omim_mapping:
         GARD/OMIM pairs introduced during the current alert run and consumed by
@@ -36,9 +37,9 @@ class PublicationPipelineWrapUpTask(PipelineBase):
         Newly retrieved OMIM entry_json rows used to create OMIMRef graph data.
     '''
     PUBLICATION_TABLES_WITH_IS_NEW_COLUMN: Tuple[str, ...] = (
-        'update_publication_article',
-        'publication_gard_omim_mapping',
         'publication_omim',
+        'publication_article',
+        'publication_gard_omim_mapping',
     )
 
     def __init__(self):

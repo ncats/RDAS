@@ -19,7 +19,7 @@ load_dotenv()
 from pipelines.pipeline_base import PipelineBase
 
 """
-Update the is_EPI, is_NHS (default is NULL) in table UPDATE_publication_article
+Update is_EPI and is_NHS for new rows in publication_article.
 """
 # Reference: C_publication/init_4_publication-update-EPI-NHS-of-Article-multi.py
 
@@ -150,7 +150,7 @@ def process_publication_article(obj: Dict[str, Any]) -> Tuple[bool, bool, Any, O
         obj: Article data containing id, pubmed_id, title, and abstract_text.
 
     Returns:
-        Tuple matching the update_publication_article update statement:
+        Tuple matching the publication_article update statement:
         is_epi, is_nhs, epi_probability, epi_extract, pubmed_id.
     """
 
@@ -197,9 +197,9 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
     # implement
     def process_new_data(self) -> None:
         
-        fetch_is_new_query = f'SELECT id, pubmed_id, title, abstract_text FROM update_publication_article WHERE is_new = 1'
+        fetch_is_new_query = f'SELECT id, pubmed_id, title, abstract_text FROM publication_article WHERE is_new = 1'
 
-        update_sql = " UPDATE update_publication_article SET is_EPI = %s, is_NHS = %s, epi_probability =%s, epi_extract = %s WHERE pubmed_id = %s "
+        update_sql = " UPDATE publication_article SET is_EPI = %s, is_NHS = %s, epi_probability =%s, epi_extract = %s WHERE pubmed_id = %s "
 
         
         update_cursor = self.mysql.cursor()    

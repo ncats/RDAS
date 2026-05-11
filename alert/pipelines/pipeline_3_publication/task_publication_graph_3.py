@@ -15,7 +15,7 @@ from utils.tools import _as_list, _make_hash_key, _to_string
 """
 Create EpidemiologyAnnotation nodes for new publication articles.
 
-For each new row in update_publication_article (is_new = 1), read epi_extract,
+For each new row in publication_article (is_new = 1), read epi_extract,
 create a unique EpidemiologyAnnotation node, and link it to the matching Article
 node with has_epidemiological_annotation.
 """
@@ -59,7 +59,7 @@ class NewPublicationEpidemiologyGraphTask(PipelineBase):
             pubmed_id,
             epi_probability,
             epi_extract
-        FROM update_publication_article
+        FROM publication_article
         WHERE is_new = 1
         AND pubmed_id IS NOT NULL
         AND epi_extract IS NOT NULL

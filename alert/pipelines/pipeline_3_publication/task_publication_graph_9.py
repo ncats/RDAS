@@ -13,11 +13,11 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _make_hash_key, _to_string
 
 """
-Create PubtatorAnnotation nodes for newly staged publication articles.
+Create PubtatorAnnotation nodes for new publication articles.
 
 Task publication_5 retrieves and parses PubTator data into
 publication_pubtator_parsed. This graph task reads those parsed annotations
-only for rows whose PubMed IDs are in update_publication_article with is_new = 1,
+only for rows whose PubMed IDs are in publication_article with is_new = 1,
 then creates:
 
     (Article)-[:has_pubtator_annotation]->(PubtatorAnnotation)
@@ -31,7 +31,7 @@ annotation type, and relation type, matching the initializer behavior.
 
 
 class NewPublicationPubtatorGraphTask(PipelineBase):
-    """Create PubTator annotation nodes for newly staged publications."""
+    """Create PubTator annotation nodes for new publications."""
 
     BATCH_SIZE = 1000
 
@@ -61,7 +61,7 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
     '''
 
     # PubTator data is populated by task_publication_5; this query limits graph
-    # updates to parsed rows that belong to newly staged publication articles.
+    # updates to parsed rows that belong to new publication articles.
     FETCH_NEW_PUBTATOR_QUERY = '''
         SELECT DISTINCT
             ppp.id,
@@ -71,9 +71,9 @@ class NewPublicationPubtatorGraphTask(PipelineBase):
             ppp.infons_text,
             ppp.relation_type
         FROM publication_pubtator_parsed AS ppp
-        INNER JOIN update_publication_article AS upa
-            ON upa.pubmed_id = ppp.pubmed_id
-        WHERE upa.is_new = 1
+        INNER JOIN publication_article AS pa
+            ON pa.pubmed_id = ppp.pubmed_id
+        WHERE pa.is_new = 1
         AND ppp.pubmed_id IS NOT NULL
         ORDER BY ppp.pubmed_id, ppp.id
     '''

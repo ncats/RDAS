@@ -13,23 +13,23 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _normalize_tuple, _normalize_txt
 
 """
-Create person rows for newly staged publication authors.
+Create person rows for new publication authors.
 
 This task is the alert-pipeline version of:
 F_person/1_generate_person_of_publication.py
 
-It reads update_publication_article rows where is_new = 1, extracts authors from
+It reads publication_article rows where is_new = 1, extracts authors from
 source_json.authorList.author, and inserts those authors into person_of_all_sources
 with is_new = 1.
 """
 
 
 class NewPublicationPersonTask(PipelineBase):
-    """Extract author person records from newly staged publication articles."""
+    """Extract author person records from new publication articles."""
 
     BATCH_SIZE = 100
     PERSON_TABLE = "person_of_all_sources"
-    PUBLICATION_TABLE = "update_publication_article"
+    PUBLICATION_TABLE = "publication_article"
     ASSOCIATE_TYPE = "author"
     SOURCE = "Publication"
     ROLE = "author"
@@ -38,15 +38,15 @@ class NewPublicationPersonTask(PipelineBase):
     # person records, which keeps repeated alert runs from duplicating authors.
     FETCH_NEW_PUBLICATIONS_QUERY = f'''
         SELECT DISTINCT
-            upa.pubmed_id,
-            upa.source_json
-        FROM {PUBLICATION_TABLE} AS upa
+            pa.pubmed_id,
+            pa.source_json
+        FROM {PUBLICATION_TABLE} AS pa
         LEFT JOIN {PERSON_TABLE} AS p
-            ON p.associate_id = upa.pubmed_id
+            ON p.associate_id = pa.pubmed_id
             AND p.source = 'Publication'
-        WHERE upa.is_new = 1
-        AND upa.pubmed_id IS NOT NULL
-        AND upa.source_json IS NOT NULL
+        WHERE pa.is_new = 1
+        AND pa.pubmed_id IS NOT NULL
+        AND pa.source_json IS NOT NULL
         AND p.associate_id IS NULL
     '''
 

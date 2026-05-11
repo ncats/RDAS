@@ -76,7 +76,7 @@ class PublicationWorker:
                 
                     resultList = bigObj['resultList']['result']
                     if len(resultList) <= 0:
-                        self.logger.error("No Europe PMC result found for pubmed_id=%s. url=%s", pmid, url)
+                        self.logger.warning("No Europe PMC result found for pubmed_id=%s. url=%s", pmid, url)
                         break
 
                     has_pubmed_result = False

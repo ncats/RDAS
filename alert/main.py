@@ -21,7 +21,7 @@ class AlertPipelineRunner:
     """
 
     # Testing override from the original script. Set this to None for PRODUCTION.
-    TEST_LAST_UPDATE_DATE = date(2025, 7, 1)
+    TEST_LAST_UPDATE_DATE = date(2026, 5, 1)
 
 
     def __init__(self, look_back_days: int = 7):
@@ -77,29 +77,19 @@ class AlertPipelineRunner:
                     gard_name = gard_node.get("gardName") or gard_node.get("gard_name") or ""
 
                     # 1
-                    ct_start_time = time.time()
- 
+                    start_time = time.time()
+
                     clinical_trial_task.find_new_data(gard_node)
 
-                    ''' log the total run time '''
-                    ct_hours, ct_minutes, ct_seconds = _time_hms(time.time() - ct_start_time )
-                    self.logger.info(
-                        f"Finished NewClinicalTrialDiscoveryTask.find_new_data() for {gard_id} {gard_name} "
-                        f"in {ct_hours} hours, {ct_minutes} minutes, "
-                        f"{ct_seconds} seconds."
-                    )
 
                     # 2
-                    pub_start_time = time.time()
-
                     publication_task.find_new_data(gard_node)
 
                     ''' log the total run time '''
-                    pub_hours, pub_minutes, pub_seconds = _time_hms(time.time() - pub_start_time)
+                    hr, min, sec = _time_hms(time.time() - start_time)
                     self.logger.info(
-                        f"Finished NewPublicationDiscoveryTask.find_new_data() for {gard_id} {gard_name} "
-                        f"in {pub_hours} hours, {pub_minutes} minutes, "
-                        f"{pub_seconds} seconds."
+                        f"\n*** Finished NewClinicalTrialGraphTask & NewPublicationDiscoveryTask for ID={gard_node['id']}: [{gard_id} : {gard_name} ] "
+                        f"in {hr} hours, {min} minutes, {sec} seconds. ***\n"
                     )
 
                     total_gard_nodes += 1
@@ -127,10 +117,10 @@ class AlertPipelineRunner:
         from pipelines.pipeline_2_clinical_trial.task_clinical_trial_5 import ClinicalTrialPmidArticleImportTask
         from pipelines.pipeline_2_clinical_trial.task_clinical_trial_6 import NewClinicalTrialAnnotationTask
 
-        self._run_pipeline_task(NewClinicalTrialImportTask)
-        self._run_pipeline_task(ClinicalTrialDrugInterventionMappingTask)
-        self._run_pipeline_task(ClinicalTrialPublicationMappingTask)
-        self._run_pipeline_task(ClinicalTrialPmidArticleImportTask)
+        #self._run_pipeline_task(NewClinicalTrialImportTask)
+        #self._run_pipeline_task(ClinicalTrialDrugInterventionMappingTask)
+        #self._run_pipeline_task(ClinicalTrialPublicationMappingTask)
+        #self._run_pipeline_task(ClinicalTrialPmidArticleImportTask)
         self._run_pipeline_task(NewClinicalTrialAnnotationTask)
 
         self.logger.info("Completed run_clinical_trial_mysql_updates().")
@@ -180,8 +170,7 @@ class AlertPipelineRunner:
         from pipelines.pipeline_3_publication.task_publication_5 import NewPublicationPubtatorRetrievalTask
         from pipelines.pipeline_3_publication.task_publication_6 import NewPublicationChemicalSubstanceTask
         from pipelines.pipeline_3_publication.task_publication_7 import PublicationFalsePositiveFilterTask
-        from pipelines.pipeline_3_publication.task_publication_8 import NewPublicationArticleImportTask
-        from pipelines.pipeline_3_publication.task_publication_9 import NewOmimPublicationArticleImportTask
+        from pipelines.pipeline_3_publication.task_publication_8 import NewOmimPublicationArticleImportTask
 
 
         self._run_pipeline_task(PublicationEpiNhsClassificationTask)
@@ -190,7 +179,6 @@ class AlertPipelineRunner:
         self._run_pipeline_task(NewPublicationPubtatorRetrievalTask)
         self._run_pipeline_task(NewPublicationChemicalSubstanceTask)
         self._run_pipeline_task(PublicationFalsePositiveFilterTask)
-        self._run_pipeline_task(NewPublicationArticleImportTask)
         self._run_pipeline_task(NewOmimPublicationArticleImportTask)
 
         self.logger.info("Completed run_publication_mysql_updates().")
@@ -392,48 +380,47 @@ if __name__ == "__main__":
 
     try:
         # Step 1
-        # run_step_with_timing(
-        #     "Step 1: run_find_new_clinical_trial_and_publication_updates()",
-        #     runner.run_find_new_clinical_trial_and_publication_updates,
-        # )
-
+        '''
+        run_step_with_timing(
+            "Step 1: run_find_new_clinical_trial_and_publication_updates()",
+            runner.run_find_new_clinical_trial_and_publication_updates,
+        )
+        '''
         # Step 2
-        # run_step_with_timing(
-        #     "Step 2: run_mysql_database_updates()",
-        #     runner.run_mysql_database_updates,
-        # )
+        run_step_with_timing(
+            "Step 2: run_mysql_database_updates()",
+            runner.run_mysql_database_updates,
+        )
 
         # Step 3
-        # run_step_with_timing(
-        #     "Step 3: run_memgraph_database_updates()",
-        #     runner.run_memgraph_database_updates,
-        # )
+        run_step_with_timing(
+            "Step 3: run_memgraph_database_updates()",
+            runner.run_memgraph_database_updates,
+        )
 
         # Step 4
-        # run_step_with_timing(
-        #     "Step 4: run_pipeline_followup_updates()",
-        #     runner.run_pipeline_followup_updates,
-        # )
+        run_step_with_timing(
+            "Step 4: run_pipeline_followup_updates()",
+            runner.run_pipeline_followup_updates,
+        )
 
         # Step 5
-        # run_step_with_timing(
-        #     "Step 5: send_alert_emails()",
-        #     runner.send_alert_emails,
-        # )
+        run_step_with_timing(
+            "Step 5: send_alert_emails()",
+            runner.send_alert_emails,
+        )
 
         # Step 6
-        # run_step_with_timing(
-        #     "Step 6: run_regroup_the_person()",
-        #     runner.run_regroup_the_person,
-        # )
+        run_step_with_timing(
+            "Step 6: run_regroup_the_person()",
+            runner.run_regroup_the_person,
+        )
 
         # Step 7
-        # run_step_with_timing(
-        #     "Step 7: run_pipeline_wrapup()",
-        #     runner.run_pipeline_wrapup,
-        # )
-
-        pass
+        run_step_with_timing(
+            "Step 7: run_pipeline_wrapup()",
+            runner.run_pipeline_wrapup,
+        )
 
     finally:
         runner.close()

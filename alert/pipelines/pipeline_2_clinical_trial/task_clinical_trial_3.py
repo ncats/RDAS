@@ -51,10 +51,10 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
     def process_new_data(self) -> None:
         """Process new clinical trials and map each drug intervention to RxNorm."""
 
-        # Only newly imported clinical trials need drug-intervention extraction
-        # in this incremental alert pipeline.
+        # Only newly discovered clinical trials need drug-intervention
+        # extraction in this incremental alert pipeline.
         select_new_clinic_trial_sql = '''
-            SELECT gardid, disease, nctid, studies, id
+            SELECT gardId AS gardid, disease, nctid, studies, id
             FROM clinical_trial
             WHERE nctid IS NOT NULL
             AND is_new = 1
@@ -87,9 +87,9 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
                     self.logger.info(f"# Id: {id}, Gard_ID: {gardid}, NCTID: {nctid}, Disease: {disease}")
 
-                    # ClinicalTrials.gov stores interventions inside the
-                    # protocolSection; this task only keeps intervention records
-                    # explicitly marked as DRUG.
+                    '''
+                    # ClinicalTrials.gov stores interventions inside the protocolSection; this task only keeps intervention records explicitly marked as DRUG.
+                    '''
                     intervention_module = study.get('protocolSection', dict()).get('armsInterventionsModule', dict())
                     interventions = intervention_module.get('interventions', list())
 
@@ -127,7 +127,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
         cursor = self.mysql.cursor()
 
-        sql = '''
+        insert_intervention_drug_sql = '''
             INSERT INTO clinical_trial_intervention_drug (gardId, disease, nctid, rxnormid, intervention, drug_name, wspacy, property_key, property_val, is_new)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         '''
@@ -145,11 +145,11 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
                 if isinstance(property_val, list):
                     property_val = json.dumps(property_val)
 
-                print(f'{gardid}\t{nctid}\t{rxnormid}\t{property_key}')
+                self.logger.info(f'{gardid}\t{nctid}\t{rxnormid}\t{property_key}')
 
                 val = (gardid, disease, nctid, rxnormid, intervention, drug_name, wspacy, property_key, property_val, 1)
 
-                cursor.execute(sql, val)
+                cursor.execute(insert_intervention_drug_sql, val)
 
 
         def nlp_to_drug(intervention, matches):
@@ -242,15 +242,15 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
                         rxdata['RxNormID'] = rxnormid
 
                     except KeyError as e:
-                        print(f"KeyError: {e} - The required key does not exist in the JSON structure.")
-                        print(f'\n{obj}\n')
+                        self.logger.error(f"KeyError: {e} - The required key does not exist in the JSON structure.")
+                        self.logger.error(f'\n{obj}\n')
                         rxnormid = None  # or some default value or behavior
                     except IndexError:
-                        print("IndexError: The 'rxnormId' list is empty or does not have an element at index 0.")
-                        print(f'\n{obj}\n')
+                        self.logger.error("IndexError: The 'rxnormId' list is empty or does not have an element at index 0.")
+                        self.logger.error(f'\n{obj}\n')
                         rxnormid = None  # or handle this case appropriately
                     except (TypeError, AttributeError):
-                        print("The JSON structure is not as expected or 'response' might not be JSON.")
+                        self.logger.error("The JSON structure is not as expected or 'response' might not be JSON.")
                         rxnormid = None  # or handle this case appropriately
 
                     break  # Exit the loop if successful

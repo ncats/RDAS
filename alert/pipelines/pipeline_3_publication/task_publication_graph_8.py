@@ -11,15 +11,15 @@ sys.path.extend([
 from pipelines.pipeline_base import PipelineBase
 
 """
-Create GARD-to-Article relationships for newly staged publication articles.
+Create GARD-to-Article relationships for new publication articles.
 
-For each publication row in update_publication_article where is_new = 1, find
+For each publication row in publication_article where is_new = 1, find
 the matching GARD/pubmed mapping in publication_gard_searchterm_pubmed_mapping
 and create the Memgraph relationship:
 
     (GARD)-[:mentioned_in]->(Article)
 
-The mapping table does not have an is_new flag, so update_publication_article
+The mapping table does not have an is_new flag, so publication_article
 is the source of truth for deciding which article relationships are new for
 this alert pipeline run.
 """
@@ -28,7 +28,7 @@ this alert pipeline run.
 
 
 class NewPublicationGardArticleRelationshipTask(PipelineBase):
-    """Link newly staged Article nodes to their matching GARD disease nodes."""
+    """Link new Article nodes to their matching GARD disease nodes."""
 
     BATCH_SIZE = 300
 
@@ -41,16 +41,16 @@ class NewPublicationGardArticleRelationshipTask(PipelineBase):
         MERGE (g)-[:mentioned_in]->(p)
     '''
 
-    # Newness comes from update_publication_article. The mapping table provides
+    # Newness comes from publication_article. The mapping table provides
     # the GARD/pubmed pairs and may mark false-positive mappings with is_valid.
     FETCH_NEW_RELATIONS_QUERY = '''
         SELECT DISTINCT
             pgspm.gard_id,
             pgspm.pubmed_id
         FROM publication_gard_searchterm_pubmed_mapping AS pgspm
-        INNER JOIN update_publication_article AS upa
-            ON upa.pubmed_id = pgspm.pubmed_id
-        WHERE upa.is_new = 1
+        INNER JOIN publication_article AS pa
+            ON pa.pubmed_id = pgspm.pubmed_id
+        WHERE pa.is_new = 1
         AND pgspm.gard_id IS NOT NULL
         AND pgspm.pubmed_id IS NOT NULL
         AND (pgspm.is_valid IS NULL OR pgspm.is_valid = 1)

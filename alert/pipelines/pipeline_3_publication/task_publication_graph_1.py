@@ -12,7 +12,7 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _as_bool, _empty_if_none
 
 """
-Insert new Article nodes into Memgraph from update_publication_article.
+Insert new Article nodes into Memgraph from publication_article.
 """
 
 # Reference: C_publication/initializer/article.py
@@ -22,9 +22,9 @@ class NewPublicationArticleGraphTask(PipelineBase):
     """
     Create Article nodes in Memgraph for newly staged publications.
 
-    update_publication_article contains the current alert run's article rows.
-    This task converts those rows into Article node properties and creates nodes
-    keyed by PubMed ID.
+    publication_article contains both historical and current alert-run article
+    rows. This task filters on is_new = 1, converts those rows into Article node
+    properties, and creates nodes keyed by PubMed ID.
     """
 
     BATCH_SIZE = 300
@@ -65,7 +65,7 @@ class NewPublicationArticleGraphTask(PipelineBase):
             publication_year, cited_by_count,
             is_open_access, in_EPMC, in_PMC, is_EPI, is_NHS,
             has_PDF, pub_type
-        FROM update_publication_article
+        FROM publication_article
         WHERE is_new = 1
         AND pubmed_id IS NOT NULL
     '''

@@ -12,7 +12,7 @@ sys.path.extend([
 from pipelines.pipeline_base import PipelineBase
 
 """
-Update Article nodes in Memgraph with extra attributes from update_publication_article.
+Update Article nodes in Memgraph with extra attributes from publication_article.
 
 For each new publication row (is_new = 1), parse source_json and update the matching Memgraph Article node with:
 - fullTextUrls from source_json.fullTextUrlList.fullTextUrl[].url
@@ -28,8 +28,8 @@ class NewPublicationArticleNodeAttrsUpdateTask(PipelineBase):
     Update extra Article node attributes from staged publication metadata.
 
     Article nodes are created first with core fields. This task parses
-    source_json from the staging table and fills in attributes that come from
-    nested publication metadata.
+    source_json from publication_article rows marked is_new = 1 and fills in
+    attributes that come from nested publication metadata.
     """
 
     BATCH_SIZE = 200
@@ -50,7 +50,7 @@ class NewPublicationArticleNodeAttrsUpdateTask(PipelineBase):
         SELECT
             pubmed_id,
             source_json
-        FROM update_publication_article
+        FROM publication_article
         WHERE is_new = 1
         AND pubmed_id IS NOT NULL
         AND source_json IS NOT NULL

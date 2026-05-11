@@ -15,7 +15,7 @@ from utils.tools import _na_if_empty
 """
 Create Journal nodes for new publication articles.
 
-For each new row in update_publication_article (is_new = 1), parse
+For each new row in publication_article (is_new = 1), parse
 source_json.journalInfo.journal, create/merge the Journal node, and link the
 matching Article node to the Journal with published_in.
 """
@@ -60,13 +60,13 @@ class NewPublicationJournalGraphTask(PipelineBase):
         }
     '''
 
-    # Only new update rows are read here; source_json is required because the
+    # Only new article rows are read here; source_json is required because the
     # journal payload is nested under source_json.journalInfo.journal.
     FETCH_NEW_ARTICLES_QUERY = '''
         SELECT
             pubmed_id,
             source_json
-        FROM update_publication_article
+        FROM publication_article
         WHERE is_new = 1
         AND pubmed_id IS NOT NULL
         AND source_json IS NOT NULL

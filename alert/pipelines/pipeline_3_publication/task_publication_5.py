@@ -21,7 +21,7 @@ Retrieve pubtator data from API and insert into table publication_pubtator
 
 class NewPublicationPubtatorRetrievalTask(PipelineBase):
     """
-    Retrieve and parse PubTator annotations for newly staged publications.
+    Retrieve and parse PubTator annotations for new publications.
 
     The task first downloads PubTator JSON for new PubMed IDs, then parses the
     stored JSON into normalized annotation rows for later graph loading.
@@ -66,7 +66,7 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
         """Parse stored PubTator JSON into publication_pubtator_parsed rows."""
 
         '''
-        Select new PubMed IDs from update_publication_article that have PubTator
+        Select new PubMed IDs from publication_article that have PubTator
         source JSON in publication_pubtator, but have not yet been parsed into
         publication_pubtator_parsed.
         '''
@@ -74,9 +74,9 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
             SELECT btp.pubmed_id, btp.source_json
             FROM (
                 SELECT pp.pubmed_id, pp.source_json
-                FROM update_publication_article upa
-                INNER JOIN publication_pubtator pp ON upa.pubmed_id = pp.pubmed_id
-                WHERE upa.is_new = 1
+                FROM publication_article pa
+                INNER JOIN publication_pubtator pp ON pa.pubmed_id = pp.pubmed_id
+                WHERE pa.is_new = 1
                 AND pp.source_json IS NOT NULL
             ) btp
             LEFT JOIN publication_pubtator_parsed parsed
@@ -198,17 +198,25 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
     def retrieve_pubtator(self):
         """Download raw PubTator JSON for new PubMed IDs not already cached."""
 
-        ''' Retrieve the pubmed_id's which are in update_publication_article table but not in publication_pubtator table '''
+        ''' Retrieve PubMed IDs in publication_article that are not yet cached in publication_pubtator. '''
         fetch_query = '''
-            SELECT upa.pubmed_id
-            FROM update_publication_article upa
+            SELECT pa.pubmed_id
+            FROM publication_article pa
             LEFT JOIN publication_pubtator pp
-                ON upa.pubmed_id = pp.pubmed_id
-            WHERE upa.is_new = 1
+                ON pa.pubmed_id = pp.pubmed_id
+            WHERE pa.is_new = 1
             AND pp.pubmed_id IS NULL
         '''
 
-        insert_sql = 'INSERT INTO publication_pubtator (pubmed_id, source_json) VALUES (%s, %s)'
+        insert_sql = '''
+            INSERT INTO publication_pubtator (pubmed_id, source_json)
+            SELECT %s, %s
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM publication_pubtator
+                WHERE pubmed_id = %s
+            )
+        '''
 
         count = 0
         batch_num = 0
@@ -247,7 +255,7 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
                     if source_json:
                         source_json = json.dumps(source_json)
  
-                    val_list.append((pubmed_id, source_json)) 
+                    val_list.append((pubmed_id, source_json, pubmed_id))
                      
                     count += 1
                      

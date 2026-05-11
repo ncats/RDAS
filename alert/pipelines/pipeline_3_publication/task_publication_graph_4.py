@@ -15,7 +15,7 @@ from utils.tools import _normalize_keywords
 """
 Create Keyword nodes for new publication articles.
 
-For each new row in update_publication_article (is_new = 1), parse
+For each new row in publication_article (is_new = 1), parse
 source_json.keywordList.keyword, create Keyword nodes, and link the matching
 Article node to each Keyword with has_keyword.
 """
@@ -49,7 +49,7 @@ class NewPublicationKeywordGraphTask(PipelineBase):
     FETCH_NEW_ARTICLES_QUERY = '''
         SELECT
             pubmed_id, source_json
-        FROM update_publication_article
+        FROM publication_article
         WHERE is_new = 1
         AND pubmed_id IS NOT NULL
         AND source_json IS NOT NULL

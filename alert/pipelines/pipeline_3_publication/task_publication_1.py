@@ -27,21 +27,19 @@ For each GARD node, this pipeline searches PubMed with the node's filtered
 disease names between the node's last update date and today. 
 
 It downloads article metadata for PMIDs that are NOT already in publication_article,
-stores those article rows in UPDATE_publication_article, and records the
+stores those article rows in publication_article, and records the
 GARD/search-term/PMID relationship(unique)in publication_gard_searchterm_pubmed_mapping.
-
-*** Needs copy arictles from UPDATE_publication_article to publication_article later ***
 """
 # Reference: C_publication/init_1_publication_gard_pubmed-id.py
 # Reference: C_publication/init_2_1_publication-gard-searchterm-pubmed-mapping.py
 # Reference: C_publication/init_3_1_publication-article-by-pubmed-id.py
 
-# The pubmed_id in publication_article & UPDATE_publication_article are unique
+# The pubmed_id in publication_article should be unique for alert imports.
 '''
-# check uniqueness of pubmed_id in update_publication_article/publication_article
+# check uniqueness of pubmed_id in publication_article
 
 SELECT distinct pubmed_id, count(*) as ct
-FROM rdas_db.update_publication_article
+FROM rdas_db.publication_article
 WHERE pubmed_id IS NOT NULL
 GROUP BY pubmed_id
 HAVING COUNT(*) > 1
@@ -77,7 +75,7 @@ class NewPublicationDiscoveryTask(PipelineBase):
             pubmed_ids = self.retrieve_pubmed_ids(gard_id, name, last_update_date, today)
 
             if not pubmed_ids:
-                self.logger.info(f"No pubmed_ids found for gard_id={gard_id}, search_term={name}")
+                self.logger.warning(f"No new PubMed IDs found for [{gard_id}: {name}]")
                 continue
             
             self.find_new_publications(gard_id, name, pubmed_ids)
@@ -94,10 +92,9 @@ class NewPublicationDiscoveryTask(PipelineBase):
             self.logger.error("PUBMED_ESEARCH_API is not configured.")
             return None
 
-        #x# Exact match uses the PubMed ESearch Title/Abstract syntax.
+        # Exact match uses the PubMed ESearch Title/Abstract syntax.
         search_term_normalized = re.sub(r'\s+', '+', search_term) # replace whitespace with + sign
         term_search_query = f'"{search_term_normalized}"[Title/Abstract:~0]'
-        #x#
 
         retries = 0
         max_retries=10
@@ -173,7 +170,18 @@ class NewPublicationDiscoveryTask(PipelineBase):
         insert_article_cursor = self.mysql.cursor(buffered=True)
         insert_gard_searchterm_pubmed_mapping_cursor = self.mysql.cursor(buffered=True)
 
-        insert_new_article_sql = self.publication_worker.get_insert_sql("update_publication_article")
+        insert_new_article_sql = '''
+            INSERT INTO publication_article (
+                pubmed_id, doi, title, abstract_text, affiliation,
+                first_publication_date, publication_year, cited_by_count, is_open_access, in_EPMC,
+                in_PMC, has_PDF, pub_type, source_json, is_new)
+            SELECT %s,%s,%s,%s,%s, %s,%s,%s,%s,%s, %s,%s,%s,%s, 1
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM publication_article
+                WHERE pubmed_id = %s
+            )
+        '''
 
         insert_gard_searchterm_pubmed_mapping_sql = '''
             INSERT INTO publication_gard_searchterm_pubmed_mapping (gard_id, search_term, pubmed_id)
@@ -184,20 +192,16 @@ class NewPublicationDiscoveryTask(PipelineBase):
         try:
             # 1.
               
-            # 2. check if the pubmed_id is already in publication_article or update_publication_article
+            # 2. check if the pubmed_id is already in publication_article
             placeholders = ",".join(["%s"] * len(pubmed_ids))
 
             batch_check_exist_query = f'''
                 SELECT pubmed_id
                 FROM publication_article
                 WHERE pubmed_id IN ({placeholders})
-                UNION
-                SELECT pubmed_id
-                FROM update_publication_article
-                WHERE pubmed_id IN ({placeholders})
             '''
 
-            check_cursor.execute(batch_check_exist_query, list(pubmed_ids) + list(pubmed_ids))
+            check_cursor.execute(batch_check_exist_query, list(pubmed_ids))
 
             existing_pubmed_ids = {
                 str(existing_row[0])
@@ -207,28 +211,32 @@ class NewPublicationDiscoveryTask(PipelineBase):
             # 3. 
             for pubmed_id in pubmed_ids: 
 
-                # the pubmed_id is already in publication_article or update_publication_article table
+                # the pubmed_id is already in publication_article table
                 if pubmed_id in existing_pubmed_ids:
                     continue
                  
-                # 5. the pubmed_id is NOT in publication_article or update_publication_article, download article
+                # 5. the pubmed_id is NOT in publication_article, download article
                 article_val = self.publication_worker.download_by_pmid(pubmed_id)
 
                 if not article_val:
-                    self.logger.error(f"Unable to download pubmed_id={pubmed_id} for gard_id={gard_id}" )
+                    url = f"{os.getenv('EURO_PEPMC_SERVICE_URL')}?query=EXT_ID:{pubmed_id}&resultType=core&format=json"
+
+                    self.logger.warning(f"GARD ID: {gard_id}, Search term: {search_term} - Unable to download: {url}")
                     continue
                  
-                # 6. save the new article into update_publication_article table
-                insert_article_cursor.execute(insert_new_article_sql, article_val)
+                # 6. save the new article into publication_article table
+                insert_article_cursor.execute(insert_new_article_sql, (*article_val, pubmed_id))
 
                 self.mysql.commit()
-                self.logger.info(f"1. update_publication_article :: gard_id: {gard_id}\tsearch_term: {search_term}\tpubmed_id: {pubmed_id}")
 
-                # 7. save the gard_id, search_term and pubmed_id               
+                pubmedid_gardid_searchitem_for_logging = f'PubMed ID: {pubmed_id}\tGARD ID: {gard_id}\tSearch term: {search_term}'
+                self.logger.info(f"1. New publication added to table publication_article :: {pubmedid_gardid_searchitem_for_logging}")
+
+                # 7. save the gard_id, search_term and pubmed_id
                 insert_gard_searchterm_pubmed_mapping_cursor.execute(insert_gard_searchterm_pubmed_mapping_sql, (gard_id, search_term, pubmed_id))
-
-                self.logger.info(f"2. publication_gard_searchterm_pubmed_mapping ::  gard_id: {gard_id}\tsearch_term: {search_term}\tpubmed_id: {pubmed_id}")
                 self.mysql.commit()
+
+                self.logger.info(f"2. New mapping added to table publication_gard_searchterm_pubmed_mapping :: {pubmedid_gardid_searchitem_for_logging}")
  
         except Exception as e:
             self.logger.error(e)

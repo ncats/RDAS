@@ -12,11 +12,11 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean, _make_hash_key, _to_stripped_string
 
 """
-Create Substance nodes for newly staged publication articles.
+Create Substance nodes for new publication articles.
 
-Task publication_6 extracts chemical substances from update_publication_article
+Task publication_6 extracts chemical substances from publication_article
 into publication_substance. This graph task reads substance rows linked to
-update_publication_article where is_new = 1, creates Substance nodes, and links
+publication_article where is_new = 1, creates Substance nodes, and links
 the matching Article nodes with:
 
     (Article)-[:has_substance]->(Substance)
@@ -26,7 +26,7 @@ the matching Article nodes with:
 
 
 class NewPublicationSubstanceGraphTask(PipelineBase):
-    """Create Substance nodes and link them to newly staged Article nodes."""
+    """Create Substance nodes and link them to new Article nodes."""
 
     BATCH_SIZE = 100
 
@@ -69,9 +69,9 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
     FETCH_NEW_HASH_IDS_QUERY = '''
         SELECT DISTINCT ps.hash_id
         FROM publication_substance AS ps
-        INNER JOIN update_publication_article AS upa
-            ON upa.pubmed_id = ps.pubmed_id
-        WHERE upa.is_new = 1
+        INNER JOIN publication_article AS pa
+            ON pa.pubmed_id = ps.pubmed_id
+        WHERE pa.is_new = 1
         AND ps.hash_id IS NOT NULL
         AND ps.hash_id <> ''
         ORDER BY ps.hash_id
@@ -161,15 +161,15 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
 
         placeholders = ",".join(["%s"] * len(hash_ids))
 
-        # Rejoin to update_publication_article so the graph update only uses
-        # substance rows tied to newly staged publications.
+        # Rejoin to publication_article so the graph update only uses substance
+        # rows tied to new publications.
         substance_query = f'''
             SELECT DISTINCT 
                 ps.pubmed_id, ps.substance_name, ps.registry_number, ps.hash_id
             FROM publication_substance AS ps
-            INNER JOIN update_publication_article AS upa
-                ON upa.pubmed_id = ps.pubmed_id
-            WHERE upa.is_new = 1
+            INNER JOIN publication_article AS pa
+                ON pa.pubmed_id = ps.pubmed_id
+            WHERE pa.is_new = 1
             AND ps.hash_id IN ({placeholders})
             ORDER BY ps.hash_id, ps.pubmed_id
         '''

@@ -62,11 +62,11 @@ Common MySQL flags:
     alert_sent = 1
         Row has already been included in alert email delivery.
 
-Common staging tables:
+Common incremental tables:
 
-    update_clinical_trial
+    clinical_trial
     clinical_trial_unique
-    update_publication_article
+    publication_article
     publication_omim
     person_of_all_sources
     organization_location
@@ -127,18 +127,18 @@ Step 2A. Clinical trial MySQL staging and enrichment
            articles are not already present.
 
         5. NewClinicalTrialAnnotationTask
-           Runs biomedical entity annotation over newly staged clinical trials
+           Runs biomedical entity annotation over new clinical trials
            and stores UMLS annotation rows.
 
 
-Step 2B. Publication MySQL staging and enrichment
+Step 2B. Publication MySQL discovery and enrichment
 
     Method:
         run_publication_mysql_updates()
 
     Tasks, in order:
         1. PublicationEpiNhsClassificationTask
-           Classifies newly staged articles as epidemiology and/or natural
+           Classifies new articles as epidemiology and/or natural
            history studies.
 
         2. GardOmimPublicationMappingTask
@@ -151,16 +151,12 @@ Step 2B. Publication MySQL staging and enrichment
            Retrieves raw PubTator data and parses it into structured rows.
 
         5. NewPublicationChemicalSubstanceTask
-           Extracts chemical substance rows from newly staged articles.
+           Extracts chemical substance rows from new articles.
 
         6. PublicationFalsePositiveFilterTask
            Filters likely false-positive GARD/publication mappings.
 
-        7. NewPublicationArticleImportTask
-           Copies new rows from update_publication_article into
-           publication_article.
-
-        8. NewOmimPublicationArticleImportTask
+        7. NewOmimPublicationArticleImportTask
            Retrieves/imports publication articles referenced from new OMIM data.
 
 
@@ -219,7 +215,7 @@ Step 3B. Publication graph updates
 
     Tasks, in order:
         1. NewPublicationArticleGraphTask
-           Creates Article nodes from update_publication_article.
+           Creates Article nodes from publication_article.
 
         2. NewPublicationArticleNodeAttrsUpdateTask
            Updates extra Article attributes such as full-text URLs, issue, and
@@ -238,7 +234,7 @@ Step 3B. Publication graph updates
            Creates MeshTerm nodes and links them to Article.
 
         7. GardPublicationEpiNhsCountUpdateTask
-           Increments GARD EPI/NHS article counters for newly staged articles.
+           Increments GARD EPI/NHS article counters for new articles.
 
         8. NewPublicationGardArticleRelationshipTask
            Creates GARD-to-Article mentioned_in relationships.
@@ -295,8 +291,8 @@ Step 5. Send alert emails
     Data sources:
         Firebase Auth
         Firestore subscriptions
-        update_clinical_trial
-        update_publication_article
+        clinical_trial
+        publication_article
         publication_gard_searchterm_pubmed_mapping
 
     Notes:
@@ -311,7 +307,7 @@ Step 6. Regroup people
 
     Tasks, in order:
         1. NewPublicationPersonTask
-           Extracts publication authors from update_publication_article and
+           Extracts publication authors from publication_article and
            stages them in person_of_all_sources with is_new=1.
 
         2. NewClinicalTrialPersonTask

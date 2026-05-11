@@ -21,8 +21,8 @@ class NewClinicalTrialGardRelationshipTask(PipelineBase):
     """
     Create relationships from new ClinicalTrial nodes to GARD nodes.
 
-    update_clinical_trial records preserve the disease search term that matched
-    each trial. This task uses that term as matchedTermRDAS on the Memgraph
+    clinical_trial records preserve the disease search term that matched each
+    trial. This task uses that term as matchedTermRDAS on the Memgraph
     relationship.
     """
 
@@ -52,11 +52,11 @@ class NewClinicalTrialGardRelationshipTask(PipelineBase):
             MERGE (x)<-[:mapped_to_gard {matchedTermRDAS: chunk.disease}]-(y)
         '''
 
-        # update_clinical_trial can contain multiple GARD matches per NCT ID;
-        # is_new keeps this incremental task scoped to the current alert run.
+        # clinical_trial can contain multiple GARD matches per NCT ID; is_new
+        # keeps this incremental task scoped to the current alert run.
         fetch_new_clinical_query = '''
-                SELECT id, gardid, disease, nctid
-                FROM update_clinical_trial
+                SELECT id, gardId AS gardid, disease, nctid
+                FROM clinical_trial
                 WHERE nctid IS NOT NULL
                 AND is_new = 1
         '''

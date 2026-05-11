@@ -12,8 +12,8 @@ from pipelines.pipeline_base import PipelineBase
 """
 Update GARD nodes with new EPI/NHS article counts.
 
-For each GARD ID that has newly staged publication articles, count the new
-EPI/NHS rows from update_publication_article (is_new = 1) and add those counts
+For each GARD ID that has new publication articles, count the new
+EPI/NHS rows from publication_article (is_new = 1) and add those counts
 to the existing GARD node countEpiArticles and countNhsArticles properties.
 """
 
@@ -21,7 +21,7 @@ to the existing GARD node countEpiArticles and countNhsArticles properties.
 
 
 class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
-    """Increment GARD EPI/NHS publication counters from newly staged articles."""
+    """Increment GARD EPI/NHS publication counters from new publication articles."""
 
     BATCH_SIZE = 300
 
@@ -39,9 +39,9 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
     FETCH_GARD_IDS_QUERY = '''
         SELECT DISTINCT pgspm.gard_id
         FROM publication_gard_searchterm_pubmed_mapping AS pgspm
-        INNER JOIN update_publication_article AS upa
-            ON upa.pubmed_id = pgspm.pubmed_id
-        WHERE upa.is_new = 1
+        INNER JOIN publication_article AS pa
+            ON pa.pubmed_id = pgspm.pubmed_id
+        WHERE pa.is_new = 1
     '''
 
     def __init__(self):
@@ -121,13 +121,13 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
         count_query = f'''
             SELECT
                 pgspm.gard_id,
-                COUNT(upa.pubmed_id) AS total_articles,
-                SUM(upa.is_EPI = 1 OR upa.is_EPI = '1' OR LOWER(upa.is_EPI) = 'true') AS countEpiArticles,
-                SUM(upa.is_NHS = 1 OR upa.is_NHS = '1' OR LOWER(upa.is_NHS) = 'true') AS countNhsArticles
+                COUNT(pa.pubmed_id) AS total_articles,
+                SUM(pa.is_EPI = 1 OR pa.is_EPI = '1' OR LOWER(pa.is_EPI) = 'true') AS countEpiArticles,
+                SUM(pa.is_NHS = 1 OR pa.is_NHS = '1' OR LOWER(pa.is_NHS) = 'true') AS countNhsArticles
             FROM publication_gard_searchterm_pubmed_mapping AS pgspm
-            INNER JOIN update_publication_article AS upa
-                ON upa.pubmed_id = pgspm.pubmed_id
-            WHERE upa.is_new = 1
+            INNER JOIN publication_article AS pa
+                ON pa.pubmed_id = pgspm.pubmed_id
+            WHERE pa.is_new = 1
             AND pgspm.gard_id IN ({placeholders})
             GROUP BY pgspm.gard_id
         '''
