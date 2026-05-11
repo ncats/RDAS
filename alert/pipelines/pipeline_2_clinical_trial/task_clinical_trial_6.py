@@ -23,6 +23,7 @@ from pipelines.pipeline_base import PipelineBase
 """
 Generate the Annotation data for NEW Clinical Trail
 """
+
 # Reference: B_clinical_trial/init_9_clinical_trail_annotation_generator.py
 
 class NewClinicalTrialAnnotationTask(PipelineBase):
@@ -82,6 +83,7 @@ class NewClinicalTrialAnnotationTask(PipelineBase):
             self.logger.error(f"Error loading scispaCy models: {e}")
             self.logger.error("Please ensure all models are installed correctly using the pip commands provided in the comments.")
             return None, None, None, None
+        
         except ValueError as e:
             self.logger.error(f"Pipeline configuration error: {e}")
             self.logger.error("This might be due to incorrect component names or order.")
@@ -90,6 +92,7 @@ class NewClinicalTrialAnnotationTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
+        
         fetch_cursor = None
 
         try:
