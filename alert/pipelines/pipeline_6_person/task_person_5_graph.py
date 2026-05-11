@@ -84,7 +84,7 @@ class NewPersonAgentGraphTask(PipelineBase):
         CALL {{
             WITH a, relation
             WHERE relation.source = '{PUBLICATION}'
-            MERGE (t: Article {{pubmedId: relation.pubmedId}})
+            MATCH (t: Article {{pubmedId: relation.pubmedId}})
             MERGE (t)-[:has_author]->(a)
         }}
 

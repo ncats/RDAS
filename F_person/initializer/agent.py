@@ -87,7 +87,7 @@ class AgentInitializer(InitBase):
             CALL {{
                 WITH a, relation
                 WHERE relation.source = '{publication}'
-                MERGE (t: Article {{pubmedId: relation.pubmedId}})
+                MATCH (t: Article {{pubmedId: relation.pubmedId}})
                 MERGE (t)-[r:has_author]->(a) 
             }}
             
@@ -221,7 +221,11 @@ class AgentInitializer(InitBase):
                             relations.append({'applicationId': associate_id, 'relation_type': relation_type, 'source': grant_project})
 
                         elif source == publication:
-                            relations.append({'pubmedId': associate_id, 'relation_type': 'has_author', 'source': publication})
+                            try:
+                                pubmed_id = int(associate_id)
+                                relations.append({'pubmedId': pubmed_id, 'relation_type': 'has_author', 'source': publication})
+                            except (TypeError, ValueError):
+                                self.appender.log_stdout(f'Invalid PubMed ID skipped: {associate_id}')
                     
                         # emails
                         email = _clean(person.get('email'))
