@@ -14,7 +14,7 @@ class PersonWorker:
 
     def __init__(self):
 
-        self.processed_flag = '20260105'
+        self.processed_flag = '20260511'
 
         self.mysql = db().mysql_conn()
         self.person_table = 'person_of_all_sources'    

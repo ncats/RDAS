@@ -56,28 +56,28 @@ class NewPersonAgentGraphTask(PipelineBase):
         CALL {{
             WITH a, relation
             WHERE relation.source = '{CLINICAL_TRIAL}' AND relation.relationType = 'has_investigator'
-            MERGE (ct: ClinicalTrial {{nctId: relation.nctId}})
+            MATCH (ct: ClinicalTrial {{nctId: relation.nctId}})
             MERGE (ct)-[:has_investigator]->(a)
         }}
 
         CALL {{
             WITH a, relation
             WHERE relation.source = '{CLINICAL_TRIAL}' AND relation.relationType = 'has_contact'
-            MERGE (ct: ClinicalTrial {{nctId: relation.nctId}})
+            MATCH (ct: ClinicalTrial {{nctId: relation.nctId}})
             MERGE (ct)-[:has_contact]->(a)
         }}
 
         CALL {{
             WITH a, relation
             WHERE relation.source = '{GRANT_PROJECT}' AND relation.relationType = 'has_investigator'
-            MERGE (p: Project {{applicationId: relation.applicationId}})
+            MATCH (p: Project {{applicationId: relation.applicationId}})
             MERGE (p)-[:has_investigator]->(a)
         }}
 
         CALL {{
             WITH a, relation
             WHERE relation.source = '{GRANT_PROJECT}' AND relation.relationType = 'has_contact'
-            MERGE (p: Project {{applicationId: relation.applicationId}})
+            MATCH (p: Project {{applicationId: relation.applicationId}})
             MERGE (p)-[:has_contact]->(a)
         }}
 
@@ -90,9 +90,7 @@ class NewPersonAgentGraphTask(PipelineBase):
 
         WITH a, chunk
         UNWIND chunk.organizations AS org
-        MERGE (o: Organization {{_idx_key: org._idx_key}})
-        ON CREATE SET
-            o.name = org.name
+        MATCH (o: Organization {{_idx_key: org._idx_key}})
         MERGE (a)-[:has_affiliation]->(o)
     '''
 
