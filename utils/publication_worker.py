@@ -15,16 +15,30 @@ from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv() 
 
+from utils.applogger import AppLogger
 from utils.tools import  _normalize_txt
 
 
 class PublicationWorker:
 
 
-    def __init__(self):  
+    def __init__(self, logger=None):
 
         self.base_url = os.getenv('EURO_PEPMC_SERVICE_URL') 
         self.chars_to_remove = "!@#$%^&*()_+-={}[]|\\:;\"'<>,.?/`~"
+        self.logger = logger or self._create_logger()
+
+
+    def _create_logger(self):
+        '''
+        Keep utility logs in the same home-directory alert log folder used by PipelineBase, and expand "~" before passing the path to FileHandler.
+        '''
+        log_dir = os.path.expanduser('~/rdas-memgraph-alert-log')
+        os.makedirs(log_dir, exist_ok=True)
+        return AppLogger(
+            type(self).__name__,
+            f"{log_dir}/alert-{type(self).__name__}.log"
+        ).get_logger()
 
 
     def _check_key_value(self, obj, key):
@@ -45,6 +59,10 @@ class PublicationWorker:
         
     def download_by_pmid(self,pmid):
         #https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID:5770408&resultType=core&format=json&pageSize=1000    
+        if not self.base_url:
+            self.logger.error("EURO_PEPMC_SERVICE_URL is not configured. Cannot download pubmed_id=%s.", pmid)
+            return None
+
         url = f"{self.base_url}?query=EXT_ID:{pmid}&resultType=core&format=json"
         
         retries = 0
@@ -58,16 +76,24 @@ class PublicationWorker:
                 
                     resultList = bigObj['resultList']['result']
                     if len(resultList) <= 0:
+                        self.logger.error("No Europe PMC result found for pubmed_id=%s. url=%s", pmid, url)
                         break
 
+                    has_pubmed_result = False
                     for result in resultList:
                         if 'pmid' not in result:
                             continue
                             
                         pubmed_id  = result['pmid']
+                        has_pubmed_result = True
 
                         # The query returned more other pubmed_id(s)
                         if str(pubmed_id) != str(pmid):
+                            self.logger.info(
+                                "Skipping Europe PMC result for requested pubmed_id=%s because returned pmid=%s.",
+                                pmid,
+                                pubmed_id
+                            )
                             continue
 
                         source = _normalize_txt(result['source']) if 'source' in result else None
@@ -91,7 +117,7 @@ class PublicationWorker:
                         if abstract_text:
                             abstract_text = abstract_text.strip(self.chars_to_remove)
 
-                        print(f'pubmed_id = {pubmed_id}\t{publication_year}\t{doi}')
+                        self.logger.info(f'pubmed_id = {pubmed_id}\t{publication_year}\t{doi}')
 
                         '''
                         pubmed_id, doi, title, abstract_text, affiliation,
@@ -105,20 +131,41 @@ class PublicationWorker:
 
                         return val 
 
+                    if has_pubmed_result:
+                        self.logger.error(
+                            "Europe PMC returned results, but none matched requested pubmed_id=%s. url=%s",
+                            pmid,
+                            url
+                        )
+                    else:
+                        self.logger.error(
+                            "Europe PMC results did not include a pmid field for requested pubmed_id=%s. url=%s",
+                            pmid,
+                            url
+                        )
+
                 except KeyError as e:
-                    print(f'KeyError: {e}\n{url}')
+                    self.logger.error(f'KeyError while parsing pubmed_id={pmid}: {e}\n{url}')
                 except TypeError as e:
-                    print(f'TypeError: {e}\n{url}')
+                    self.logger.error(f'TypeError while parsing pubmed_id={pmid}: {e}\n{url}')
                 except AttributeError as e:
-                    print(f'AttributeError: {e}\n{url}')
+                    self.logger.error(f'AttributeError while parsing pubmed_id={pmid}: {e}\n{url}')
+                except ValueError as e:
+                    self.logger.error(f'ValueError while parsing pubmed_id={pmid}: {e}\n{url}')
                 
                 break  # Exit the loop if successful
             except requests.exceptions.Timeout:
                 retries += 1
+                self.logger.error(
+                    "Timeout downloading pubmed_id=%s from Europe PMC. attempt=%s/%s url=%s",
+                    pmid,
+                    retries,
+                    max_retries,
+                    url
+                )
                 time.sleep(1)
             except requests.exceptions.RequestException as e:
+                self.logger.error(f'RequestException downloading pubmed_id={pmid}: {e}\n{url}')
                 break  # Exit the loop for non-retryable errors
 
         return None
-
- 
