@@ -261,7 +261,7 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
                     insert_cursor.executemany(insert_sql, val_list)
                     self.mysql.commit()  
                     self.logger.info(f'Inserted {len(val_list)} rows into publication_pubtator table. Current total count = {count}')
-                    self.logger.info('\n'.join(str(pubmed_id) for pubmed_id in pubmed_id_list))
+                    self.logger.info(', '.join(str(pubmed_id) for pubmed_id in pubmed_id_list))
      
                 except Exception as e:
                     self.logger.error(f'{e}') 
