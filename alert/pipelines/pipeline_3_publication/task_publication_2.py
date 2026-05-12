@@ -197,7 +197,7 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
     # implement
     def process_new_data(self) -> None:
         
-        fetch_is_new_query = f'SELECT id, pubmed_id, title, abstract_text FROM publication_article WHERE is_new = 1'
+        fetch_is_new_query = f'SELECT id, pubmed_id, title, abstract_text FROM publication_article WHERE is_EPI is null AND is_new = 1'
 
         update_sql = " UPDATE publication_article SET is_EPI = %s, is_NHS = %s, epi_probability =%s, epi_extract = %s WHERE pubmed_id = %s "
 

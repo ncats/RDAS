@@ -75,8 +75,7 @@ class PublicationOminDataRetrievalTask(PipelineBase):
                 ON pgom.omim_id = po.omim_id
 
             WHERE po.omim_id IS NULL
-            -- AND pgom.is_new = 1
-
+            AND pgom.is_new = 1
             ORDER BY pgom.omim_id;
         '''
 
