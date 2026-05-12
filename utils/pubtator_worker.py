@@ -4,13 +4,17 @@ import json
 # Add the project root to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
    
+from dotenv import load_dotenv
 from utils.https_request import HTTPSUtils as HttpsUtil
 from utils.applogger import AppLogger
+
+load_dotenv()
 
 class PubtatorWorker:
 
     def __init__(self, logger=None):
         self.logger = logger or self._create_logger()
+        self.base_url = os.getenv("PUBTATOR_SERVICE_URL")
 
 
     def _create_logger(self):
@@ -48,14 +52,17 @@ class PubtatorWorker:
 
     def download_by_pmid(self,pmid):
 
-        ''' Check pubtator by PMID, https://www.ncbi.nlm.nih.gov/research/pubtator3/ '''
+        ''' Check PubTator by PMID. '''
 
         if not pmid:
             self.logger.error("Cannot download PubTator data because pubmed_id is empty.")
             return (pmid, None)
 
-        #url = f'https://www.ncbi.nlm.nih.gov/research/pubtator-api/publications/export/biocjson?pmids={pmid}'
-        url = f'https://www.ncbi.nlm.nih.gov/research/pubtator3-api/publications/export/biocjson?pmids={pmid}'
+        if not self.base_url:
+            self.logger.error("PUBTATOR_SERVICE_URL is not configured. Cannot download pubmed_id=%s.", pmid)
+            return (pmid, None)
+
+        url = f'{self.base_url}?pmids={pmid}'
 
         source_json = self._get_pubtator_json(url)
             
