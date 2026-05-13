@@ -28,7 +28,7 @@ the matching Article nodes with:
 class NewPublicationSubstanceGraphTask(PipelineBase):
     """Create Substance nodes and link them to new Article nodes."""
 
-    BATCH_SIZE = 100
+    BATCH_SIZE = 50
 
     # One Substance chunk can point to multiple Article nodes. MERGE keeps the
     # Substance node stable, while ON MATCH only fills missing name/registry data.
@@ -64,8 +64,7 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
         MERGE (a)-[:has_substance]->(s)
     '''
 
-    # Start from distinct substance hashes so all article links for the same
-    # substance are grouped before writing to Memgraph.
+    # Start from distinct substance hashes so all article links for the same substance are grouped before writing to Memgraph.
     FETCH_NEW_HASH_IDS_QUERY = '''
         SELECT DISTINCT ps.hash_id
         FROM publication_substance AS ps
