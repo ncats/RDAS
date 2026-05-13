@@ -25,7 +25,7 @@ and link each MeshTerm to the matching Article with has_mesh_term.
 class NewPublicationMeshTermGraphTask(PipelineBase):
     """Create MeshTerm nodes and Article relationships for new publications."""
 
-    BATCH_SIZE = 200
+    BATCH_SIZE = 50
 
     # Each chunk represents one Article with zero or more MeSH descriptors.
     # UNWIND expands those descriptors into individual MeshTerm nodes and links.

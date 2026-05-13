@@ -32,7 +32,7 @@ class NewPublicationArticleNodeAttrsUpdateTask(PipelineBase):
     attributes that come from nested publication metadata.
     """
 
-    BATCH_SIZE = 200
+    BATCH_SIZE = 50
 
     # This task updates existing Article nodes only; it does not create Article
     # nodes if the PubMed ID is missing from Memgraph.

@@ -26,7 +26,7 @@ matching Article node to the Journal with has_journal.
 class NewPublicationJournalGraphTask(PipelineBase):
     """Create Journal graph records for newly staged publication articles."""
 
-    BATCH_SIZE = 100
+    BATCH_SIZE = 50
 
     # Journal identity follows the initializer logic: use title when ISSN/eISSN
     # are missing, otherwise use the ISSN/eISSN pair so shared journals collapse

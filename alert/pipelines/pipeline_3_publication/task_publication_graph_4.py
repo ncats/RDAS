@@ -31,7 +31,7 @@ class NewPublicationKeywordGraphTask(PipelineBase):
     those keyword values and links them to the Article node identified by PubMed ID.
     """
 
-    BATCH_SIZE = 200
+    BATCH_SIZE = 50
 
     # Keyword nodes are reused by keyword text, so multiple articles can point
     # to the same normalized Keyword node.
