@@ -29,13 +29,14 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
-    # StudyDesign nodes are keyed per trial so the same study design is not
-    # created again if this task is rerun for the same NCT ID.
+    # The bulk initializer creates one StudyDesign node per trial. Since this
+    # node does not have a persisted key property, CREATE must be followed by
+    # SET, not ON CREATE SET.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
-        MERGE (y:StudyDesign {nctId: chunk.nctId})
-        ON CREATE SET
+        CREATE (y:StudyDesign)
+        SET
             y.designAllocation = chunk.allocation,
             y.designInterventionModel = chunk.interventionModel,
             y.designInterventionModelDescription = chunk.interventionModelDescription,
