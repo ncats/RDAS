@@ -27,7 +27,7 @@ class NewPublicationArticleGraphTask(PipelineBase):
     properties, and creates nodes keyed by PubMed ID.
     """
 
-    BATCH_SIZE = 300
+    BATCH_SIZE = 50
 
     '''
     Create Article nodes only when the PubMed ID does not already exist.
@@ -67,7 +67,6 @@ class NewPublicationArticleGraphTask(PipelineBase):
             has_PDF, pub_type
         FROM publication_article
         WHERE is_new = 1
-        AND pubmed_id IS NOT NULL
     '''
 
     def __init__(self):

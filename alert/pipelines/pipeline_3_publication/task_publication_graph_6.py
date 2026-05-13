@@ -45,8 +45,6 @@ class NewPublicationMeshTermGraphTask(PipelineBase):
             pubmed_id, source_json
         FROM publication_article
         WHERE is_new = 1
-        AND pubmed_id IS NOT NULL
-        AND source_json IS NOT NULL
     '''
 
     def __init__(self):

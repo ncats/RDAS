@@ -51,8 +51,6 @@ class NewPublicationKeywordGraphTask(PipelineBase):
             pubmed_id, source_json
         FROM publication_article
         WHERE is_new = 1
-        AND pubmed_id IS NOT NULL
-        AND source_json IS NOT NULL
     '''
 
     def __init__(self):
@@ -91,8 +89,7 @@ class NewPublicationKeywordGraphTask(PipelineBase):
                 chunks = []
 
                 for row in rows:
-                    # Build one article-to-keywords chunk from the nested
-                    # source_json keyword payload.
+                    # Build one article-to-keywords chunk from the nested source_json keyword payload.
                     keyword_chunk = self._create_keyword_chunk(row)
 
                     if keyword_chunk is None:

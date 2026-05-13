@@ -61,7 +61,6 @@ class NewPublicationEpidemiologyGraphTask(PipelineBase):
             epi_extract
         FROM publication_article
         WHERE is_new = 1
-        AND pubmed_id IS NOT NULL
         AND epi_extract IS NOT NULL
         AND (
             is_EPI = 1

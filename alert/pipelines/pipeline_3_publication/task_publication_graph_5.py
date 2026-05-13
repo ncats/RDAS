@@ -67,9 +67,7 @@ class NewPublicationJournalGraphTask(PipelineBase):
             pubmed_id,
             source_json
         FROM publication_article
-        WHERE is_new = 1
-        AND pubmed_id IS NOT NULL
-        AND source_json IS NOT NULL
+        WHERE is_new = 1 
     '''
 
     def __init__(self):
