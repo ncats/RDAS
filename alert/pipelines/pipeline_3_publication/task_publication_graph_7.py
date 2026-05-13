@@ -23,7 +23,7 @@ to the existing GARD node countEpiArticles and countNhsArticles properties.
 class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
     """Increment GARD EPI/NHS publication counters from new publication articles."""
 
-    BATCH_SIZE = 300
+    BATCH_SIZE = 100
 
     ''' Implements an incremental update so it adds new counts to existing GARD node totals instead of overwriting them'''
     BATCH_UPDATE = '''
@@ -34,12 +34,12 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
             d.countNhsArticles = coalesce(d.countNhsArticles, 0) + chunk.countNhsArticles
     '''
 
-    # Start from the mapping table so only GARD nodes touched by new PubMed
-    # articles are counted and updated.
+    # Start from new publication rows, then find the touched GARD IDs through
+    # the mapping table.
     FETCH_GARD_IDS_QUERY = '''
         SELECT DISTINCT pgspm.gard_id
-        FROM publication_gard_searchterm_pubmed_mapping AS pgspm
-        INNER JOIN publication_article AS pa
+        FROM publication_article AS pa
+        INNER JOIN publication_gard_searchterm_pubmed_mapping AS pgspm
             ON pa.pubmed_id = pgspm.pubmed_id
         WHERE pa.is_new = 1
     '''
@@ -60,6 +60,7 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
         gard_cursor = None
         count_cursor = None
         total = 0
+        batch_num = 0
 
         try:
             gard_cursor = self.mysql.cursor(dictionary=True, buffered=True)
@@ -73,6 +74,9 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
                 if not rows:
                     self.logger.info("No more rows to fetch.")
                     break
+                
+                batch_num += 1
+                self.logger.info(f"--- batch# = {batch_num} ---")
 
                 gard_ids = [row["gard_id"] for row in rows if row.get("gard_id")]
 
@@ -83,7 +87,7 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
                 # Count EPI/NHS flags for this batch of GARD IDs before sending
                 # the compact counter deltas to Memgraph.
                 chunks = self._get_epi_nhs_count_chunks(count_cursor, gard_ids)
-
+                print(f'# of chunks = {len(chunks)}')
                 if not chunks:
                     self.logger.info("No EPI/NHS count chunks to update in Memgraph.")
                     continue
@@ -116,20 +120,41 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
 
         placeholders = ",".join(["%s"] * len(gard_ids))
 
-        # The flags can arrive as numbers or strings, so the SUM expressions
-        # normalize common truthy values while grouping by GARD ID.
+        # The mapping table can contain multiple rows for the same
+        # gard_id/pubmed_id through different search terms. Count distinct
+        # article mappings first, then join to new articles so each PMID only
+        # contributes once per GARD ID.
         count_query = f'''
+        
             SELECT
-                pgspm.gard_id,
-                COUNT(pa.pubmed_id) AS total_articles,
-                SUM(pa.is_EPI = 1 OR pa.is_EPI = '1' OR LOWER(pa.is_EPI) = 'true') AS countEpiArticles,
-                SUM(pa.is_NHS = 1 OR pa.is_NHS = '1' OR LOWER(pa.is_NHS) = 'true') AS countNhsArticles
-            FROM publication_gard_searchterm_pubmed_mapping AS pgspm
-            INNER JOIN publication_article AS pa
-                ON pa.pubmed_id = pgspm.pubmed_id
-            WHERE pa.is_new = 1
-            AND pgspm.gard_id IN ({placeholders})
-            GROUP BY pgspm.gard_id
+                mapping.gard_id,
+                COUNT(mapping.pubmed_id) AS total_articles,
+                SUM(article.is_epi) AS countEpiArticles,
+                SUM(article.is_nhs) AS countNhsArticles
+
+            FROM                 
+                (
+                    SELECT DISTINCT gard_id, pubmed_id
+                    FROM publication_gard_searchterm_pubmed_mapping
+                    WHERE gard_id IN ({placeholders})
+                    AND pubmed_id IS NOT NULL 
+                ) AS mapping
+
+                INNER JOIN 
+                
+                (
+                    SELECT
+                        pubmed_id,
+                        MAX(LOWER(COALESCE(is_EPI, '')) IN ('1', 'true')) AS is_epi,
+                        MAX(LOWER(COALESCE(is_NHS, '')) IN ('1', 'true')) AS is_nhs
+                    FROM publication_article
+                    WHERE is_new = 1
+                    GROUP BY pubmed_id 
+                ) AS article
+
+                ON article.pubmed_id = mapping.pubmed_id
+                
+            GROUP BY mapping.gard_id
         '''
 
         cursor.execute(count_query, gard_ids)

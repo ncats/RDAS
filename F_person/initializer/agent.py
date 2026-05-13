@@ -56,47 +56,62 @@ class AgentInitializer(InitBase):
                 a.contactEmail = chunk.contactEmail
 
             WITH a, chunk
-            UNWIND chunk.relations AS relation
-            
             CALL {{
+                WITH a, chunk
+                UNWIND chunk.organizations AS org
+                MATCH (o:Organization {{_idx_key: org._idx_key}})
+                MERGE (a)-[:has_affiliation]->(o)
+            }}
+
+            WITH a, chunk
+            CALL {{
+                WITH a, chunk
+                UNWIND chunk.relations AS relation
                 WITH a, relation
                 WHERE relation.source = '{clinical_trial}' AND relation.relation_type = 'has_investigator'
                 MATCH (ct: ClinicalTrial {{nctId: relation.nctId}})
                 MERGE (ct)-[r:has_investigator]->(a) 
             }}
 
+            WITH a, chunk
             CALL {{
+                WITH a, chunk
+                UNWIND chunk.relations AS relation
                 WITH a, relation
                 WHERE relation.source = '{clinical_trial}' AND relation.relation_type = 'has_contact'
                 MATCH (ct: ClinicalTrial {{nctId: relation.nctId}})
                 MERGE (ct)-[r:has_contact]->(a) 
             }}
             
+            WITH a, chunk
             CALL {{
+                WITH a, chunk
+                UNWIND chunk.relations AS relation
                 WITH a, relation
                 WHERE relation.source = '{grant_project}' AND relation.relation_type = 'has_investigator'
                 MATCH (p: Project {{applicationId: relation.applicationId}})
                 MERGE (p)-[r:has_investigator]->(a) 
             }}
 
+            WITH a, chunk
             CALL {{
+                WITH a, chunk
+                UNWIND chunk.relations AS relation
                 WITH a, relation
                 WHERE relation.source = '{grant_project}' AND relation.relation_type = 'has_contact'
                 MATCH (p: Project {{applicationId: relation.applicationId}})
                 MERGE (p)-[r:has_contact]->(a) 
             }}
             
+            WITH a, chunk
             CALL {{
+                WITH a, chunk
+                UNWIND chunk.relations AS relation
                 WITH a, relation
                 WHERE relation.source = '{publication}'
                 MATCH (t: Article {{pubmedId: relation.pubmedId}})
                 MERGE (t)-[r:has_author]->(a) 
             }}
-            
-            WITH a, chunk
-            UNWIND chunk.organizations AS org
-            MATCH (o:Organization {{_idx_key: org._idx_key}})
-            MERGE (a)-[:has_affiliation]->(o)            
         '''
 
         # init

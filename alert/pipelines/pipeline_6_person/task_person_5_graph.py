@@ -51,47 +51,62 @@ class NewPersonAgentGraphTask(PipelineBase):
             a.lastUpdatedByRDAS = chunk.formattedToday
 
         WITH a, chunk
-        UNWIND chunk.relations AS relation
-
         CALL {{
+            WITH a, chunk
+            UNWIND chunk.organizations AS org
+            MATCH (o: Organization {{_idx_key: org._idx_key}})
+            MERGE (a)-[:has_affiliation]->(o)
+        }}
+
+        WITH a, chunk
+        CALL {{
+            WITH a, chunk
+            UNWIND chunk.relations AS relation
             WITH a, relation
             WHERE relation.source = '{CLINICAL_TRIAL}' AND relation.relationType = 'has_investigator'
             MATCH (ct: ClinicalTrial {{nctId: relation.nctId}})
             MERGE (ct)-[:has_investigator]->(a)
         }}
 
+        WITH a, chunk
         CALL {{
+            WITH a, chunk
+            UNWIND chunk.relations AS relation
             WITH a, relation
             WHERE relation.source = '{CLINICAL_TRIAL}' AND relation.relationType = 'has_contact'
             MATCH (ct: ClinicalTrial {{nctId: relation.nctId}})
             MERGE (ct)-[:has_contact]->(a)
         }}
 
+        WITH a, chunk
         CALL {{
+            WITH a, chunk
+            UNWIND chunk.relations AS relation
             WITH a, relation
             WHERE relation.source = '{GRANT_PROJECT}' AND relation.relationType = 'has_investigator'
             MATCH (p: Project {{applicationId: relation.applicationId}})
             MERGE (p)-[:has_investigator]->(a)
         }}
 
+        WITH a, chunk
         CALL {{
+            WITH a, chunk
+            UNWIND chunk.relations AS relation
             WITH a, relation
             WHERE relation.source = '{GRANT_PROJECT}' AND relation.relationType = 'has_contact'
             MATCH (p: Project {{applicationId: relation.applicationId}})
             MERGE (p)-[:has_contact]->(a)
         }}
 
+        WITH a, chunk
         CALL {{
+            WITH a, chunk
+            UNWIND chunk.relations AS relation
             WITH a, relation
             WHERE relation.source = '{PUBLICATION}'
             MATCH (t: Article {{pubmedId: relation.pubmedId}})
             MERGE (t)-[:has_author]->(a)
         }}
-
-        WITH a, chunk
-        UNWIND chunk.organizations AS org
-        MATCH (o: Organization {{_idx_key: org._idx_key}})
-        MERGE (a)-[:has_affiliation]->(o)
     '''
 
     # Only new person rows are read, and only after grouping has assigned an
