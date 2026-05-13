@@ -38,7 +38,7 @@ class ClinicalTrialToGARDMappingInitializer(InitBase):
             UNWIND $chunks AS chunk
             MATCH (x: GARD {gardId: chunk.gardId})
             MATCH (y: ClinicalTrial {nctId: chunk.nctId})
-            MERGE (x)<-[:mapped_to_gard {matchedTermRDAS: chunk.disease}]-(y)
+            MERGE (x)<-[:has_clinical_trial {matchedTermRDAS: chunk.disease}]-(y)
         '''
         start = time.time()
 
@@ -84,4 +84,4 @@ class ClinicalTrialToGARDMappingInitializer(InitBase):
         hours, minutes, seconds = _time_hms(elapsed_time)
 
         self.appender.log_stdout(f'\n\n{"="*50} All done! Total time elapsed: {hours} hours, {minutes} minutes, {seconds} seconds {"="*50}\n\n') 
-        self.appender.close() 
+        self.appender.close()

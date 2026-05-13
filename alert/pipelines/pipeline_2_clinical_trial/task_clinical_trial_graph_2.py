@@ -49,7 +49,7 @@ class NewClinicalTrialGardRelationshipTask(PipelineBase):
             UNWIND $chunks AS chunk
             MATCH (x: GARD {gardId: chunk.gardId})
             MATCH (y: ClinicalTrial {nctId: chunk.nctId})
-            MERGE (x)<-[:mapped_to_gard {matchedTermRDAS: chunk.disease}]-(y)
+            MERGE (x)<-[:has_clinical_trial {matchedTermRDAS: chunk.disease}]-(y)
         '''
 
         # clinical_trial can contain multiple GARD matches per NCT ID; is_new

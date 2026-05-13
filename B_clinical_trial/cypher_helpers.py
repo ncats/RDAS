@@ -273,7 +273,7 @@ def cypher_ClinicalTrial(nctid, study, gard_id, term_matched):
         SET {set_items},            
             y.Phase = "{ _clean(phase_parse)}"
 
-        MERGE (x)<-[:mapped_to_gard {{MatchedTermRDAS: "{term_matched}"}}]-(y)
+        MERGE (x)<-[:has_clinical_trial {{MatchedTermRDAS: "{term_matched}"}}]-(y)
         RETURN id(y) AS ct_id
     ''' 
     return query
@@ -284,7 +284,7 @@ def cypher_ClinicalTrial_map_to_GARD(gardid, nctid, term_matched):
     query = f'''
             MATCH (x:GARD {{GardId: "{gardid}"}})
             MATCH (y:ClinicalTrial {{NCTId: "{nctid}"}})
-            MERGE (x)<-[:mapped_to_gard {{MatchedTermRDAS: "{term_matched}"}}]-(y)
+            MERGE (x)<-[:has_clinical_trial {{MatchedTermRDAS: "{term_matched}"}}]-(y)
             '''
     return query
     
@@ -464,7 +464,7 @@ def cypher_Condition(study):
         query = f"""
             MATCH (x:ClinicalTrial) WHERE x.NCTId = "{nctid}"
             MERGE (y:Condition {{Condition: "{condition_normalized}"}})
-            MERGE (x)-[:investigates_condition]->(y)
+            MERGE (x)-[:has_investigated_condition]->(y)
             RETURN y AS cond, id(y) AS cond_id
         """ 
 
@@ -481,7 +481,7 @@ def cypher_Condition_mapping(cond_internal_id, condition_normalized, gard_id_nam
                 query = f"""
                     MATCH (x:GARD) WHERE x.GardId = "{gardid}"
                     MATCH (y:Condition) WHERE id(y) = {cond_internal_id}
-                    MERGE (y)-[:mapped_to_gard]->(x)
+                    MERGE (y)-[:has_mapped_condition]->(x)
                     return y
                 """
                 yield query 

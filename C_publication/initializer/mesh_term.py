@@ -43,7 +43,7 @@ class MeshTermInitializer(InitBase):
 
             UNWIND chunk.meshTerms AS meshTerm
             MERGE (m: MeshTerm {meshTerm: meshTerm})
-            MERGE (m)-[r: mesh_term_for]->(p) 
+            MERGE (m)-[r: has_mesh_term]->(p)
         '''         
   
         id_ranges = _id_range_generator(min_id, max_id, step, batch_size)
@@ -83,7 +83,6 @@ class MeshTermInitializer(InitBase):
                     raise 
 
             self.update_processed_flag(start_id, end_id, self.processed_flag)
- 
             self.appender.log_stdout(f'{_curr_timestamp()} [total: {_count}], [flag: {self.processed_flag}], Id range: {start_id} - {end_id}, #chunks = {len(chunks)}')
  
         self.close_mysql_conn() 
@@ -158,5 +157,3 @@ class MeshTermInitializer(InitBase):
                 mesh_terms_list.append(descriptor_name)
 
         return mesh_terms_list
-
- 

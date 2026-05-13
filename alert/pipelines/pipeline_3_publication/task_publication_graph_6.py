@@ -16,7 +16,7 @@ Create MeshTerm nodes for new publication articles.
 
 For each new row in publication_article (is_new = 1), parse
 source_json.meshHeadingList.meshHeading[].descriptorName, create MeshTerm nodes,
-and link each MeshTerm to the matching Article with mesh_term_for.
+and link each MeshTerm to the matching Article with has_mesh_term.
 """
 
 # Reference: C_publication/initializer/mesh_term.py
@@ -35,7 +35,7 @@ class NewPublicationMeshTermGraphTask(PipelineBase):
 
         UNWIND chunk.meshTerms AS meshTerm
         MERGE (m:MeshTerm {meshTerm: meshTerm})
-        MERGE (m)-[:mesh_term_for]->(p)
+        MERGE (m)-[:has_mesh_term]->(p)
     '''
 
     # MeSH headings live inside source_json, so only rows with publication JSON

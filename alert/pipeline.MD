@@ -258,13 +258,13 @@ Tasks, in order:
 4. `NewPublicationKeywordGraphTask`
    - Creates `Keyword` nodes and Article keyword links.
 5. `NewPublicationJournalGraphTask`
-   - Creates `Journal` nodes and `published_in` links.
+   - Creates `Journal` nodes and `has_journal` links.
 6. `NewPublicationMeshTermGraphTask`
    - Creates `MeshTerm` nodes and Article MeSH links.
 7. `GardPublicationEpiNhsCountUpdateTask`
    - Increments GARD EPI/NHS article counters for new articles.
 8. `NewPublicationGardArticleRelationshipTask`
-   - Creates GARD to Article `mentioned_in` relationships.
+   - Creates GARD to Article `has_mention_in` relationships.
 9. `NewPublicationPubtatorGraphTask`
    - Creates PubTator annotation nodes and Article annotation links.
 10. `NewPublicationSubstanceGraphTask`

@@ -44,14 +44,14 @@ class ConditionInitializer(InitBase):
             UNWIND condition_gard_mappings AS mapping
             
             MERGE (con: Condition {condition: mapping.condition})
-            MERGE (ct)-[:investigates_condition]->(con)
+            MERGE (ct)-[:has_investigated_condition]->(con)
             
             WITH con, mapping.gardid_list AS gardid_list
             WHERE gardid_list IS NOT NULL AND size(gardid_list) > 0
             
             UNWIND gardid_list AS gardId
             MATCH (g: GARD {gardId: gardId})
-            MERGE (con)-[:mapped_to_gard]->(g)
+            MERGE (con)-[:has_mapped_condition]->(g)
         '''
         
         # O(1) performance

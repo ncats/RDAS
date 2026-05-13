@@ -19,6 +19,8 @@ class AgentInitializer(InitBase):
 
         super().__init__('person_of_all_sources', 'Agent')
 
+        self.processed_flag = '20260511'
+
         class_name = type(self).__name__
         self.log_file = f'{self.log_dir}/2-{class_name}-{_date_string()}.log'
         self.appender = FileAppender(self.log_file)

@@ -17,7 +17,7 @@ Create Journal nodes for new publication articles.
 
 For each new row in publication_article (is_new = 1), parse
 source_json.journalInfo.journal, create/merge the Journal node, and link the
-matching Article node to the Journal with published_in.
+matching Article node to the Journal with has_journal.
 """
 
 # Reference: C_publication/initializer/journal.py
@@ -46,7 +46,7 @@ class NewPublicationJournalGraphTask(PipelineBase):
                 j.issn = item.journal.issn,
                 j.essn = item.journal.essn,
                 j.nlmid = item.journal.nlmid
-            MERGE (a)-[:published_in]->(j)
+            MERGE (a)-[:has_journal]->(j)
             RETURN j
             UNION
             WITH item, a
@@ -55,7 +55,7 @@ class NewPublicationJournalGraphTask(PipelineBase):
             ON CREATE SET
                 j.title = item.journal.title,
                 j.nlmid = item.journal.nlmid
-            MERGE (a)-[:published_in]->(j)
+            MERGE (a)-[:has_journal]->(j)
             RETURN j
         }
     '''
@@ -155,7 +155,7 @@ class NewPublicationJournalGraphTask(PipelineBase):
             return None
 
         # PubMed article metadata stores journal details in a nested object;
-        # articles without journal data cannot form a published_in relationship.
+        # articles without journal data cannot form a has_journal relationship.
         journal = (source_obj.get("journalInfo") or {}).get("journal")
 
         if not journal:

@@ -42,7 +42,7 @@ class GARDToArticleRelationshipInitializer(InitBase):
             UNWIND $relations AS rel
             MATCH(p: Article {pubmedId: rel.pubmedId})
             MATCH (g: GARD {gardId: rel.gardId})
-            MERGE (g)-[:mentioned_in]->(p) 
+            MERGE (g)-[:has_mention_in]->(p)
         '''
 
         id_ranges = _id_range_generator(min_id, max_id, step, batch_size)
@@ -86,4 +86,4 @@ class GARDToArticleRelationshipInitializer(InitBase):
         self.close_mysql_conn()  
 
         self.appender.log_stdout(f'\n{"="*50}{_curr_timestamp()} Done! Total = {_count} {"="*50}\n')
-        self.appender.close()  
+        self.appender.close()

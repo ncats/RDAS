@@ -69,6 +69,10 @@ class ArticleIsGeneReviewUpdater(InitBase):
             return None
         
 
+    def init_nodes(self):
+        self.update()
+
+
     def update(self):
         # Implementation for updating GeneReview status
 

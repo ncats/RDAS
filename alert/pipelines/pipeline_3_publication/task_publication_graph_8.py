@@ -17,7 +17,7 @@ For each publication row in publication_article where is_new = 1, find
 the matching GARD/pubmed mapping in publication_gard_searchterm_pubmed_mapping
 and create the Memgraph relationship:
 
-    (GARD)-[:mentioned_in]->(Article)
+    (GARD)-[:has_mention_in]->(Article)
 
 The mapping table does not have an is_new flag, so publication_article
 is the source of truth for deciding which article relationships are new for
@@ -38,7 +38,7 @@ class NewPublicationGardArticleRelationshipTask(PipelineBase):
         UNWIND $chunks AS chunk
         MATCH (p:Article {pubmedId: chunk.pubmedId})
         MATCH (g:GARD {gardId: chunk.gardId})
-        MERGE (g)-[:mentioned_in]->(p)
+        MERGE (g)-[:has_mention_in]->(p)
     '''
 
     # Newness comes from publication_article. The mapping table provides

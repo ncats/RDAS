@@ -52,7 +52,7 @@ class JournalInitializer(InitBase):
                     j.issn = item.journal.issn,
                     j.essn = item.journal.essn,
                     j.nlmid = item.journal.nlmid
-                MERGE (a)-[:published_in]->(j)
+                MERGE (a)-[:has_journal]->(j)
                 RETURN j
                 UNION
                 WITH item, a
@@ -61,7 +61,7 @@ class JournalInitializer(InitBase):
                 ON CREATE SET 
                     j.title = item.journal.title,
                     j.nlmid = item.journal.nlmid
-                MERGE (a)-[:published_in]->(j)
+                MERGE (a)-[:has_journal]->(j)
                 RETURN j
             }
         '''
@@ -142,4 +142,3 @@ class JournalInitializer(InitBase):
        
         self.appender.log_stdout(f'\n{"="*50}{_curr_timestamp()} Done! Total = {_count} {"="*50}\n')
         self.appender.close()
-  

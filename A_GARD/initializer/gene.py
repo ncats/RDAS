@@ -10,7 +10,7 @@ from baseclass.init_base import InitBase
 
 """
     1. Upload Gene nodes
-    2. Create condition_associated_with_gene relationship from Gene to GARD
+    2. Create has_associated_gene relationship from GARD to Gene
     3. See the previous version: 1_GARD/init_4_GARD_step_4.py
 """
 
@@ -54,7 +54,7 @@ class GeneInitializer(InitBase):
                 d.orphanet = chunk.orphanet,
                 d.umls = chunk.umls
              
-            MERGE (g)-[r:condition_associated_with_gene]->(d)
+            MERGE (g)-[r:has_associated_gene]->(d)
             ON CREATE SET
                 r.Reference = chunk.reference
         '''
