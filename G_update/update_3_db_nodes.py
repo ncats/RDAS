@@ -29,11 +29,11 @@ def run_updaters(stage):
 
         # GARDRelationshipsStatisticsUpdater
 
-        # ArticleIsGeneReviewUpdater,
+        ArticleIsGeneReviewUpdater,
         # EPIAndNHSUpdater
 
-        OrganizationLocationFinder,
-        OrganizationLocationUpdater,
+        #OrganizationLocationFinder,
+        #OrganizationLocationUpdater,
        
     ]
 
