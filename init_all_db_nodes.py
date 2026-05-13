@@ -56,6 +56,9 @@ from D_grant.initializer.core_project_article_relation import CoreProjectToArtic
 from D_grant.initializer.core_project_clinical_trail_relation import CoreProjectClinicalTrialRelationInitializer
 from D_grant.initializer.funding_IC import FundingIcInitializer
 
+from F_person.initializer.agent import AgentInitializer
+
+
 
 if __name__ == '__main__':
 
@@ -125,13 +128,18 @@ if __name__ == '__main__':
         CoreProjectToArticleRelationInitializer,
         CoreProjectClinicalTrialRelationInitializer,
         FundingIcInitializer
+
+        # Person
+        #AgentInitializer
+
     ]
  
 
     # testing
     base_initializers = [  
         #EpiAndNhsCountsInitializer
-        CoreProjectToGARDRelationInitializer
+        #CoreProjectToGARDRelationInitializer
+        AgentInitializer
     ]
 
     for index, InitializerClass in enumerate(base_initializers):
