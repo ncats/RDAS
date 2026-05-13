@@ -10,7 +10,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _clean
+from utils.tools import _clean, _make_hash_key
 
 
 """
@@ -29,17 +29,16 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
-    # PrimaryOutcome nodes are keyed by trial and outcome fields so identical
-    # outcome rows are reused instead of duplicated on rerun.
+    # PrimaryOutcome nodes are keyed by a hashed composite key so reruns can
+    # reuse outcomes without scanning long text fields.
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
-        MERGE (y: PrimaryOutcome {
-            nctId: chunk.nctId,
-            primaryOutcomeMeasure: chunk.measure,
-            primaryOutcomeTimeFrame: chunk.timeFrame,
-            primaryOutcomeDescription: chunk.description
-        })
+        MERGE (y: PrimaryOutcome {_composite_key: chunk._composite_key})
+        ON CREATE SET
+            y.primaryOutcomeMeasure = chunk.measure,
+            y.primaryOutcomeTimeFrame = chunk.timeFrame,
+            y.primaryOutcomeDescription = chunk.description
 
         MERGE (x)-[:has_outcome]->(y)
     '''
@@ -129,11 +128,17 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
             if not isinstance(outcome, dict):
                 continue
 
+            measure = _clean(outcome.get('measure', ''))
+            time_frame = _clean(outcome.get('timeFrame', ''))
+            description = _clean(outcome.get('description', ''))
+            composite_key = _make_hash_key(f"{nctid}|{measure}|{time_frame}|{description}")
+
             chunks.append({
                 "nctId": nctid,
-                "measure": _clean(outcome.get('measure', '')),
-                "timeFrame": _clean(outcome.get('timeFrame', '')),
-                "description": _clean(outcome.get('description', ''))
+                "_composite_key": composite_key,
+                "measure": measure,
+                "timeFrame": time_frame,
+                "description": description
             })
 
         return chunks
