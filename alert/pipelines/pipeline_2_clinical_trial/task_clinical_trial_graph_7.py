@@ -131,7 +131,7 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
             measure = _clean(outcome.get('measure', ''))
             time_frame = _clean(outcome.get('timeFrame', ''))
             description = _clean(outcome.get('description', ''))
-            composite_key = _make_hash_key(f"{nctid}|{measure}|{time_frame}|{description}")
+            composite_key = _make_hash_key(f"{measure}|{time_frame}|{description}")
 
             chunks.append({
                 "nctId": nctid,

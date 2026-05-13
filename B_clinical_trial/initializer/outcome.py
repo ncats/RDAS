@@ -6,7 +6,7 @@ import json
 from baseclass.init_base import InitBase
 from utils.minmaxid import MinMaxIdLoader
 from utils.file_appender import FileAppender
-from utils.tools import  _id_range_generator, _clean, _curr_timestamp, _date_string
+from utils.tools import  _id_range_generator, _clean, _curr_timestamp, _date_string, _make_hash_key
 
 # Create PrimaryOutcome nodes
 class PrimaryOutcomeInitializer(InitBase):
@@ -15,6 +15,7 @@ class PrimaryOutcomeInitializer(InitBase):
     def __init__(self): 
 
         super().__init__('clinical_trial_unique', 'PrimaryOutcome')
+        self.create_indexes('PrimaryOutcome', ['_composite_key'])
         
         class_name = type(self).__name__
         self.log_file = f'{self.log_dir}/2-{class_name}-{_date_string()}.log'
@@ -36,8 +37,8 @@ class PrimaryOutcomeInitializer(InitBase):
         batch_create = '''
             UNWIND $chunks AS chunk
             MATCH (x: ClinicalTrial {nctId: chunk.nctId}) 
-            CREATE (y: PrimaryOutcome)
-            SET 
+            MERGE (y: PrimaryOutcome {_composite_key: chunk._composite_key})
+            ON CREATE SET 
                 y.primaryOutcomeMeasure = chunk.measure,
                 y.primaryOutcomeTimeFrame = chunk.timeFrame,
                 y.primaryOutcomeDescription = chunk.description
@@ -89,13 +90,18 @@ class PrimaryOutcomeInitializer(InitBase):
                     ]
                 '''
                 for outcome in primaryOutcomes:
+                    measure = _clean(outcome.get('measure',''))
+                    timeFrame = _clean(outcome.get('timeFrame',''))
+                    description = _clean( outcome.get('description',''))
+                    _composite_key = _make_hash_key(f"{measure}|{timeFrame}|{description}")
 
                     chunks.append(
                         {   
                             "nctId": nctid,
-                            "measure": _clean(outcome.get('measure','')),
-                            "timeFrame":  _clean(outcome.get('timeFrame','')),
-                            "description":  _clean( outcome.get('description','')) 
+                            "_composite_key": _composite_key,
+                            "measure": measure,
+                            "timeFrame": timeFrame,
+                            "description": description
                         }
                     )
             
