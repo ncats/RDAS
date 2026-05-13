@@ -34,8 +34,8 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
-        MERGE (y:IndividualPatientData {nctId: chunk.nctId})
-        ON CREATE SET
+        CREATE (y:IndividualPatientData)
+        SET
             y.ipdSharing = chunk.IPDSharing,
             y.ipdSharingInfoType = chunk.IPDSharingInfoType,
             y.ipdSharingTimeFrame = chunk.IPDSharingTimeFrame,
