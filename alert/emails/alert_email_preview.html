@@ -1,0 +1,57 @@
+<html>
+<head>
+    <style>
+        body { background-color: white; font-family: Arial, sans-serif; text-align: left; }
+        table { margin: 0; border-collapse: collapse; }
+        table, th, td { border: 1px solid black; }
+        th, td { padding-left: 15px; padding-right: 15px; padding-top: 5px; padding-bottom: 5px; }
+        th { text-align: center; }
+        td { text-align: left; }
+    </style>
+</head>
+
+<body style="text-align: left;">
+
+    <!--
+        1. cd RDASWorkspace/rdas-memgraph
+        2. Run: python3 -m http.server 8000
+        3. http://localhost:8000/alert/emails/alert_email_preview.html
+        4. http://localhost:8000/alert/emails/alert_email_template.html
+    -->
+
+    <h1 style="font-size:50px; color:purple;">Rare Disease Alert System</h1>
+    <!-- <h2></h2> -->
+    <h3>You have 1 new entries for your subscribed rare diseases in the database</h3>
+    <table>
+        <tr>
+            <th>Disease Name</th>
+            <th>GARD ID</th>
+            <!--  -->
+                <!--  -->
+                    <th>New Articles</th>
+                <!--  -->
+            <!--  -->
+        </tr>
+        <!--  -->
+            <!--  -->
+            <!--  -->
+            <!--  -->
+            <!--  -->
+            <!--  -->
+                <tr>
+                    <td><a href="https://rdas.ncats.nih.gov/disease?id=GARD:0007467"> Hutchinson-Gilford progeria syndrome </a></td>
+                    <td>GARD:0007467</td>
+                    <!--  -->
+                        <!--  -->
+                            <td>88</td>
+                        <!--  -->
+                    <!--  -->
+                </tr>
+            <!--  -->
+        <!--  -->
+    </table>
+    <h4>Results gathered within the time period of 2026-05-07 - 2026-05-14</h4>
+
+    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6e/National_Center_for_Advancing_Translational_Sciences_logo.png" alt="Rare Disease Alert System" width="300">
+</body>
+</html>

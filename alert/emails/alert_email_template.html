@@ -1,15 +1,16 @@
 <html>
 <head>
     <style>
-        body { background-color: white; font-family: Arial, sans-serif; }
-        table { margin: auto; border-collapse: collapse; }
+        body { background-color: white; font-family: Arial, sans-serif; text-align: left; }
+        table { margin: 0; border-collapse: collapse; }
         table, th, td { border: 1px solid black; }
         th, td { padding-left: 15px; padding-right: 15px; padding-top: 5px; padding-bottom: 5px; }
-        /* Add more styling as needed */
+        th { text-align: center; }
+        td { text-align: left; }
     </style>
 </head>
 
-<body style="text-align: center;">
+<body style="text-align: left;">
     <h1 style="font-size:50px; color:purple;">Rare Disease Alert System</h1>
     <!-- <h2>{{ data['name'] }}</h2> -->
     <h3>You have {{ data['total'] }} new entries for your subscribed rare diseases in the database</h3>
@@ -17,40 +18,40 @@
         <tr>
             <th>Disease Name</th>
             <th>GARD ID</th>
-            {% for dataset in data['datasets'] %}
-                {% if dataset == 'articles' %}
+            <!-- {% for dataset in data['datasets'] %} -->
+                <!-- {% if dataset == 'articles' %} -->
                     <th>New Articles</th>
-                {% elif dataset == 'trials' %}
+                <!-- {% elif dataset == 'trials' %} -->
                     <th>New Clinical Trials</th>
-                {% elif dataset == 'grants' %}
+                <!-- {% elif dataset == 'grants' %} -->
                     <th>New Fundings</th>
-                {% endif %}
-            {% endfor %}
+                <!-- {% endif %} -->
+            <!-- {% endfor %} -->
         </tr>
-        {% for gard_id, gard_name in data['subscriptions'].items() %}
-            {% set gard_data = data.get(gard_id, {}) %}
-            {% set articles = gard_data.get('articles', 0) %}
-            {% set trials = gard_data.get('trials', 0) %}
-            {% set grants = gard_data.get('grants', 0) %}
-            {% if articles > 0 or trials > 0 or grants > 0 %}
+        <!-- {% for gard_id, gard_name in data['subscriptions'].items() %} -->
+            <!-- {% set gard_data = data.get(gard_id, {}) %} -->
+            <!-- {% set articles = gard_data.get('articles', 0) %} -->
+            <!-- {% set trials = gard_data.get('trials', 0) %} -->
+            <!-- {% set grants = gard_data.get('grants', 0) %} -->
+            <!-- {% if articles > 0 or trials > 0 or grants > 0 %} -->
                 <tr>
                     <td><a href="https://rdas.ncats.nih.gov/disease?id={{ gard_id }}"> {{ gard_name }} </a></td>
                     <td>{{ gard_id }}</td>
-                    {% for dataset in data['datasets'] %}
-                        {% if dataset == 'articles' %}
+                    <!-- {% for dataset in data['datasets'] %} -->
+                        <!-- {% if dataset == 'articles' %} -->
                             <td>{{ articles }}</td>
-                        {% elif dataset == 'trials' %}
+                        <!-- {% elif dataset == 'trials' %} -->
                             <td>{{ trials }}</td>
-                        {% elif dataset == 'grants' %}
+                        <!-- {% elif dataset == 'grants' %} -->
                             <td>{{ grants }}</td>
-                        {% endif %}
-                    {% endfor %}
+                        <!-- {% endif %} -->
+                    <!-- {% endfor %} -->
                 </tr>
-            {% endif %}
-        {% endfor %}
+            <!-- {% endif %} -->
+        <!-- {% endfor %} -->
     </table>
     <h4>Results gathered within the time period of {{ data['update_date_start'] }} - {{ data['update_date_end'] }}</h4>
-    
+
     <img src="https://upload.wikimedia.org/wikipedia/commons/6/6e/National_Center_for_Advancing_Translational_Sciences_logo.png" alt="Rare Disease Alert System" width="300">
 </body>
 </html>
