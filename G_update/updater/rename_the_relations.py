@@ -85,6 +85,10 @@ RELATION_RENAME_SPECS = (
     ("Disease", "mapped_to_gard", "ClinicalTrial", "has_clinical_trial"),
     ("Disease", "mentioned_in", "Article", "has_mention_in"),
     ("Disease", "condition_associated_with_gene", "Gene", "has_associated_gene"),
+    ("ClinicalTrial", "annotated", "Annotation", "has_annotation"),
+    ("ClinicalTrial", "associated_with", "Organization", "has_associated_organization"),
+    ("Project", "has_mention_under", "Disease", "has_researched_disease"),
+    ("Intervention", "mapped_to_rxnorm", "Drug", "has_rxnorm_mapping"),
 )
 
 
