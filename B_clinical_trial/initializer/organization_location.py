@@ -55,7 +55,7 @@ class OrganizationLocationInitializer(InitBase):
                 org.website = '',
                 org.types = []
 
-            MERGE (ct)-[:associated_with]->(org)  
+            MERGE (ct)-[:has_associated_organization]->(org)  
 
             WITH chunk, ct
             UNWIND chunk.locations AS location
@@ -177,7 +177,6 @@ class OrganizationLocationInitializer(InitBase):
 
         self.appender.log_stdout(f'\n{_curr_timestamp()} {"="*50} Done! Total = {total} {"="*50}\n\n')
         self.appender.close()
-
 
 
 

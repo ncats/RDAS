@@ -325,7 +325,7 @@ def cypher_AssociatedEntity(study):
                 EntityType: "{node_type}"
             }})          
 
-            MERGE (x)<-[:associated_with]-(y)
+            MERGE (x)-[:has_associated_organization]->(y)
         """
 
         return query
@@ -678,7 +678,7 @@ def rxnorm_map(intervention):
         query = f'''
                 MERGE (x:Drug {{RxNormID: {rxnormid} }}) 
                 WITH x MATCH (y:Intervention {{InterventionName: "{intervention_name}" }}) 
-                MERGE (y)-[:mapped_to_rxnorm {{WITH_SPACY: {wspacy} }}]->(x)
+                MERGE (y)-[:has_rxnorm_mapping {{WITH_SPACY: {wspacy} }}]->(x)
                 '''
 
         yield query

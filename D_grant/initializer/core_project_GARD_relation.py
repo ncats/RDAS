@@ -6,7 +6,7 @@ from baseclass.init_base import InitBase
 from utils.file_appender import FileAppender
 from utils.tools import _date_string
 
-''' Create Disease-[has_mention_under]->CoreProject relationship '''
+''' Create CoreProject-[has_researched_disease]->Disease relationship '''
 class CoreProjectToGARDRelationInitializer(InitBase):
 
     def __init__(self): 
@@ -31,7 +31,7 @@ class CoreProjectToGARDRelationInitializer(InitBase):
             UNWIND $chunks AS chunk 
             MATCH(disease:GARD {gardId: chunk.gardId}) 
             MATCH(cp:CoreProject {coreProjectNumber: chunk.coreProjectNumber})
-            MERGE (disease)-[:has_mention_under]->(cp)
+            MERGE (cp)-[:has_researched_disease]->(disease)
         '''  
 
         fetch_query = f''' SELECT DISTINCT gard_id, core_project_num 
@@ -83,6 +83,5 @@ class CoreProjectToGARDRelationInitializer(InitBase):
                 fetch_cursor.close()
 
             
-
 
 

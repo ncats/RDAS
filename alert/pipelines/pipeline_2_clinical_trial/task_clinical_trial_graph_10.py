@@ -42,7 +42,7 @@ class NewClinicalTrialAnnotationGraphTask(PipelineBase):
 
         WITH a, chunk
         MATCH (ct: ClinicalTrial {nctId: chunk.nctId})
-        MERGE (ct)-[:annotated]->(a)
+        MERGE (ct)-[:has_annotation]->(a)
     '''
 
     # Join to clinical_trial_unique so graph loading is scoped to newly imported

@@ -44,7 +44,7 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
 
         WITH x, y, chunk
         WHERE y IS NOT NULL
-        MERGE (y)-[:mapped_to_rxnorm {with_spacy: chunk.wspacy}]->(x)
+        MERGE (y)-[:has_rxnorm_mapping {with_spacy: chunk.wspacy}]->(x)
     '''
 
 

@@ -51,7 +51,7 @@ class FundingIcInitializer(InitBase):
                 org.website = '',
                 org.types = []
 
-            MERGE (cp)-[:funded_by]->(org)            
+            MERGE (cp)-[:has_funding_organization]->(org)            
         '''
 
 
@@ -112,7 +112,6 @@ class FundingIcInitializer(InitBase):
 
         self.appender.log_stdout(f'\n{_curr_timestamp()} {"="*50} Done! Total = {total} {"="*50}\n\n')
         self.appender.close()
-
 
 
 

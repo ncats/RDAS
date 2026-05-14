@@ -56,7 +56,7 @@ class CoreProjectToArticleRelationInitializer(InitBase):
             MERGE (cp:CoreProject {coreProjectNumber: chunk.coreProjectNumber})
 
             // Only create relationship if Article exists
-            MERGE (cp)-[:published]->(p)
+            MERGE (cp)-[:has_publication]->(p)
             '''
 
          

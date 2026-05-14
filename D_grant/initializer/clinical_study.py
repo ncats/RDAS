@@ -53,7 +53,7 @@ class ClinicalStudyInitializer(InitBase):
 
             WITH cs, chunk
             MATCH(cp:CoreProject) WHERE cp.coreProjectNumber = chunk.coreProjectNumber
-            MERGE (cp)-[:studied]->(cs)
+            MERGE (cp)-[:has_clinical_trial]->(cs)
         '''  
 
         id_ranges = _id_range_generator(min_id, max_id, step, batch_size)

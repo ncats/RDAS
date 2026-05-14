@@ -44,7 +44,7 @@ class NewClinicalTrialOrganizationLocationGraphTask(PipelineBase):
                 org.website = '',
                 org.types = []
 
-            MERGE (ct)-[:associated_with]->(org)
+            MERGE (ct)-[:has_associated_organization]->(org)
         )
 
         WITH chunk, ct

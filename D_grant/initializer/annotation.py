@@ -51,7 +51,7 @@ class GrantAnnotationInitializer(InitBase):
 
             WITH a, chunk
             MATCH (p: Project {applicationId: chunk.applicationId})
-            MERGE (p)-[:annotated]->(a)                
+            MERGE (p)-[:has_annotation]->(a)                
         '''  
 
         id_ranges = _id_range_generator(min_id, max_id, step, batch_size)

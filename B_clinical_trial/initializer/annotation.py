@@ -52,7 +52,7 @@ class ClinicalTrialAnnotationInitializer(InitBase):
 
             WITH a, chunk
             MATCH (ct: ClinicalTrial {nctId: chunk.nctId})
-            MERGE (ct)-[:annotated]->(a)                
+            MERGE (ct)-[:has_annotation]->(a)                
         '''  
 
         id_ranges = _id_range_generator(min_id, max_id, step, batch_size)

@@ -43,7 +43,7 @@ class CoreProjectClinicalTrialRelationInitializer(InitBase):
             UNWIND $chunks AS chunk 
             MATCH(ct: ClinicalTrial {nctId: chunk.nctId})
             MATCH(cp:CoreProject {coreProjectNumber: chunk.coreProjectNumber})
-            MERGE (cp)-[:studied]->(ct)
+            MERGE (cp)-[:has_clinical_trial]->(ct)
         '''  
 
         id_ranges = _id_range_generator(min_id, max_id, step, batch_size)

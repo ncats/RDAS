@@ -51,7 +51,7 @@ class AgentInitializer(InitBase):
 
             WITH a, chunk
             MATCH (p: Project {applicationId: chunk.applicationId})
-            MERGE (a)-[:funded_by]->(p)                
+            MERGE (p)-[:has_funding_organization]->(a)                
         '''  
 
         id_ranges = _id_range_generator(min_id, max_id, step, batch_size)

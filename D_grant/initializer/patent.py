@@ -64,7 +64,7 @@ class PatentInitializer(InitBase):
             WITH p, chunk 
             MATCH(cp: CoreProject {coreProjectNumber: chunk.coreProjectNumber}) 
 
-            MERGE (cp)-[:patented]->(p)
+            MERGE (cp)-[:has_patent]->(p)
         '''  
 
         id_ranges = _id_range_generator(min_id, max_id, step, batch_size)
