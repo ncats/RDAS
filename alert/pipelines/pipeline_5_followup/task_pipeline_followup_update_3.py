@@ -243,17 +243,51 @@ class OrganizationLocationRorLookupTask(PipelineBase):
         start_time = time.time()
 
         try:
-            for batch_num, batch in self.organization_generator(self.BATCH_SIZE):
+            '''
+            Step 1:
+            Read Organization nodes from Memgraph in small _idx_key-ordered
+            batches. The generator only returns Organization nodes whose ror_id
+            is still blank, so every batch represents graph records that still
+            need either a ROR lookup or a staged MySQL location row.
+            '''
+            for batch_num, batch in self.organization_generator_from_graph_db(self.BATCH_SIZE):
                 batch_start = time.time()
 
+                '''
+                Step 2:
+                Skip defensive empty batches. The generator should normally not
+                yield an empty batch, but this keeps the task safe if its
+                implementation changes later.
+                '''
                 if not batch:
                     self.logger.info(f"Batch #{batch_num}: empty batch, skipped.")
                     continue
 
-                # Only call ROR for graph organizations that are not already in
-                # organization_location; existing rows are re-marked as new.
+                '''
+                Step 3:
+                Collect the graph _idx_key values for this batch. The _idx_key
+                is the stable bridge between Memgraph Organization nodes and
+                organization_location.original_name_in_graph_db_idx_key in
+                MySQL.
+                '''
                 batch_idx_keys = [org["_idx_key"] for org in batch if org.get("_idx_key")]
-                idx_keys_to_process = set(self.find_idx_keys_not_in_db(batch_idx_keys))
+
+                '''
+                Step 4:
+                Compare this batch against organization_location. Only
+                idx_keys_to_process should call the ROR API. If a key already
+                exists in MySQL, the lookup was already attempted or saved, so
+                the task avoids another network request.
+                '''
+                idx_keys_to_process = set(self.find_idx_keys_not_in_msql_db(batch_idx_keys))
+
+                '''
+                Step 5:
+                Identify organizations that already have a MySQL
+                organization_location row. These are not sent to ROR again, but
+                they still need is_new = 1 so the next follow-up task can push
+                their saved details back into Memgraph.
+                '''
                 existing_idx_keys = [
                     idx_key
                     for idx_key in batch_idx_keys
@@ -261,15 +295,33 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                 ]
                 marked_existing_count = self.mark_existing_organization_locations_as_new(existing_idx_keys)
 
+                '''
+                Step 6:
+                Build the ROR request list. Each item must have both a graph
+                _idx_key and a name; without the name there is nothing useful to
+                send to the ROR affiliation endpoint.
+                '''
                 org_list_to_process = [
                     org
                     for org in batch
                     if org.get("_idx_key") in idx_keys_to_process and org.get("name")
                 ]
 
+                '''
+                Step 7:
+                Track how much of the batch was already known before any ROR
+                calls. This is useful for logs and for understanding why a batch
+                may produce few new API lookups.
+                '''
                 already_in_db_count = len(batch_idx_keys) - len(idx_keys_to_process)
                 total_already_in_db += already_in_db_count
 
+                '''
+                Step 8:
+                Log the batch split before making network calls. If the task is
+                slow, this message shows whether time is being spent on ROR
+                lookups or whether most rows were already in MySQL.
+                '''
                 self.logger.info(
                     f"Batch #{batch_num}: graph organizations={len(batch)}, "
                     f"already in DB={already_in_db_count}, "
@@ -277,24 +329,66 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                     f"to query in ROR={len(org_list_to_process)}."
                 )
 
+                '''
+                Step 9:
+                If every graph organization in this batch already had a MySQL
+                row, there is no ROR work left for this batch. Continue to the
+                next Memgraph batch after re-marking existing MySQL rows as new.
+                '''
                 if not org_list_to_process:
                     continue
 
-                # Split the API results into found and not-found lists so both
-                # outcomes are saved and the graph can suppress future misses.
+                '''
+                Step 10:
+                Query ROR in parallel for the organizations that truly need a
+                lookup. The helper returns three lists: found rows to upsert,
+                not-found rows to record in MySQL, and not-found graph keys to
+                mark with ror_id = 'N/A'.
+                '''
                 found_orgs, not_found_orgs, not_found_idx_keys = self.lookup_organizations(org_list_to_process)
 
+                '''
+                Step 11:
+                Save successful ROR matches into organization_location with
+                is_new = 1. The next follow-up task uses these staged rows to
+                update Organization node properties such as ror_id, website,
+                city, country, and coordinates.
+                '''
                 saved_found_count = self.save_found_organizations(found_orgs)
+
+                '''
+                Step 12:
+                Save failed ROR lookups too. This records that the organization
+                was checked and prevents repeated API calls for the same graph
+                organization in future runs.
+                '''
                 saved_not_found_count = self.save_not_found_organizations(not_found_orgs)
 
+                '''
+                Step 13:
+                Mark not-found Organization nodes in Memgraph as ror_id = 'N/A'.
+                That removes them from future blank-ror lookup batches while
+                preserving the fact that ROR did not return a chosen match.
+                '''
                 if not_found_idx_keys:
                     self.mark_not_found_in_graph(not_found_idx_keys)
 
+                '''
+                Step 14:
+                Update cumulative counters after MySQL saves complete. These
+                totals summarize how many rows were staged and how many ROR
+                lookups succeeded or failed.
+                '''
                 batch_processed = saved_found_count + saved_not_found_count
                 total_processed += batch_processed
                 total_found += saved_found_count
                 total_not_found += saved_not_found_count
 
+                '''
+                Step 15:
+                Log the batch timing and outcome. This makes it easier to spot
+                slow ROR responses or unusually large not-found batches.
+                '''
                 hours, minutes, seconds = _time_hms(time.time() - batch_start)
                 self.logger.info(
                     f"Batch #{batch_num} complete: found={saved_found_count}, "
@@ -302,6 +396,12 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                     f"time={hours} hours, {minutes} minutes, {seconds} seconds."
                 )
 
+            '''
+            Step 16:
+            After all graph batches have been consumed, log the full task
+            summary, including total elapsed time and how many organizations
+            were found, not found, or already present in MySQL.
+            '''
             total_hours, total_minutes, total_seconds = _time_hms(time.time() - start_time)
             self.logger.info(
                 "Completed OrganizationLocationRorLookupTask: "
@@ -311,6 +411,12 @@ class OrganizationLocationRorLookupTask(PipelineBase):
             )
 
         except Exception as e:
+            '''
+            Step 17:
+            Catch unexpected failures at the task level so the alert logs show
+            where the ROR lookup stage failed. Lower-level helper methods handle
+            their own commits and rollbacks.
+            '''
             self.logger.error(f"OrganizationLocationRorLookupTask failed: {e}")
 
         finally:
@@ -318,7 +424,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
             self.close()
 
 
-    def organization_generator(self, batch_size: int = 100):
+    def organization_generator_from_graph_db(self, batch_size: int = 100):
 
         '''
         Yield Organization nodes that still need ROR lookup.
@@ -361,7 +467,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
             batch_num += 1
 
 
-    def find_idx_keys_not_in_db(self, idx_keys: List[str]) -> List[str]:
+    def find_idx_keys_not_in_msql_db(self, idx_keys: List[str]) -> List[str]:
 
         '''
         Skip organizations already stored in organization_location so ROR is not
@@ -462,6 +568,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
             }
 
             for future in as_completed(future_to_org):
+                
                 org = future_to_org[future]
                 org_name = org.get("name") or ""
                 idx_key = org.get("_idx_key")
