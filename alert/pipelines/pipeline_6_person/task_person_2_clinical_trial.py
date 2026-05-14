@@ -60,20 +60,16 @@ class NewClinicalTrialPersonTask(PipelineBase):
     ASSOCIATE_TYPE_PI = "PI"
     ASSOCIATE_TYPE_CONTACT = "contact"
 
-    # Only process new clinical trials that do not already have ClinicalTrial
-    # person rows, which keeps repeated alert runs from duplicating people.
+    # Person grouping handles duplicate person rows, so this task only reads
+    # new clinical trial rows and inserts the people found in studies JSON.
     FETCH_NEW_CLINICAL_TRIALS_QUERY = f'''
-        SELECT DISTINCT
+        SELECT
             ctu.nctid,
             ctu.studies
         FROM {CLINICAL_TRIAL_TABLE} AS ctu
-        LEFT JOIN {PERSON_TABLE} AS p
-            ON p.associate_id = ctu.nctid
-            AND p.source = 'ClinicalTrial'
         WHERE ctu.is_new = 1
         AND ctu.nctid IS NOT NULL
         AND ctu.studies IS NOT NULL
-        AND p.associate_id IS NULL
     '''
 
     # person_of_all_sources is the shared staging table that later grouping and

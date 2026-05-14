@@ -1,8 +1,11 @@
+import copy
 import os
 import re
 import string
 import sys
 from typing import Any, Dict, List
+
+import pandas as pd
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -13,20 +16,22 @@ sys.path.extend([
 
 from pipelines.pipeline_base import PipelineBase
 from F_person.person_disambiguation import PersonDisambiguator
+from utils.tools import _curr_timestamp
 
 """
 Generate RDAS person groups.
 
 It groups person_of_all_sources rows by last name, runs PersonDisambiguator, and
 updates rdas_group_id. The affected last names come from rows where is_new = 1,
-but disambiguation uses all people with those last names.
+but disambiguation uses all people with those last names. Existing rdas_group_id
+values are preserved and assigned to matching new rows.
 """
 
 #F_person/4_generate_person_group.py
 
 
 class NewPersonGroupingTask(PipelineBase):
-    """Regenerate RDAS person groups for last names touched by new rows."""
+    """Assign group IDs to new people without changing existing group IDs."""
 
     PERSON_TABLE = "person_of_all_sources"
     GRANT_PROJECT_TABLE = "grant_project"
@@ -36,6 +41,7 @@ class NewPersonGroupingTask(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=False)
+        self.group_id_processed_flag = _curr_timestamp("%Y%m%d%H%M%S")
 
 
     def find_new_data(self, gard_node) -> None:
@@ -128,6 +134,7 @@ class NewPersonGroupingTask(PipelineBase):
             WHERE last_name LIKE %s
             AND is_new = 1
             AND last_name IS NOT NULL
+            AND last_name != ''
             ORDER BY last_name ASC
         '''
 
@@ -326,34 +333,26 @@ class NewPersonGroupingTask(PipelineBase):
         disambiguator = PersonDisambiguator(last_name, person_list)
         df = disambiguator.process()
 
-        return df[["id", "final"]]
+        return df[["id", "rdas_group_id", "final"]]
 
 
     def update_rdas_group_id(self, df_subset, last_name: str) -> int:
-        """Persist the final RDAS group ID for each person row."""
+        """Persist group IDs only for new/unassigned person rows."""
 
         if df_subset is None or df_subset.empty:
             return 0
 
-        df = df_subset[["id", "final"]].copy()
-
-        normalized_last_name = re.sub(r"\W+", "", last_name or "")
-        # If the disambiguator leaves a row ungrouped, assign a deterministic
-        # fallback ID under this last name so every processed row has a group.
-        df.loc[df["final"].isna(), "final"] = (
-            normalized_last_name + "_x_" + df.index[df["final"].isna()].astype(str)
-        )
-
-        df = df[["final", "id"]]
-        tuples = list(df.itertuples(index=False, name=None))
+        tuples = self.build_group_id_update_tuples(df_subset, last_name)
 
         if not tuples:
             return 0
 
         update_sql = f'''
             UPDATE {self.PERSON_TABLE}
-            SET rdas_group_id = %s
+            SET rdas_group_id = %s,
+                group_id_processed = %s
             WHERE id = %s
+            AND (rdas_group_id IS NULL OR rdas_group_id = '')
         '''
 
         cursor = None
@@ -363,7 +362,7 @@ class NewPersonGroupingTask(PipelineBase):
             cursor.executemany(update_sql, tuples)
             self.mysql.commit()
 
-            return len(tuples)
+            return cursor.rowcount
 
         except Exception as e:
             self.logger.error(f"Error updating RDAS group ids for last_name={last_name}: {e}")
@@ -376,3 +375,138 @@ class NewPersonGroupingTask(PipelineBase):
         finally:
             if cursor:
                 cursor.close()
+
+
+    def build_group_id_update_tuples(self, df_subset, last_name: str):
+
+        '''
+        Match PersonGroupIdUpdater's incremental behavior:
+        keep existing rdas_group_id values stable, replace matching generated
+        disambiguation groups with the existing ID, and update only rows that do
+        not already have an rdas_group_id.
+        '''
+        '''
+        Step 1:
+        Keep only the columns needed to decide the final update.
+        id identifies the MySQL row, rdas_group_id is the existing stable ID,
+        and final is the temporary group from PersonDisambiguator.
+        '''
+        df = df_subset[["id", "rdas_group_id", "final"]].copy()
+
+        '''
+        Step 2:
+        Work with dictionaries so the logic mirrors PersonGroupIdUpdater and
+        each row is easy to compare.
+        '''
+        records = df.to_dict("records")
+
+        '''
+        Step 3:
+        Keep the original disambiguator output unchanged while building a
+        resolved copy. The copy is where generated final groups can be replaced
+        by existing rdas_group_id values.
+        '''
+        resolved_records = copy.deepcopy(records)
+
+        '''
+        Step 4:
+        For each row that already has an rdas_group_id, use that existing ID as
+        the canonical group ID for every row assigned to the same temporary
+        disambiguator group.
+        '''
+        for record in records:
+            new_rdas_group_id = record.get("final")
+            existing_rdas_group_id = record.get("rdas_group_id")
+
+            '''
+            Case A:
+            Existing row has rdas_group_id, and PersonDisambiguator also
+            assigned it a temporary final group. Any new row with the same final
+            group should receive the existing rdas_group_id.
+            '''
+            if (
+                not self.is_empty_group_id(existing_rdas_group_id)
+                and not self.is_empty_group_id(new_rdas_group_id)
+            ):
+                for item in resolved_records:
+                    if (
+                        not self.is_empty_group_id(item.get("final"))
+                        and item.get("final") == new_rdas_group_id
+                    ):
+                        item["final"] = existing_rdas_group_id
+
+            '''
+            Case B:
+            Existing row has rdas_group_id, but its temporary final group is
+            empty. Keep the existing ID on that row in the resolved copy so it
+            is not treated as an ungrouped person later.
+            '''
+            if (
+                not self.is_empty_group_id(existing_rdas_group_id)
+                and self.is_empty_group_id(new_rdas_group_id)
+            ):
+                for item in resolved_records:
+                    if (
+                        item.get("rdas_group_id") == existing_rdas_group_id
+                        and self.is_empty_group_id(item.get("final"))
+                    ):
+                        item["final"] = existing_rdas_group_id
+
+        '''
+        Step 5:
+        Prepare a fallback ID for truly new/unmatched people. This is only used
+        when a row has no existing rdas_group_id and the disambiguator did not
+        assign it to any group.
+        '''
+        normalized_last_name = re.sub(r"\W+", "", last_name or "")
+        fallback_timestamp = _curr_timestamp("%Y%m%d%H%M%S")
+        tuples = []
+
+        '''
+        Step 6:
+        Build SQL parameter tuples only for rows that do not already have
+        rdas_group_id. Existing grouped rows are skipped so their stable IDs
+        remain unchanged in MySQL and Memgraph.
+        '''
+        for index, item in enumerate(resolved_records):
+            if not self.is_empty_group_id(item.get("rdas_group_id")):
+                continue
+
+            final_group_id = item.get("final")
+
+            '''
+            Step 7:
+            If the new row matched an existing group, final_group_id is now that
+            existing rdas_group_id. If it did not match anything, create a
+            unique fallback group under this last name.
+            '''
+            if self.is_empty_group_id(final_group_id):
+                final_group_id = f"{normalized_last_name}_{fallback_timestamp}_{index}"
+
+            '''
+            Step 8:
+            Tuple order matches update_rdas_group_id():
+            SET rdas_group_id = %s, group_id_processed = %s WHERE id = %s.
+            '''
+            tuples.append((final_group_id, self.group_id_processed_flag, item.get("id")))
+
+        '''
+        Step 9:
+        The caller executes these updates with an extra SQL guard:
+        AND (rdas_group_id IS NULL OR rdas_group_id = ''). That protects
+        existing grouped rows even if this method is changed later.
+        '''
+        return tuples
+
+
+    @staticmethod
+    def is_empty_group_id(value: Any) -> bool:
+        """Return True for NULL, blank, or NaN group IDs."""
+
+        if value is None:
+            return True
+
+        if isinstance(value, str):
+            return not value.strip()
+
+        return bool(pd.isna(value))

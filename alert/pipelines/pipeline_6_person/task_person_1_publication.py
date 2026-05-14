@@ -13,15 +13,13 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _normalize_tuple, _normalize_txt
 
 """
-Create person rows for new publication authors.
-
-This task is the alert-pipeline version of:
-F_person/1_generate_person_of_publication.py
-
+Create person rows for new publication authors. 
 It reads publication_article rows where is_new = 1, extracts authors from
 source_json.authorList.author, and inserts those authors into person_of_all_sources
 with is_new = 1.
 """
+
+# Reference: F_person/1_generate_person_of_publication.py
 
 
 class NewPublicationPersonTask(PipelineBase):
@@ -34,20 +32,17 @@ class NewPublicationPersonTask(PipelineBase):
     SOURCE = "Publication"
     ROLE = "author"
 
-    # Only process new publication rows that do not already have Publication
-    # person records, which keeps repeated alert runs from duplicating authors.
+    # Person grouping handles duplicate person rows, so this task only reads
+    # new publication rows and inserts the authors found in source_json.
     FETCH_NEW_PUBLICATIONS_QUERY = f'''
-        SELECT DISTINCT
+        SELECT
             pa.pubmed_id,
             pa.source_json
-        FROM {PUBLICATION_TABLE} AS pa
-        LEFT JOIN {PERSON_TABLE} AS p
-            ON p.associate_id = pa.pubmed_id
-            AND p.source = 'Publication'
+        FROM {PUBLICATION_TABLE} AS pa FORCE INDEX (idx_article_isnew)
         WHERE pa.is_new = 1
         AND pa.pubmed_id IS NOT NULL
         AND pa.source_json IS NOT NULL
-        AND p.associate_id IS NULL
+        ORDER BY pa.id
     '''
 
     # person_of_all_sources is the shared staging table for publication,
@@ -56,6 +51,7 @@ class NewPublicationPersonTask(PipelineBase):
         INSERT INTO {PERSON_TABLE}
         (
             associate_id,
+            associate_id_int,
             associate_type,
             source,
             title,
@@ -67,7 +63,7 @@ class NewPublicationPersonTask(PipelineBase):
             orcid,
             is_new
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1)
     '''
 
     def __init__(self):
@@ -208,6 +204,7 @@ class NewPublicationPersonTask(PipelineBase):
             # Prefer individual author names when first or last name is present.
             return (
                 pubmed_id,
+                pubmed_id,
                 self.ASSOCIATE_TYPE,
                 self.SOURCE,
                 None,
@@ -224,6 +221,7 @@ class NewPublicationPersonTask(PipelineBase):
         if collective_name:
             # Some records use a group author instead of individual names.
             return (
+                pubmed_id,
                 pubmed_id,
                 self.ASSOCIATE_TYPE,
                 self.SOURCE,
