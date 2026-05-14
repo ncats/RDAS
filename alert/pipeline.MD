@@ -238,6 +238,8 @@ Tasks, in order:
    - Creates individual patient data nodes and links them to trials.
 10. `NewClinicalTrialAnnotationGraphTask`
     - Creates annotation nodes from UMLS rows and links them to trials.
+11. `NewClinicalTrialOrganizationLocationGraphTask`
+    - Creates organization and trial-location nodes and links them to trials.
 
 ### Step 3B: Publication Graph Updates
 

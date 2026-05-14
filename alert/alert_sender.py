@@ -96,6 +96,8 @@ class AlertSender(PipelineBase):
             users = firebaseAgent.get_firebase_authed_users_with_firestore_gard_ids_list()
 
             all_updates_summary = []
+            update_date_end = date.today()
+            update_date_start = update_date_end - timedelta(days=self.LOOK_BACK_DAYS)
             
             ''' 2. Send alert to each user '''
             for user in users:
@@ -132,9 +134,6 @@ class AlertSender(PipelineBase):
                 display_name = user['display_name']
 
                 user_subscriptions = user.get("subscriptions", {})
-                update_date_end = date.today()
-
-                update_date_start = update_date_end - timedelta(days = self.LOOK_BACK_DAYS)
 
                 ''' A payload template / initial payload structure'''
                 payload = {
@@ -160,8 +159,7 @@ class AlertSender(PipelineBase):
                     finally:
                         cursor.close()
 
-                    # No rows means this subscribed disease has no new alertable
-                    # trials or articles in the current staging tables.
+                    # No rows means this subscribed disease has no new alertable trials or articles in the current staging tables.
                     if not rows:
                         continue
 
@@ -175,6 +173,13 @@ class AlertSender(PipelineBase):
                         payload["data"][gardId][item_name] = new_items_count
                         datasets.add(item_name)
 
+                '''
+                active_subscriptions only contains subscribed GARD IDs that
+                returned at least one new clinical trial or publication row.
+                If it is empty, this user has no alertable updates, so continue
+                before send_html_alert_email(). This guarantees no user alert
+                email is sent with an empty update payload.
+                '''
                 subscription_count = len(active_subscriptions)
                 if subscription_count == 0:
                     self.logger.info(f'* No new subscriptions found for user: {user} - {datetime.now()}')
@@ -185,46 +190,58 @@ class AlertSender(PipelineBase):
                 payload["data"]["total"] = subscription_count
                  
                 ''' 4. Send alert email to user '''
-                # The payload contains only subscriptions that actually had new
-                # content, so users do not receive empty disease sections.
+                ''' The payload contains only subscriptions that actually had new content, so users do not receive empty disease sections. '''
                 emailClient.send_html_alert_email(
                     subject = self.subject,
                     payload = payload,                            
-                    #mail_to = user.get('email'), # For PRODUCTION
-                    mail_to = 'tongan.zhao@nih.gov', # For testing, remove for PRODUCTION
+                    mail_to = user.get('email'),
+                    #mail_to = 'tongan.zhao@nih.gov', # For testing, remove for PRODUCTION
                     mail_cc = None,
                 )
-        
+                
                 self.logger.info(f'\nSent alert to user: {user} - {datetime.now()}')
                 self.logger.info(json.dumps(payload, indent=2, ensure_ascii=False))
                  
+                ''' add to summary'''
                 all_updates_summary.append({"email": email, "display_name": display_name, "payload": payload})
 
             ''' 5. Send summary email to admins '''
-            # The summary email is an operational audit of all user alerts sent
-            # during this run. It is skipped when no user had new updates.
-            if all_updates_summary:
-                try:
-                    summary_recipients = _recipient_list(os.getenv("ALERT_SUMMARY_EMAIL_RECIPIENTS"))
+            '''
+            Admin summary delivery is separate from per-user alert delivery.
+            all_updates_summary is populated only after a user email is sent,
+            so an empty list means no user alert emails went out. The admin
+            summary is still sent below to report that no updates were found
+            for the current alert period.
+            '''
+            try: 
+                summary_recipients = _recipient_list(os.getenv("ALERT_SUMMARY_EMAIL_RECIPIENTS"))
 
-                    if summary_recipients:
+                if summary_recipients:
+                    summary_period = (
+                        f"{update_date_start.strftime('%Y-%m-%d')} - "
+                        f"{update_date_end.strftime('%Y-%m-%d')}"
+                    )
+                    summary_subject = f"{self.subject} Summary"
+                    if not all_updates_summary:
+                        summary_subject = f"{summary_subject} - No Updates"
 
-                        emailClient.send_html_summary_email(
-                            subject = f"{self.subject} Summary",
-                            all_updates_summary = all_updates_summary,
-                            title = "RDAS Alerts Summary for Admins",
-                            mail_to = summary_recipients,
-                            mail_cc = [],
-                        )
+                    emailClient.send_html_summary_email(
+                        subject = summary_subject,
+                        all_updates_summary = all_updates_summary,
+                        title = f"RDAS Alerts Summary for Admins ({summary_period})",
+                        mail_to = summary_recipients,
+                        mail_cc = [],
+                    )
+
+                    if all_updates_summary:
                         self.logger.info(f"Sent summary alert email with {len(all_updates_summary)} user sections.")
                     else:
-                        self.logger.error("ALERT_SUMMARY_EMAIL_RECIPIENTS is empty. Summary alert email was not sent.")
+                        self.logger.info("Sent summary alert email with no user updates for the current period.")
+                else:
+                    self.logger.error("ALERT_SUMMARY_EMAIL_RECIPIENTS is empty. Summary alert email was not sent.")
 
-                except Exception as e:
-                    self.logger.error(f"Unable to send summary alert email: {e}")
-
-            else:
-                self.logger.info("No user updates found. Summary alert email was not sent.")
+            except Exception as e:
+                self.logger.error(f"Unable to send summary alert email: {e}")
 
         finally:
             # Explicitly close the db connections
