@@ -39,6 +39,9 @@ class NewPersonAgentGraphTask(PipelineBase):
         UNWIND $chunks AS chunk
 
         MERGE (a: Agent {{_idx_key: chunk._idx_key}})
+
+        // These properties are written only when the Agent node is first created.
+        // Existing Agent values are not overwritten here.
         ON CREATE SET
             a.fullName = chunk.fullName,
             a.firstName = chunk.firstName,
@@ -47,7 +50,35 @@ class NewPersonAgentGraphTask(PipelineBase):
             a.pi_id = chunk.pi_id,
             a.contactEmail = chunk.contactEmail,
             a.dateCreatedByRDAS = chunk.formattedToday
+
+        // Fill only missing Agent fields on existing nodes, and always refresh lastUpdatedByRDAS.
+        // This keeps old values stable while allowing a new person row to complete blank properties.
         SET
+            a.fullName = CASE
+                WHEN coalesce(a.fullName, '') = '' THEN chunk.fullName
+                ELSE a.fullName
+            END,
+            a.firstName = CASE
+                WHEN coalesce(a.firstName, '') = '' THEN chunk.firstName
+                ELSE a.firstName
+            END,
+            a.lastName = CASE
+                WHEN coalesce(a.lastName, '') = '' THEN chunk.lastName
+                ELSE a.lastName
+            END,
+            a.orc_id = CASE
+                WHEN coalesce(a.orc_id, '') = '' AND chunk.orc_id <> '' THEN chunk.orc_id
+                ELSE coalesce(a.orc_id, '')
+            END,
+            a.pi_id = CASE
+                WHEN coalesce(a.pi_id, '') = '' AND chunk.pi_id <> '' THEN chunk.pi_id
+                ELSE coalesce(a.pi_id, '')
+            END,
+            a.contactEmail = CASE
+                WHEN chunk.contactEmail IS NULL THEN coalesce(a.contactEmail, [])
+                WHEN a.contactEmail IS NULL THEN chunk.contactEmail
+                ELSE a.contactEmail + [email IN chunk.contactEmail WHERE NOT email IN a.contactEmail]
+            END,
             a.lastUpdatedByRDAS = chunk.formattedToday
 
         WITH a, chunk
