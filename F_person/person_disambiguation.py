@@ -13,27 +13,44 @@ from collections import deque
 from typing import List, Dict
 from itertools import combinations
 from collections import Counter, defaultdict
-from utils.tools import _elapsed_time
+from utils.applogger import AppLogger
+from utils.tools import _elapsed_time, _date_string
 
 class PersonDisambiguator:
     """
     A class to perform author disambiguation on publication/grant/clinical trial data.
     """
     
-    def __init__(self, last_name, data_list: List[Dict]):
+    def __init__(self, last_name, data_list: List[Dict], logger=None):
         """
         Initialize the disambiguator with data.
         
         Args:
+            last_name (str): Last name currently being disambiguated.
             data_list (List[Dict]): List of dictionaries with author data
                 Expected fields: ['id', 'associate_id', 'associate_type', 'source', 
                                  'first_name', 'last_name', 'affiliation', 'orcid', 
                                  'email', 'phone', 'first_publication_date', 'title', 
                                  'abstract_text', 'author_list', 'first_author', 'last_author']
+            logger: Optional logger supplied by the caller. If omitted, the class
+                creates its own file/console logger.
         """
+        self.logger = logger or self.create_logger()
         self.df = None
         self.last_name = last_name
         self.load_from_dict_list(data_list)
+        
+
+    def create_logger(self):
+        """Create a default logger for standalone person disambiguation runs."""
+
+        log_dir = "logs"
+        os.makedirs(log_dir, exist_ok=True)
+
+        class_name = type(self).__name__
+        log_file = f"{log_dir}/F-{class_name}-{_date_string()}.log"
+
+        return AppLogger(class_name, log_file).get_logger()
         
 
     def load_from_dict_list(self, data_list: List[Dict]):
@@ -65,7 +82,7 @@ class PersonDisambiguator:
                 lambda x: x if isinstance(x, str) else (', '.join(x) if isinstance(x, list) else '')
             )
         
-        print(f"Last name: {self.last_name}, loaded {len(self.df)} records from dictionary list")
+        self.logger.info(f"Last name: {self.last_name}, loaded {len(self.df)} records from dictionary list")
 
         # Auto-detect last_name from the data. Get the most common last name in the dataset
         """
@@ -78,7 +95,7 @@ class PersonDisambiguator:
         else:
             self.last_name = "Unknown"       
         
-        print(f"Auto-detected last name: {self.last_name}")
+        self.logger.info(f"Auto-detected last name: {self.last_name}")
         """
 
 
@@ -860,61 +877,61 @@ class PersonDisambiguator:
         """
         start_time = time.time()
         
-        print(f"Starting author disambiguation for: {self.last_name}")
+        self.logger.info(f"\n--- Starting author disambiguation for: {self.last_name} ---")
         #print(f"{'='*60}\n")
         
-        # Step 1: Initial grouping
-        print("1", end=" ")
+        # Step 1: Initial grouping 
+        self.logger.info("Step 1: Creating initial groups (ORCID, affiliation, coauthor).")
         #print("Step 1: Creating initial groups (ORCID, affiliation, coauthor)...")
         self.process_initial_grouping()
         
-        # Step 2: Resolve conflicts
-        print("2", end=" ")
+        # Step 2: Resolve conflicts 
+        self.logger.info("Step 2: Resolving conflicts.")
         #print("Step 2: Resolving conflicts...")
         self.resolve_conflicts()
         
-        # Step 3: Merge groups
-        print("3", end=" ")
+        # Step 3: Merge groups 
+        self.logger.info("Step 3: Merging groups.")
         #print("Step 3: Merging groups...")
         self.create_merged_groups()
         
-        # Step 4: Refine with coauthors
-        print("4", end=" ")
+        # Step 4: Refine with coauthors 
+        self.logger.info("Step 4: Refining with coauthor analysis.")
         #print("Step 4: Refining with coauthor analysis...")
         self.refine_with_coauthors()
         
-        # Step 5: Assign unified groups
-        print("5", end=" ")
+        # Step 5: Assign unified groups 
+        self.logger.info("Step 5: Assigning unified groups.")
         #print("Step 5: Assigning unified groups...")
         self.assign_unified_groups()
         
-        # Step 6: First-last author groups
-        print("6", end=" ")
+        # Step 6: First-last author groups 
+        self.logger.info("Step 6: Creating first-last author groups.")
         #print("Step 6: Creating first-last author groups...")
         self.create_firstlast_groups()
         
-        # Step 7: Merge unified with first-last
-        print("7", end=" ")
+        # Step 7: Merge unified with first-last 
+        self.logger.info("Step 7: Merging unified with first-last groups.")
         #print("Step 7: Merging unified with first-last groups...")
         self.merge_unified_with_firstlast()
         
-        # Step 8: Find missing coauthor groups
-        print("8", end=" ")
+        # Step 8: Find missing coauthor groups 
+        self.logger.info("Step 8: Finding missing coauthor groups.")
         #print("Step 8: Finding missing coauthor groups...")
         self.find_missing_coauthor_groups()
         
-        # Step 9: Create final unified groups
-        print("9", end=" ")
+        # Step 9: Create final unified groups 
+        self.logger.info("Step 9: Creating final unified groups.")
         #print("Step 9: Creating final unified groups...")
         self.create_final_unified_groups()
         
-        # Step 10: Finalize
-        print("10", end=" ")
+        # Step 10: Finalize 
+        self.logger.info("Step 10: Finalizing groups.")
         #print("Step 10: Finalizing groups...")
         self.finalize_groups()
         
-        # Step 11: Clean up for output
-        print("11", end=" ")
+        # Step 11: Clean up for output 
+        self.logger.info("Step 11: Preparing output.")
         #print("Step 11: Preparing output...")
         self.df["author_list"] = self.df["author_list"].apply(
             lambda x: ast.literal_eval(x) if isinstance(x, str) and x.startswith("{") else x
@@ -934,9 +951,10 @@ class PersonDisambiguator:
         
         # Save output if path provided
         if output_csv:
-            print("12", end=" ")
+            self.logger.info(f"Step 12: Saving to {output_csv}.")
             #print(f"Step 12: Saving to {output_csv}...")
             self.df.to_csv(output_csv, index=False)
+            self.logger.info(f"💾 Output saved to: {output_csv}")
         
 
         end_time = time.time()
@@ -946,13 +964,9 @@ class PersonDisambiguator:
         unique = len(self.df['final'].unique())
         numOfIdentified = self.df['final'].notna().sum()  # counts non-null values
 
-        print(f"\n✅ Time elapsed: {hours} hours, {minutes} minutes, {seconds} seconds.  📊 Processed {total} records")
-        print(f"👥 Unique disambiguated identities: {unique}. Total {numOfIdentified} of {total} have been identified")
+        self.logger.info(f"✅ Time elapsed: {hours} hours, {minutes} minutes, {seconds} seconds.  📊 Processed {total} records")
+        self.logger.info(f"👥 Unique disambiguated identities: {unique}. Total {numOfIdentified} of {total} have been identified")
 
-        if output_csv:
-            print(f"💾 Output saved to: {output_csv}")
- 
-        
         return self.df
 
 

@@ -333,7 +333,7 @@ class NewPersonGroupingTask(PipelineBase):
     def disambiguate(self, last_name: str, person_list: List[Dict[str, Any]]):
         """Delegate person matching to the shared PersonDisambiguator."""
 
-        disambiguator = PersonDisambiguator(last_name, person_list)
+        disambiguator = PersonDisambiguator(last_name, person_list, logger=self.logger)
         df = disambiguator.process()
 
         return df[["id", "rdas_group_id", "final"]]
