@@ -82,7 +82,7 @@ class PersonDisambiguator:
                 lambda x: x if isinstance(x, str) else (', '.join(x) if isinstance(x, list) else '')
             )
         
-        self.logger.info(f"\n--- Last name: {self.last_name}, loaded {len(self.df)} records from dictionary list ---")
+        self.logger.info(f"Last name: {self.last_name}, loaded {len(self.df)} records from dictionary list")
 
         # Auto-detect last_name from the data. Get the most common last name in the dataset
         """
@@ -881,57 +881,46 @@ class PersonDisambiguator:
         #print(f"{'='*60}\n")
         
         # Step 1: Initial grouping 
-        self.logger.info("Step 1: Creating initial groups (ORCID, affiliation, coauthor).")
         #print("Step 1: Creating initial groups (ORCID, affiliation, coauthor)...")
         self.process_initial_grouping()
         
         # Step 2: Resolve conflicts 
-        self.logger.info("Step 2: Resolving conflicts.")
         #print("Step 2: Resolving conflicts...")
         self.resolve_conflicts()
         
         # Step 3: Merge groups 
-        self.logger.info("Step 3: Merging groups.")
         #print("Step 3: Merging groups...")
         self.create_merged_groups()
         
         # Step 4: Refine with coauthors 
-        self.logger.info("Step 4: Refining with coauthor analysis.")
         #print("Step 4: Refining with coauthor analysis...")
         self.refine_with_coauthors()
         
         # Step 5: Assign unified groups 
-        self.logger.info("Step 5: Assigning unified groups.")
         #print("Step 5: Assigning unified groups...")
         self.assign_unified_groups()
         
         # Step 6: First-last author groups 
-        self.logger.info("Step 6: Creating first-last author groups.")
         #print("Step 6: Creating first-last author groups...")
         self.create_firstlast_groups()
         
         # Step 7: Merge unified with first-last 
-        self.logger.info("Step 7: Merging unified with first-last groups.")
         #print("Step 7: Merging unified with first-last groups...")
         self.merge_unified_with_firstlast()
         
         # Step 8: Find missing coauthor groups 
-        self.logger.info("Step 8: Finding missing coauthor groups.")
         #print("Step 8: Finding missing coauthor groups...")
         self.find_missing_coauthor_groups()
         
         # Step 9: Create final unified groups 
-        self.logger.info("Step 9: Creating final unified groups.")
         #print("Step 9: Creating final unified groups...")
         self.create_final_unified_groups()
         
         # Step 10: Finalize 
-        self.logger.info("Step 10: Finalizing groups.")
         #print("Step 10: Finalizing groups...")
         self.finalize_groups()
         
         # Step 11: Clean up for output 
-        self.logger.info("Step 11: Preparing output.")
         #print("Step 11: Preparing output...")
         self.df["author_list"] = self.df["author_list"].apply(
             lambda x: ast.literal_eval(x) if isinstance(x, str) and x.startswith("{") else x
@@ -951,7 +940,6 @@ class PersonDisambiguator:
         
         # Save output if path provided
         if output_csv:
-            self.logger.info(f"Step 12: Saving to {output_csv}.")
             #print(f"Step 12: Saving to {output_csv}...")
             self.df.to_csv(output_csv, index=False)
             self.logger.info(f"💾 Output saved to: {output_csv}")

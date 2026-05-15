@@ -53,6 +53,7 @@ class NewPersonGroupingTask(PipelineBase):
 
         total_last_names = 0
         total_people_updated = 0
+        processed_last_names = set()
 
         try:
             for prefix in self._iter_last_name_prefixes():
@@ -61,13 +62,22 @@ class NewPersonGroupingTask(PipelineBase):
                 last_names = self.get_newly_added_last_names_by_prefix(prefix)
 
                 if not last_names:
+                    self.logger.info(f'No new last names starts with {prefix} found.\n')
                     continue
 
                 for last_name in last_names:
                     if not last_name:
                         continue
 
-                    self.logger.info(f"Processing last_name={last_name}")
+                    normalized_last_name = str(last_name).strip().lower()
+
+                    if normalized_last_name in processed_last_names:
+                        self.logger.info(f"Skipping already processed last_name={last_name}")
+                        continue
+
+                    processed_last_names.add(normalized_last_name)
+
+                    self.logger.info(f"Processing last_name = {last_name}")
 
                     person_list = self.fetch_person_by_last_name_for_group_id_update(last_name)
 
@@ -81,7 +91,7 @@ class NewPersonGroupingTask(PipelineBase):
 
                     self.logger.info(
                         f"Processed last_name={last_name}; "
-                        f"people updated={updated_count}; total people updated={total_people_updated}."
+                        f"people updated={updated_count}; total people updated={total_people_updated}.\n"
                     )
 
             self.logger.info(
@@ -138,6 +148,7 @@ class NewPersonGroupingTask(PipelineBase):
             FROM {self.PERSON_TABLE}
             WHERE last_name LIKE %s
             AND is_new = 1
+            AND (rdas_group_id IS NULL OR rdas_group_id = '')
         '''
 
         cursor = None
