@@ -55,15 +55,20 @@ class NewPersonGroupingTask(PipelineBase):
         total_people_updated = 0
 
         try:
-            for prefix in self.iter_last_name_prefixes():
+            for prefix in self._iter_last_name_prefixes():
                 self.logger.info(f"Processing last-name prefix: {prefix}")
 
-                last_names = self.get_last_names_by_prefix_for_group_id_update(prefix)
+                last_names = self.get_newly_added_last_names_by_prefix(prefix)
 
                 if not last_names:
                     continue
 
                 for last_name in last_names:
+                    if not last_name:
+                        continue
+
+                    self.logger.info(f"Processing last_name={last_name}")
+
                     person_list = self.fetch_person_by_last_name_for_group_id_update(last_name)
 
                     if not person_list:
@@ -95,7 +100,7 @@ class NewPersonGroupingTask(PipelineBase):
             self.close()
 
 
-    def iter_last_name_prefixes(self):
+    def _iter_last_name_prefixes(self):
 
         '''
         Match the prefix traversal from F_person/4_generate_person_group.py.
@@ -123,7 +128,7 @@ class NewPersonGroupingTask(PipelineBase):
                 yield first_char + second_char
 
 
-    def get_last_names_by_prefix_for_group_id_update(self, prefix: str) -> List[str]:
+    def get_newly_added_last_names_by_prefix(self, prefix: str) -> List[str]:
         """Return new-row last names under one prefix for regrouping."""
 
         # is_new only chooses which last names were affected by this alert run.
@@ -133,9 +138,6 @@ class NewPersonGroupingTask(PipelineBase):
             FROM {self.PERSON_TABLE}
             WHERE last_name LIKE %s
             AND is_new = 1
-            AND last_name IS NOT NULL
-            AND last_name != ''
-            ORDER BY last_name ASC
         '''
 
         cursor = None
@@ -282,25 +284,26 @@ class NewPersonGroupingTask(PipelineBase):
     def process_last_name_group(self, last_name: str, person_list: List[Dict[str, Any]]) -> int:
         """Run disambiguation for one last name and persist updated group IDs."""
 
-        grouped_by_letter = self.group_people_for_disambiguation(person_list)
+        disambiguation_batches = self.create_person_batches_by_first_name_initial(person_list)
+
         total_updated = 0
 
-        for group_key, sublist in grouped_by_letter.items():
+        for group_key, sublist in disambiguation_batches.items():
+
             if not sublist:
                 continue
 
-            self.logger.info(
-                f"Disambiguating last_name={last_name}; group={group_key}; records={len(sublist)}."
-            )
+            self.logger.info(f"Disambiguating last_name={last_name}; group={group_key}; records={len(sublist)}.")
 
             df_subset = self.disambiguate(last_name, sublist)
+
             updated_count = self.update_rdas_group_id(df_subset, last_name)
             total_updated += updated_count
 
         return total_updated
 
 
-    def group_people_for_disambiguation(self, person_list: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    def  create_person_batches_by_first_name_initial(self, person_list: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
         """Split very large last-name groups by first initial before grouping."""
 
         if len(person_list) < self.LARGE_LAST_NAME_GROUP_SIZE:
@@ -342,7 +345,7 @@ class NewPersonGroupingTask(PipelineBase):
         if df_subset is None or df_subset.empty:
             return 0
 
-        tuples = self.build_group_id_update_tuples(df_subset, last_name)
+        tuples = self._build_group_id_update_tuples(df_subset, last_name)
 
         if not tuples:
             return 0
@@ -377,7 +380,7 @@ class NewPersonGroupingTask(PipelineBase):
                 cursor.close()
 
 
-    def build_group_id_update_tuples(self, df_subset, last_name: str):
+    def _build_group_id_update_tuples(self, df_subset, last_name: str):
 
         '''
         Match PersonGroupIdUpdater's incremental behavior:
@@ -425,12 +428,12 @@ class NewPersonGroupingTask(PipelineBase):
             group should receive the existing rdas_group_id.
             '''
             if (
-                not self.is_empty_group_id(existing_rdas_group_id)
-                and not self.is_empty_group_id(new_rdas_group_id)
+                not self._is_empty_group_id(existing_rdas_group_id)
+                and not self._is_empty_group_id(new_rdas_group_id)
             ):
                 for item in resolved_records:
                     if (
-                        not self.is_empty_group_id(item.get("final"))
+                        not self._is_empty_group_id(item.get("final"))
                         and item.get("final") == new_rdas_group_id
                     ):
                         item["final"] = existing_rdas_group_id
@@ -442,13 +445,13 @@ class NewPersonGroupingTask(PipelineBase):
             is not treated as an ungrouped person later.
             '''
             if (
-                not self.is_empty_group_id(existing_rdas_group_id)
-                and self.is_empty_group_id(new_rdas_group_id)
+                not self._is_empty_group_id(existing_rdas_group_id)
+                and self._is_empty_group_id(new_rdas_group_id)
             ):
                 for item in resolved_records:
                     if (
                         item.get("rdas_group_id") == existing_rdas_group_id
-                        and self.is_empty_group_id(item.get("final"))
+                        and self._is_empty_group_id(item.get("final"))
                     ):
                         item["final"] = existing_rdas_group_id
 
@@ -469,7 +472,7 @@ class NewPersonGroupingTask(PipelineBase):
         remain unchanged in MySQL and Memgraph.
         '''
         for index, item in enumerate(resolved_records):
-            if not self.is_empty_group_id(item.get("rdas_group_id")):
+            if not self._is_empty_group_id(item.get("rdas_group_id")):
                 continue
 
             final_group_id = item.get("final")
@@ -480,7 +483,7 @@ class NewPersonGroupingTask(PipelineBase):
             existing rdas_group_id. If it did not match anything, create a
             unique fallback group under this last name.
             '''
-            if self.is_empty_group_id(final_group_id):
+            if self._is_empty_group_id(final_group_id):
                 final_group_id = f"{normalized_last_name}_{fallback_timestamp}_{index}"
 
             '''
@@ -500,7 +503,7 @@ class NewPersonGroupingTask(PipelineBase):
 
 
     @staticmethod
-    def is_empty_group_id(value: Any) -> bool:
+    def _is_empty_group_id(value: Any) -> bool:
         """Return True for NULL, blank, or NaN group IDs."""
 
         if value is None:
