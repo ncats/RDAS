@@ -964,7 +964,9 @@ class PersonDisambiguator:
         unique = len(self.df['final'].unique())
         numOfIdentified = self.df['final'].notna().sum()  # counts non-null values
 
-        self.logger.info(f"✅ Time elapsed: {hours} hours, {minutes} minutes, {seconds} seconds.  📊 Processed {total} records")
+        if hours > 0 or minutes > 0 or seconds > 10:            
+            self.logger.info(f"✅ Time elapsed: {hours} hours, {minutes} minutes, {seconds} seconds.  📊 Processed {total} records")
+
         self.logger.info(f"👥 Unique disambiguated identities: {unique}. Total {numOfIdentified} of {total} have been identified")
 
         return self.df
