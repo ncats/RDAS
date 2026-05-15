@@ -82,7 +82,7 @@ class PersonDisambiguator:
                 lambda x: x if isinstance(x, str) else (', '.join(x) if isinstance(x, list) else '')
             )
         
-        self.logger.info(f"Last name: {self.last_name}, loaded {len(self.df)} records from dictionary list")
+        self.logger.info(f"\n--- Last name: {self.last_name}, loaded {len(self.df)} records from dictionary list ---")
 
         # Auto-detect last_name from the data. Get the most common last name in the dataset
         """
@@ -877,7 +877,7 @@ class PersonDisambiguator:
         """
         start_time = time.time()
         
-        self.logger.info(f"\n--- Starting author disambiguation for: {self.last_name} ---")
+        self.logger.info(f"Starting author disambiguation for: {self.last_name}")
         #print(f"{'='*60}\n")
         
         # Step 1: Initial grouping 
