@@ -216,25 +216,51 @@ class NewPublicationPersonTask(PipelineBase):
                 orcid,
             )
 
-        collective_name = _normalize_txt(author.get("collectiveName"))
+        fallback_first_name, fallback_last_name = self.extract_name_from_full_name(author)
 
-        if collective_name:
-            # Some records use a group author instead of individual names.
+        if fallback_first_name is not None or fallback_last_name is not None:
+            # Some Europe PMC rows have fullName but no split firstName/lastName.
             return (
                 pubmed_id,
                 pubmed_id,
                 self.ASSOCIATE_TYPE,
                 self.SOURCE,
                 None,
+                fallback_first_name,
+                fallback_last_name,
                 None,
-                None,
-                self._truncate(collective_name, 3500),
                 self.ROLE,
                 affiliation,
                 orcid,
             )
 
+        # Collective authors are groups/consortium names, not individual people.
+        # Person grouping and Agent graph creation require first/last names, so
+        # skip collective-only author entries instead of inserting blank names.
         return None
+
+
+    def extract_name_from_full_name(self, author: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
+        """Use fullName as a fallback when Europe PMC omits firstName/lastName."""
+
+        if author.get("collectiveName"):
+            return None, None
+
+        full_name = _normalize_txt(author.get("fullName"))
+
+        if not full_name:
+            return None, None
+
+        parts = str(full_name).strip().split()
+
+        if len(parts) < 2:
+            return None, self._truncate(parts[0], 250) if parts else None
+
+        # Europe PMC fullName is usually shaped like "LastName Initials".
+        fallback_last_name = parts[0]
+        fallback_first_name = " ".join(parts[1:])
+
+        return self._truncate(fallback_first_name, 250), self._truncate(fallback_last_name, 250)
 
 
     def extract_orcid(self, author: Dict[str, Any]) -> Optional[str]:
