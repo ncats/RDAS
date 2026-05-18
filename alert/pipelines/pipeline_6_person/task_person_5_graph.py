@@ -158,7 +158,6 @@ class NewPersonAgentGraphTask(PipelineBase):
             role
         FROM {PERSON_TABLE}
         WHERE is_new = 1
-        AND rdas_group_id IS NOT NULL
     '''
 
     def __init__(self):
