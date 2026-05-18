@@ -20,7 +20,7 @@ class PubtatorWorker:
     def _create_logger(self):
         # Keep utility logs in the same home-directory alert log folder used by
         # PipelineBase, and expand "~" before passing the path to FileHandler.
-        log_dir = os.path.expanduser('~/rdas-memgraph-alert-log')
+        log_dir = os.path.expanduser('~/rdas-memgraph-alert-logs')
         os.makedirs(log_dir, exist_ok=True)
         return AppLogger(
             type(self).__name__,
