@@ -223,6 +223,13 @@ class PublicationPersonAgentUpdater:
         first_name = row.get("first_name")
         original_last_name = row.get("last_name")
 
+        '''
+        Skip rows that cannot safely create both the Agent node and the
+        Article-to-Agent relationship:
+        - rdas_group_id is required because it becomes the Agent identity.
+        - pubmed_id is required because it matches Article.pubmedId in Memgraph.
+        - first_name and last_name are required for the Agent display name.
+        '''
         if not rdas_group_id or pubmed_id is None or not first_name or not original_last_name:
             return None
 
