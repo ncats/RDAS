@@ -27,7 +27,7 @@ organization_location.is_new = 1, and marks not-found Organization nodes with
 ror_id = 'N/A'.
 """
 
-# Reference: G_update/updater/organization_location_step_1_finder_multiple.py
+# Reference: G_update/organization_location_step_1_finder_multiple.py
 
 
 def _clean_org_name(text: Any) -> Any:

@@ -19,7 +19,7 @@ Mark Article nodes that are GeneReviews.
 This task should run after Article nodes have been written to Memgraph.
 """
 
-# Reference: G_update/updater/article_is_gene_review_updater.py
+# Reference: G_update/article_is_gene_review_updater.py
 
 
 class ArticleGeneReviewFlagUpdateTask(PipelineBase):

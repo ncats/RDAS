@@ -4,7 +4,6 @@ import sys
 _dir = os.path.dirname(__file__)
 sys.path.extend([
     os.path.abspath(os.path.join(_dir, '..')),
-    os.path.abspath(os.path.join(_dir, '../..'))
 ])
 
 from colorama import init, Fore, Style
@@ -25,11 +24,11 @@ Pipeline Steps:
  Step 1: Run B_clinical_trial/initializer/organization_location.py
  Step 2: Run D_grant/initializer/funding_IC.py
  Step 3: Run this script to fetch ROR data and populate MySQL
- Step 4: Run G_update/updater/organization_location_2_updater.py to sync back to graph DB
+ Step 4: Run G_update/organization_location_step_2_updater.py to sync back to graph DB
 '''
 
 # STANDALONE FUNCTIONS - Must be at module level for multiprocessing compatibility
-# Consider to change to ThreadPoolExecutor, see example: G_update/updater/article_EPI_NHS_updater_multithread.py
+# Consider to change to ThreadPoolExecutor, see example: G_update/article_EPI_NHS_updater_multithread.py
 
 def _clean_org_name(text):
     """

@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional
 _dir = os.path.dirname(__file__)
 sys.path.extend([
     os.path.abspath(os.path.join(_dir, '..')),
-    os.path.abspath(os.path.join(_dir, '../..')),
 ])
 
 try:

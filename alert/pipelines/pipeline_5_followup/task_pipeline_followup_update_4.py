@@ -17,7 +17,7 @@ from utils.tools import _clean, _make_hash_key, _time_hms
 Sync new organization location rows from MySQL back to Memgraph.
 
 This task is the alert-pipeline version of:
-G_update/updater/organization_location_step_2_updater.py
+G_update/organization_location_step_2_updater.py
 
 It reads organization_location rows where is_new = 1, updates matching
 Organization nodes with ROR metadata, creates Location nodes when location data
