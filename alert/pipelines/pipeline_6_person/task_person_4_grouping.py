@@ -3,6 +3,7 @@ import os
 import re
 import string
 import sys
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from typing import Any, Dict, List
 
 import pandas as pd
@@ -30,6 +31,200 @@ values are preserved and assigned to matching new rows.
 #F_person/4_generate_person_group.py
 
 
+class _NoOpLogger:
+    """Small logger used inside worker processes to avoid sharing parent loggers."""
+
+    def info(self, message):
+        pass
+
+    def error(self, message):
+        pass
+
+
+def _process_last_name_group_worker(last_name: str, person_list: List[Dict[str, Any]],
+        group_id_processed_flag: str, large_last_name_group_size: int, empty_first_name: str) -> Dict[str, Any]:
+    """
+    Worker-process function.
+
+    It does CPU-heavy disambiguation only and returns SQL update tuples to the
+    parent process. It does not open or use a MySQL connection.
+    """
+
+    tuples = []
+    batches_processed = 0
+    disambiguation_batches = _create_person_batches_by_first_name_initial(
+        person_list,
+        large_last_name_group_size,
+        empty_first_name
+    )
+
+    for group_key, sublist in disambiguation_batches.items():
+        if not sublist:
+            continue
+
+        batches_processed += 1
+        disambiguator = PersonDisambiguator(last_name, sublist, logger=_NoOpLogger())
+        df = disambiguator.process()
+        df_subset = df[["id", "rdas_group_id", "final"]]
+
+        tuples.extend(_build_group_id_update_tuples_for_worker(
+            df_subset,
+            last_name,
+            group_id_processed_flag
+        ))
+
+    return {
+        "last_name": last_name,
+        "records": len(person_list),
+        "batches_processed": batches_processed,
+        "tuples": tuples,
+    }
+
+
+def _create_person_batches_by_first_name_initial(person_list: List[Dict[str, Any]], large_last_name_group_size: int, 
+                                                 empty_first_name: str) -> Dict[str, List[Dict[str, Any]]]:
+    """Split very large last-name groups by first initial before grouping."""
+
+    if len(person_list) < large_last_name_group_size:
+        return {"A-Z": person_list}
+
+    grouped_by_letter = {}
+    lowerchars = list(string.ascii_lowercase)
+    lowerchars.append(empty_first_name)
+
+    for char in lowerchars:
+        if char == empty_first_name:
+            grouped_by_letter[char] = [
+                person for person in person_list if not person.get("first_name")
+            ]
+        else:
+            grouped_by_letter[char] = [
+                person
+                for person in person_list
+                if person.get("first_name") and person["first_name"][0].lower() == char
+            ]
+
+    return grouped_by_letter
+
+
+def _build_group_id_update_tuples_for_worker(df_subset, last_name: str, group_id_processed_flag: str):
+    """
+    Build SQL update tuples in the worker process.
+
+    This is a module-level function so multiprocessing can pickle and run it safely. 
+    It returns tuples that the parent process writes to MySQL.
+    """
+
+    df = df_subset[["id", "rdas_group_id", "final"]].copy()
+    records = df.to_dict("records")
+    resolved_records = copy.deepcopy(records)
+
+    '''
+    PersonDisambiguator writes a temporary group value into the `final` column for the current run.
+    Some rows in this batch may already have an existing `rdas_group_id` saved in `person_of_all_sources`
+    from a previous full load or earlier alert run.
+    Those existing database `rdas_group_id` values should be preserved because they already identify
+    previously grouped people (in Memgraph).
+
+    If PersonDisambiguator places a new row into the same temporary `final` group as a row that already
+    has `rdas_group_id`, the new row should receive that existing database `rdas_group_id`.
+    This prevents the same person group from getting a brand-new `rdas_group_id` during an alert update.
+
+    `records` is the original disambiguator output. `resolved_records` is the copy we mutate before building SQL tuples.
+    '''
+    for record in records:
+        new_rdas_group_id = record.get("final")
+        existing_rdas_group_id = record.get("rdas_group_id")
+
+        '''
+        Case 1:
+        The current row already has an existing rdas_group_id AND the
+        disambiguator assigned it to a temporary final group.
+
+        That means every row with the same temporary final group should use this
+        existing rdas_group_id. This is how a new person row gets linked
+        to the same Agent/person group as an older matching row.
+
+        Example:
+            Existing row: rdas_group_id = "Zhao_12", final = "group_3"
+            New row:      rdas_group_id = NULL,      final = "group_3"
+
+        After this block:
+            New row final becomes "Zhao_12", so the SQL update assigns it the
+            existing rdas_group_id instead of storing "group_3".
+        '''
+        if (
+            not _is_empty_group_id_for_worker(existing_rdas_group_id)
+            and not _is_empty_group_id_for_worker(new_rdas_group_id)
+        ):
+            for item in resolved_records:
+                '''
+                Only rows with the same non-empty temporary final group are
+                updated. Blank final values are handled in the next case.
+                '''
+                if (
+                    not _is_empty_group_id_for_worker(item.get("final"))
+                    and item.get("final") == new_rdas_group_id
+                ):
+                    item["final"] = existing_rdas_group_id
+
+        '''
+        Case 2:
+        The current row already has an existing rdas_group_id, but the
+        disambiguator did not place it into a temporary final group.
+
+        This can happen when the row is not connected strongly enough to other
+        rows in this run. We still preserve its existing rdas_group_id in the
+        resolved copy so it is not treated like a brand-new ungrouped person.
+        '''
+        if (
+            not _is_empty_group_id_for_worker(existing_rdas_group_id)
+            and _is_empty_group_id_for_worker(new_rdas_group_id)
+        ):
+            for item in resolved_records:
+                '''
+                Find the same existing grouped row in the mutable copy and copy
+                its existing rdas_group_id into final. Later, rows that already
+                have rdas_group_id are skipped for SQL updates, but keeping final
+                resolved makes the data state explicit and prevents fallback IDs
+                from being considered for existing grouped rows.
+                '''
+                if (
+                    item.get("rdas_group_id") == existing_rdas_group_id
+                    and _is_empty_group_id_for_worker(item.get("final"))
+                ):
+                    item["final"] = existing_rdas_group_id
+
+    normalized_last_name = re.sub(r"\W+", "", last_name or "")
+    fallback_timestamp = _curr_timestamp("%Y%m%d%H%M%S")
+    tuples = []
+
+    for index, item in enumerate(resolved_records):
+        if not _is_empty_group_id_for_worker(item.get("rdas_group_id")):
+            continue
+
+        final_group_id = item.get("final")
+
+        if _is_empty_group_id_for_worker(final_group_id):
+            final_group_id = f"{normalized_last_name}_{fallback_timestamp}_{index}"
+
+        tuples.append((final_group_id, group_id_processed_flag, item.get("id")))
+
+    return tuples
+
+
+def _is_empty_group_id_for_worker(value: Any) -> bool:
+    """Return True for NULL, blank, or NaN group IDs."""
+
+    if value is None:
+        return True
+
+    if isinstance(value, str):
+        return not value.strip()
+
+    return bool(pd.isna(value))
+
+
 class NewPersonGroupingTask(PipelineBase):
     """Assign group IDs to new people without changing existing group IDs."""
 
@@ -38,10 +233,14 @@ class NewPersonGroupingTask(PipelineBase):
     PUBLICATION_ARTICLE_TABLE = "publication_article"
     LARGE_LAST_NAME_GROUP_SIZE = 5000
     EMPTY_FIRST_NAME = "NONE"
+    DEFAULT_MAX_WORKERS = 15
+    MAX_PENDING_FUTURES_PER_WORKER = 2
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=False)
         self.group_id_processed_flag = _curr_timestamp("%Y%m%d%H%M%S")
+        self.max_workers = self._resolve_max_workers()
+        self.max_pending_futures = self.max_workers * self.MAX_PENDING_FUTURES_PER_WORKER
 
 
     def find_new_data(self, gard_node) -> None:
@@ -54,45 +253,73 @@ class NewPersonGroupingTask(PipelineBase):
         total_last_names = 0
         total_people_updated = 0
         processed_last_names = set()
+        pending_futures = {}
 
         try:
-            for prefix in self._iter_last_name_prefixes():
-                self.logger.info(f"Processing last-name prefix: {prefix}")
+            self.logger.info(
+                f"Starting PersonGroupingTask with max_workers={self.max_workers}; "
+                f"max_pending_futures={self.max_pending_futures}."
+            )
 
-                last_names = self.get_newly_added_last_names_by_prefix(prefix)
+            with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
 
-                if not last_names:
-                    self.logger.info(f'No new last names starts with {prefix} found.\n')
-                    continue
+                for prefix in self._iter_last_name_prefixes():
+                    self.logger.info(f"Processing last-name prefix: {prefix}")
 
-                for last_name in last_names:
-                    if not last_name:
+                    last_names = self.get_newly_added_last_names_by_prefix(prefix)
+
+                    if not last_names:
+                        self.logger.info(f'No new last names starts with {prefix} found.\n')
                         continue
 
-                    normalized_last_name = str(last_name).strip().lower()
+                    for last_name in last_names:
+                        if not last_name:
+                            continue
 
-                    if normalized_last_name in processed_last_names:
-                        self.logger.info(f"Skipping already processed last_name={last_name}")
-                        continue
+                        normalized_last_name = str(last_name).strip().lower()
 
-                    processed_last_names.add(normalized_last_name)
+                        if normalized_last_name in processed_last_names:
+                            self.logger.info(f"Skipping already processed last_name={last_name}")
+                            continue
 
-                    self.logger.info(f"Processing last_name = {last_name}")
+                        processed_last_names.add(normalized_last_name)
 
-                    person_list = self.fetch_person_by_last_name_for_group_id_update(last_name)
+                        self.logger.info(f"Processing last_name = {last_name}")
 
-                    if not person_list:
-                        continue
+                        person_list = self.fetch_person_by_last_name_for_group_id_update(last_name)
 
-                    updated_count = self.process_last_name_group(last_name, person_list)
+                        if not person_list:
+                            continue
 
-                    total_last_names += 1
-                    total_people_updated += updated_count
+                        future = executor.submit(
+                            _process_last_name_group_worker,
+                            last_name,
+                            person_list,
+                            self.group_id_processed_flag,
+                            self.LARGE_LAST_NAME_GROUP_SIZE,
+                            self.EMPTY_FIRST_NAME
+                        )
 
-                    self.logger.info(
-                        f"Processed last_name={last_name}; "
-                        f"people updated={updated_count}; total people updated={total_people_updated}.\n"
-                    )
+                        pending_futures[future] = {"last_name": last_name, "records": len(person_list),}
+
+                        '''
+                        Do not submit every last_name to the process pool at once. Each pending future holds its person_list in
+                        memory until the worker finishes, and large last-name groups can be expensive.
+
+                        When the queue reaches max_pending_futures, wait until at least one worker finishes, then apply that worker's
+                        returned SQL tuples in the parent process. 
+                        This keeps memory bounded while still allowing several disambiguation jobs to run in parallel.
+                        '''
+                        if len(pending_futures) >= self.max_pending_futures:
+                            completed_count, updated_count = self._drain_grouping_futures(pending_futures, wait_for_all=False )
+
+                            total_last_names += completed_count
+                            total_people_updated += updated_count
+
+                completed_count, updated_count = self._drain_grouping_futures(pending_futures,  wait_for_all=True)
+
+                total_last_names += completed_count
+                total_people_updated += updated_count
 
             self.logger.info(
                 f"Completed PersonGroupingTask. "
@@ -108,6 +335,71 @@ class NewPersonGroupingTask(PipelineBase):
         finally:
             ''' Explicitly close all db connections. '''
             self.close()
+
+
+    def _resolve_max_workers(self) -> int:
+        """Resolve multiprocessing worker count from env, capped by CPU count."""
+
+        cpu_count = os.cpu_count() or 1
+        configured_workers = os.getenv("PERSON_GROUPING_MAX_WORKERS")
+
+        if configured_workers:
+            try:
+                return max(1, min(int(configured_workers), cpu_count))
+            except ValueError:
+                self.logger.info(
+                    f"Invalid PERSON_GROUPING_MAX_WORKERS={configured_workers}; "
+                    f"using default {self.DEFAULT_MAX_WORKERS}."
+                )
+
+        return max(1, min(self.DEFAULT_MAX_WORKERS, cpu_count))
+
+
+    def _drain_grouping_futures(self, pending_futures, wait_for_all: bool):
+        """Apply completed worker results using the parent MySQL connection."""
+
+        if not pending_futures:
+            return 0, 0
+
+        completed_total = 0
+        updated_total = 0
+
+        if wait_for_all:
+            done, _ = wait(pending_futures.keys())
+        else:
+            done, _ = wait(pending_futures.keys(), return_when=FIRST_COMPLETED)
+
+        for future in done:
+            metadata = pending_futures.pop(future)
+            completed_count, updated_count = self._handle_grouping_future(future, metadata)
+            
+            completed_total += completed_count
+            updated_total += updated_count
+
+        return completed_total, updated_total
+
+
+    def _handle_grouping_future(self, future, metadata):
+        """Read one worker result and update MySQL in the parent process."""
+
+        last_name = metadata.get("last_name")
+
+        try:
+            result = future.result()
+        except Exception as e:
+            self.logger.error(f"Person grouping worker failed for last_name={last_name}: {e}")
+            return 0, 0
+
+        tuples = result.get("tuples", [])
+        updated_count = self.update_rdas_group_id_with_tuples(tuples, last_name)
+
+        self.logger.info(
+            f"Processed last_name={last_name}; records={result.get('records', 0)}; "
+            f"batches={result.get('batches_processed', 0)}; update tuples={len(tuples)}; "
+            f"people updated={updated_count}.\n"
+        )
+
+        return 1, updated_count
 
 
     def _iter_last_name_prefixes(self):
@@ -292,71 +584,8 @@ class NewPersonGroupingTask(PipelineBase):
                 cursor.close()
 
 
-    def process_last_name_group(self, last_name: str, person_list: List[Dict[str, Any]]) -> int:
-        """Run disambiguation for one last name and persist updated group IDs."""
-
-        disambiguation_batches = self.create_person_batches_by_first_name_initial(person_list)
-
-        total_updated = 0
-
-        for group_key, sublist in disambiguation_batches.items():
-
-            if not sublist:
-                continue
-
-            self.logger.info(f"Disambiguating last_name={last_name}; group={group_key}; records={len(sublist)}.")
-
-            df_subset = self.disambiguate(last_name, sublist)
-
-            updated_count = self.update_rdas_group_id(df_subset, last_name)
-            total_updated += updated_count
-
-        return total_updated
-
-
-    def  create_person_batches_by_first_name_initial(self, person_list: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
-        """Split very large last-name groups by first initial before grouping."""
-
-        if len(person_list) < self.LARGE_LAST_NAME_GROUP_SIZE:
-            return {"A-Z": person_list}
-
-        # Large last-name groups are expensive to compare all at once, so split
-        # by first initial while keeping missing first names together.
-        grouped_by_letter = {}
-        lowerchars = list(string.ascii_lowercase)
-        lowerchars.append(self.EMPTY_FIRST_NAME)
-
-        for char in lowerchars:
-            if char == self.EMPTY_FIRST_NAME:
-                grouped_by_letter[char] = [
-                    person for person in person_list if not person.get("first_name")
-                ]
-            else:
-                grouped_by_letter[char] = [
-                    person
-                    for person in person_list
-                    if person.get("first_name") and person["first_name"][0].lower() == char
-                ]
-
-        return grouped_by_letter
-
-
-    def disambiguate(self, last_name: str, person_list: List[Dict[str, Any]]):
-        """Delegate person matching to the shared PersonDisambiguator."""
-
-        disambiguator = PersonDisambiguator(last_name, person_list, logger=self.logger)
-        df = disambiguator.process()
-
-        return df[["id", "rdas_group_id", "final"]]
-
-
-    def update_rdas_group_id(self, df_subset, last_name: str) -> int:
-        """Persist group IDs only for new/unassigned person rows."""
-
-        if df_subset is None or df_subset.empty:
-            return 0
-
-        tuples = self._build_group_id_update_tuples(df_subset, last_name)
+    def update_rdas_group_id_with_tuples(self, tuples, last_name: str) -> int:
+        """Persist worker-built group ID tuples using the parent MySQL connection."""
 
         if not tuples:
             return 0
@@ -389,138 +618,3 @@ class NewPersonGroupingTask(PipelineBase):
         finally:
             if cursor:
                 cursor.close()
-
-
-    def _build_group_id_update_tuples(self, df_subset, last_name: str):
-
-        '''
-        Match PersonGroupIdUpdater's incremental behavior:
-        keep existing rdas_group_id values stable, replace matching generated
-        disambiguation groups with the existing ID, and update only rows that do
-        not already have an rdas_group_id.
-        '''
-        '''
-        Step 1:
-        Keep only the columns needed to decide the final update.
-        id identifies the MySQL row, rdas_group_id is the existing stable ID,
-        and final is the temporary group from PersonDisambiguator.
-        '''
-        df = df_subset[["id", "rdas_group_id", "final"]].copy()
-
-        '''
-        Step 2:
-        Work with dictionaries so the logic mirrors PersonGroupIdUpdater and
-        each row is easy to compare.
-        '''
-        records = df.to_dict("records")
-
-        '''
-        Step 3:
-        Keep the original disambiguator output unchanged while building a
-        resolved copy. The copy is where generated final groups can be replaced
-        by existing rdas_group_id values.
-        '''
-        resolved_records = copy.deepcopy(records)
-
-        '''
-        Step 4:
-        For each row that already has an rdas_group_id, use that existing ID as
-        the canonical group ID for every row assigned to the same temporary
-        disambiguator group.
-        '''
-        for record in records:
-            new_rdas_group_id = record.get("final")
-            existing_rdas_group_id = record.get("rdas_group_id")
-
-            '''
-            Case A:
-            Existing row has rdas_group_id, and PersonDisambiguator also
-            assigned it a temporary final group. Any new row with the same final
-            group should receive the existing rdas_group_id.
-            '''
-            if (
-                not self._is_empty_group_id(existing_rdas_group_id)
-                and not self._is_empty_group_id(new_rdas_group_id)
-            ):
-                for item in resolved_records:
-                    if (
-                        not self._is_empty_group_id(item.get("final"))
-                        and item.get("final") == new_rdas_group_id
-                    ):
-                        item["final"] = existing_rdas_group_id
-
-            '''
-            Case B:
-            Existing row has rdas_group_id, but its temporary final group is
-            empty. Keep the existing ID on that row in the resolved copy so it
-            is not treated as an ungrouped person later.
-            '''
-            if (
-                not self._is_empty_group_id(existing_rdas_group_id)
-                and self._is_empty_group_id(new_rdas_group_id)
-            ):
-                for item in resolved_records:
-                    if (
-                        item.get("rdas_group_id") == existing_rdas_group_id
-                        and self._is_empty_group_id(item.get("final"))
-                    ):
-                        item["final"] = existing_rdas_group_id
-
-        '''
-        Step 5:
-        Prepare a fallback ID for truly new/unmatched people. This is only used
-        when a row has no existing rdas_group_id and the disambiguator did not
-        assign it to any group.
-        '''
-        normalized_last_name = re.sub(r"\W+", "", last_name or "")
-        fallback_timestamp = _curr_timestamp("%Y%m%d%H%M%S")
-        tuples = []
-
-        '''
-        Step 6:
-        Build SQL parameter tuples only for rows that do not already have
-        rdas_group_id. Existing grouped rows are skipped so their stable IDs
-        remain unchanged in MySQL and Memgraph.
-        '''
-        for index, item in enumerate(resolved_records):
-            if not self._is_empty_group_id(item.get("rdas_group_id")):
-                continue
-
-            final_group_id = item.get("final")
-
-            '''
-            Step 7:
-            If the new row matched an existing group, final_group_id is now that
-            existing rdas_group_id. If it did not match anything, create a
-            unique fallback group under this last name.
-            '''
-            if self._is_empty_group_id(final_group_id):
-                final_group_id = f"{normalized_last_name}_{fallback_timestamp}_{index}"
-
-            '''
-            Step 8:
-            Tuple order matches update_rdas_group_id():
-            SET rdas_group_id = %s, group_id_processed = %s WHERE id = %s.
-            '''
-            tuples.append((final_group_id, self.group_id_processed_flag, item.get("id")))
-
-        '''
-        Step 9:
-        The caller executes these updates with an extra SQL guard:
-        AND (rdas_group_id IS NULL OR rdas_group_id = ''). That protects
-        existing grouped rows even if this method is changed later.
-        '''
-        return tuples
-
-
-    @staticmethod
-    def _is_empty_group_id(value: Any) -> bool:
-        """Return True for NULL, blank, or NaN group IDs."""
-
-        if value is None:
-            return True
-
-        if isinstance(value, str):
-            return not value.strip()
-
-        return bool(pd.isna(value))
