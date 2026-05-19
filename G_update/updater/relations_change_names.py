@@ -87,9 +87,9 @@ RELATION_RENAME_SPECS = (
     ("Disease", "condition_associated_with_gene", "Gene", "has_associated_gene"),
     ("ClinicalTrial", "annotated", "Annotation", "has_annotation"),
     ("ClinicalTrial", "associated_with", "Organization", "has_associated_organization"),
-    ("Project", "has_mention_under", "Disease", "has_researched_disease"),
+    ("Project", "researched_by", "Disease", "has_researched_disease"),
     ("Intervention", "mapped_to_rxnorm", "Drug", "has_rxnorm_mapping"),
-)
+) 
 
 
 class RelationRenameUpdater:
