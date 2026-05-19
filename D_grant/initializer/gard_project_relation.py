@@ -42,7 +42,7 @@ class GardProjectReleationInitializer(InitBase):
             UNWIND $chunks AS chunk 
             MATCH(p:Project) WHERE p.applicationId = chunk.applicationId
             MATCH (g:GARD) WHERE g.gardId = chunk.gardId 
-            MERGE (g)-[:researched_by {confidenceScore: chunk.confidenceScore, semanticSimilarity: chunk.semanticSimilarity, sourceType: chunk.sourceType}]->(p) 
+            MERGE (p)-[:has_researched_disease {confidenceScore: chunk.confidenceScore, semanticSimilarity: chunk.semanticSimilarity, sourceType: chunk.sourceType}]->(g) 
         '''      
 
         id_ranges = _id_range_generator(min_id, max_id, step, batch_size)
