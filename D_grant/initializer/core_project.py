@@ -1,11 +1,12 @@
 import os
 import sys
+from decimal import Decimal, InvalidOperation
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
    
 from baseclass.init_base import InitBase
 from utils.minmaxid import MinMaxIdLoader
 from utils.file_appender import FileAppender
-from utils.tools import _id_range_generator, _format_dollars, _val, _curr_timestamp, _date_string, _set_value_for_none
+from utils.tools import _id_range_generator, _val, _curr_timestamp, _date_string, _set_value_for_none
 
 # 1. Create CoreProject nodes
 class CoreProjectInitializer(InitBase):
@@ -38,8 +39,9 @@ class CoreProjectInitializer(InitBase):
             UNWIND $chunks AS chunk
             MERGE (cp: CoreProject {coreProjectNumber: chunk.coreProjectNumber}) 
             ON CREATE SET 
-                cp.coreProjectNumber = chunk.coreProjectNumber,
-                cp.totalCost = chunk.totalCost
+                cp.coreProjectNumber = chunk.coreProjectNumber
+
+            SET cp.totalCost = chunk.totalCost
 
             WITH cp, chunk
             MATCH(p: Project {applicationId: chunk.applicationId})
@@ -53,11 +55,25 @@ class CoreProjectInitializer(InitBase):
 
             query = f'''
                 SELECT  
-                    p.application_id, p.core_project_num, p.full_project_num, p.TOTAL_COST
+                    p.application_id,
+                    p.core_project_num,
+                    cost.total_cost_1,
+                    cost.total_cost_2
                 FROM  {self.table_name} gpru  
 
                 LEFT JOIN grant_project p
                 ON gpru.application_id=p.application_id
+
+                LEFT JOIN (
+                    SELECT
+                        p2.core_project_num,
+                        SUM(p2.TOTAL_COST) AS total_cost_1,
+                        SUM(p2.DIRECT_COST_AMT + p2.INDIRECT_COST_AMT) AS total_cost_2
+                    FROM grant_project AS p2
+                    WHERE p2.core_project_num IS NOT NULL
+                    GROUP BY p2.core_project_num
+                ) cost
+                ON p.core_project_num = cost.core_project_num
 
                 WHERE (gpru.id BETWEEN {start_id} AND {end_id}) 
                     AND (gpru.processed IS NULL OR gpru.processed != '{self.processed_flag}')
@@ -73,17 +89,20 @@ class CoreProjectInitializer(InitBase):
                 total += 1
                 row = _set_value_for_none(row)
                 
-                core_project_num = row['core_project_num'] or row['full_project_num']
+                core_project_num = row['core_project_num']
 
                 if not core_project_num:
                     continue
 
-                total_cost = row['TOTAL_COST']
+                total_cost = row['total_cost_2']
+
+                if total_cost is None:
+                    total_cost = row['total_cost_1']
 
                 chunks.append({
                     "applicationId":  row['application_id'],                   
                     "coreProjectNumber":  core_project_num,
-                    "totalCost": _format_dollars(total_cost) if total_cost not in (None, '') and int(total_cost) > 0  else ''
+                    "totalCost": self._to_number_or_blank(total_cost)
                 })
               
             self.memgraph.execute(batch_create, {"chunks": chunks})   
@@ -96,6 +115,35 @@ class CoreProjectInitializer(InitBase):
 
         self.appender.log_stdout(f'\n\n{_curr_timestamp()} {"="*50} Done Total = {total} {"="*50}\n\n')
         self.appender.close()
+
+
+    def _to_number_or_blank(self, value):
+        """
+        Convert the selected MySQL total cost to a Python number.
+        If MySQL has no cost value, keep CoreProject.totalCost as an empty string.
+        """
+
+        if value is None:
+            return ''
+
+        if isinstance(value, str) and value.strip() == '':
+            return ''
+
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+
+        if isinstance(value, float):
+            return int(value) if value.is_integer() else value
+
+        if isinstance(value, Decimal):
+            return int(value) if value == value.to_integral_value() else float(value)
+
+        try:
+            number = Decimal(str(value).strip().replace(',', ''))
+        except (InvalidOperation, ValueError):
+            return ''
+
+        return int(number) if number == number.to_integral_value() else float(number)
         
 
 
