@@ -75,7 +75,7 @@ class NewPublicationDiscoveryTask(PipelineBase):
             pubmed_ids = self.retrieve_pubmed_ids(gard_id, name, last_update_date, today)
 
             if not pubmed_ids:
-                self.logger.warning(f"No new PubMed IDs found for [{gard_id}: {name}]")
+                #self.logger.warning(f"No new PubMed IDs found for [{gard_id}: {name}]")
                 continue
             
             self.find_new_publications(gard_id, name, pubmed_ids)

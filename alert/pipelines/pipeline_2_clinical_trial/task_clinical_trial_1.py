@@ -170,7 +170,7 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
                             pageToken = response_txt['nextPageToken']
 
                     else:
-                        self.logger.info(f'No new NCTIDs found for: {gardId}')
+                        #self.logger.info(f'No new NCTIDs found for: {gardId}')
                         break
 
             except Exception as e:
