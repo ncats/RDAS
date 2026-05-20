@@ -3,12 +3,14 @@ import os
 import sys
 from abc import ABC, abstractmethod
 from datetime import datetime
+from dotenv import load_dotenv
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
     os.path.abspath(os.path.join(_dir, "../..")),
     os.path.abspath(os.path.join(_dir, "../../..")),
 ])
+load_dotenv(os.path.abspath(os.path.join(_dir, "../..", ".env")))
 
 from utils.applogger import AppLogger
 from baseclass.conn import DBConnection as db
@@ -33,7 +35,7 @@ class PipelineBase(ABC):
         Python file APIs do not expand "~" automatically, so resolve it to
         the current user's home directory before creating the log folder.
         '''
-        self.log_dir = os.path.expanduser('~/rdas-memgraph-alert-logs')
+        self.log_dir = os.path.expanduser(os.getenv("ALERT_LOG_DIR", "logs"))
         os.makedirs(self.log_dir, exist_ok=True)
 
         class_name = type(self).__name__

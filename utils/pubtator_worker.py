@@ -2,13 +2,14 @@ import os
 import sys
 import json
 # Add the project root to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+_dir = os.path.dirname(__file__)
+sys.path.append(os.path.abspath(os.path.join(_dir, '..')))
    
 from dotenv import load_dotenv
 from utils.https_request import HTTPSUtils as HttpsUtil
 from utils.applogger import AppLogger
 
-load_dotenv()
+load_dotenv(os.path.abspath(os.path.join(_dir, '..', '.env')))
 
 class PubtatorWorker:
 
@@ -20,7 +21,7 @@ class PubtatorWorker:
     def _create_logger(self):
         # Keep utility logs in the same home-directory alert log folder used by
         # PipelineBase, and expand "~" before passing the path to FileHandler.
-        log_dir = os.path.expanduser('~/rdas-memgraph-alert-logs')
+        log_dir = os.path.expanduser(os.getenv("ALERT_LOG_DIR", "logs"))
         os.makedirs(log_dir, exist_ok=True)
         return AppLogger(
             type(self).__name__,

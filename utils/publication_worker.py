@@ -2,7 +2,8 @@ import os
 import sys
 import json
 # Add the project root to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+_dir = os.path.dirname(__file__)
+sys.path.append(os.path.abspath(os.path.join(_dir, '..')))
 
 import requests
 import urllib3
@@ -13,7 +14,7 @@ warnings.filterwarnings("ignore", category=urllib3.exceptions.InsecureRequestWar
 import time
 from datetime import datetime
 from dotenv import load_dotenv
-load_dotenv() 
+load_dotenv(os.path.abspath(os.path.join(_dir, '..', '.env')))
 
 from utils.applogger import AppLogger
 from utils.tools import  _normalize_txt
@@ -33,7 +34,7 @@ class PublicationWorker:
         '''
         Keep utility logs in the same home-directory alert log folder used by PipelineBase, and expand "~" before passing the path to FileHandler.
         '''
-        log_dir = os.path.expanduser('~/rdas-memgraph-alert-logs')
+        log_dir = os.path.expanduser(os.getenv("ALERT_LOG_DIR", "logs"))
         os.makedirs(log_dir, exist_ok=True)
         return AppLogger(
             type(self).__name__,
