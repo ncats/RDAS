@@ -4,12 +4,10 @@ import re
 import copy
 import string
 import pandas as pd
-#sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-#sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 _dir = os.path.dirname(__file__)
 sys.path.extend([
-    os.path.abspath(os.path.join(_dir, '..')),
-    os.path.abspath(os.path.join(_dir, '../..'))
+    _dir,
+    os.path.abspath(os.path.join(_dir, '..'))
 ])
 
 from colorama import init, Fore, Style
@@ -19,7 +17,18 @@ from person_worker import PersonWorker
 from person_disambiguation import PersonDisambiguator
 from utils.tools import ask_to_continue, _curr_timestamp
 
+'''
+Process the last names whose rows still need person group-id assignment.
 
+PersonWorker.get_last_names_for_group_id_update() reads distinct last_name values
+from person_of_all_sources where group_id_processed IS NULL.
+Those last names are the work queue for this updater.
+
+After this updater assigns rdas_group_id to the new/unprocessed person rows,
+PersonWorker.update_rdas_group_id_with_tuples() also writes group_id_processed =
+self.processed_flag. That processed flag prevents the same rows from being picked
+up again the next time this updater runs.
+'''
 class PersonGroupIdUpdater:
 
 
@@ -33,14 +42,18 @@ class PersonGroupIdUpdater:
 
         worker = PersonWorker()
 
+        '''
+        Step 1:
+        Get the distinct last names that still have at least one row with
+        group_id_processed IS NULL. The grouping process runs by last name so
+        PersonDisambiguator can compare people with the same family name.
+        '''
         last_names_list = worker.get_last_names_for_group_id_update()
         #last_names_list = ['Zai']
 
         if not last_names_list:  
             print(f'{Fore.RED}No last names to update.{Style.RESET_ALL}')
             return True
-
-
         
 
         for last_name in last_names_list:
