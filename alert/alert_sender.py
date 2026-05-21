@@ -205,6 +205,9 @@ class AlertSender(PipelineBase):
                 ''' add to summary'''
                 all_updates_summary.append({"email": email, "display_name": display_name, "payload": payload})
 
+            ''' Save the full alert summary payload into MySQL as a JSON string. ''' 
+            self.save_alert_summary(datetime.now(), update_date_start, update_date_end, all_updates_summary)
+
             ''' 5. Send summary email to admins '''
             '''
             Admin summary delivery is separate from per-user alert delivery.
@@ -221,9 +224,11 @@ class AlertSender(PipelineBase):
                         f"{update_date_start.strftime('%Y-%m-%d')} - "
                         f"{update_date_end.strftime('%Y-%m-%d')}"
                     )
+
                     summary_subject = f"{self.subject} Summary"
                     if not all_updates_summary:
                         summary_subject = f"{summary_subject} - No Updates"
+                        
 
                     emailClient.send_html_summary_email(
                         subject = summary_subject,
@@ -249,3 +254,36 @@ class AlertSender(PipelineBase):
 
             if firebaseAgent is not None:
                 firebaseAgent.close()
+
+
+    def save_alert_summary(self, date_sent, from_date, to_date, all_updates_summary) -> int:
+        """Save all user alert summaries into alert_summary.summary as JSON."""
+
+        insert_sql = '''
+            INSERT INTO alert_summary (date_sent, from_date, to_date, summary)
+            VALUES (%s, %s, %s, %s)
+        '''
+
+        cursor = None
+        summary_json = json.dumps(all_updates_summary or [], ensure_ascii=False, default=str)
+
+        try:
+            cursor = self.mysql.cursor()
+            cursor.execute(insert_sql, (date_sent, from_date, to_date, summary_json))
+            self.mysql.commit()
+
+            self.logger.info(f"Saved alert summary JSON to alert_summary.")
+
+            return cursor.rowcount
+
+        except Exception as e:
+            self.logger.error(f"Unable to save alert summary JSON to alert_summary: {e}")
+
+            if self.mysql:
+                self.mysql.rollback()
+
+            return 0
+
+        finally:
+            if cursor:
+                cursor.close()
