@@ -21,9 +21,10 @@ setup.txt
 spacy-readme.txt
 token.txt
 orcid.txt
-rdas_table_indexes.txt
+rdas_db_table_indexes.txt
 rdas-graph.png
 workflow.html
+requirements-full.txt
 __init__.py
 
 # Jupyter
