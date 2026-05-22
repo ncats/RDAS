@@ -4,7 +4,7 @@ import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import requests
 
@@ -15,7 +15,8 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _make_hash_key, _time_hms, _to_float, _to_int
+from utils.LlamaOrgNameExtractHelper import LlamaOrgNameExtractHelper
+from utils.tools import _time_hms, _to_float, _to_int
 
 """
 Fetch ROR organization location data for Organization nodes.
@@ -219,9 +220,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=True)
-        self.llama_model = os.getenv("OLLAMA_MODEL", "llama3.1")
-        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-        self.ollama_timeout = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
+        self.org_name_extractor = LlamaOrgNameExtractHelper(logger=self.logger)
 
 
     def find_new_data(self, gard_node) -> None:
@@ -563,7 +562,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
             if not original_name or not idx_key:
                 continue
 
-            extracted_name = self.extract_organization_name(original_name)
+            extracted_name = self.org_name_extractor.extract_organization_name(original_name)
 
             if extracted_name is None:
                 self.logger.info(
@@ -572,7 +571,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                 )
                 continue
 
-            extracted_name = self.normalize_extracted_name(extracted_name)
+            extracted_name = self.org_name_extractor.normalize_extracted_name(extracted_name)
 
             if not extracted_name:
                 not_found_idx_keys.append(idx_key)
@@ -580,7 +579,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                 self.logger.info(f"ROR not found: extractor returned no organization name for {original_name}")
                 continue
 
-            extracted_name_hash_key = _make_hash_key(extracted_name)
+            extracted_name_hash_key = self.org_name_extractor.make_extracted_name_hash_key(extracted_name)
             prepared_orgs.append({
                 "name": extracted_name,
                 "original_name_in_graph_db": str(original_name)[:500],
@@ -695,87 +694,6 @@ class OrganizationLocationRorLookupTask(PipelineBase):
             extracted_name_hash_key,
             idx_key,
         )
-
-
-    def extract_organization_name(self, original_name: str) -> Optional[str]:
-        """Ask the configured Ollama model for one clean organization name."""
-
-        prompt = self.build_prompt(original_name)
-        url = f"{self.ollama_base_url}/api/generate"
-
-        payload = {
-            "model": self.llama_model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0,
-            },
-        }
-
-        try:
-            response = requests.post(url, json=payload, timeout=self.ollama_timeout)
-            response.raise_for_status()
-            data = response.json()
-
-            return self.clean_llama_response(data.get("response", ""))
-
-        except requests.RequestException as e:
-            self.logger.error(f"Llama request failed for original_name={original_name[:120]}: {e}")
-            return None
-
-        except ValueError as e:
-            self.logger.error(f"Llama response was not valid JSON for original_name={original_name[:120]}: {e}")
-            return None
-
-
-    def build_prompt(self, original_name: str) -> str:
-        """Create a strict prompt so the model returns only the organization name."""
-
-        return f'''
-                Extract the main organization or institution name from the text below.
-                Return only one clean organization name.
-                Do not include departments, addresses, people, explanations, labels, bullets, or quotes.
-                If there is no organization name, return an empty string.
-
-                Text:
-                {original_name}
-            '''.strip()
-
-
-    def clean_llama_response(self, response_text: Any) -> str:
-        """Normalize the model response before using it for ROR lookup."""
-
-        if response_text is None:
-            return ""
-
-        text = str(response_text).strip()
-        text = re.sub(r"^```(?:text)?", "", text, flags=re.IGNORECASE).strip()
-        text = re.sub(r"```$", "", text).strip()
-
-        if "\n" in text:
-            text = next((line.strip() for line in text.splitlines() if line.strip()), "")
-
-        text = re.sub(r"^(organization name|organization|institution)\s*:\s*", "", text, flags=re.IGNORECASE)
-        text = text.strip(" \t\r\n\"'`*-")
-
-        if text.endswith("."):
-            text = text[:-1].strip()
-
-        if text.lower() in {"none", "n/a", "na", "unknown", "empty string", "no organization name"}:
-            return ""
-
-        return text
-
-
-    def normalize_extracted_name(self, extracted_name: Any) -> str:
-        """Trim and fit the extracted organization name to the MySQL column."""
-
-        if not extracted_name:
-            return ""
-
-        extracted_name = " ".join(str(extracted_name).strip().split())
-
-        return extracted_name[:200].strip()
 
 
     def save_found_organizations(self, org_info_tuple_list: List[Tuple[Any, ...]]) -> int:

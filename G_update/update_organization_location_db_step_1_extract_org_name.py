@@ -1,10 +1,8 @@
 import os
-import re
 import sys
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
-import requests
 from dotenv import load_dotenv
 
 _dir = os.path.dirname(__file__)
@@ -17,7 +15,8 @@ load_dotenv(os.path.abspath(os.path.join(_dir, "..", ".env")))
 
 from baseclass.conn import DBConnection as db
 from utils.applogger import AppLogger
-from utils.tools import _make_hash_key, _time_hms
+from utils.LlamaOrgNameExtractHelper import LlamaOrgNameExtractHelper
+from utils.tools import _time_hms
 
 # *** Update the existing data in organization_location table ***
 """
@@ -58,11 +57,8 @@ class OrganizationNameExtractionTask:
         self.logger = AppLogger(class_name, self.log_file).get_logger()
         self.logger.info(f'\n\n{"*" * 20} The {class_name} is initialized. {"*" * 20}\n')
 
-        self.llama_model = os.getenv("OLLAMA_MODEL", "llama3.1")
-        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-        self.ollama_timeout = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
-
-        self.processed_with = self.llama_model
+        self.org_name_extractor = LlamaOrgNameExtractHelper(logger=self.logger)
+        self.processed_with = self.org_name_extractor.llama_model
 
 
     def find_new_data(self, gard_node) -> None:
@@ -222,13 +218,13 @@ class OrganizationNameExtractionTask:
                 update_tuples.append((None, None, self.PROCESSED_FLAG, self.processed_with, row_id))
                 continue
 
-            extracted_name = self.extract_organization_name(original_name)
+            extracted_name = self.org_name_extractor.extract_organization_name(original_name)
 
             if extracted_name is None:
                 self.logger.info(f"Skipping id={row_id}; Llama request failed and will be retried later.")
                 continue
 
-            extracted_name = (extracted_name[:200] if len(extracted_name) > 200 else extracted_name).strip()
+            extracted_name = self.org_name_extractor.normalize_extracted_name(extracted_name)
 
             if not extracted_name:
                 update_tuples.append((None, None, self.PROCESSED_FLAG, self.processed_with, row_id))
@@ -236,80 +232,10 @@ class OrganizationNameExtractionTask:
 
             self.logger.info(f"[id] ={row_id}, [extracted_name]: {extracted_name}\n") 
 
-            extracted_name_hash_key = _make_hash_key(extracted_name)
+            extracted_name_hash_key = self.org_name_extractor.make_extracted_name_hash_key(extracted_name)
             update_tuples.append((extracted_name, extracted_name_hash_key, self.PROCESSED_FLAG, self.processed_with, row_id))
 
         return update_tuples
-
-
-    def extract_organization_name(self, original_name: str) -> Optional[str]:
-        """Ask the local llama3.1 model for one clean organization name."""
-
-        prompt = self.build_prompt(original_name)
-        url = f"{self.ollama_base_url}/api/generate"
-
-        payload = {
-            "model": self.llama_model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0,
-            },
-        }
-
-        try:
-            response = requests.post(url, json=payload, timeout=self.ollama_timeout)
-            response.raise_for_status()
-            data = response.json()
-
-            return self.clean_llama_response(data.get("response", ""))
-
-        except requests.RequestException as e:
-            self.logger.error(f"Llama request failed for original_name={original_name[:120]}: {e}")
-            return None
-
-        except ValueError as e:
-            self.logger.error(f"Llama response was not valid JSON for original_name={original_name[:120]}: {e}")
-            return None
-
-
-    def build_prompt(self, original_name: str) -> str:
-        """Create a strict prompt so the model returns only the organization name."""
-
-        return f'''
-                Extract the main organization or institution name from the text below.
-                Return only one clean organization name.
-                Do not include departments, addresses, people, explanations, labels, bullets, or quotes.
-                If there is no organization name, return an empty string.
-
-                Text:
-                {original_name}
-            '''.strip()
-
-
-    def clean_llama_response(self, response_text: Any) -> str:
-        """Normalize the model response before saving it to MySQL."""
-
-        if response_text is None:
-            return ""
-
-        text = str(response_text).strip()
-        text = re.sub(r"^```(?:text)?", "", text, flags=re.IGNORECASE).strip()
-        text = re.sub(r"```$", "", text).strip()
-
-        if "\n" in text:
-            text = next((line.strip() for line in text.splitlines() if line.strip()), "")
-
-        text = re.sub(r"^(organization name|organization|institution)\s*:\s*", "", text, flags=re.IGNORECASE)
-        text = text.strip(" \t\r\n\"'`*-")
-
-        if text.endswith("."):
-            text = text[:-1].strip()
-
-        if text.lower() in {"none", "n/a", "na", "unknown", "empty string", "no organization name"}:
-            return ""
-
-        return text
 
 
     def update_organization_names(self, cursor: Any, update_tuples: List[Tuple[Any, Any, str, Any]]) -> int:
