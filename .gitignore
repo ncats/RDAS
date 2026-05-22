@@ -6,22 +6,21 @@
 *.log
 *.sh
 *.json
-*.sql
+/*.sql
+/*.txt
+!/requirements.txt
 *.cypher
 **/data
+AGENTS.md
 mtu
 test
 tools
 movies
 */screenshots
+pipeline_desc
 ZTA-pipeline
 **/tables.txt
 **/production.txt
-setup.txt
-spacy-readme.txt
-token.txt
-orcid.txt
-rdas_db_table_indexes.txt
 rdas-graph.png
 workflow.html
 requirements-full.txt
@@ -37,3 +36,15 @@ __init__.py
 # Moon intermediate files
 F_person/riea/Moon_*.csv
 #!F_person/riea/Moon_final.csv
+
+# Non-Python analysis/support files/
+D_grant/init_10_linktable_PMID_already_exist_in_Publication_db.sql
+D_grant/init_9_GARD_and_Project_relationship.md
+D_grant/table.sql
+F_person/0_create_associate_id_int_column.sql
+F_person/person.sql
+F_person/riea/1_AuthorDisambiguation_NEW.ipynb
+F_person/riea/Author disambiguation.docx
+F_person/riea/Moon-2025-09-22.csv
+alert/emails/alert_email_preview.html
+alert/pipeline.MD
