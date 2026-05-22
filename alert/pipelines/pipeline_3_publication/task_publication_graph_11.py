@@ -11,7 +11,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _make_hash_key
+from utils.tools import _make_hash_key, _to_int
 
 '''
 Create OMIMRef nodes and Article/OMIMRef mappings for newly retrieved OMIM entries.
@@ -217,8 +217,12 @@ class NewPublicationOmimRefGraphTask(PipelineBase):
 
             # Each output chunk represents one Article and all OMIMRef nodes
             # that should be linked to it.
+            pubmed_id_int = _to_int(pubmed_id)
+            if pubmed_id_int is None:
+                self.logger.error(f"Invalid pubmed_id found: {pubmed_id}.")
+
             pubmed_omimrefs_mapping_list.append({
-                "pubmedId": self._to_int(pubmed_id),
+                "pubmedId": pubmed_id_int,
                 "targetRefs": self.transform_target_refs(target_refs),
                 "formattedToday": self.formatted_today
             })
@@ -555,13 +559,3 @@ class NewPublicationOmimRefGraphTask(PipelineBase):
                 references.append(reference)
 
         return references
-
-
-    def _to_int(self, value: Any):
-        """Convert PubMed IDs from OMIM references to integers."""
-
-        try:
-            return int(value)
-        except (TypeError, ValueError) as e:
-            self.logger.error(f"Invalid pubmed_id found: {value}. Error: {e}")
-            return None

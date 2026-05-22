@@ -9,7 +9,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _clean, _make_hash_key, _to_stripped_string
+from utils.tools import _clean, _make_hash_key, _to_int, _to_stripped_string
 
 """
 Create Substance nodes for new publication articles.
@@ -191,10 +191,13 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
             registry_number = None
 
             for row in rows_by_hash_id.get(hash_id, []):
-                pubmed_id = self._to_int(row.get("pubmed_id"))
+                raw_pubmed_id = row.get("pubmed_id")
+                pubmed_id = _to_int(raw_pubmed_id)
 
                 if pubmed_id is not None:
                     pubmed_id_list.append(pubmed_id)
+                else:
+                    self.logger.error(f"Invalid pubmed_id found: {raw_pubmed_id}.")
 
                 row_substance_name = _to_stripped_string(row.get("substance_name"))
                 row_registry_number = _to_stripped_string(row.get("registry_number"))
@@ -232,12 +235,3 @@ class NewPublicationSubstanceGraphTask(PipelineBase):
 
         composite_str = "".join(composite_str.split())
         return _make_hash_key(composite_str)
-
-
-    def _to_int(self, value: Any):
-        """Convert PubMed IDs from MySQL values to integers."""
-        try:
-            return int(value)
-        except (TypeError, ValueError) as e:
-            self.logger.error(f"Invalid pubmed_id found: {value}. Error: {e}")
-            return None

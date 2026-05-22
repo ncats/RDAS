@@ -276,6 +276,47 @@ def _try_parse_int(s):
     except ValueError:
         # If conversion fails, return None
         return None
+
+
+def _to_int(value: Any) -> Optional[int]:
+    """Convert nullable database/API values to ints."""
+
+    if value is None or value == "":
+        return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_float(value: Any) -> Optional[float]:
+    """Convert nullable database/API values to floats."""
+
+    if value is None or value == "":
+        return None
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_json_list(value: Any) -> List[Any]:
+    """Parse a JSON list value, passing through existing lists."""
+
+    if value is None:
+        return []
+
+    try:
+        parsed = json.loads(value) if isinstance(value, str) else value
+    except json.JSONDecodeError:
+        return []
+
+    if isinstance(parsed, list):
+        return parsed
+
+    return [parsed]
     
 
 def _na(s):

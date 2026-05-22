@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 import time
@@ -11,7 +10,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _clean, _make_hash_key, _time_hms
+from utils.tools import _clean, _make_hash_key, _parse_json_list, _time_hms, _to_float
 
 """
 Sync new organization location rows from MySQL back to Memgraph.
@@ -199,9 +198,9 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                 "hasLocation": False
             }
 
-        lat = self._to_float(row.get("lat"))
-        lng = self._to_float(row.get("lng"))
-        types = self._parse_types(row.get("types"))
+        lat = _to_float(row.get("lat"))
+        lng = _to_float(row.get("lng"))
+        types = _parse_json_list(row.get("types"))
 
         # Prefer coordinates for Location identity. If coordinates are missing,
         # fall back to the organization name so a stable key is still produced.
@@ -224,31 +223,3 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             "hasLocation": True
         }
 
-
-    def _parse_types(self, value: Any) -> List[Any]:
-        """Parse ROR organization types from JSON or pass through list values."""
-
-        if value is None:
-            return []
-
-        try:
-            parsed = json.loads(value) if isinstance(value, str) else value
-        except json.JSONDecodeError:
-            return []
-
-        if isinstance(parsed, list):
-            return parsed
-
-        return [parsed]
-
-
-    def _to_float(self, value: Any):
-        """Convert nullable MySQL coordinate values to floats."""
-
-        if value is None or value == "":
-            return None
-
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None

@@ -1,4 +1,3 @@
-import json
 import os
 import re
 import sys
@@ -17,7 +16,7 @@ load_dotenv(os.path.abspath(os.path.join(_dir, "..", ".env")))
 
 from baseclass.conn import DBConnection as db
 from utils.applogger import AppLogger
-from utils.tools import _clean, _make_hash_key, _time_hms
+from utils.tools import _clean, _make_hash_key, _parse_json_list, _time_hms, _to_float, _to_int
 
 
 class OrganizationLocationGraphUpdateTask:
@@ -288,9 +287,9 @@ class OrganizationLocationGraphUpdateTask:
             return None
 
         display_name = _clean(row.get("org_name", "")) or _clean(row.get("original_name_in_graph_db", ""))
-        lat = self.to_float(row.get("lat"))
-        lng = self.to_float(row.get("lng"))
-        geonames_id = self.to_int(row.get("geonames_id"))
+        lat = _to_float(row.get("lat"))
+        lng = _to_float(row.get("lng"))
+        geonames_id = _to_int(row.get("geonames_id"))
 
         has_location = any([
             row.get("city"),
@@ -321,7 +320,7 @@ class OrganizationLocationGraphUpdateTask:
         return {
             "displayName": display_name,
             "rorId": ror_id,
-            "types": self.parse_types(row.get("types")),
+            "types": _parse_json_list(row.get("types")),
             "website": _clean(row.get("website", "")),
             "established": _clean(row.get("established", "")),
             "status": _clean(row.get("status", "")),
@@ -499,47 +498,6 @@ class OrganizationLocationGraphUpdateTask:
         """
 
         self.memgraph.execute(query, {"duplicate_id": duplicate_id})
-
-
-    def parse_types(self, value: Any) -> List[Any]:
-        """Parse ROR organization types from JSON text or list values."""
-
-        if value is None:
-            return []
-
-        try:
-            parsed = json.loads(value) if isinstance(value, str) else value
-        except json.JSONDecodeError:
-            return []
-
-        if isinstance(parsed, list):
-            return parsed
-
-        return [parsed]
-
-
-    def to_float(self, value: Any) -> Optional[float]:
-        """Convert nullable MySQL coordinate values to floats."""
-
-        if value is None or value == "":
-            return None
-
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
-
-
-    def to_int(self, value: Any) -> Optional[int]:
-        """Convert nullable MySQL integer values to ints."""
-
-        if value is None or value == "":
-            return None
-
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return None
 
 
 if __name__ == "__main__":

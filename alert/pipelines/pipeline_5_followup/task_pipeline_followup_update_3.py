@@ -15,7 +15,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _time_hms
+from utils.tools import _time_hms, _to_float, _to_int
 
 """
 Fetch ROR organization location data for Organization nodes.
@@ -43,28 +43,6 @@ def _clean_org_name(text: Any) -> Any:
     text = re.sub(r'\s+', ' ', text)
 
     return text.strip()
-
-
-def _to_float(value: Any):
-    """Convert nullable API values to floats for location coordinates."""
-    if value is None or value == "":
-        return None
-
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _to_int(value: Any):
-    """Convert nullable API values to integers for geonames IDs."""
-    if value is None or value == "":
-        return None
-
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def lookup_ror_static(org_name: str, idx_key: str, timeout: int = 20):

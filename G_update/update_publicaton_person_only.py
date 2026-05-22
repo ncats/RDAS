@@ -26,7 +26,7 @@ init()
 
 from baseclass.conn import DBConnection as db
 from utils.file_appender import FileAppender
-from utils.tools import _clean, _date_string, _make_hash_key, _remove_parentheses
+from utils.tools import _clean, _date_string, _make_hash_key, _remove_parentheses, _to_int
 
 
 """
@@ -268,25 +268,17 @@ class PublicationPersonAgentUpdater:
     def get_pubmed_id(self, row: Dict[str, Any]) -> Optional[int]:
         """Return associate_id_int, the integer PubMed ID used by Article.pubmedId."""
 
-        return self.to_int(
-            row.get("associate_id_int"),
-            row.get("table_row_id"),
-            row.get("associate_id")
-        )
+        value = row.get("associate_id_int")
+        pubmed_id = _to_int(value)
 
-
-    def to_int(self, value: Any, table_row_id: Any = None, associate_id: Any = None) -> Optional[int]:
-        """Convert associate_id_int to the integer PubMed ID used in Memgraph."""
-
-        try:
-            return int(value)
-        except (TypeError, ValueError):
+        if pubmed_id is None:
             self.appender.log_stdout(
                 f"{Fore.YELLOW}Invalid PubMed ID skipped for person "
-                f"table_row_id={table_row_id}, associate_id={associate_id}, "
+                f"table_row_id={row.get('table_row_id')}, associate_id={row.get('associate_id')}, "
                 f"associate_id_int={value}.{Style.RESET_ALL}"
             )
-            return None
+
+        return pubmed_id
 
 
     def normalize_last_name(self, last_name: Any) -> Optional[str]:

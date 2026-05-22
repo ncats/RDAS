@@ -11,7 +11,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _clean, _make_hash_key, _remove_parentheses
+from utils.tools import _clean, _make_hash_key, _remove_parentheses, _to_int
 
 """
 Create Agent nodes and relationships for newly staged people.
@@ -368,9 +368,10 @@ class NewPersonAgentGraphTask(PipelineBase):
         if source == self.PUBLICATION:
             # Article relationships use integer PubMed IDs to match Article
             # node identity in Memgraph.
-            pubmed_id = self._to_int(associate_id)
+            pubmed_id = _to_int(associate_id)
 
             if pubmed_id is None:
+                self.logger.error(f"Invalid pubmed_id found for Agent relationship: {associate_id}")
                 return None
 
             return {
@@ -427,13 +428,3 @@ class NewPersonAgentGraphTask(PipelineBase):
         last_name = last_name.strip()
 
         return last_name or None
-
-
-    def _to_int(self, value: Any) -> Optional[int]:
-        """Convert publication associate IDs to integer PubMed IDs."""
-
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            self.logger.error(f"Invalid pubmed_id found for Agent relationship: {value}")
-            return None
