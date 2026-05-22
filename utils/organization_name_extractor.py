@@ -6,70 +6,44 @@ import requests
 
 from utils.tools import _make_hash_key
 
+"""
+Shared helper for extracting clean organization names with a local model API.
+
+Two organization-location flows need the same behavior:
+1. Build a strict prompt that asks the model for only one organization name.
+2. Call the configured model generation endpoint.
+3. Clean common formatting artifacts from the model response.
+4. Normalize the extracted name to fit organization_location.model_extracted_name.
+5. Generate the deterministic hash saved in model_extracted_name_hash_key.
+"""
 
 class OrganizationNameExtractor:
-    """
-    Shared helper for extracting clean organization names with a local Ollama model.
-
-    Two organization-location flows need the same behavior:
-    1. Build a strict prompt that asks the model for only one organization name.
-    2. Call the configured Ollama /api/generate endpoint.
-    3. Clean common formatting artifacts from the model response.
-    4. Normalize the extracted name to fit organization_location.model_extracted_name.
-    5. Generate the deterministic hash saved in model_extracted_name_hash_key.
-    """
-
-    DEFAULT_MODEL = "llama3.1"
-    DEFAULT_BASE_URL = "http://localhost:11434"
-    DEFAULT_TIMEOUT_SECONDS = 120
-    EXTRACTED_NAME_MAX_LENGTH = 200
-
-    def __init__(
-        self,
-        logger: Any = None,
-        llama_model: Optional[str] = None,
-        ollama_base_url: Optional[str] = None,
-        ollama_timeout: Any = None,
-    ):
-        """
-        Read Ollama settings from explicit arguments first, then environment.
-
-        Args:
-            logger: Optional logger with error()/warning() methods.
-            llama_model: Optional model override; defaults to OLLAMA_MODEL.
-            ollama_base_url: Optional Ollama base URL; defaults to OLLAMA_BASE_URL.
-            ollama_timeout: Optional timeout override; defaults to OLLAMA_TIMEOUT_SECONDS.
-        """
+    
+    def __init__(self, logger: Any = None):
+        """Read organization-name extraction settings from environment."""
         self.logger = logger
-        self.llama_model = llama_model or os.getenv("OLLAMA_MODEL", self.DEFAULT_MODEL)
-        self.ollama_base_url = (
-            ollama_base_url
-            or os.getenv("OLLAMA_BASE_URL", self.DEFAULT_BASE_URL)
-        ).rstrip("/")
 
-        timeout_value = (
-            ollama_timeout
-            if ollama_timeout is not None
-            else os.getenv("OLLAMA_TIMEOUT_SECONDS", str(self.DEFAULT_TIMEOUT_SECONDS))
-        )
-        self.ollama_timeout = self._parse_timeout(timeout_value)
+        self.model_name = self._required_env("ORG_NAME_EXTRACT_MODEL")
+        self.model_api_base_url = self._required_env("ORG_NAME_EXTRACT_BASE_URL").rstrip("/")
+        self.request_timeout = self._parse_timeout(os.getenv("ORG_NAME_EXTRACT_TIMEOUT_SECONDS") )
+        self.extracted_name_max_length = self._parse_positive_int(os.getenv("ORG_NAME_EXTRACT_MAX_LENGTH"), "ORG_NAME_EXTRACT_MAX_LENGTH", )
 
 
     def extract_organization_name(self, original_name: str) -> Optional[str]:
         """
-        Ask the configured Ollama model for one clean organization name.
+        Ask the configured model for one clean organization name.
 
         Returns:
             str: The cleaned model response. This can be an empty string when
                 the model says there is no organization name.
-            None: The Ollama request or response parsing failed. Callers use
+            None: The model request or response parsing failed. Callers use
                 None as a retryable extraction failure.
         """
         prompt = self.build_prompt(original_name)
-        url = f"{self.ollama_base_url}/api/generate"
+        url = f"{self.model_api_base_url}/api/generate"
 
         payload = {
-            "model": self.llama_model,
+            "model": self.model_name,
             "prompt": prompt,
             "stream": False,
             "options": {
@@ -78,18 +52,18 @@ class OrganizationNameExtractor:
         }
 
         try:
-            response = requests.post(url, json=payload, timeout=self.ollama_timeout)
+            response = requests.post(url, json=payload, timeout=self.request_timeout)
             response.raise_for_status()
             data = response.json()
 
-            return self.clean_llama_response(data.get("response", ""))
+            return self.clean_model_response(data.get("response", ""))
 
         except requests.RequestException as exc:
-            self._log_error(f"Llama request failed for original_name={str(original_name)[:120]}: {exc}")
+            self._log_error(f"Model request failed for original_name={str(original_name)[:120]}: {exc}")
             return None
 
         except ValueError as exc:
-            self._log_error(f"Llama response was not valid JSON for original_name={str(original_name)[:120]}: {exc}")
+            self._log_error(f"Model response was not valid JSON for original_name={str(original_name)[:120]}: {exc}")
             return None
 
 
@@ -107,11 +81,11 @@ class OrganizationNameExtractor:
             '''.strip()
 
 
-    def clean_llama_response(self, response_text: Any) -> str:
+    def clean_model_response(self, response_text: Any) -> str:
         """
         Normalize the raw model response before it is stored or used for ROR.
 
-        Ollama responses occasionally include markdown fences, labels, trailing
+        Model responses occasionally include markdown fences, labels, trailing
         punctuation, or sentinel values such as "N/A". This cleanup keeps the
         downstream database and ROR lookup logic working with one plain string.
         """
@@ -149,7 +123,7 @@ class OrganizationNameExtractor:
 
         normalized_name = " ".join(str(extracted_name).strip().split())
 
-        return normalized_name[:self.EXTRACTED_NAME_MAX_LENGTH].strip()
+        return normalized_name[:self.extracted_name_max_length].strip()
 
 
     def make_extracted_name_hash_key(self, extracted_name: str) -> Optional[str]:
@@ -164,17 +138,35 @@ class OrganizationNameExtractor:
 
 
     def _parse_timeout(self, timeout_value: Any) -> int:
-        """Parse timeout configuration and fall back to the default if invalid."""
+        """Parse timeout configuration as a positive integer."""
+
+        return self._parse_positive_int(timeout_value, "ORG_NAME_EXTRACT_TIMEOUT_SECONDS")
+
+
+    def _parse_positive_int(self, value: Any, setting_name: str) -> int:
+        """Parse a required positive integer setting."""
 
         try:
-            return int(timeout_value)
+            parsed_value = int(value)
+
+            if parsed_value > 0:
+                return parsed_value
 
         except (TypeError, ValueError):
-            self._log_warning(
-                f"Invalid OLLAMA_TIMEOUT_SECONDS={timeout_value}; "
-                f"using {self.DEFAULT_TIMEOUT_SECONDS} seconds."
-            )
-            return self.DEFAULT_TIMEOUT_SECONDS
+            pass
+
+        raise ValueError(f"{setting_name} must be a positive integer. Current value: {value}")
+
+
+    def _required_env(self, setting_name: str) -> str:
+        """Read a required environment setting and fail clearly if it is blank."""
+
+        value = os.getenv(setting_name)
+
+        if value and value.strip():
+            return value.strip()
+
+        raise ValueError(f"Missing required environment variable: {setting_name}")
 
 
     def _log_error(self, message: str) -> None:
