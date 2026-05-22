@@ -30,7 +30,7 @@ fetch_sql = f'''
             LIMIT %s
         '''
 The raw graph value is stored in original_name_in_graph_db. It may contain a department, address, person text, or other affiliation text. 
-This task sends that raw value to a local llama3.1 model and stores the returned organization name in model_extracted_name 
+This task sends that raw value to the configured local model and stores the returned organization name in model_extracted_name
 and a deterministic hash key in model_extracted_name_hash_key.
 """
 
@@ -58,7 +58,7 @@ class OrganizationNameExtractionTask:
         self.logger.info(f'\n\n{"*" * 20} The {class_name} is initialized. {"*" * 20}\n')
 
         self.org_name_extractor = OrganizationNameExtractor(logger=self.logger)
-        self.processed_with = self.org_name_extractor.llama_model
+        self.processed_with = self.org_name_extractor.model_name
 
 
     def find_new_data(self, gard_node) -> None:
@@ -84,7 +84,7 @@ class OrganizationNameExtractionTask:
 
     def process_new_data(self) -> None:
         """
-        Load organization_location rows with ror_id IS NULL, ask llama3.1 for a
+        Load organization_location rows with ror_id IS NULL, ask the configured model for a
         clean organization name, and update model_extracted_name for each
         processed row.
         """
@@ -115,7 +115,7 @@ class OrganizationNameExtractionTask:
                 rows = self.fetch_organization_batch()
 
                 if not rows:
-                    self.logger.info("No more organization_location rows need Llama name extraction.")
+                    self.logger.info("No more organization_location rows need model-based name extraction.")
                     break
 
                 batch_num += 1
@@ -129,7 +129,7 @@ class OrganizationNameExtractionTask:
                 Step 2:
                 Extract names row by row. This is the simpler path that avoids
                 large JSON prompts and response parsing overhead from the
-                previous Llama sub-batch version.
+                previous model sub-batch version.
                 '''
                 update_tuples = self.build_organization_name_update_tuples(rows)
 
@@ -137,7 +137,7 @@ class OrganizationNameExtractionTask:
                 Step 3:
                 Save rows that can be marked processed. Rows with blank source
                 text are marked with null extracted fields. Rows where the
-                Llama request failed are left unprocessed so a later run can
+                model request failed are left unprocessed so a later run can
                 retry them.
                 '''
                 if not update_tuples:
@@ -221,7 +221,7 @@ class OrganizationNameExtractionTask:
             extracted_name = self.org_name_extractor.extract_organization_name(original_name)
 
             if extracted_name is None:
-                self.logger.info(f"Skipping id={row_id}; Llama request failed and will be retried later.")
+                self.logger.info(f"Skipping id={row_id}; model request failed and will be retried later.")
                 continue
 
             extracted_name = self.org_name_extractor.normalize_extracted_name(extracted_name)
