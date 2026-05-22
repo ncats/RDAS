@@ -19,12 +19,12 @@ from utils.tools import _time_hms, _to_float, _to_int
 
 """
 Fetch ROR organization location data for Organization nodes.
- 
-It finds Organization nodes whose ror_id is still empty, skips organizations
-already stored in MySQL organization_location, queries the ROR API for the
-remaining organizations, saves found and not-found rows into MySQL with
-organization_location.is_new = 1, and marks not-found Organization nodes with
-ror_id = 'N/A'.
+
+1. Find Organization nodes whose ror_id is still empty.
+2. Skip organizations already stored in the MySQL organization_location table.
+3. Query the ROR API for the remaining organizations.
+4. Save found and not-found rows into MySQL with organization_location.is_new = 1.
+5. Mark not-found Organization nodes in Memgraph with ror_id = 'N/A'.
 """
 
 # Reference: G_update/organization_location_step_1_finder_multiple.py
