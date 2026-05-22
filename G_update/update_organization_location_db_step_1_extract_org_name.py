@@ -15,7 +15,7 @@ load_dotenv(os.path.abspath(os.path.join(_dir, "..", ".env")))
 
 from baseclass.conn import DBConnection as db
 from utils.applogger import AppLogger
-from utils.LlamaOrgNameExtractHelper import LlamaOrgNameExtractHelper
+from utils.organization_name_extractor import OrganizationNameExtractor
 from utils.tools import _time_hms
 
 # *** Update the existing data in organization_location table ***
@@ -57,7 +57,7 @@ class OrganizationNameExtractionTask:
         self.logger = AppLogger(class_name, self.log_file).get_logger()
         self.logger.info(f'\n\n{"*" * 20} The {class_name} is initialized. {"*" * 20}\n')
 
-        self.org_name_extractor = LlamaOrgNameExtractHelper(logger=self.logger)
+        self.org_name_extractor = OrganizationNameExtractor(logger=self.logger)
         self.processed_with = self.org_name_extractor.llama_model
 
 

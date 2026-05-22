@@ -7,7 +7,7 @@ import requests
 from utils.tools import _make_hash_key
 
 
-class LlamaOrgNameExtractHelper:
+class OrganizationNameExtractor:
     """
     Shared helper for extracting clean organization names with a local Ollama model.
 

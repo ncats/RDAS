@@ -15,7 +15,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.LlamaOrgNameExtractHelper import LlamaOrgNameExtractHelper
+from utils.organization_name_extractor import OrganizationNameExtractor
 from utils.tools import _time_hms, _to_float, _to_int
 
 """
@@ -220,7 +220,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=True)
-        self.org_name_extractor = LlamaOrgNameExtractHelper(logger=self.logger)
+        self.org_name_extractor = OrganizationNameExtractor(logger=self.logger)
 
 
     def find_new_data(self, gard_node) -> None:
