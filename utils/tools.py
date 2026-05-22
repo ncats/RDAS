@@ -10,6 +10,8 @@ import time
 import json
 import random
 import datetime
+import hashlib
+import unicodedata
 import pandas as pd
 from pathlib import Path 
 from datetime import datetime as DT
@@ -28,102 +30,197 @@ from colorama import init, Fore, Style
 # Initialize colorama for Windows compatibility
 init()
 
-import re
-import hashlib
-import unicodedata
-from typing import Any
+def read_csv(file_path: Any) -> pd.DataFrame:
+    """
+    Read a CSV file into a pandas DataFrame.
 
-def read_csv(file_path):
+    This helper keeps CSV loading behavior consistent across the project:
+    - index_col=False prevents pandas from treating the first column as an index.
+    - Path normalizes string/path-like inputs before passing them to pandas.
+    - Specific file and parser errors are re-raised with clearer file context
+      while preserving the original exception as the cause.
+    """
+    path = Path(file_path)
 
     try:
-        df = pd.read_csv(file_path, index_col=False)
-        return df
-    except FileNotFoundError: 
-        raise FileNotFoundError(f"Error: The file '{file_path}' does not exist.")
-    except pd.errors.EmptyDataError: 
-        raise pd.errors.EmptyDataError(f"Error: The {file_path} file is empty.") 
-    except pd.errors.ParserError: 
-        raise pd.errors.ParserError("Error: Unable to parse the CSV file. Check the file's format.")
-    except Exception as e:
-        # Catch-all for any other exceptions
-        raise Exception(f"An unexpected error occurred: {e}")
+        return pd.read_csv(path, index_col=False)
+
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"CSV file does not exist: {path}") from exc
+
+    except pd.errors.EmptyDataError as exc:
+        raise pd.errors.EmptyDataError(f"CSV file is empty: {path}") from exc
+
+    except pd.errors.ParserError as exc:
+        raise pd.errors.ParserError(f"Unable to parse CSV file: {path}") from exc
 
 
-def read_csv_as_dict(file_path):
+def read_csv_as_dict(file_path: Any) -> List[Dict[str, str]]:
+    """
+    Read a CSV file as a list of dictionaries.
 
-    with open(file_path, 'r', encoding='utf-8-sig') as csv_file:
-        reader = csv.DictReader(csv_file)
+    csv.DictReader uses the first row as column names and returns each later row
+    as a dict keyed by those names. The utf-8-sig encoding intentionally accepts
+    CSV files that include a UTF-8 byte-order mark, which is common in files
+    exported from spreadsheet tools.
+    """
+    path = Path(file_path)
 
-        return [row for row in reader]
+    try:
+        # newline="" lets the csv module handle platform-specific line endings
+        # correctly instead of letting Python translate them before parsing.
+        with path.open("r", encoding="utf-8-sig", newline="") as csv_file:
+            reader = csv.DictReader(csv_file)
+            return [row for row in reader]
+
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"CSV file does not exist: {path}") from exc
+
+    except csv.Error as exc:
+        raise csv.Error(f"Unable to parse CSV file as dictionaries: {path}") from exc
     
     
-def write_json_to_file(data: Any, file_path: str) -> None:
+def write_json_to_file(data: Any, file_path: Any) -> None:
     """
     Serialize a Python object to a JSON file.
 
-    Args:
-        data: JSON-serializable Python object (dict, list, etc.)
-        file_path: Destination file path
+    The helper uses the same readable JSON format everywhere:
+    - UTF-8 output for consistent cross-platform file handling.
+    - ensure_ascii=False so non-ASCII text is written as normal characters.
+    - indent=2 so generated files are easy to inspect in reviews and logs.
     """
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(
-            data,
-            f,
-            ensure_ascii=False,  # preserve Unicode characters
-            indent=2             # readable formatting
-        )
+    path = Path(file_path)
+
+    try:
+        # Use Path.open so callers can pass either a string path or a Path-like
+        # object without each call site having to normalize the value first.
+        with path.open("w", encoding="utf-8") as json_file:
+            json.dump(
+                data,
+                json_file,
+                ensure_ascii=False,
+                indent=2,
+            )
+
+    except TypeError as exc:
+        raise TypeError(f"Data is not JSON serializable for file: {path}") from exc
+
+    except ValueError as exc:
+        raise ValueError(f"Unable to encode JSON data for file: {path}") from exc
+
+    except OSError as exc:
+        raise OSError(f"Unable to write JSON file: {path}") from exc
 
 
 def _load_json_file(file_path: Any) -> Any:
-    """Load JSON from a path-like value."""
+    """
+    Load and parse a JSON file.
+
+    This helper centralizes JSON reads so callers get consistent UTF-8 handling
+    and useful file-specific errors. It returns the decoded Python value exactly
+    as json.load produces it, usually a dict or list.
+    """
     path = Path(file_path)
 
-    if not path.exists():
-        raise FileNotFoundError(f"Missing JSON file: {path}")
+    try:
+        # Keep reads explicit as UTF-8 because project-generated JSON files are
+        # written that way by write_json_to_file().
+        with path.open("r", encoding="utf-8") as json_file:
+            return json.load(json_file)
 
-    with path.open("r", encoding="utf-8") as file:
-        return json.load(file)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"JSON file does not exist: {path}") from exc
+
+    except json.JSONDecodeError as exc:
+        raise json.JSONDecodeError(
+            f"Unable to parse JSON file {path}: {exc.msg}",
+            exc.doc,
+            exc.pos,
+        ) from exc
+
+    except OSError as exc:
+        raise OSError(f"Unable to read JSON file: {path}") from exc
 
 
 def _format_recipients(recipients: Any) -> Optional[str]:
-    """Format one or more email recipients for an email header."""
+    """
+    Format one or more email recipients for an email header.
+
+    Email headers expect one comma-separated string, but callers may pass a
+    single email, a comma-separated string, or an iterable of email values.
+    Return None only when the caller provided no recipient value at all; that
+    lets the email-sending code skip optional headers such as Cc.
+    """
     if recipients is None:
         return None
 
-    if isinstance(recipients, (list, tuple, set)):
-        return ", ".join(str(email).strip() for email in recipients if str(email).strip())
+    # Reuse the list-normalization helper so header formatting and SMTP
+    # recipient-envelope formatting stay consistent with each other.
+    normalized_recipients = _recipient_list(recipients)
 
-    return str(recipients)
+    return ", ".join(normalized_recipients)
 
 
 def _recipient_list(*recipient_values: Any) -> List[str]:
-    """Flatten comma-separated and iterable recipient values into a clean list."""
-    recipients = []
+    """
+    Flatten email recipient inputs into a clean list.
 
-    for value in recipient_values:
-        if not value:
-            continue
+    Callers may pass recipients in several practical forms:
+    - one comma-separated string from an environment variable,
+    - a list/tuple/set from configuration,
+    - multiple values that combine To and Cc recipients.
+
+    Every non-empty recipient is stripped of surrounding whitespace. Empty
+    values are ignored so the returned list is ready for SMTP sendmail().
+    """
+    recipients: List[str] = []
+
+    def append_recipient_value(value: Any) -> None:
+        """Normalize one recipient value and append any concrete emails."""
+        if value is None:
+            return
 
         if isinstance(value, (list, tuple, set)):
-            recipients.extend(str(email).strip() for email in value if str(email).strip())
-        else:
-            recipients.extend(email.strip() for email in str(value).split(",") if email.strip())
+            # Recurse through nested collections so callers do not need to
+            # flatten config values before passing them into this helper.
+            for nested_value in value:
+                append_recipient_value(nested_value)
+            return
+
+        # A single string can still contain multiple comma-separated emails,
+        # especially when it came from an environment variable.
+        for email in str(value).split(","):
+            cleaned_email = email.strip()
+            if cleaned_email:
+                recipients.append(cleaned_email)
+
+    for value in recipient_values:
+        append_recipient_value(value)
 
     return recipients
 
 
-def insert_params_to_template(template, params):
+def insert_params_to_template(template: str, params: Dict[str, Any]) -> str:
+    """
+    Render a simple ``$name`` placeholder template with concrete values.
 
-    real_query = template
+    This helper is useful for generating readable query text or script output
+    from small templates. It is intentionally simple and should not replace
+    parameterized database APIs for user-provided values in executable SQL.
+
+    Values are rendered through _escape_sql_literal() so SQL-style literal
+    formatting is implemented in one place instead of being duplicated here.
+    """
+    rendered_template = template
 
     for key, value in params.items():
-        if isinstance(value, str):
-            real_query = real_query.replace(f'${key}', f"'{value}'")
-        else:
-            # For non-string values, we might want to convert them to a string representation
-            real_query = real_query.replace(f'${key}', json.dumps(value))
+        placeholder = f"${key}"
+        rendered_template = rendered_template.replace(
+            placeholder,
+            _escape_sql_literal(value),
+        )
 
-    return real_query
+    return rendered_template
 
         
 def _is_english(syn):
@@ -230,10 +327,9 @@ def _clean_data_extract(data):
         
         # Check if value is a non-empty string
         elif isinstance(v, str):
-            # Remove all characters except: letters, numbers, whitespace, 
-            # hyphens, slashes, @ symbols, periods, and plus signs
-            text = re.sub(r'[^\w\s\-\/@.+]+', '', v)
-            cleaned[k] = f'"{text}"'
+            # Reuse the same string sanitizer as _clean() so dictionary-level
+            # extraction and scalar cleaning cannot drift apart over time.
+            cleaned[k] = f'"{_clean(v)}"'
         
         # For all other data types (numbers, booleans, None, etc.)
         else:
@@ -270,12 +366,8 @@ def _split_string_with_brackets(text):
 
 
 def _try_parse_int(s):
-    try:
-        # Attempt to convert the string to an integer
-        return int(s)
-    except ValueError:
-        # If conversion fails, return None
-        return None
+    """Backward-compatible wrapper around the shared nullable int parser."""
+    return _to_int(s)
 
 
 def _to_int(value: Any) -> Optional[int]:
@@ -320,7 +412,11 @@ def _parse_json_list(value: Any) -> List[Any]:
     
 
 def _na(s):
-    if s in ['NA', 'N/A','na','n/a', 'null', 'none', 'None']:
+    """Convert common string NA/null markers to None."""
+    if s is None:
+        return None
+
+    if _to_stripped_string(s).lower() in {'na', 'n/a', 'null', 'none'}:
         return None
     
     return s
@@ -473,18 +569,29 @@ def _utf8(text):
     return text  # Leave non-strings untouched)
 
 
-def _normalize_txt(text):
-         
+def _normalize_ascii_text(text: Any, default: Any = '') -> Any:
+    """
+    Normalize Unicode text to plain ASCII.
+
+    Several older helpers need the same normalization but disagree on what to
+    return for non-string inputs. Keeping the normalization in this helper makes
+    that shared behavior explicit while allowing each wrapper to keep its legacy
+    default.
+    """
     if isinstance(text, str):
         return unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
-    return text  # Leave non-strings untouched
+
+    return default
+
+
+def _normalize_txt(text):
+    """Normalize strings to ASCII and leave non-string values untouched."""
+    return _normalize_ascii_text(text, default=text)
 
 
 def _to_txt(text):
-         
-    if isinstance(text, str):
-        return unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
-    return '' 
+    """Normalize strings to ASCII and return an empty string for non-strings."""
+    return _normalize_ascii_text(text, default='')
 
 
 def _normalize_tuple(rowTuple):
@@ -537,14 +644,27 @@ def _val(obj, default=''):
     return obj if obj is not None else default
 
 
-def _arr(obj, delimiter=';', default=[]): 
-    return obj.split(delimiter) if obj is not None else default
+def _arr(obj, delimiter=';', default=None):
+    """
+    Split a delimited string into a list.
+
+    The previous implementation used [] as a default argument, which creates one
+    shared list object at function-definition time. Use None internally instead
+    so each call gets a fresh empty list unless the caller passes an explicit
+    default value.
+    """
+    if obj is None:
+        return list(default) if isinstance(default, list) else (default or [])
+
+    return str(obj).split(delimiter)
 
 
 def _split_str(item):
+    """Split a bracket-wrapped comma-separated string into a list."""
     if not item:
         return []
-    return item.strip('[]').split(',')
+
+    return [part.strip() for part in str(item).strip('[]').split(',') if part.strip()]
 
 
 def _time_hms(elapsed_time):
@@ -555,8 +675,6 @@ def _time_hms(elapsed_time):
 def _time_day_hms(elapsed_time):
     hours, minutes, seconds = _time_hms(elapsed_time)
     days, hours = divmod(hours, 24)
-    return int(days), int(hours), int(minutes), int(seconds)
-
     return int(days), int(hours), int(minutes), int(seconds)
 
 
@@ -595,18 +713,13 @@ def _hash_az(input_string):
 
 
 def _elapsed_time(start_time, end_time):
+    """Backward-compatible wrapper around elapsed_time()."""
     return elapsed_time(start_time, end_time)
 
 
 def elapsed_time(start_time, end_time):
-    time_diff = end_time - start_time
-
-    # Convert to hours, minutes, and seconds
-    hours = int(time_diff // 3600)
-    minutes = int((time_diff % 3600) // 60)
-    seconds = int(time_diff % 60)
-
-    return hours, minutes, seconds
+    """Return elapsed wall-clock time as ``(hours, minutes, seconds)``."""
+    return _time_hms(end_time - start_time)
 
 # for MySQL query result rows only
 def _set_value_for_none(row):
@@ -647,12 +760,12 @@ def _empty_if_none(value: Any) -> Any:
 
 def _to_string(value: Any) -> str:
     """Return an empty string for None, otherwise convert the value to string."""
-    return "" if value is None else str(value)
+    return str(_empty_if_none(value))
 
 
 def _to_stripped_string(value: Any) -> str:
     """Return an empty string for None, otherwise convert to a stripped string."""
-    return "" if value is None else str(value).strip()
+    return _to_string(value).strip()
 
 
 def _na_if_empty(value: Any) -> str:
