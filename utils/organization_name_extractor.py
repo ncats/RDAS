@@ -1,9 +1,11 @@
 import os
 import re
-from typing import Any, Optional
-
+import time
+import shlex
 import requests
-
+import subprocess
+from typing import Any, Optional
+from urllib.parse import urlparse
 from utils.tools import _make_hash_key
 
 """
@@ -18,15 +20,21 @@ Two organization-location flows need the same behavior:
 """
 
 class OrganizationNameExtractor:
-    
+
     def __init__(self, logger: Any = None):
         """Read organization-name extraction settings from environment."""
         self.logger = logger
 
         self.model_name = self._required_env("ORG_NAME_EXTRACT_MODEL")
         self.model_api_base_url = self._required_env("ORG_NAME_EXTRACT_BASE_URL").rstrip("/")
-        self.request_timeout = self._parse_timeout(os.getenv("ORG_NAME_EXTRACT_TIMEOUT_SECONDS") )
-        self.extracted_name_max_length = self._parse_positive_int(os.getenv("ORG_NAME_EXTRACT_MAX_LENGTH"), "ORG_NAME_EXTRACT_MAX_LENGTH", )
+        self.request_timeout = self._parse_timeout(os.getenv("ORG_NAME_EXTRACT_TIMEOUT_SECONDS"))
+        self.extracted_name_max_length = self._parse_positive_int(os.getenv("ORG_NAME_EXTRACT_MAX_LENGTH"), "ORG_NAME_EXTRACT_MAX_LENGTH",)
+
+        self._model_server_checked = False
+        self._model_server_is_running = False
+        self._model_server_start_attempted = False
+        self._model_server_process = None
+        self.check_model_server_running()
 
 
     def extract_organization_name(self, original_name: str) -> Optional[str]:
@@ -39,6 +47,9 @@ class OrganizationNameExtractor:
             None: The model request or response parsing failed. Callers use
                 None as a retryable extraction failure.
         """
+        if not self._model_server_is_running:
+            return None
+
         prompt = self.build_prompt(original_name)
         url = f"{self.model_api_base_url}/api/generate"
 
@@ -65,6 +76,105 @@ class OrganizationNameExtractor:
         except ValueError as exc:
             self._log_error(f"Model response was not valid JSON for original_name={str(original_name)[:120]}: {exc}")
             return None
+
+
+    def check_model_server_running(self) -> bool:
+        """
+        Check whether the configured model server is reachable.
+
+        The check is cached for this extractor instance so a down model server
+        does not trigger one extra health request for every organization row.
+        """
+        if self._model_server_checked:
+            return self._model_server_is_running
+
+        if self._request_model_server_health():
+            self._model_server_is_running = True
+            self._model_server_checked = True
+            return True
+
+        self._log_warning(f"Model server is not reachable at {self.model_api_base_url}; attempting to start it.")
+
+        if self.start_model_server():
+            self._model_server_is_running = self.wait_for_model_server_start()
+        else:
+            self._model_server_is_running = False
+
+        self._model_server_checked = True
+
+        if not self._model_server_is_running:
+            self._log_error(f"Model server is not running or not reachable at {self.model_api_base_url}.")
+
+        return self._model_server_is_running
+
+
+    def start_model_server(self) -> bool:
+        """
+        Start the local model server with MODEL_START_COMMAND.
+        Example:
+            MODEL_START_COMMAND=ollama serve
+        """
+        if self._model_server_start_attempted:
+            return self._model_server_process is not None
+
+        self._model_server_start_attempted = True
+
+        if not self._is_local_model_api():
+            self._log_error(f"Auto-start is only supported for local model endpoints. Configured endpoint: {self.model_api_base_url}")
+            return False
+
+        start_command = self._required_env("MODEL_START_COMMAND")
+
+        try:
+            self._model_server_process = subprocess.Popen(
+                shlex.split(start_command),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            self._log_info(f"Started model server with: {start_command}")
+
+            return True
+
+        except (OSError, ValueError) as exc:
+            self._model_server_process = None
+            self._log_error(f"Failed to start model server with MODEL_START_COMMAND={start_command}: {exc}")
+            return False
+
+
+    def wait_for_model_server_start(self, attempts: int = 10, delay_seconds: float = 1.0) -> bool:
+        """Poll the model server until it responds or the startup wait expires."""
+
+        for _ in range(attempts):
+            if self._request_model_server_health():
+                return True
+
+            time.sleep(delay_seconds)
+
+        return False
+
+
+    def _request_model_server_health(self) -> bool:
+        """Return True when the configured model server health endpoint responds."""
+
+        try:
+            response = requests.get(
+                f"{self.model_api_base_url}/api/tags",
+                timeout=min(self.request_timeout, 5),
+            )
+            response.raise_for_status()
+            return True
+
+        except requests.RequestException:
+            return False
+
+
+    def _is_local_model_api(self) -> bool:
+        """Return True when the configured model API URL points to this machine."""
+
+        hostname = urlparse(self.model_api_base_url).hostname
+
+        return hostname in {"localhost", "127.0.0.1", "::1"}
 
 
     def build_prompt(self, original_name: str) -> str:
@@ -174,6 +284,13 @@ class OrganizationNameExtractor:
 
         if self.logger is not None and hasattr(self.logger, "error"):
             self.logger.error(message)
+
+
+    def _log_info(self, message: str) -> None:
+        """Log an informational message when a logger is available."""
+
+        if self.logger is not None and hasattr(self.logger, "info"):
+            self.logger.info(message)
 
 
     def _log_warning(self, message: str) -> None:
