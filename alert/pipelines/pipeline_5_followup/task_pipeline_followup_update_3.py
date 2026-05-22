@@ -4,7 +4,7 @@ import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -15,19 +15,22 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _time_hms, _to_float, _to_int
+from utils.tools import _make_hash_key, _time_hms, _to_float, _to_int
 
 """
 Fetch ROR organization location data for Organization nodes.
 
-1. Find Organization nodes whose ror_id is still empty.
+1. Find Organization nodes whose ror_id is still empty in Memgraph.
 2. Skip organizations already stored in the MySQL organization_location table.
-3. Query the ROR API for the remaining organizations.
-4. Save found and not-found rows into MySQL with organization_location.is_new = 1.
-5. Mark not-found Organization nodes in Memgraph with ror_id = 'N/A'.
+3. Extract a cleaner organization name with the configured Ollama model.
+4. Query the ROR API with the extracted organization name.
+5. Save found and not-found rows into MySQL with organization_location.is_new = 1.
+6. Mark not-found Organization nodes in Memgraph with ror_id = 'N/A'.
 """
 
-# Reference: G_update/organization_location_step_1_finder_multiple.py
+# References:
+# - G_update/update_organization_location_db_step_1_extract_org_name.py
+# - G_update/update_organization_location_db_step_2_ROR_find.py
 
 
 def _clean_org_name(text: Any) -> Any:
@@ -169,10 +172,11 @@ class OrganizationLocationRorLookupTask(PipelineBase):
             ror_id, original_name_in_graph_db, org_name, geonames_id, established,
             status, types, website, city, country,
             country_code, state, lat, lng, full_data,
+            model_extracted_name, model_extracted_name_hash_key,
             original_name_in_graph_db_idx_key,
             is_new
         )
-        VALUES (%s, %s, %s, %s, %s,  %s, %s, %s, %s, %s,  %s, %s, %s, %s, %s,  %s, 1)
+        VALUES (%s, %s, %s, %s, %s,  %s, %s, %s, %s, %s,  %s, %s, %s, %s, %s,  %s, %s, %s, 1)
         ON DUPLICATE KEY UPDATE
             ror_id = VALUES(ror_id),
             original_name_in_graph_db = VALUES(original_name_in_graph_db),
@@ -189,6 +193,8 @@ class OrganizationLocationRorLookupTask(PipelineBase):
             lat = VALUES(lat),
             lng = VALUES(lng),
             full_data = VALUES(full_data),
+            model_extracted_name = VALUES(model_extracted_name),
+            model_extracted_name_hash_key = VALUES(model_extracted_name_hash_key),
             is_new = 1
     '''
 
@@ -196,15 +202,26 @@ class OrganizationLocationRorLookupTask(PipelineBase):
     # and lets downstream steps work from the same is_new flag.
     INSERT_NOT_FOUND_ORGANIZATION_SQL = f'''
         INSERT INTO {TABLE_NAME}
-        (original_name_in_graph_db, original_name_in_graph_db_idx_key, is_new)
-        VALUES (%s, %s, 1)
+        (
+            original_name_in_graph_db,
+            original_name_in_graph_db_idx_key,
+            model_extracted_name,
+            model_extracted_name_hash_key,
+            is_new
+        )
+        VALUES (%s, %s, %s, %s, 1)
         ON DUPLICATE KEY UPDATE
             original_name_in_graph_db = VALUES(original_name_in_graph_db),
+            model_extracted_name = VALUES(model_extracted_name),
+            model_extracted_name_hash_key = VALUES(model_extracted_name_hash_key),
             is_new = 1
     '''
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=True)
+        self.llama_model = os.getenv("OLLAMA_MODEL", "llama3.1")
+        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+        self.ollama_timeout = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
 
 
     def find_new_data(self, gard_node) -> None:
@@ -519,11 +536,16 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                 cursor.close()
 
 
-    def lookup_organizations(self, orgs: List[Dict[str, Any]]) -> Tuple[List[Tuple[Any, ...]], List[Tuple[str, str]], List[str]]:
+    def lookup_organizations(self, orgs: List[Dict[str, Any]]) -> Tuple[List[Tuple[Any, ...]], List[Tuple[Any, ...]], List[str]]:
 
         '''
-        Run ROR lookups in parallel. ROR calls are network I/O, so threads are a
-        simpler fit than multiprocessing inside the alert runner.
+        Extract a clean organization name first, then run ROR lookups in
+        parallel with that extracted name.
+
+        The original graph Organization.name remains stored as
+        original_name_in_graph_db. The extracted name is saved separately in
+        model_extracted_name/model_extracted_name_hash_key and is the value sent
+        to the ROR affiliation endpoint.
         '''
         found_orgs = []
         not_found_orgs = []
@@ -532,7 +554,45 @@ class OrganizationLocationRorLookupTask(PipelineBase):
         if not orgs:
             return found_orgs, not_found_orgs, not_found_idx_keys
 
-        max_workers = min(self.MAX_WORKERS, len(orgs))
+        prepared_orgs = []
+
+        for org in orgs:
+            original_name = org.get("name") or ""
+            idx_key = org.get("_idx_key")
+
+            if not original_name or not idx_key:
+                continue
+
+            extracted_name = self.extract_organization_name(original_name)
+
+            if extracted_name is None:
+                self.logger.info(
+                    f"Skipping ROR lookup for idx_key={idx_key}; "
+                    "organization name extraction failed and can be retried later."
+                )
+                continue
+
+            extracted_name = self.normalize_extracted_name(extracted_name)
+
+            if not extracted_name:
+                not_found_idx_keys.append(idx_key)
+                not_found_orgs.append((str(original_name)[:500], idx_key, None, None))
+                self.logger.info(f"ROR not found: extractor returned no organization name for {original_name}")
+                continue
+
+            extracted_name_hash_key = _make_hash_key(extracted_name)
+            prepared_orgs.append({
+                "name": extracted_name,
+                "original_name_in_graph_db": str(original_name)[:500],
+                "extracted_name": extracted_name,
+                "extracted_name_hash_key": extracted_name_hash_key,
+                "_idx_key": idx_key,
+            })
+
+        if not prepared_orgs:
+            return found_orgs, not_found_orgs, not_found_idx_keys
+
+        max_workers = min(self.MAX_WORKERS, len(prepared_orgs))
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_org = {
@@ -542,30 +602,180 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                     org.get("_idx_key"),
                     self.ROR_TIMEOUT,
                 ): org
-                for org in orgs
+                for org in prepared_orgs
             }
 
             for future in as_completed(future_to_org):
                 
                 org = future_to_org[future]
-                org_name = org.get("name") or ""
+                extracted_name = org.get("extracted_name") or ""
+                original_name = org.get("original_name_in_graph_db") or ""
+                extracted_name_hash_key = org.get("extracted_name_hash_key")
                 idx_key = org.get("_idx_key")
 
                 try:
                     result = future.result()
                 except Exception as e:
-                    self.logger.error(f"ROR lookup failed for organization={org_name}, idx_key={idx_key}: {e}")
+                    self.logger.error(
+                        f"ROR lookup failed for extracted_name={extracted_name}, "
+                        f"original_name={original_name}, idx_key={idx_key}: {e}"
+                    )
                     result = None
 
                 if result is not None:
-                    found_orgs.append(result)
-                    self.logger.info(f"ROR found: {org_name}")
+                    found_orgs.append(self.build_found_organization_tuple(
+                        result,
+                        original_name,
+                        extracted_name,
+                        extracted_name_hash_key,
+                    ))
+                    self.logger.info(
+                        f"ROR found: extracted_name={extracted_name}, original_name={original_name}"
+                    )
                 else:
                     not_found_idx_keys.append(idx_key)
-                    not_found_orgs.append((str(org_name)[:500], idx_key))
-                    self.logger.info(f"ROR not found: {org_name}")
+                    not_found_orgs.append((
+                        original_name,
+                        idx_key,
+                        extracted_name,
+                        extracted_name_hash_key,
+                    ))
+                    self.logger.info(
+                        f"ROR not found: extracted_name={extracted_name}, original_name={original_name}"
+                    )
 
         return found_orgs, not_found_orgs, not_found_idx_keys
+
+
+    def build_found_organization_tuple(
+        self,
+        ror_result: Tuple[Any, ...],
+        original_name: str,
+        extracted_name: str,
+        extracted_name_hash_key: str,
+    ) -> Tuple[Any, ...]:
+        """Add original/extracted-name fields to one successful ROR result."""
+
+        (
+            ror_id,
+            _lookup_name,
+            org_display_name,
+            geonames_id,
+            established,
+            status,
+            types,
+            website,
+            city,
+            country,
+            country_code,
+            state,
+            lat,
+            lng,
+            full_data,
+            idx_key,
+        ) = ror_result
+
+        return (
+            ror_id,
+            original_name,
+            org_display_name,
+            geonames_id,
+            established,
+            status,
+            types,
+            website,
+            city,
+            country,
+            country_code,
+            state,
+            lat,
+            lng,
+            full_data,
+            extracted_name,
+            extracted_name_hash_key,
+            idx_key,
+        )
+
+
+    def extract_organization_name(self, original_name: str) -> Optional[str]:
+        """Ask the configured Ollama model for one clean organization name."""
+
+        prompt = self.build_prompt(original_name)
+        url = f"{self.ollama_base_url}/api/generate"
+
+        payload = {
+            "model": self.llama_model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0,
+            },
+        }
+
+        try:
+            response = requests.post(url, json=payload, timeout=self.ollama_timeout)
+            response.raise_for_status()
+            data = response.json()
+
+            return self.clean_llama_response(data.get("response", ""))
+
+        except requests.RequestException as e:
+            self.logger.error(f"Llama request failed for original_name={original_name[:120]}: {e}")
+            return None
+
+        except ValueError as e:
+            self.logger.error(f"Llama response was not valid JSON for original_name={original_name[:120]}: {e}")
+            return None
+
+
+    def build_prompt(self, original_name: str) -> str:
+        """Create a strict prompt so the model returns only the organization name."""
+
+        return f'''
+                Extract the main organization or institution name from the text below.
+                Return only one clean organization name.
+                Do not include departments, addresses, people, explanations, labels, bullets, or quotes.
+                If there is no organization name, return an empty string.
+
+                Text:
+                {original_name}
+            '''.strip()
+
+
+    def clean_llama_response(self, response_text: Any) -> str:
+        """Normalize the model response before using it for ROR lookup."""
+
+        if response_text is None:
+            return ""
+
+        text = str(response_text).strip()
+        text = re.sub(r"^```(?:text)?", "", text, flags=re.IGNORECASE).strip()
+        text = re.sub(r"```$", "", text).strip()
+
+        if "\n" in text:
+            text = next((line.strip() for line in text.splitlines() if line.strip()), "")
+
+        text = re.sub(r"^(organization name|organization|institution)\s*:\s*", "", text, flags=re.IGNORECASE)
+        text = text.strip(" \t\r\n\"'`*-")
+
+        if text.endswith("."):
+            text = text[:-1].strip()
+
+        if text.lower() in {"none", "n/a", "na", "unknown", "empty string", "no organization name"}:
+            return ""
+
+        return text
+
+
+    def normalize_extracted_name(self, extracted_name: Any) -> str:
+        """Trim and fit the extracted organization name to the MySQL column."""
+
+        if not extracted_name:
+            return ""
+
+        extracted_name = " ".join(str(extracted_name).strip().split())
+
+        return extracted_name[:200].strip()
 
 
     def save_found_organizations(self, org_info_tuple_list: List[Tuple[Any, ...]]) -> int:
