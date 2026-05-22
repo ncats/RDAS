@@ -27,6 +27,26 @@ Pipeline Steps:
  Step 4: Run G_update/organization_location_step_2_updater.py to sync back to graph DB
 '''
 
+'''
+What this script does:
+ This script enriches Organization nodes that do not yet have a ROR ID by
+ looking up their names in the ROR (Research Organization Registry) API.
+ It reads candidate Organization nodes from Memgraph in batches, skips any
+ organizations already recorded in the MySQL organization_location table, and
+ runs the remaining ROR API lookups in parallel with multiprocessing.
+
+ For organizations found in ROR, it stores the ROR ID, display name, website,
+ organization type list, geonames ID, city, state, country, coordinates, and
+ the full ROR API response in MySQL. For organizations not found in ROR, it
+ inserts a placeholder MySQL row and sets the Organization node ror_id to
+ 'N/A' in Memgraph so the same organization is not repeatedly searched.
+
+ This is the finder/loading step. Run organization_location_step_2_updater.py
+ afterward to sync the saved MySQL ROR/location data back into Memgraph as
+ Organization properties, Location nodes, and has_location relationships.
+'''
+
+
 # STANDALONE FUNCTIONS - Must be at module level for multiprocessing compatibility
 # Consider to change to ThreadPoolExecutor, see example: G_update/article_EPI_NHS_updater_multithread.py
 

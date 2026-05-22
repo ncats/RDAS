@@ -22,6 +22,25 @@ Pipeline Steps:
  Step 3: Run this script to sync MySQL data back to graph database
 '''
 
+'''
+What this script does:
+ This script syncs organization ROR/location data from the MySQL
+ organization_location table back into Memgraph. It scans Organization nodes
+ whose ror_id is still empty, looks up their saved MySQL rows by
+ original_name_in_graph_db_idx_key, and updates the matching graph nodes in
+ batches.
+
+ When a MySQL row has valid ROR data, the script updates the Organization node
+ with the ROR ID, display name, types, and website, then creates or reuses a
+ Location node generated from coordinates or organization name and links it via
+ a has_location relationship. When no location/ROR data is available, it marks
+ the Organization node with ror_id='N/A' so later runs can skip it.
+
+ This is the graph synchronization step and should be run after the finder step
+ has populated MySQL with ROR API results.
+'''
+
+
 class OrganizationLocationUpdater(InitBase):
     """
     Updates Organization nodes in Memgraph with location data from MySQL.
