@@ -18,7 +18,7 @@ from utils.tools import _date_string, _clean, _make_hash_key, _curr_timestamp, a
 '''
 Pipeline Steps:
  Step 1: Run B_clinical_trial/initializer/organization_location.py
- Step 2: Run E_integrate/updater/1_organization_location_finder.py to fetch ROR data
+ Step 2: Run E_followup/updater/1_organization_location_finder.py to fetch ROR data
  Step 3: Run this script to sync MySQL data back to graph database
 '''
 
