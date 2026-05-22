@@ -23,7 +23,7 @@ Fetch ROR organization location data for Organization nodes.
 
 1. Find Organization nodes whose ror_id is still empty in Memgraph.
 2. Skip organizations already stored in the MySQL organization_location table.
-3. Extract a cleaner organization name with the configured Ollama model.
+3. Extract a cleaner organization name with the configured model.
 4. Query the ROR API with the extracted organization name.
 5. Save found and not-found rows into MySQL with organization_location.is_new = 1.
 6. Mark not-found Organization nodes in Memgraph with ror_id = 'N/A'.
@@ -62,6 +62,7 @@ def lookup_ror_static(org_name: str, idx_key: str, timeout: int = 20):
         return None
 
     ror_organizations_api = os.getenv("ROR_ORGANIZATIONS_API")
+
     if not ror_organizations_api:
         return None
 
@@ -546,6 +547,13 @@ class OrganizationLocationRorLookupTask(PipelineBase):
         model_extracted_name/model_extracted_name_hash_key and is the value sent
         to the ROR affiliation endpoint.
         '''
+        '''
+        Step 1:
+        Initialize the three output collections expected by the caller.
+        found_orgs contains INSERT tuples for successful ROR matches.
+        not_found_orgs contains INSERT tuples for completed no-match lookups.
+        not_found_idx_keys contains graph Organization keys that should become N/A.
+        '''
         found_orgs = []
         not_found_orgs = []
         not_found_idx_keys = []
@@ -553,35 +561,72 @@ class OrganizationLocationRorLookupTask(PipelineBase):
         if not orgs:
             return found_orgs, not_found_orgs, not_found_idx_keys
 
+        '''
+        Step 2:
+        Build a normalized lookup payload before starting threads.
+        The model request is done first so every ROR worker receives a simple,
+        already-prepared organization name.
+        '''
         prepared_orgs = []
 
         for org in orgs:
+            '''
+            Step 2.1:
+            Keep both the original graph name and the graph _idx_key.
+            The original name is preserved in MySQL even when ROR is queried
+            with a cleaner extracted name.
+            '''
             original_name = org.get("name") or ""
             idx_key = org.get("_idx_key")
 
             if not original_name or not idx_key:
                 continue
 
+            '''
+            Step 2.2:
+            Ask the configured model to extract the core organization name from the raw string original_name.
+            '''
             extracted_name = self.org_name_extractor.extract_organization_name(original_name)
 
             if extracted_name is None:
-                self.logger.info(
-                    f"Skipping ROR lookup for idx_key={idx_key}; "
-                    "organization name extraction failed and can be retried later."
-                )
+                '''
+                Step 2.2.1:
+                A None return means the model request failed.
+                Do not mark the organization not-found; leave it retryable for a future run.
+                '''
+                self.logger.info(f"Skipping ROR lookup for idx_key={idx_key}; organization name extraction failed and can be retried later.")
                 continue
 
+            '''
+            Step 2.3:
+            Normalize the model response to the DB column size.
+            '''
             extracted_name = self.org_name_extractor.normalize_extracted_name(extracted_name)
 
-            if not extracted_name:
-                not_found_idx_keys.append(idx_key)
-                not_found_orgs.append((str(original_name)[:500], idx_key, None, None))
-                self.logger.info(f"ROR not found: extractor returned no organization name for {original_name}")
-                continue
+            if extracted_name:
+                '''
+                Step 2.4:
+                Prefer the extracted name for ROR lookup when it is available, and save its deterministic hash key with the row.
+                '''
+                lookup_name = extracted_name
+                extracted_name_hash_key = self.org_name_extractor.make_extracted_name_hash_key(extracted_name)
+            else:
+                '''
+                Step 2.5:
+                If extraction succeeded but returned blank, continue with the
+                original graph name rather than treating it as a terminal not-found result.
+                '''
+                lookup_name = original_name
+                extracted_name_hash_key = None
+                self.logger.info(f"Extractor returned no organization name; falling back to original_name for ROR lookup: {original_name}")
 
-            extracted_name_hash_key = self.org_name_extractor.make_extracted_name_hash_key(extracted_name)
+            '''
+            Step 2.6:
+            Store the exact fields needed after the threaded ROR result returns.
+            This avoids recomputing extraction metadata later.
+            '''
             prepared_orgs.append({
-                "name": extracted_name,
+                "name": lookup_name,
                 "original_name_in_graph_db": str(original_name)[:500],
                 "extracted_name": extracted_name,
                 "extracted_name_hash_key": extracted_name_hash_key,
@@ -591,6 +636,11 @@ class OrganizationLocationRorLookupTask(PipelineBase):
         if not prepared_orgs:
             return found_orgs, not_found_orgs, not_found_idx_keys
 
+        '''
+        Step 3:
+        Run ROR lookups in parallel.
+        These are network-bound API calls, so ThreadPoolExecutor is enough and avoids multiprocessing overhead.
+        '''
         max_workers = min(self.MAX_WORKERS, len(prepared_orgs))
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -605,7 +655,11 @@ class OrganizationLocationRorLookupTask(PipelineBase):
             }
 
             for future in as_completed(future_to_org):
-                
+                '''
+                Step 4:
+                Recover the metadata associated with this completed future so
+                found/not-found rows can preserve both original and extracted organization names.
+                '''
                 org = future_to_org[future]
                 extracted_name = org.get("extracted_name") or ""
                 original_name = org.get("original_name_in_graph_db") or ""
@@ -613,15 +667,25 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                 idx_key = org.get("_idx_key")
 
                 try:
+                    '''
+                    Step 4.1:
+                    Read the ROR result. lookup_ror_static returns a tuple for a chosen ROR match and None for no match.
+                    '''
                     result = future.result()
                 except Exception as e:
-                    self.logger.error(
-                        f"ROR lookup failed for extracted_name={extracted_name}, "
-                        f"original_name={original_name}, idx_key={idx_key}: {e}"
-                    )
+                    '''
+                    Step 4.2:
+                    Treat unexpected worker exceptions as no-match for this run and log the context needed to diagnose it.
+                    '''
+                    self.logger.error(f"ROR lookup failed for extracted_name={extracted_name}, original_name={original_name}, idx_key={idx_key}: {e}")
+
                     result = None
 
                 if result is not None:
+                    '''
+                    Step 5:
+                    Convert successful ROR data into the INSERT tuple shape expected by save_found_organizations().
+                    '''
                     found_orgs.append(self.build_found_organization_tuple(
                         result,
                         original_name,
@@ -632,6 +696,11 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                         f"ROR found: extracted_name={extracted_name}, original_name={original_name}"
                     )
                 else:
+                    '''
+                    Step 6:
+                    Save completed no-match lookups and collect the graph key
+                    so the caller can mark the Organization ror_id as N/A in Memgraph.
+                    '''
                     not_found_idx_keys.append(idx_key)
                     not_found_orgs.append((
                         original_name,
@@ -646,103 +715,53 @@ class OrganizationLocationRorLookupTask(PipelineBase):
         return found_orgs, not_found_orgs, not_found_idx_keys
 
 
-    def build_found_organization_tuple(
-        self,
-        ror_result: Tuple[Any, ...],
-        original_name: str,
-        extracted_name: str,
-        extracted_name_hash_key: str,
-    ) -> Tuple[Any, ...]:
+    def build_found_organization_tuple(self, ror_result: Tuple[Any, ...], original_name: str, extracted_name: str, extracted_name_hash_key: str,) -> Tuple[Any, ...]:
         """Add original/extracted-name fields to one successful ROR result."""
-
         (
-            ror_id,
-            _lookup_name,
-            org_display_name,
-            geonames_id,
-            established,
-            status,
-            types,
-            website,
-            city,
-            country,
-            country_code,
-            state,
-            lat,
-            lng,
-            full_data,
+            ror_id, _lookup_name, org_display_name, geonames_id, established,
+            status, types, website, city, country,
+            country_code, state, lat, lng, full_data,
             idx_key,
         ) = ror_result
 
         return (
-            ror_id,
-            original_name,
-            org_display_name,
-            geonames_id,
-            established,
-            status,
-            types,
-            website,
-            city,
-            country,
-            country_code,
-            state,
-            lat,
-            lng,
-            full_data,
-            extracted_name,
-            extracted_name_hash_key,
-            idx_key,
+            ror_id, original_name, org_display_name, geonames_id, established,
+            status, types, website, city, country,
+            country_code, state, lat, lng, full_data,
+            extracted_name, extracted_name_hash_key, idx_key,
         )
 
 
     def save_found_organizations(self, org_info_tuple_list: List[Tuple[Any, ...]]) -> int:
         """Save successful ROR lookup rows into organization_location."""
 
-        if not org_info_tuple_list:
-            return 0
-
-        cursor = None
-
-        try:
-            cursor = self.mysql.cursor(buffered=True)
-            cursor.executemany(self.INSERT_FOUND_ORGANIZATION_SQL, org_info_tuple_list)
-            self.mysql.commit()
-            self.logger.info(f"Saved {cursor.rowcount} found organizations into {self.TABLE_NAME}.")
-
-            return len(org_info_tuple_list)
-
-        except Exception as e:
-            self.logger.error(f"Error saving found organization_location rows: {e}")
-
-            if self.mysql:
-                self.mysql.rollback()
-
-            return 0
-
-        finally:
-            if cursor:
-                cursor.close()
+        return self.save_organization_rows(self.INSERT_FOUND_ORGANIZATION_SQL, org_info_tuple_list,  "found", )
 
 
     def save_not_found_organizations(self, not_found_list: List[Tuple[str, str]]) -> int:
         """Save failed ROR lookups so they are not repeatedly queried."""
 
-        if not not_found_list:
+        return self.save_organization_rows(self.INSERT_NOT_FOUND_ORGANIZATION_SQL, not_found_list, "not-found", )
+
+
+    def save_organization_rows(self, sql: str, rows: List[Tuple[Any, ...]], label: str) -> int:
+        """Execute one organization_location batch save with shared error handling."""
+
+        if not rows:
             return 0
 
         cursor = None
 
         try:
             cursor = self.mysql.cursor(buffered=True)
-            cursor.executemany(self.INSERT_NOT_FOUND_ORGANIZATION_SQL, not_found_list)
+            cursor.executemany(sql, rows)
             self.mysql.commit()
-            self.logger.info(f"Saved {cursor.rowcount} not-found organizations into {self.TABLE_NAME}.")
+            self.logger.info(f"Saved {cursor.rowcount} {label} organizations into {self.TABLE_NAME}.")
 
-            return len(not_found_list)
+            return len(rows)
 
         except Exception as e:
-            self.logger.error(f"Error saving not-found organization_location rows: {e}")
+            self.logger.error(f"Error saving {label} organization_location rows: {e}")
 
             if self.mysql:
                 self.mysql.rollback()
