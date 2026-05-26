@@ -246,12 +246,14 @@ class AlertPipelineRunner:
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_2 import ArticleGeneReviewFlagUpdateTask
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_3 import OrganizationLocationRorLookupTask
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_4 import OrganizationLocationGraphSyncTask
+        from pipelines.pipeline_5_followup.task_pipeline_followup_update_5 import DiseaseCountsRefreshTask
 
         self._run_pipeline_task(GardRelationshipCountRefreshTask)
         self._run_pipeline_task(ArticleGeneReviewFlagUpdateTask)
-        self._run_pipeline_task(OrganizationLocationRorLookupTask)
-        self._run_pipeline_task(OrganizationLocationGraphSyncTask)
 
+        #self._run_pipeline_task(OrganizationLocationRorLookupTask)
+        #self._run_pipeline_task(OrganizationLocationGraphSyncTask)
+        self._run_pipeline_task(DiseaseCountsRefreshTask)
  
 
     def send_alert_emails(self, look_back_days: Optional[int] = None) -> None:
