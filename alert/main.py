@@ -1,7 +1,9 @@
 import os
+import shutil
 import sys
 import time
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any, Optional, Type
 from dotenv import load_dotenv
 
@@ -343,9 +345,44 @@ class AlertPipelineRunner:
             return
 
         task.close()
+ 
 
+    def _next_available_archive_path(self, path: Path) -> Path:
+        """Return a non-existing archive path without overwriting older logs."""
+
+        count = 1
+        candidate = path
+
+        while candidate.exists():
+            candidate = path.with_name(f"{path.name}.{count}")
+            count += 1
+
+        return candidate
+    
+
+    def _archive_log_files_by_date(self) -> None:
+        """Move top-level log files into a date-stamped archive folder."""
+
+        log_dir = Path(self.log_dir)
+        archive_dir = log_dir / date.today().strftime("%Y%m%d")
+        archive_dir.mkdir(parents=True, exist_ok=True)
+
+        log_files = [
+            path
+            for pattern in ("*.log", "*.log.*")
+            for path in log_dir.glob(pattern)
+            if path.is_file()
+        ]
+
+        for log_file in log_files:
+            target = archive_dir / log_file.name
+            if target.exists():
+                target = self._next_available_archive_path(target)
+
+            shutil.move(str(log_file), str(target))
 
  
+
 if __name__ == "__main__":
 
     LOOK_BACK_DAYS = 7
@@ -438,7 +475,7 @@ if __name__ == "__main__":
             f"{'=' * 20}\n\n"
         )
 
-        """Flush and close the runner logger."""
+        """ Flush and close the runner logger. """
         if getattr(runner, "logger", None):
             logger = runner.logger
 
@@ -449,3 +486,6 @@ if __name__ == "__main__":
 
             runner.logger = None
             print("Logger closed")
+
+        ''' Create a date-stamped archive directory under runner.log_dir, like 20260526, then move all *.log and *.log.* files into it. '''
+        runner._archive_log_files_by_date()
