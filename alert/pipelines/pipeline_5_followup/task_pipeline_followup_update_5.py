@@ -155,6 +155,7 @@ class DiseaseCountsRefreshTask(PipelineBase):
         batch_num = 0
         batch_size = 50       
         total_updated = 0
+        very_start_time = time.time()
 
         fetch_GARD_nodes_cypher = '''
             MATCH (g:GARD)
@@ -229,6 +230,9 @@ class DiseaseCountsRefreshTask(PipelineBase):
 
             ''' Explicitly close all db connections. '''
             self.close()
+
+            hours, minutes, seconds = _time_hms(time.time() - very_start_time)
+            self.logger.info(f'\n\n****** Total time elapsed: {hours} hours, {minutes} minutes, {seconds} seconds ******\n\n')
 
 
     def _disease_article_iterms_count(self, gard_id: str, fetch_cursor):
