@@ -46,5 +46,5 @@ F_person/person.sql
 F_person/riea/1_AuthorDisambiguation_NEW.ipynb
 F_person/riea/Author disambiguation.docx
 F_person/riea/Moon-2025-09-22.csv
-alert/emails/alert_email_preview.html
-alert/pipeline.MD
+Z_Alert/emails/alert_email_preview.html
+Z_Alert/pipeline.MD

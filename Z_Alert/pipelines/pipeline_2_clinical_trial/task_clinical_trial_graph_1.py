@@ -15,7 +15,7 @@ from pipelines.pipeline_base import PipelineBase
 """
 Insert NEW Clinical Trial nodes
 """
-# Reference: alert/pipelines/pipeline_2_clinical_trial/task_clinical_trial_2.py
+# Reference: Z_Alert/pipelines/pipeline_2_clinical_trial/task_clinical_trial_2.py
 # Reference: B_clinical_trial/initializer/clinicaltrial.py
 
 class NewClinicalTrialGraphTask(PipelineBase):

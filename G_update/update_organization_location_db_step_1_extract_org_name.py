@@ -31,13 +31,15 @@ fetch_sql = f'''
         '''
 The raw graph value is stored in original_name_in_graph_db. It may contain a department, address, person text, or other affiliation text. 
 This task sends that raw value to the configured local model and stores the returned organization name in model_extracted_name
-and a deterministic hash key in model_extracted_name_hash_key.
+and a deterministic hash key in model_extracted_name_hash_key. If the model request fails, the row is marked with
+ror_id = 'N/A' so the same timeout/error row is not fetched forever.
 """
 
 class OrganizationNameExtractionTask:
     
     TABLE_NAME = "organization_location"
     PROCESSED_FLAG = "llama3.1_org_name_extracted"
+    ROR_NOT_AVAILABLE = "N/A"
     BATCH_SIZE = 200
 
 
@@ -67,6 +69,12 @@ class OrganizationNameExtractionTask:
 
     def close(self) -> None:
         """Close this updater's MySQL connection and logger handlers."""
+
+        if getattr(self, "org_name_extractor", None) is not None:
+            close_extractor = getattr(self.org_name_extractor, "close", None)
+
+            if callable(close_extractor):
+                close_extractor()
 
         if self.mysql is not None and self.mysql.is_connected():
             self.mysql.close()
@@ -137,8 +145,9 @@ class OrganizationNameExtractionTask:
                 Step 3:
                 Save rows that can be marked processed. Rows with blank source
                 text are marked with null extracted fields. Rows where the
-                model request failed are left unprocessed so a later run can
-                retry them.
+                model request failed are marked with ror_id = 'N/A' and
+                processed, which prevents repeated model calls for rows that
+                keep timing out.
                 '''
                 if not update_tuples:
                     self.logger.error( f"Batch #{batch_num}: no rows could be updated. Stopping to avoid repeatedly fetching the same unprocessed rows.")
@@ -203,7 +212,7 @@ class OrganizationNameExtractionTask:
 
 
 
-    def build_organization_name_update_tuples(self, rows: List[Dict[str, Any]]) -> List[Tuple[Any, Any, str, Any]]:
+    def build_organization_name_update_tuples(self, rows: List[Dict[str, Any]]) -> List[Tuple[Any, Any, Any, str, Any, Any]]:
         """Create the SQL update tuples for one fetched batch."""
 
         update_tuples = []
@@ -215,36 +224,43 @@ class OrganizationNameExtractionTask:
             self.logger.info(f"[id] ={row_id}, [original_name]: {original_name}") 
 
             if not original_name:
-                update_tuples.append((None, None, self.PROCESSED_FLAG, self.processed_with, row_id))
+                update_tuples.append((None, None, None, self.PROCESSED_FLAG, self.processed_with, row_id))
                 continue
 
             extracted_name = self.org_name_extractor.extract_organization_name(original_name)
 
             if extracted_name is None:
-                self.logger.info(f"Skipping id={row_id}; model request failed and will be retried later.")
+                '''
+                A None return means the local model request failed, for example
+                a localhost Ollama timeout. Mark the row terminal with
+                ror_id='N/A' so the same bad request does not block every
+                future batch.
+                '''
+                self.logger.info(f"Marking id={row_id} with ror_id='N/A'; model request failed.")
+                update_tuples.append((self.ROR_NOT_AVAILABLE, None, None, self.PROCESSED_FLAG, self.processed_with, row_id))
                 continue
 
             extracted_name = self.org_name_extractor.normalize_extracted_name(extracted_name)
 
             if not extracted_name:
-                update_tuples.append((None, None, self.PROCESSED_FLAG, self.processed_with, row_id))
+                update_tuples.append((None, None, None, self.PROCESSED_FLAG, self.processed_with, row_id))
                 continue
 
             self.logger.info(f"[id] ={row_id}, [extracted_name]: {extracted_name}\n") 
 
             extracted_name_hash_key = self.org_name_extractor.make_extracted_name_hash_key(extracted_name)
-            update_tuples.append((extracted_name, extracted_name_hash_key, self.PROCESSED_FLAG, self.processed_with, row_id))
+            update_tuples.append((None, extracted_name, extracted_name_hash_key, self.PROCESSED_FLAG, self.processed_with, row_id))
 
         return update_tuples
 
 
-    def update_organization_names(self, cursor: Any, update_tuples: List[Tuple[Any, Any, str, Any]]) -> int:
+    def update_organization_names(self, cursor: Any, update_tuples: List[Tuple[Any, Any, Any, str, Any, Any]]) -> int:
         """
-        Save extracted names to organization_location.
+        Save extracted names and terminal model failures to organization_location.
 
-        is_new is set to 0 because these rows still do not have ROR metadata.
-        A later ROR lookup should mark the row new again only after ror_id,
-        location, and website data are available.
+        ror_id stays NULL for successful name extraction so the ROR lookup step
+        can process the row next. ror_id is set to 'N/A' only when the model
+        request itself failed and the row should stop retrying this step.
         """
 
         if not update_tuples:
@@ -252,7 +268,8 @@ class OrganizationNameExtractionTask:
 
         update_sql = f'''
             UPDATE {self.TABLE_NAME}
-            SET model_extracted_name = %s,
+            SET ror_id = %s,
+                model_extracted_name = %s,
                 model_extracted_name_hash_key = %s,
                 processed = %s,
                 processed_with = %s

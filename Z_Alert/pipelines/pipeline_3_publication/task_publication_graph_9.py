@@ -26,7 +26,7 @@ Duplicate PubTator rows are merged by PubMed ID, annotation identifier,
 annotation type, and relation type, matching the initializer behavior.
 """
 
-# Reference: alert/pipelines/pipeline_3_publication/task_publication_5.py
+# Reference: Z_Alert/pipelines/pipeline_3_publication/task_publication_5.py
 # Reference: C_publication/initializer/pubtator.py
 
 

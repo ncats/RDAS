@@ -25,7 +25,7 @@ entries into PubMed work:
 5. Download only PubMed articles that are not already in publication_article.
 """
 
-# Reference: alert/pipelines/pipeline_2_clinical_trial/task_clinical_trial_4.py
+# Reference: Z_Alert/pipelines/pipeline_2_clinical_trial/task_clinical_trial_4.py
 # Reference: C_publication/init_6_publication-retrieve-omim.py
 
 class NewOmimPublicationArticleImportTask(PipelineBase):
