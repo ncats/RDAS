@@ -190,7 +190,7 @@ class OrganizationNameExtractor:
         return f'''
                 Extract the main organization or institution name from the text below.
                 Return only one clean organization name.
-                Do not include departments, addresses, people, explanations, labels, bullets, or quotes.
+                Do not include departments, addresses, people, explanations, labels, bullets, emails or quotes.
                 If there is no organization name, return an empty string.
 
                 Text:
