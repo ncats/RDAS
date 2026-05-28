@@ -34,6 +34,7 @@ class OrganizationNameExtractor:
         self._model_server_is_running = False
         self._model_server_start_attempted = False
         self._model_server_process = None
+        self.session = requests.Session()
         self.check_model_server_running()
 
 
@@ -63,7 +64,7 @@ class OrganizationNameExtractor:
         }
 
         try:
-            response = requests.post(url, json=payload, timeout=self.request_timeout)
+            response = self.session.post(url, json=payload, timeout=self.request_timeout)
             response.raise_for_status()
             data = response.json()
 
@@ -158,7 +159,7 @@ class OrganizationNameExtractor:
         """Return True when the configured model server health endpoint responds."""
 
         try:
-            response = requests.get(
+            response = self.session.get(
                 f"{self.model_api_base_url}/api/tags",
                 timeout=min(self.request_timeout, 5),
             )
@@ -167,6 +168,12 @@ class OrganizationNameExtractor:
 
         except requests.RequestException:
             return False
+
+
+    def close(self) -> None:
+        """Close the reusable HTTP session and release pooled connections."""
+
+        self.session.close()
 
 
     def _is_local_model_api(self) -> bool:
