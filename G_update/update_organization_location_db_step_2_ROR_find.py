@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import time
+from collections import OrderedDict
 from typing import Any, Dict, List
 
 import requests
@@ -29,6 +30,8 @@ class RORFindOrganizationTask:
     PROCESSED_FLAG = "llama3.1_org_name_extracted"
 
     LOOKUP_ERROR = object()
+    CACHE_MISS = object()
+    DEFAULT_LOOKUP_CACHE_MAX_SIZE = 100000
 
     def __init__(self):
 
@@ -42,6 +45,26 @@ class RORFindOrganizationTask:
         self.logger.info(f'\n\n{"*" * 20} The {class_name} is initialized. {"*" * 20}\n')
 
         self.ror_ssl_verify = self.get_ror_ssl_verify_setting()
+        self.ror_api_url = os.getenv("ROR_ORGANIZATIONS_API", "https://api.ror.org/v2/organizations")
+
+        '''
+        Reuse one HTTP session for the whole task. For millions of ROR lookups,
+        this avoids creating a fresh TCP/TLS connection for every request and
+        lets requests/urllib3 reuse pooled connections to api.ror.org.
+        '''
+        self.ror_session = requests.Session()
+
+        '''
+        Cache ROR lookup results by cleaned organization name. Many rows can
+        have the same model_extracted_name, so this prevents duplicate API calls
+        within the same run. The cache is bounded so a run with millions of
+        unique names does not grow memory without limit.
+        '''
+        self.ror_lookup_cache = OrderedDict()
+        self.ror_lookup_cache_max_size = self.get_ror_lookup_cache_max_size()
+        self.ror_cache_hit_count = 0
+        self.ror_cache_miss_count = 0
+        self.ror_cache_eviction_count = 0
   
 
     def update(self) -> None:
@@ -78,6 +101,9 @@ class RORFindOrganizationTask:
                 found_vals = []
                 not_found_ids = []
                 error_count = 0
+                batch_cache_hit_start = self.ror_cache_hit_count
+                batch_cache_miss_start = self.ror_cache_miss_count
+                batch_cache_eviction_start = self.ror_cache_eviction_count
 
                 self.logger.info(f'\n\n------ batch #: {batch_num} ------\n')
 
@@ -148,7 +174,11 @@ class RORFindOrganizationTask:
 
                 self.logger.info(
                     f"Batch #{batch_num}: fetched={len(rows)}, found={found_count}, "
-                    f"not_found={not_found_count}, lookup_errors={error_count}."
+                    f"not_found={not_found_count}, lookup_errors={error_count}, "
+                    f"cache_hits={self.ror_cache_hit_count - batch_cache_hit_start}, "
+                    f"api_calls={self.ror_cache_miss_count - batch_cache_miss_start}, "
+                    f"cache_evictions={self.ror_cache_eviction_count - batch_cache_eviction_start}, "
+                    f"cache_size={len(self.ror_lookup_cache)}."
                 )
 
                 '''
@@ -173,6 +203,8 @@ class RORFindOrganizationTask:
             self.logger.info(
                 f"Completed RORFindOrganizationTask. found={total_found}, "
                 f"not_found={total_not_found}, lookup_errors={total_errors}, "
+                f"cache_hits={self.ror_cache_hit_count}, api_calls={self.ror_cache_miss_count}, "
+                f"cache_evictions={self.ror_cache_eviction_count}, cache_size={len(self.ror_lookup_cache)}, "
                 f"time={hours} hours, {minutes} minutes, {seconds} seconds."
             )
 
@@ -181,9 +213,13 @@ class RORFindOrganizationTask:
         finally:
             '''
             Step 8:
-            Always close the MySQL connection and logger handlers so the script
-            can exit cleanly and log files are flushed.
+            Always close the reusable HTTP session, MySQL connection, and logger
+            handlers so the script can exit cleanly and log files are flushed.
             '''
+            if getattr(self, "ror_session", None) is not None:
+                self.ror_session.close()
+                self.ror_session = None
+
             if self.mysql is not None and self.mysql.is_connected():
                 print(f"Closing MySQL connection...")
                 self.mysql.close()
@@ -320,15 +356,25 @@ class RORFindOrganizationTask:
         if not cleaned_org_name:
             return None
 
+        '''
+        Use the cleaned name as the dedup/cache key before making any network
+        request. A found cache value is stored without organization_location.id,
+        so the cached ROR data can be reused for every duplicate row.
+        '''
+        cache_key = self.make_ror_lookup_cache_key(cleaned_org_name)
+        cached_result = self.get_cached_ror_lookup(cache_key, id)
+
+        if cached_result is not self.CACHE_MISS:
+            return cached_result
+
         try:
             '''
             Query the ROR affiliation endpoint. ROR_ORGANIZATIONS_API can be
             configured in .env, otherwise the public v2 organizations endpoint
             is used.
             '''
-            url = os.getenv("ROR_ORGANIZATIONS_API", "https://api.ror.org/v2/organizations")
-            r = requests.get(
-                url,
+            r = self.ror_session.get(
+                self.ror_api_url,
                 params={"affiliation": cleaned_org_name},
                 timeout=timeout,
                 verify=self.ror_ssl_verify,
@@ -344,6 +390,7 @@ class RORFindOrganizationTask:
 
             # Check if API returned valid results
             if data.get('number_of_results') == 0 or not items or not items[0].get('chosen'):
+                self.set_cached_ror_lookup(cache_key, None)
                 return None
                 
             first_item = items[0]
@@ -403,24 +450,83 @@ class RORFindOrganizationTask:
             Return values in exactly the same order as
             update_found_organization_location_data() expects.
             '''
-            return (
+            lookup_result = (
                 ror_id, org_display_name, geonames_id_int, established, 
                 status, types, website, city, country, 
-                country_code, state, lat_float, lng_float, full_data,
-                id
+                country_code, state, lat_float, lng_float, full_data
             )
+
+            self.set_cached_ror_lookup(cache_key, lookup_result)
+
+            return self.add_row_id_to_lookup_result(lookup_result, id)
                 
         except requests.RequestException as e:
             self.logger.error(f"ROR request failed for id={id}, name={cleaned_org_name}: {e}")
+            self.set_cached_ror_lookup(cache_key, self.LOOKUP_ERROR)
             return self.LOOKUP_ERROR
 
         except (KeyError, ValueError, json.JSONDecodeError) as e:
             self.logger.error(f"ROR response parsing failed for id={id}, name={cleaned_org_name}: {e}")
+            self.set_cached_ror_lookup(cache_key, self.LOOKUP_ERROR)
             return self.LOOKUP_ERROR
 
         except Exception as e:
             self.logger.error(f"Unexpected ROR lookup failure for id={id}, name={cleaned_org_name}: {e}")
+            self.set_cached_ror_lookup(cache_key, self.LOOKUP_ERROR)
             return self.LOOKUP_ERROR
+
+
+    def make_ror_lookup_cache_key(self, cleaned_org_name: str) -> str:
+        """Create a stable cache key for equivalent organization names."""
+
+        '''
+        ROR affiliation search is not meaningfully case-sensitive for our use
+        case, so casefolding lets "NIH" and "nih" share the same cached result.
+        Whitespace has already been normalized by clean_org_name().
+        '''
+        return cleaned_org_name.casefold()
+
+
+    def get_cached_ror_lookup(self, cache_key: str, id: int):
+        """Return a cached ROR lookup result, or CACHE_MISS when not cached."""
+
+        if cache_key not in self.ror_lookup_cache:
+            self.ror_cache_miss_count += 1
+            return self.CACHE_MISS
+
+        '''
+        Move the key to the end so the cache behaves like a simple LRU cache.
+        This keeps recently duplicated organization names available when the
+        cache reaches its configured maximum size.
+        '''
+        cached_result = self.ror_lookup_cache[cache_key]
+        self.ror_lookup_cache.move_to_end(cache_key)
+        self.ror_cache_hit_count += 1
+
+        if cached_result is self.LOOKUP_ERROR or cached_result is None:
+            return cached_result
+
+        return self.add_row_id_to_lookup_result(cached_result, id)
+
+
+    def set_cached_ror_lookup(self, cache_key: str, lookup_result) -> None:
+        """Store one ROR lookup result and evict old entries if needed."""
+
+        if self.ror_lookup_cache_max_size <= 0:
+            return
+
+        self.ror_lookup_cache[cache_key] = lookup_result
+        self.ror_lookup_cache.move_to_end(cache_key)
+
+        while len(self.ror_lookup_cache) > self.ror_lookup_cache_max_size:
+            self.ror_lookup_cache.popitem(last=False)
+            self.ror_cache_eviction_count += 1
+
+
+    def add_row_id_to_lookup_result(self, lookup_result, id: int):
+        """Append organization_location.id to a cached ROR result tuple."""
+
+        return lookup_result + (id,)
 
 
     def clean_org_name(self, value):
@@ -469,6 +575,37 @@ class RORFindOrganizationTask:
             return False
 
         return True
+
+
+    def get_ror_lookup_cache_max_size(self) -> int:
+        """Read the maximum in-memory ROR lookup cache size from the environment."""
+
+        raw_value = os.getenv("ROR_LOOKUP_CACHE_MAX_SIZE")
+
+        if not raw_value:
+            return self.DEFAULT_LOOKUP_CACHE_MAX_SIZE
+
+        try:
+            max_size = int(raw_value)
+
+        except ValueError:
+            self.logger.warning(
+                f"Invalid ROR_LOOKUP_CACHE_MAX_SIZE={raw_value}; "
+                f"using default {self.DEFAULT_LOOKUP_CACHE_MAX_SIZE}."
+            )
+            return self.DEFAULT_LOOKUP_CACHE_MAX_SIZE
+
+        if max_size < 0:
+            self.logger.warning(
+                f"ROR_LOOKUP_CACHE_MAX_SIZE={raw_value} is negative; "
+                f"using default {self.DEFAULT_LOOKUP_CACHE_MAX_SIZE}."
+            )
+            return self.DEFAULT_LOOKUP_CACHE_MAX_SIZE
+
+        if max_size == 0:
+            self.logger.warning("ROR lookup cache is disabled because ROR_LOOKUP_CACHE_MAX_SIZE=0.")
+
+        return max_size
         
 
 
