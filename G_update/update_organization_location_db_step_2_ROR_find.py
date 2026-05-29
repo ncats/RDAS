@@ -73,8 +73,9 @@ class RORFindOrganizationTask:
         These counters summarize the whole run. "found" means ROR returned a
         chosen organization and the row received ROR/location fields.
         "not_found" means ROR returned no chosen match and the row was marked
-        ror_id = 'N/A'. "errors" means an API or parsing problem happened, so
-        the row is intentionally left with ror_id IS NULL for a later retry.
+        ror_id = 'N/A'. "errors" means an API or parsing problem happened. Those
+        rows are also marked ror_id = 'N/A' so a small set of bad ROR responses
+        cannot keep being fetched forever and block the tail end of the run.
         '''
         total_found = 0
         total_not_found = 0
@@ -100,7 +101,7 @@ class RORFindOrganizationTask:
                 batch_num += 1
                 found_vals = []
                 not_found_ids = []
-                error_count = 0
+                error_ids = []
                 batch_cache_hit_start = self.ror_cache_hit_count
                 batch_cache_miss_start = self.ror_cache_miss_count
                 batch_cache_eviction_start = self.ror_cache_eviction_count
@@ -114,7 +115,9 @@ class RORFindOrganizationTask:
 
                 - tuple: ROR found a chosen organization; save the returned data.
                 - None: ROR did not find a chosen organization; mark as N/A.
-                - LOOKUP_ERROR: network/parsing error; leave unmodified for retry.
+                - LOOKUP_ERROR: network/parsing error; mark as N/A so the same
+                  row does not stop the whole task when it becomes the only
+                  remaining row in the fetch window.
                 '''
                 idx = 0
                 for row in rows:
@@ -126,7 +129,7 @@ class RORFindOrganizationTask:
                     val = self.lookup_ror_static(id, model_extracted_name)
 
                     if val is self.LOOKUP_ERROR:
-                        error_count += 1
+                        error_ids.append(id)
 
                         self.logger.warning(
                             f"#{idx}, [id]={id}, [model_extracted_name]={model_extracted_name}, "
@@ -164,17 +167,26 @@ class RORFindOrganizationTask:
 
                 '''
                 Step 5:
-                Update run-level counters after both database writes finish.
-                Lookup errors are counted but not saved, so those rows can be
-                retried in a future run.
+                Mark lookup-error rows as ror_id = 'N/A'. The previous behavior
+                left these rows with ror_id IS NULL, which meant the final
+                error-only batch could be fetched repeatedly and then trip the
+                "no rows were updated" stop guard. Since this table has no
+                separate retry/error-status column, using the same terminal N/A
+                marker is the safest way to keep the job moving.
+                '''
+                lookup_error_count = self.mark_lookup_error_organization_locations(error_ids)
+
+                '''
+                Step 6:
+                Update run-level counters after all database writes finish.
                 '''
                 total_found += found_count
                 total_not_found += not_found_count
-                total_errors += error_count
+                total_errors += lookup_error_count
 
                 self.logger.info(
                     f"Batch #{batch_num}: fetched={len(rows)}, found={found_count}, "
-                    f"not_found={not_found_count}, lookup_errors={error_count}, "
+                    f"not_found={not_found_count}, lookup_errors={lookup_error_count}, "
                     f"cache_hits={self.ror_cache_hit_count - batch_cache_hit_start}, "
                     f"api_calls={self.ror_cache_miss_count - batch_cache_miss_start}, "
                     f"cache_evictions={self.ror_cache_eviction_count - batch_cache_eviction_start}, "
@@ -182,12 +194,12 @@ class RORFindOrganizationTask:
                 )
 
                 '''
-                Step 6:
+                Step 7:
                 If nothing was updated, stop the loop. This avoids repeatedly
-                fetching the same batch when every row hit a retryable ROR/API
-                error.
+                fetching the same batch if an unexpected database condition
+                prevents every attempted update from affecting a row.
                 '''
-                if found_count == 0 and not_found_count == 0:
+                if found_count == 0 and not_found_count == 0 and lookup_error_count == 0:
                     self.logger.error(
                         f"Batch #{batch_num}: no rows were updated. "
                         "Stopping to avoid repeatedly fetching the same rows."
@@ -195,9 +207,9 @@ class RORFindOrganizationTask:
                     break
 
             '''
-            Step 7:
+            Step 8:
             Log the final totals and elapsed time after all eligible rows have
-            been processed or the loop stops because of retryable failures.
+            been processed or the loop stops because no updates affected rows.
             '''
             hours, minutes, seconds = _time_hms(time.time() - start_time)
             self.logger.info(
@@ -212,7 +224,7 @@ class RORFindOrganizationTask:
             self.logger.error(f"RORFindOrganizationTask failed: {e}")
         finally:
             '''
-            Step 8:
+            Step 9:
             Always close the reusable HTTP session, MySQL connection, and logger
             handlers so the script can exit cleanly and log files are flushed.
             '''
@@ -343,6 +355,21 @@ class RORFindOrganizationTask:
         finally:
             if cursor:
                 cursor.close()
+
+
+    def mark_lookup_error_organization_locations(self, ids: List[int]) -> int:
+        """Mark ROR lookup-error rows so they do not block later batches."""
+
+        '''
+        ids contains organization_location.id values for rows where the ROR API
+        request failed or returned an unexpected payload. Historically those
+        rows stayed ror_id IS NULL for retry, but when they were the only rows
+        left, the job fetched them again and stopped with "no rows were updated".
+
+        Using ror_id = 'N/A' matches the existing terminal marker used for
+        no-match rows and for step-1 model failures.
+        '''
+        return self.mark_not_found_organization_locations(ids)
 
             
     def lookup_ror_static(self, id: int, model_extracted_name: str, timeout: int = 20):
