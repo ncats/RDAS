@@ -1,282 +1,359 @@
-import os
-import sys
-# Add the project root to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+"""
+Upload NIH RePORTER project CSV files into the MySQL grant_project table.
 
-from dotenv import load_dotenv
-load_dotenv()
+Expected input files:
+    D_grant/data/projects/RePORTER_PRJ_C_FY1985.CSV
+    D_grant/data/projects/RePORTER_PRJ_C_FY1986.CSV
+    ...
 
-import re
+Usage:
+    python D_grant/init_2_upload_projects_to_mysql_db.py
+
+Notes:
+    - This loader appends rows. If you are doing a full reload, truncate
+      grant_project manually before running:
+          TRUNCATE TABLE grant_project;
+    - RePORTER project files changed layout after FY2005. Files through FY2005
+      use FOA_NUMBER, while FY2006 and later use OPPORTUNITY NUMBER plus
+      several cost/organization columns.
+"""
+
 import csv
+import os
+import re
+import sys
+from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
-from utils.tools import parse_date
-from utils.tools import ask_to_continue, detect_file_encoding, _normalize_tuple
-from baseclass.conn import DBConnection as db
+from typing import Any, Dict, List, Optional, Tuple
 
-from colorama import init, Fore, Style
-# Initialize colorama for Windows compatibility
-init()
- 
-#
-# TRUNCATE TABLE grant_project
-#
-# -- This deletes all rows and resets AUTO_INCREMENT to 1 
-#For table grant_project, the step = 1 
+# Add the project root to the Python path when this file is run directly.
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
 
-def convert_value(value, converter=None):
-    """Convert value using converter function, return None if empty"""
-    if not value:
-        return None
-    return converter(value) if converter else value
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
-def upload_projects(dir_path):
+TABLE_NAME = "grant_project"
+DEFAULT_PROJECTS_DIR = SCRIPT_DIR / "data" / "projects"
+DEFAULT_BATCH_SIZE = 1000
+MIN_REPORTER_PROJECT_YEAR = 1985
+MAX_REPORTER_PROJECT_YEAR = date.today().year + 1
 
-    if not os.path.exists(dir_path):
-        print(f"Error: Directory '{dir_path}' does not exist")
-        return None    
-    # Print directory contents
-    #print(f"Contents of '{dir_path}': {os.listdir(dir_path)}")
+
+@dataclass(frozen=True)
+class FieldConfig:
+    """Map one CSV column to one grant_project database column."""
+
+    csv_column: str
+    db_column: str
+    converter: Optional[str] = None
+
+
+# Tuple[FieldConfig, ...] - tuple of FieldConfig objects, with any length
+COMMON_PROJECT_FIELDS: Tuple[FieldConfig, ...] = (
+    FieldConfig("APPLICATION_ID", "APPLICATION_ID", "int"),
+    FieldConfig("ACTIVITY", "ACTIVITY"),
+    FieldConfig("ADMINISTERING_IC", "ADMINISTERING_IC"),
+    FieldConfig("APPLICATION_TYPE", "APPLICATION_TYPE", "int"),
+    FieldConfig("ARRA_FUNDED", "ARRA_FUNDED"),
+    FieldConfig("AWARD_NOTICE_DATE", "AWARD_NOTICE_DATE", "date"),
+    FieldConfig("BUDGET_START", "BUDGET_START", "date"),
+    FieldConfig("BUDGET_END", "BUDGET_END", "date"),
+    FieldConfig("CFDA_CODE", "CFDA_CODE"),
+    FieldConfig("CORE_PROJECT_NUM", "CORE_PROJECT_NUM"),
+    FieldConfig("ED_INST_TYPE", "ED_INST_TYPE"),
+    FieldConfig("FULL_PROJECT_NUM", "FULL_PROJECT_NUM"),
+    FieldConfig("SUBPROJECT_ID", "SUBPROJECT_ID"),
+    FieldConfig("FUNDING_ICs", "FUNDING_ICs"),
+    FieldConfig("FY", "FY", "int"),
+    FieldConfig("IC_NAME", "IC_NAME"),
+    FieldConfig("NIH_SPENDING_CATS", "NIH_SPENDING_CATS"),
+    FieldConfig("ORG_CITY", "ORG_CITY"),
+    FieldConfig("ORG_COUNTRY", "ORG_COUNTRY"),
+    FieldConfig("ORG_DEPT", "ORG_DEPT"),
+    FieldConfig("ORG_DISTRICT", "ORG_DISTRICT"),
+    FieldConfig("ORG_DUNS", "ORG_DUNS"),
+    FieldConfig("ORG_FIPS", "ORG_FIPS"),
+    FieldConfig("ORG_NAME", "ORG_NAME"),
+    FieldConfig("ORG_STATE", "ORG_STATE"),
+    FieldConfig("ORG_ZIPCODE", "ORG_ZIPCODE"),
+    FieldConfig("PHR", "PHR"),
+    FieldConfig("PI_IDS", "PI_IDS"),
+    FieldConfig("PI_NAMEs", "PI_NAMEs"),
+    FieldConfig("PROGRAM_OFFICER_NAME", "PROGRAM_OFFICER_NAME"),
+    FieldConfig("PROJECT_START", "PROJECT_START", "date"),
+    FieldConfig("PROJECT_END", "PROJECT_END", "date"),
+    FieldConfig("PROJECT_TERMS", "PROJECT_TERMS"),
+    FieldConfig("PROJECT_TITLE", "PROJECT_TITLE"),
+    FieldConfig("SERIAL_NUMBER", "SERIAL_NUMBER"),
+    FieldConfig("STUDY_SECTION", "STUDY_SECTION"),
+    FieldConfig("STUDY_SECTION_NAME", "STUDY_SECTION_NAME"),
+    FieldConfig("SUFFIX", "SUFFIX"),
+    FieldConfig("SUPPORT_YEAR", "SUPPORT_YEAR", "int"),
+    FieldConfig("TOTAL_COST", "TOTAL_COST", "int"),
+    FieldConfig("TOTAL_COST_SUB_PROJECT", "TOTAL_COST_SUB_PROJECT", "int"),
+)
+
+PRE_2006_PROJECT_FIELDS: Tuple[FieldConfig, ...] = (
+    FieldConfig("FOA_NUMBER", "FOA_NUMBER"),
+)
+
+POST_2005_PROJECT_FIELDS: Tuple[FieldConfig, ...] = (
+    FieldConfig("OPPORTUNITY NUMBER", "OPPORTUNITY_NUMBER"),
+    FieldConfig("FUNDING_MECHANISM", "FUNDING_MECHANISM"),
+    FieldConfig("ORG_IPF_CODE", "ORG_IPF_CODE", "int"),
+    FieldConfig("DIRECT_COST_AMT", "DIRECT_COST_AMT", "int"),
+    FieldConfig("INDIRECT_COST_AMT", "INDIRECT_COST_AMT", "int"),
+)
+
+
+def upload_projects(dir_path: os.PathLike = DEFAULT_PROJECTS_DIR, batch_size: int = DEFAULT_BATCH_SIZE, ) -> Dict[str, int]:
+    """
+    Upload all RePORTER project CSV files from dir_path into grant_project.
+
+    The CSV files are streamed row by row. Only batch_size rows are kept in
+    memory at a time, which is important because the yearly RePORTER project
+    files can be large.
+    """
+
+    from baseclass.conn import DBConnection as db
+    from utils.tools import _normalize_tuple, convert_to_int, detect_file_encoding, parse_date
+
+    projects_dir = Path(dir_path).expanduser().resolve()
+
+    if batch_size <= 0:
+        raise ValueError("batch_size must be greater than 0")
+
+    # Some RePORTER text columns can be large. Raise the csv module limit once
+    # before streaming files so PHR/PROJECT_TERMS fields do not fail parsing.
+    max_csv_field_size = sys.maxsize
+
+    while True:
+        try:
+            csv.field_size_limit(max_csv_field_size)
+            break
+
+        except OverflowError:
+            max_csv_field_size = int(max_csv_field_size / 10)
+
+    if not projects_dir.is_dir():
+        raise FileNotFoundError(f"Project CSV directory does not exist: {projects_dir}")
+
+    csv_files = sorted(projects_dir.glob("RePORTER_PRJ_C_FY*.[Cc][Ss][Vv]"))
+
+    if not csv_files:
+        print(f"No RePORTER project CSV files found in: {projects_dir}")
+        return {"files_processed": 0, "rows_inserted": 0, "failed_files": 0}
 
     conn = db().mysql_conn()
-    cursor = conn.cursor()
+    cursor = None
+    summary = {"files_processed": 0, "rows_inserted": 0, "failed_files": 0}
 
-    # Get all CSV files (case-insensitive)
-    csv_files = Path(dir_path).glob('RePORTER_PRJ_C_FY*.[Cc][Ss][Vv]')
-   
-    for csv_file in csv_files:
+    try:
+        cursor = conn.cursor()
 
-        filename = csv_file.name
-        print(f'\n{filename}')
- 
-        try:
-            year = _get_year(filename)
-        except ValueError as e:
-            print(e)
-              
-        total = 0
-        row_touples_list = []
-        is_year_after_2005 =  year > 2005
-        print(f'[Year = {year}]: is_year_after_2005 = {is_year_after_2005}')
-
-        encoding, confidence = detect_file_encoding(dir_path+'/'+filename)
-        print(f"Detected encoding: {encoding} (Confidence: {confidence:.2%})")
-
-        with open(csv_file, 'r', newline='', encoding=encoding, errors='replace') as file:
-
-            reader = csv.DictReader(file)  
-
-            for row in list(reader):
-                '''
-                data_tuple = (
-                    int(row['APPLICATION_ID']) if row['APPLICATION_ID'] else None,  # APPLICATION_ID
-                    row['ACTIVITY'] if row['ACTIVITY'] else None,  # ACTIVITY
-                    row['ADMINISTERING_IC'] if row['ADMINISTERING_IC'] else None,  # ADMINISTERING_IC
-                    int(row['APPLICATION_TYPE']) if row['APPLICATION_TYPE'] else None,  # APPLICATION_TYPE
-                    row['ARRA_FUNDED'] if row['ARRA_FUNDED'] else None,  # ARRA_FUNDED
-                    parse_date(row['AWARD_NOTICE_DATE']),  # AWARD_NOTICE_DATE
-                    parse_date(row['BUDGET_START']),  # BUDGET_START
-                    parse_date(row['BUDGET_END']),  # BUDGET_END
-                    row['CFDA_CODE'] if row['CFDA_CODE'] else None,  # CFDA_CODE
-                    row['CORE_PROJECT_NUM'] if row['CORE_PROJECT_NUM'] else None,  # CORE_PROJECT_NUM
-                    row['ED_INST_TYPE'] if row['ED_INST_TYPE'] else None,  # ED_INST_TYPE
-                    
-                    row['FULL_PROJECT_NUM'] if row['FULL_PROJECT_NUM'] else None,  # FULL_PROJECT_NUM
-                    row['SUBPROJECT_ID'] if row['SUBPROJECT_ID'] else None,  # SUBPROJECT_ID
-                    row['FUNDING_ICs'] if row['FUNDING_ICs'] else None,  # FUNDING_ICs
-                    int(row['FY']) if row['FY'] else None,  # FY
-                    row['IC_NAME'] if row['IC_NAME'] else None,  # IC_NAME
-                    row['NIH_SPENDING_CATS'] if row['NIH_SPENDING_CATS'] else None,  # NIH_SPENDING_CATS
-                    row['ORG_CITY'] if row['ORG_CITY'] else None,  # ORG_CITY
-                    row['ORG_COUNTRY'] if row['ORG_COUNTRY'] else None,  # ORG_COUNTRY
-                    row['ORG_DEPT'] if row['ORG_DEPT'] else None,  # ORG_DEPT
-                    row['ORG_DISTRICT'] if row['ORG_DISTRICT'] else None,  # ORG_DISTRICT
-                    row['ORG_DUNS'] if row['ORG_DUNS'] else None,  # ORG_DUNS
-                    row['ORG_FIPS'] if row['ORG_FIPS'] else None,  # ORG_FIPS
-                    row['ORG_NAME'] if row['ORG_NAME'] else None,  # ORG_NAME
-                    row['ORG_STATE'] if row['ORG_STATE'] else None,  # ORG_STATE
-                    row['ORG_ZIPCODE'] if row['ORG_ZIPCODE'] else None,  # ORG_ZIPCODE
-                    row['PHR'] if row['PHR'] else None,  # PHR
-                    row['PI_IDS'] if row['PI_IDS'] else None,  # PI_IDS
-                    row['PI_NAMEs'] if row['PI_NAMEs'] else None,  # PI_NAMEs
-                    row['PROGRAM_OFFICER_NAME'] if row['PROGRAM_OFFICER_NAME'] else None,  # PROGRAM_OFFICER_NAME
-                    parse_date(row['PROJECT_START']),  # PROJECT_START
-                    parse_date(row['PROJECT_END']),  # PROJECT_END
-                    row['PROJECT_TERMS'] if row['PROJECT_TERMS'] else None,  # PROJECT_TERMS
-                    row['PROJECT_TITLE'] if row['PROJECT_TITLE'] else None,  # PROJECT_TITLE
-                    row['SERIAL_NUMBER'] if row['SERIAL_NUMBER'] else None,  # SERIAL_NUMBER
-                    row['STUDY_SECTION'] if row['STUDY_SECTION'] else None,  # STUDY_SECTION
-                    row['STUDY_SECTION_NAME'] if row['STUDY_SECTION_NAME'] else None,  # STUDY_SECTION_NAME
-                    
-                    row['SUFFIX'] if row['SUFFIX'] else None,  # SUFFIX
-                    int(row['SUPPORT_YEAR']) if row['SUPPORT_YEAR'] else None,  # SUPPORT_YEAR
-                    int(row['TOTAL_COST']) if row['TOTAL_COST'] else None,  # TOTAL_COST
-                    int(row['TOTAL_COST_SUB_PROJECT']) if row['TOTAL_COST_SUB_PROJECT'] else None,  # TOTAL_COST_SUB_PROJECT 
+        for csv_file in csv_files:
+            try:
+                # The project CSV schema changes by fiscal year. Keeping the
+                # field list year-aware lets one loader handle both historical
+                # files and current files while still generating one explicit
+                # INSERT column list for MySQL.
+                year = _get_year(csv_file.name)
+                fields = COMMON_PROJECT_FIELDS + (
+                    POST_2005_PROJECT_FIELDS if year > 2005 else PRE_2006_PROJECT_FIELDS
                 )
-                '''
-                # Define field configurations: (field_name, converter_function)
-                fields = [
-                    ('APPLICATION_ID', int),
-                    ('ACTIVITY', None),
-                    ('ADMINISTERING_IC', None),
-                    ('APPLICATION_TYPE', int),
-                    ('ARRA_FUNDED', None),
-                    ('AWARD_NOTICE_DATE', parse_date),
-                    ('BUDGET_START', parse_date),
-                    ('BUDGET_END', parse_date),
-                    ('CFDA_CODE', None),
-                    ('CORE_PROJECT_NUM', None),
-                    ('ED_INST_TYPE', None),
-                    ('FULL_PROJECT_NUM', None),
-                    ('SUBPROJECT_ID', None),
-                    ('FUNDING_ICs', None),
-                    ('FY', int),
-                    ('IC_NAME', None),
-                    ('NIH_SPENDING_CATS', None),
-                    ('ORG_CITY', None),
-                    ('ORG_COUNTRY', None),
-                    ('ORG_DEPT', None),
-                    ('ORG_DISTRICT', None),
-                    ('ORG_DUNS', None),
-                    ('ORG_FIPS', None),
-                    ('ORG_NAME', None),
-                    ('ORG_STATE', None),
-                    ('ORG_ZIPCODE', None),
-                    ('PHR', None),
-                    ('PI_IDS', None),
-                    ('PI_NAMEs', None),
-                    ('PROGRAM_OFFICER_NAME', None),
-                    ('PROJECT_START', parse_date),
-                    ('PROJECT_END', parse_date),
-                    ('PROJECT_TERMS', None),
-                    ('PROJECT_TITLE', None),
-                    ('SERIAL_NUMBER', None),
-                    ('STUDY_SECTION', None),
-                    ('STUDY_SECTION_NAME', None),
-                    ('SUFFIX', None),
-                    ('SUPPORT_YEAR', int),
-                    ('TOTAL_COST', int),
-                    ('TOTAL_COST_SUB_PROJECT', int),
-                ]
 
-                data_tuple = tuple(convert_value(row[field], converter) for field, converter in fields)
+                # Build the INSERT statement from the exact field mapping used
+                # below to convert row values. This prevents a common loader
+                # bug where the VALUES placeholders drift away from the column
+                # order after adding/removing a CSV field.
+                db_columns = [f"`{field.db_column}`" for field in fields]
+                placeholders = ["%s"] * len(db_columns)
+                insert_sql = f"""
+                    INSERT INTO `{TABLE_NAME}` ({", ".join(db_columns)})
+                    VALUES ({", ".join(placeholders)})
+                """
+
+                row_batch: List[Tuple[Any, ...]] = []
+                inserted_count = 0
+
+                # RePORTER files have not always used the same encoding. Detect
+                # the likely encoding from the file bytes, then normalize UTF-8
+                # to utf-8-sig so Python strips a byte-order mark from the first
+                # header column when present.
+                detected_encoding, confidence = detect_file_encoding(csv_file)
+                encoding = detected_encoding or "utf-8-sig"
+                normalized_encoding = encoding.strip().lower().replace("_", "-")
+
+                # utf-8-sig reads normal UTF-8 and also removes a UTF-8 BOM from
+                # the first CSV header when one is present.
+                if normalized_encoding in {"utf-8", "utf8", "utf-8-sig"}:
+                    encoding = "utf-8-sig"
+
+                print(f"\n{csv_file.name}")
+                print(f"[Year={year}] post_2005_format={year > 2005}")
+                print(
+                    f"Detected encoding: {detected_encoding} "
+                    f"(confidence: {confidence:.2%}); reading as {encoding}"
+                )
+
+                with csv_file.open("r", newline="", encoding=encoding, errors="replace") as file_obj:
+                    reader = csv.DictReader(file_obj)
+
+                    # Validate headers once before processing rows. A missing
+                    # field should fail the file immediately instead of creating
+                    # rows with silent NULL values in important columns.
+                    if not reader.fieldnames:
+                        raise ValueError(f"{csv_file.name} does not contain a CSV header row.")
+
+                    csv_columns = set(reader.fieldnames)
+                    missing_columns = [
+                        field.csv_column
+                        for field in fields
+                        if field.csv_column not in csv_columns
+                    ]
+
+                    if missing_columns:
+                        raise ValueError(
+                            f"{csv_file.name} is missing required column(s): "
+                            f"{', '.join(missing_columns)}"
+                        )
+
+                    for row_number, row in enumerate(reader, start=2):
+                        values = []
+
+                        # Convert the current CSV row in the same order as the
+                        # generated INSERT columns. Empty strings become NULL;
+                        # dates use the shared parse_date helper; integer-ish
+                        # money/count fields allow comma separators.
+                        for field in fields:
+                            value = row.get(field.csv_column)
+
+                            try:
+                                if value is None:
+                                    converted_value = None
+
+                                else:
+                                    if isinstance(value, str):
+                                        value = value.strip()
+
+                                    if value == "":
+                                        converted_value = None
+                                    elif field.converter == "int":
+                                        converted_value = convert_to_int(value)
+                                    elif field.converter == "date":
+                                        converted_value = parse_date(value)
+                                    else:
+                                        converted_value = value
+
+                            except ValueError as exc:
+                                raise ValueError(
+                                    f"{csv_file.name} row {row_number}, "
+                                    f"column {field.csv_column}: {exc}"
+                                ) from exc
+
+                            values.append(converted_value)
+
+                        # Keep using the shared normalizer so text cleanup stays
+                        # consistent with the rest of the RDAS import pipeline.
+                        row_batch.append(_normalize_tuple(tuple(values)))
+
+                        if len(row_batch) >= batch_size:
+                            # Commit each batch. This keeps memory bounded and
+                            # avoids one huge transaction across a yearly file.
+                            try:
+                                cursor.executemany(insert_sql, row_batch)
+                                conn.commit()
+
+                            except Exception:
+                                conn.rollback()
+                                raise
+
+                            inserted_count += len(row_batch)
+                            row_batch.clear()
+
+                            if inserted_count % 10000 == 0:
+                                print(f"{inserted_count} rows inserted...", flush=True)
+                            else:
+                                print(".", end=" ", flush=True)
+
+                if row_batch:
+                    # Flush the final partial batch for the file.
+                    try:
+                        cursor.executemany(insert_sql, row_batch)
+                        conn.commit()
+
+                    except Exception:
+                        conn.rollback()
+                        raise
+
+                    inserted_count += len(row_batch)
+                    row_batch.clear()
+
+                print(f"\n{csv_file.name}: inserted {inserted_count} row(s)\n")
+
+                summary["files_processed"] += 1
+                summary["rows_inserted"] += inserted_count
+
+            except Exception as exc:
+                summary["failed_files"] += 1
+                print(f"\nFailed to upload {csv_file.name}: {exc}")
+                raise
+
+    finally:
+        if cursor is not None:
+            cursor.close()
+
+        if conn is not None and conn.is_connected():
+            conn.close()
+
+    return summary
 
 
-                if is_year_after_2005:
-                     # Files after 2005, starts with 2006
-                    data_tuple = data_tuple + (
-                        row['OPPORTUNITY NUMBER'] if row['OPPORTUNITY NUMBER'] else None,  # OPPORTUNITY NUMBER
-                        row['FUNDING_MECHANISM'] if row['FUNDING_MECHANISM'] else None,  # FUNDING_MECHANISM
-                        int(row['ORG_IPF_CODE']) if row['ORG_IPF_CODE'] else None,  # ORG_IPF_CODE
-                        int(row['DIRECT_COST_AMT']) if row['DIRECT_COST_AMT'] else None,  # DIRECT_COST_AMT
-                        int(row['INDIRECT_COST_AMT']) if row['INDIRECT_COST_AMT'] else None  # INDIRECT_COST_AMT
-                    )  
-                else: 
-                    # The files before 2006 has a column 'FOA_NUMBER'
-                    data_tuple = data_tuple + (row['FOA_NUMBER'] if row['FOA_NUMBER'] else None,) 
+def _get_year(filename: str) -> int:
+    """Extract and validate the fiscal year from a RePORTER project filename."""
 
-                # remove unwanted characters
-                data_tuple = _normalize_tuple(data_tuple)
-                   
-                row_touples_list.append(data_tuple)
-                total += 1 
-
-                if total % 50 == 0:
-                    # Save rows of a csv file into mysql                   
-                    cursor.executemany(_insert_sql(is_year_after_2005), row_touples_list)   
-                    row_touples_list = []
-              
-                if total % 1000 == 0:
-                    conn.commit()
-                    print('.', end= ' ', flush=True)
-
-
-        # Upload the leftover
-        cursor.executemany(_insert_sql(is_year_after_2005), row_touples_list)
-        conn.commit()
-
-        print(f'\n{csv_file.name}:: total = {total}\n')
-   
-    if cursor:
-        cursor.close()
-
-    if conn:
-        conn.close
-
-
-
-def _get_year(filename):
-
-    pattern = r'RePORTER_PRJ_C_FY(\d{4})\.[Cc][Ss][Vv]'
+    pattern = r"RePORTER_PRJ_C_FY(\d{4})\.[Cc][Ss][Vv]$"
     match = re.match(pattern, filename)
 
-    if match:
-        year = int(match.group(1))  # Returns the year (4 digits)
+    if not match:
+        raise ValueError(
+            f"Filename '{filename}' does not match the expected pattern "
+            "'RePORTER_PRJ_C_FY<year>.CSV'"
+        )
 
-        if year > 2025 or year < 1985:
-            raise ValueError(f"The Year cannot less than 1985 or greater than 2025")
-        
-        return year 
-        
-    raise ValueError(f"Filename '{filename}' does not match the expected pattern 'RePORTER_PRJ_C_FY<year>.CSV'")
-    
+    year = int(match.group(1))
+
+    if year < MIN_REPORTER_PROJECT_YEAR or year > MAX_REPORTER_PROJECT_YEAR:
+        raise ValueError(
+            f"Year {year} is outside the expected RePORTER project range "
+            f"{MIN_REPORTER_PROJECT_YEAR}-{MAX_REPORTER_PROJECT_YEAR}."
+        )
+
+    return year
 
 
-common_column_names = '''
-        APPLICATION_ID,ACTIVITY,ADMINISTERING_IC,APPLICATION_TYPE,ARRA_FUNDED,
-        AWARD_NOTICE_DATE,BUDGET_START,BUDGET_END,CFDA_CODE,CORE_PROJECT_NUM,
-        ED_INST_TYPE,      FULL_PROJECT_NUM,SUBPROJECT_ID,FUNDING_ICs,
-        FY,IC_NAME,NIH_SPENDING_CATS,ORG_CITY,ORG_COUNTRY,
-        ORG_DEPT,ORG_DISTRICT,ORG_DUNS,ORG_FIPS,ORG_NAME,
-        ORG_STATE,ORG_ZIPCODE,PHR,PI_IDS,PI_NAMEs,
-        PROGRAM_OFFICER_NAME,PROJECT_START,PROJECT_END,PROJECT_TERMS,PROJECT_TITLE,
-        SERIAL_NUMBER,STUDY_SECTION,STUDY_SECTION_NAME,SUFFIX,SUPPORT_YEAR,
-        TOTAL_COST,TOTAL_COST_SUB_PROJECT
-    '''
+def main() -> int:
+    """Run the project CSV upload."""
 
-common_column_placehoders = '''
-        %s, %s, %s, %s, %s, 
-        %s,     %s, %s, %s, 
-        %s, %s, %s, %s, %s, 
-        %s, %s, %s, %s, %s, 
-        %s, %s, %s, %s, %s, 
-        %s, %s, %s, %s, %s, 
-        %s, %s, %s, %s, %s, 
-        %s, %s, %s, %s, %s, 
-        %s, %s
-'''
+    from utils.tools import ask_to_continue
 
-def _insert_sql(is_year_after_2005):
- 
-    # If the 1985 <= year <= 2005, Common clumns + FOA_NUMBER
-    insert_sql = f'''
-        INSERT INTO grant_project ( {common_column_names}, FOA_NUMBER ) VALUES ( {common_column_placehoders}, %s )
-    '''
+    if not ask_to_continue("*** Upload the grant Projects into MySQL database? *** "):
+        print("\n------------------------ Stopped ------------------------\n")
+        return 1
 
-    if is_year_after_2005: 
-        # Common clumns
-        # Add: OPPORTUNITY_NUMBER, FUNDING_MECHANISM, ORG_IPF_CODE, DIRECT_COST_AMT, INDIRECT_COST_AMT
-        insert_sql = f'''
-            INSERT INTO grant_project (
-                {common_column_names},
-                OPPORTUNITY_NUMBER, FUNDING_MECHANISM, ORG_IPF_CODE, DIRECT_COST_AMT, INDIRECT_COST_AMT
-            ) 
-            VALUES ( {common_column_placehoders}, %s, %s, %s, %s, %s )
-        '''
+    summary = upload_projects()
 
-    return insert_sql
+    print(
+        "\nUpload complete: "
+        f"files_processed={summary['files_processed']}, "
+        f"rows_inserted={summary['rows_inserted']}, "
+        f"failed_files={summary['failed_files']}\n"
+    )
 
- 
+    return 0
 
-if __name__ == '__main__':
 
-    ok = ask_to_continue(f'*** Upload the grant Projects into MySQL database? *** ')
-
-    if not ok:
-        sys.exit(Fore.RED + '\n------------------------ Stopped ------------------------\n'+ Style.RESET_ALL)
-
-    base_dir = f'{Path(__file__).parent}/data'
-
-    # 1.
-    upload_projects(f'{base_dir}/projects') 
-
-    print(Fore.BLUE + f'\n=**=**=**=**=**=**=**=**=**=**=**=**=**=**=**= All Done  =**=**=**=**=**=**=**=**=**=**=**=**=**=**=**=\n'+ Style.RESET_ALL)
+if __name__ == "__main__":
+    raise SystemExit(main())

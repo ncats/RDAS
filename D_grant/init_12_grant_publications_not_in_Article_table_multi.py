@@ -1,258 +1,261 @@
-import os
-import sys
-import json
-# Add the project root to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+"""
+Download grant-linked PMIDs that are not already in publication_article.
 
-import requests
-import urllib3
-import warnings
-# Suppress only the InsecureRequestWarning
-warnings.filterwarnings("ignore", category=urllib3.exceptions.InsecureRequestWarning)
+Original operational notes kept here because they explain the expected staging
+table and the relationship path used by the query.
 
-import time
-from datetime import datetime
-from dotenv import load_dotenv
-load_dotenv()
+Create table grant_publication_not_in_article the SAME as publication_article:
+    The table grant_publication_not_in_article contains the PMIDs which are in
+    Grant but not in publication_article.
 
-from colorama import init, Fore, Style
-# Initialize colorama for Windows compatibility
-init()
+Clean the grant_gard_project_relation data by:
+    UPDATE rdas_db.grant_gard_project_relation
+    SET core_project_num = NULL
+    WHERE TRIM(core_project_num) = '';
 
-from multiprocessing import Pool, cpu_count
-from baseclass.conn import DBConnection as db
-from utils.tools import ask_to_continue, _id_range_generator, _normalize_txt
-from utils.publication_worker import PublicationWorker
-
-# Create table grant_publication_not_in_article the SAME as publication_article
-'''
-The table grant_publication_not_in_article contains the PMIDs which are in Grant but not in publication_article.
-'''
-
-# Clean the grant_gard_project_relation data by
-'''
-UPDATE rdas_db.grant_gard_project_relation SET core_project_num = NULL WHERE TRIM(core_project_num) = '';
-'''
-
-# Criteria
-'''
+Criteria:
     grant_publication links to grant_linktable via pmid.
     grant_linktable links to grant_gard_project_relation via project_number and core_project_num.
     grant_gard_project_relation links to grant_gard_project_relation_unique_application_id via application_id.
-''' 
 
-# To retrieve gp.pmid from the rdas_db.grant_publication table that are not present in the rdas_db.publication_article table and grant_publication_not_in_article
-'''
-SELECT gp.pmid
-FROM rdas_db.grant_publication gp
-JOIN rdas_db.grant_linktable gl ON gp.pmid = gl.pmid
-JOIN rdas_db.grant_gard_project_relation gpr ON gl.project_number = gpr.core_project_num
-JOIN rdas_db.grant_gard_project_relation_unique_application_id gpru ON gpr.application_id = gpru.application_id
-LEFT JOIN rdas_db.publication_article pa ON gp.pmid = pa.pubmed_id
-LEFT JOIN rdas_db.grant_publication_not_in_article gpn ON gp.pmid = gpn.pubmed_id
-WHERE gpru.pmid_processed is NULL)
-AND gpr.core_project_num IS NOT NULL 
-AND pa.pubmed_id IS NULL
-AND gpn.pubmed_id IS NULL
-'''
+To retrieve gp.pmid from rdas_db.grant_publication that are not present in both
+rdas_db.publication_article and rdas_db.grant_publication_not_in_article:
+    SELECT DISTINCT gp.pmid
+    FROM rdas_db.grant_publication AS gp
+    JOIN rdas_db.grant_linktable AS gl
+        ON gl.PMID = gp.PMID
+    JOIN rdas_db.grant_gard_project_relation AS gpr
+        ON gpr.core_project_num = gl.PROJECT_NUMBER
+    JOIN rdas_db.grant_gard_project_relation_unique_application_id AS gpru
+        ON gpru.application_id = gpr.application_id
+    LEFT JOIN rdas_db.publication_article AS pa
+        ON pa.pubmed_id = gp.PMID
+    LEFT JOIN rdas_db.grant_publication_not_in_article AS gpn
+        ON gpn.pubmed_id = gp.PMID
+    WHERE gpru.pmid_processed IS NULL
+      AND gpr.core_project_num IS NOT NULL
+      AND gp.PMID IS NOT NULL
+      AND pa.pubmed_id IS NULL
+      AND gpn.pubmed_id IS NULL;
 
-# Check duplicates
-''' SELECT pubmed_id, count(*) as cnt FROM rdas_db.grant_publication_not_in_article group by pubmed_id order by cnt desc; '''
+Check duplicates:
+    SELECT pubmed_id, COUNT(*) AS cnt
+    FROM rdas_db.grant_publication_not_in_article
+    GROUP BY pubmed_id
+    ORDER BY cnt DESC;
+"""
 
-base_url = os.getenv('EURO_PEPMC_SERVICE_URL')
-chars_to_remove = "!@#$%^&*()_+-={}[]|\\:;\"'<>,.?/`~"
+import sys
+from multiprocessing import Pool, cpu_count
+from pathlib import Path
+from typing import Any, List, Optional, Tuple
 
-def check_key_value(obj, key):
-    result = key in obj and obj[key] == 'Y'
-    return result
- 
+import mysql.connector
 
-def get_pmids_need_to_download(start_id, end_id):
+# Add the project root to the Python path so this file can be run directly:
+# python D_grant/init_12_grant_publications_not_in_Article_table_multi.py
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+sys.path.append(str(PROJECT_ROOT))
 
-    query = f'''
-        SELECT DISTINCT gp.pmid
-        FROM rdas_db.grant_publication gp
-        JOIN rdas_db.grant_linktable gl ON gp.pmid = gl.pmid
-        JOIN rdas_db.grant_gard_project_relation gpr ON gl.project_number = gpr.core_project_num
-        JOIN rdas_db.grant_gard_project_relation_unique_application_id gpru ON gpr.application_id = gpru.application_id
-        LEFT JOIN rdas_db.publication_article pa ON gp.pmid = pa.pubmed_id 
-        WHERE gpru.id BETWEEN {start_id} AND {end_id}
-        AND gpru.pmid_processed IS NULL
-        AND gpr.core_project_num IS NOT NULL
-        AND pa.pubmed_id IS NULL 
-    '''
-
-    dict_cursor = mysql.cursor(dictionary=True, buffered=True)
-    dict_cursor.execute(query)
-    rows = dict_cursor.fetchall()
-
-    pmids = [row['pmid'] for row in rows]
-    dict_cursor.close()
-    
-    return pmids
-    
-''' 
-def download_by_pmid(pmid):
-    #https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID:5770408&resultType=core&format=json&pageSize=1000    
-    url = f"{base_url}?query=EXT_ID:{pmid}&resultType=core&format=json"
-    
-    retries = 0
-    max_retries=10
-    while retries < max_retries:
-        try:                
-            response = requests.get(url, verify=False)
-            response.raise_for_status()  # Raise an exception for HTTP errors (4xx and 5xx)                                
-            try:
-                bigObj = response.json()
-            
-                resultList = bigObj['resultList']['result']
-                if len(resultList) <= 0:
-                    break
-
-                for result in resultList:
-                    if 'pmid' not in result:
-                        continue
-                        
-                    pubmed_id  = result['pmid']
-
-                    # The query returned more other pubmed_id(s)
-                    if str(pubmed_id) != str(pmid):
-                        continue
-
-                    source = _normalize_txt(result['source']) if 'source' in result else None
-                    doi = _normalize_txt(result['doi']) if 'doi' in result else None
-                    title = _normalize_txt(result['title']) if 'title' in result else None
-                    abstract_text = _normalize_txt(result['abstractText']) if 'abstractText' in result else None
-                    affiliation = _normalize_txt(result['affiliation']) if 'affiliation' in result else None
-                    first_publication_date = result['firstPublicationDate'] if 'firstPublicationDate' in result else None
-                    publication_year = int(datetime.strptime(result['firstPublicationDate'], '%Y-%m-%d').year) if 'firstPublicationDate' in result else None
-                    is_open_access = check_key_value(result, 'isOpenAccess')
-                    in_EPMC = check_key_value(result, 'inEPMC')
-                    in_PMC = check_key_value(result, 'inPMC')
-                    has_PDF = check_key_value(result, 'hasPDF')
-                    
-                    pub_type = json.dumps(result['pubTypeList']['pubType']) if 'pubTypeList' in result else None
-                    cited_by_count = int(result['citedByCount']) if 'citedByCount' in result else 0
-                    
-                    if title:
-                        title = title.strip(chars_to_remove)
-
-                    if abstract_text:
-                        abstract_text = abstract_text.strip(chars_to_remove)
-
-                    print(f'pubmed_id = {pubmed_id}\t{publication_year}\t{doi}')
-
-                     
-                    #pubmed_id, doi, title, abstract_text, affiliation,
-                    #first_publication_date, publication_year, cited_by_count, is_open_access, in_EPMC, 
-                    #in_PMC, has_PDF,  pub_type, source_json
-                     
-                    val = (pubmed_id, doi, title, abstract_text, affiliation, 
-                        first_publication_date, publication_year, cited_by_count, is_open_access, in_EPMC,
-                        in_PMC, has_PDF, pub_type, json.dumps(result)
-                        ) 
-
-                    return val 
-
-            except KeyError as e:
-                print(f'KeyError: {e}\n{url}')
-            except TypeError as e:
-                print(f'TypeError: {e}\n{url}')
-            except AttributeError as e:
-                print(f'AttributeError: {e}\n{url}')
-            
-            break  # Exit the loop if successful
-        except requests.exceptions.Timeout:
-            retries += 1
-            time.sleep(1)
-        except requests.exceptions.RequestException as e:
-            break  # Exit the loop for non-retryable errors
-
-    return None
-'''
-
-def download_by_pmid(pmid):
-    return PublicationWorker().download_by_pmid(pmid)
+from baseclass.conn import DBConnection as db
+from utils.publication_worker import PublicationWorker
+from utils.tools import _id_range_generator, ask_to_continue
 
 
-def main_multiprocessing(num_processes, pmids):
+# The original comments and confirmation prompt describe this as a staging table.
+TARGET_TABLE = "grant_publication_not_in_article"
+PROCESSED_FLAG = 1
 
-    # Create a Pool of worker processes 'with' statement ensures the pool is properly closed
-    with Pool(processes=num_processes) as pool:
-        # map() applies the download_url function to each item in urls. 
-        # For very long tasks, pool.apply_async() or pool.imap() might be better.
+# Keep the original range size. A small range limits the number of PMIDs queued
+# at once and makes each processed-flag commit easy to retry if a range fails.
+DEFAULT_ID_STEP = 1
+DEFAULT_RANGE_BATCH_SIZE = 5
 
-        # pool.map() is a blocking call. 
-        # This means the main program's execution will pause at this line until all the tasks have been completed 
-        # by the worker processes and all their results have been returned.
-        # The 'results' is a list
-        results = pool.map(download_by_pmid, pmids)
+# The old script used 22 worker processes. Keep that cap, but avoid launching
+# more processes than the machine can reasonably use.
+DEFAULT_PROCESS_COUNT = max(1, min(22, cpu_count() - 1))
 
-    return results
+PublicationRow = Tuple[Any, ...]
+_PUBLICATION_WORKER: Optional[PublicationWorker] = None
+
+PENDING_BOUNDS_QUERY = """
+    SELECT
+        MIN(id) AS min_id,
+        MAX(id) AS max_id
+    FROM rdas_db.grant_gard_project_relation_unique_application_id
+    WHERE pmid_processed IS NULL
+"""
+
+PMIDS_TO_DOWNLOAD_QUERY = """
+    SELECT DISTINCT
+        gp.PMID AS pmid
+    FROM rdas_db.grant_publication AS gp
+    JOIN rdas_db.grant_linktable AS gl
+        ON gl.PMID = gp.PMID
+    JOIN rdas_db.grant_gard_project_relation AS gpr
+        ON gpr.core_project_num = gl.PROJECT_NUMBER
+    JOIN rdas_db.grant_gard_project_relation_unique_application_id AS gpru
+        ON gpru.application_id = gpr.application_id
+    LEFT JOIN rdas_db.publication_article AS pa
+        ON pa.pubmed_id = gp.PMID
+    LEFT JOIN rdas_db.grant_publication_not_in_article AS gpn
+        ON gpn.pubmed_id = gp.PMID
+    WHERE gpru.id BETWEEN %s AND %s
+      AND gpru.pmid_processed IS NULL
+      AND gpr.core_project_num IS NOT NULL
+      AND gp.PMID IS NOT NULL
+      AND pa.pubmed_id IS NULL
+      AND gpn.pubmed_id IS NULL
+"""
+
+MARK_RANGE_PROCESSED_QUERY = """
+    UPDATE rdas_db.grant_gard_project_relation_unique_application_id
+    SET pmid_processed = %s
+    WHERE id BETWEEN %s AND %s
+      AND pmid_processed IS NULL
+"""
 
 
-if __name__ == "__main__": 
+def init_publication_worker() -> None:
+    """Create one PublicationWorker per process instead of one per PMID."""
+    global _PUBLICATION_WORKER
+    _PUBLICATION_WORKER = PublicationWorker()
 
-    ok = ask_to_continue('Find the Grant publication PMIDs which are not present in the publication_article table , and store into the table grant_publication_not_in_article?')
+
+def download_by_pmid(pmid: Any) -> Optional[PublicationRow]:
+    """Pool worker wrapper used by multiprocessing.Pool.map."""
+    global _PUBLICATION_WORKER
+
+    if _PUBLICATION_WORKER is None:
+        _PUBLICATION_WORKER = PublicationWorker()
+
+    return _PUBLICATION_WORKER.download_by_pmid(pmid)
+
+
+def get_pending_id_bounds(cursor: Any) -> Optional[Tuple[int, int]]:
+    """Return the min/max unprocessed work-table IDs, or None when finished."""
+    cursor.execute(PENDING_BOUNDS_QUERY)
+    row = cursor.fetchone()
+
+    if not row or row["min_id"] is None or row["max_id"] is None:
+        return None
+
+    return int(row["min_id"]), int(row["max_id"])
+
+
+def get_pmids_need_to_download(cursor: Any, start_id: int, end_id: int) -> List[Any]:
+    """Fetch distinct missing PMIDs for one grant work-table ID range."""
+    cursor.execute(PMIDS_TO_DOWNLOAD_QUERY, (start_id, end_id))
+    rows = cursor.fetchall()
+    return [row["pmid"] for row in rows if row.get("pmid") is not None]
+
+
+def mark_range_processed(cursor: Any, start_id: int, end_id: int) -> int:
+    """Mark a completed ID range so future runs skip it."""
+    cursor.execute(MARK_RANGE_PROCESSED_QUERY, (PROCESSED_FLAG, start_id, end_id))
+    return cursor.rowcount
+
+
+def main() -> int:
+    ok = ask_to_continue(
+        "Find the Grant publication PMIDs which are not present in publication_article, "
+        f"download them, and store into {TARGET_TABLE}?"
+    )
     if not ok:
-        sys.exit('------Stopped ------')
-
+        print("Stopped.")
+        return 0
 
     mysql = db().mysql_conn()
+    if mysql is None:
+        print("Unable to connect to MySQL.")
+        return 1
 
-    update_cursor = mysql.cursor(buffered=True)
-    insert_cursor = mysql.cursor(buffered=True) 
- 
-    # select min(id), max(id) from rdas_db.grant_gard_project_relation_unique_application_id;
-    min_id = 1 #200236 #163696 #82476 #1
-    max_id = 388186
-    step = 1
-    batch_size = 5
+    fetch_cursor = mysql.cursor(dictionary=True)
+    update_cursor = mysql.cursor()
+    insert_cursor = mysql.cursor()
 
-    pmid_count = 0
-    id_ranges = _id_range_generator(min_id, max_id, step, batch_size)
+    total_ranges = 0
+    failed_ranges = 0
+    total_pmids_seen = 0
+    total_downloaded_rows = 0
+    total_inserted_rows = 0
 
-    insert_sql = PublicationWorker().get_insert_sql()
+    try:
+        bounds = get_pending_id_bounds(fetch_cursor)
+        if bounds is None:
+            print("No pending grant publication PMID ranges found.")
+            return 0
 
-    with Pool(processes=22) as pool:
+        min_id, max_id = bounds
+        print(f"Pending work-table ID range: [{min_id}-{max_id}]")
 
-        for start_id, end_id in id_ranges:
-        
-            pmids = get_pmids_need_to_download(start_id, end_id)
-            if len(pmids) == 0:
-                print(f'\n{Fore.BLUE}[{start_id} - {end_id}] pmids.size = 0{Style.RESET_ALL}\n')
-                update_cursor.execute(f'UPDATE grant_gard_project_relation_unique_application_id SET pmid_processed = 1 WHERE id BETWEEN {start_id} AND {end_id}')
-                mysql.commit() 
-                continue
+        insert_sql = PublicationWorker().get_insert_sql(TARGET_TABLE)
 
-            #num_processes = min(len(pmids), cpu_count()-1) # Don't create more processes than tasks
-            #batch_val = main_multiprocessing(num_processes=num_processes, pmids=pmids)
+        # No overhead of Pool creation: create the Pool once and reuse it for
+        # every ID range. pool.map() is blocking, so the DB update for a range
+        # happens only after every PMID in that range has finished downloading.
+        with Pool(processes=DEFAULT_PROCESS_COUNT, initializer=init_publication_worker) as pool:
+            for start_id, end_id in _id_range_generator(min_id, max_id, DEFAULT_ID_STEP, DEFAULT_RANGE_BATCH_SIZE):
+                total_ranges += 1
+                range_label = f"[{start_id}-{end_id}]"
+                print(f"\n{'=' * 12} Processing ID range {range_label} {'=' * 12}")
 
-            ''' No overhead of Pool creation '''
-            batch_val = pool.map(download_by_pmid, pmids)
+                try:
+                    pmids = get_pmids_need_to_download(fetch_cursor, start_id, end_id)
 
-            batch_val = [val for val in batch_val if val is not None]
-            pmid_count += len(batch_val)
+                    if not pmids:
+                        marked_count = mark_range_processed(update_cursor, start_id, end_id)
+                        mysql.commit()
+                        print(f"{range_label} pmids=0, marked_processed={marked_count}")
+                        continue
 
-            try: 
-                insert_cursor.executemany(insert_sql, batch_val)
-                mysql.commit() 
-                
-                print(f'\n{Fore.BLUE}[{start_id} - {end_id}], total PMIDs = {pmid_count}. This batch insert size = {len(batch_val)}{Style.RESET_ALL}\n') 
+                    total_pmids_seen += len(pmids)
 
-                update_cursor.execute(f'UPDATE grant_gard_project_relation_unique_application_id SET pmid_processed = 1 WHERE id BETWEEN {start_id} AND {end_id}')
-                mysql.commit() 
+                    downloaded_rows = pool.map(download_by_pmid, pmids)
+                    batch_values = [row for row in downloaded_rows if row is not None]
+                    total_downloaded_rows += len(batch_values)
 
-            except Exception as e:
-                print(e)
+                    if batch_values:
+                        insert_cursor.executemany(insert_sql, batch_values)
+                        total_inserted_rows += len(batch_values)
 
-    
-    if insert_cursor:
-        insert_cursor.close() 
-    if update_cursor:
+                    marked_count = mark_range_processed(update_cursor, start_id, end_id)
+                    mysql.commit()
+
+                    print(
+                        f"{range_label} complete: "
+                        f"pmids={len(pmids)}, "
+                        f"downloaded_rows={len(batch_values)}, "
+                        f"marked_processed={marked_count}, "
+                        f"total_inserted_rows={total_inserted_rows}"
+                    )
+
+                except mysql.connector.Error as exc:
+                    failed_ranges += 1
+                    mysql.rollback()
+                    print(f"Database error for range {range_label}: {exc}")
+
+                except Exception as exc:
+                    failed_ranges += 1
+                    mysql.rollback()
+                    print(f"Processing error for range {range_label}: {exc}")
+
+    finally:
+        insert_cursor.close()
         update_cursor.close()
-    if mysql:
-        mysql.close()   
+        fetch_cursor.close()
+        mysql.close()
+
+    print(f"\n{'=' * 12} All Done {'=' * 12}")
+    print(
+        f"Ranges={total_ranges}, failed_ranges={failed_ranges}, "
+        f"pmids_seen={total_pmids_seen}, downloaded_rows={total_downloaded_rows}, "
+        f"inserted_rows={total_inserted_rows}"
+    )
+
+    return 1 if failed_ranges else 0
 
 
-    print( f'{Fore.BLUE+Style.BRIGHT}{"="*50} Total = {pmid_count} {"="*50}{Style.RESET_ALL}\n\n')
+if __name__ == "__main__":
+    raise SystemExit(main())

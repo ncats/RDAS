@@ -1,554 +1,791 @@
-import os
-import sys
-# Add the project root to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+"""
+Test GARD disease-to-grant project relationship matching for selected projects.
 
-import re
-import nltk
-print(f'nltk version: {nltk.__version__}')
-print(f'nltk.data.path: {nltk.data.path}')
-# Manually install punkt and stopwords in /Users/zhaot3/nltk_data
-# cd /Users/zhaot3/nltk_data
-# wget --no-check-certificate https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/tokenizers/punkt.zip
-# wget --no-check-certificate https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/stopwords.zip
-# wget --no-check-certificate https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/english_wordnet.zip
-'''
-nltk.download('wordnet')
-nltk.download('punkt')
-nltk.download('stopwords')
-'''
-from nltk.corpus import stopwords
-from nltk.stem import PorterStemmer
-from nltk.tokenize import word_tokenize
+Core purpose preserved from the original script:
+    The primary goal of this script is to identify and quantify the relevance
+    of various GARD diseases to NIH grant projects. It does this by performing
+    text analysis on project titles, public health relevance statements, and
+    abstract texts to find mentions of GARD disease names and synonyms.
 
-from sentence_transformers import SentenceTransformer, util
-from transformers import AutoTokenizer, AutoModel
-import torch
+This file is the test/debug version of the pipeline. It analyzes a small,
+explicit list of grant_project IDs and prints the matching result. The original
+script had the database insert section commented out; this version preserves
+that safety by default with SAVE_RESULTS_TO_DB = False.
 
-import spacy
-nlp = spacy.load("en_core_web_sm")
+Operational notes preserved from the original script:
 
-from dotenv import load_dotenv
-load_dotenv()
+    1. Find and inspect duplicate APPLICATION_ID values in grant_abstract:
 
-from colorama import init, Fore, Style
-# Initialize colorama for Windows compatibility
-init()
+        SELECT application_id
+        FROM rdas_db.grant_abstract
+        GROUP BY application_id
+        HAVING COUNT(1) > 1;
 
-import ast
+        SELECT *
+        FROM rdas_db.grant_abstract
+        WHERE APPLICATION_ID IN (
+            7916889, 10200508, 10224557, 10410101,
+            10711865, 10817330, 10991546, 10993253
+        )
+        ORDER BY APPLICATION_ID;
+
+    2. Create indexes on application_id and year on grant_abstract, and on
+       grant_project as needed:
+
+        ALTER TABLE `rdas_db`.`grant_abstract`
+        ADD INDEX `idx_grant_abstract_year` (`YEAR` ASC) VISIBLE,
+        ADD INDEX `idx_grant_abstract_app_id` (`APPLICATION_ID` ASC) VISIBLE,
+        ADD INDEX `idx_grant_abstract_app_id_yr` (`APPLICATION_ID` ASC, `YEAR` ASC) VISIBLE;
+
+    3. No duplicate APPLICATION_ID in grant_project. Use p.FY = a.YEAR to
+       de-duplicate APPLICATION_ID in grant_abstract:
+
+        SELECT p.APPLICATION_ID, p.FY, p.PROJECT_TITLE, p.PHR, a.ABSTRACT_TEXT
+        FROM rdas_db.grant_project p, rdas_db.grant_abstract a
+        WHERE p.APPLICATION_ID = a.APPLICATION_ID
+          AND p.FY = a.YEAR;
+
+    4. Check generated relationship results:
+
+        SELECT gard_id, COUNT(gard_id)
+        FROM rdas_db.grant_gard_project_relation
+        GROUP BY gard_id
+        ORDER BY COUNT(gard_id) DESC;
+
+        SELECT application_id, COUNT(application_id)
+        FROM rdas_db.grant_gard_project_relation
+        GROUP BY application_id
+        ORDER BY COUNT(application_id) DESC;
+
+        SELECT application_id, gard_id, COUNT(*)
+        FROM rdas_db.grant_gard_project_relation
+        GROUP BY application_id, gard_id
+        ORDER BY COUNT(*) DESC;
+
+        SELECT application_id, gard_id, COUNT(*)
+        FROM rdas_db.grant_gard_project_relation
+        GROUP BY application_id, gard_id
+        HAVING COUNT(*) > 1
+        ORDER BY COUNT(*) DESC;
+
+Original test-project note preserved:
+    -- The id of the grant_project table
+    -- id = 2397144
+    id = 2231557
+    -- p.id IN (
+    --     2351651,2351652,2351653,2351654,2351655,2351656,2351657,
+    --     2351658,2351659,2351660,2351661,2351662,2351663,2351664,
+    --     2351665,2351666,2351667,2351668,2351669,2351670,2351671,
+    --     2351672,2351673,2351674,2351675,2351676,2351677,2351678
+    -- )
+
+NLTK data note preserved from the original script:
+    _stem_text uses NLTK tokenization. If NLTK data is missing, install it in
+    your local NLTK data directory, for example:
+
+        cd /Users/zhaot3/nltk_data
+        wget --no-check-certificate https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/tokenizers/punkt.zip
+        wget --no-check-certificate https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/stopwords.zip
+        wget --no-check-certificate https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/english_wordnet.zip
+"""
+
 import math
-from baseclass.conn import DBConnection as db
-from utils.tools import ask_to_continue, _val, _normalize_tuple, _stem_text, _remove_stop_words, _id_range_generator
+import os
+import re
+import sys
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+# Add the project root to the Python path when this file is run directly.
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
+WORD_PATTERN = re.compile(r"\b\w+\b")
+GARD_TERM_SEPARATOR = "$$$"
+DEFAULT_TEST_PROJECT_IDS = (2231557,)
+DEFAULT_FETCH_SIZE = 100
+SAVE_RESULTS_TO_DB = False
+
+GARD_PROCESSED_NAMES: List[Dict[str, Any]] = []
+GARD_ID_BY_NAME: Dict[str, Any] = {}
+SPACY_MODEL = None
+CLINICAL_BERT_TOKENIZER = None
+CLINICAL_BERT_MODEL = None
+
+RELATION_INSERT_SQL = """
+    INSERT INTO grant_gard_project_relation (
+        gard_id,
+        application_id,
+        gard_name,
+        source_type,
+        confidence_score,
+        semantic_similarity,
+        core_project_num,
+        raw_result
+    )
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 """
-    *Core Purpose *
-    The primary goal of this script is to identify and quantify the relevance of various GARD diseases to NIH grant projects. 
-    It does this by performing sophisticated text analysis on different parts of grant applications (project titles, public health relevance statements, 
-    and abstract texts) to find mentions of GARD disease names and their synonyms.
+
+GARD_PROCESSED_NAMES_SQL = """
+    SELECT
+        gardid,
+        name,
+        synonyms,
+        synonyms_sw,
+        synonyms_sw_bow,
+        synonyms_sw_stem,
+        synonyms_sw_stem_bow
+    FROM grant_gard_processed_names
 """
 
-# 1. Find and see the duplicate APPLICATION_ID in grant_abstract
-'''
-    SELECT application_id FROM rdas_db.grant_abstract GROUP BY application_id HAVING COUNT(1) > 1
-    SELECT * FROM rdas_db.grant_abstract  where APPLICATION_ID in (7916889, 10200508, 10224557, 10410101, 10711865, 10817330, 10991546, 10993253 ) order by APPLICATION_ID;
-'''
 
-# 2. Create indexes on application_id and year on 'grant_abstract', as well as on 'grant_project'
-'''
-    ALTER TABLE `rdas_db`.`grant_abstract` 
-    ADD INDEX `idx_grant_abstract_year` (`YEAR` ASC) VISIBLE,
-    ADD INDEX `idx_grant_abstract_app_id` (`APPLICATION_ID` ASC) VISIBLE,
-    ADD INDEX `idx_grant_abstract_app_id_yr` (`APPLICATION_ID` ASC, `YEAR` ASC) VISIBLE;
-'''
+def split_sentence(sentence: str) -> List[str]:
+    """Split text with the original word regex."""
 
-# 3. No duplicate APPLICATION_ID in grant_project. Use 'p.FY=a.YEAR' to de-duplicate APPLICATION_ID in grant_abstract
-'''
-SELECT p.APPLICATION_ID, p.FY, p.PROJECT_TITLE, p.PHR, a.ABSTRACT_TEXT 
-FROM rdas_db.grant_project p, rdas_db.grant_abstract a
-where p.APPLICATION_ID=a.APPLICATION_ID and p.FY=a.YEAR
-'''
-
-# 4. Check results
-''' 
-select gard_id, count(gard_id) FROM rdas_db.grant_gard_project_relation group by gard_id order by count(gard_id) desc;
-select application_id, count(application_id) FROM rdas_db.grant_gard_project_relation group by application_id order by count(application_id) desc;
+    return WORD_PATTERN.findall(sentence)
 
 
-select application_id,gard_id, count(*) FROM rdas_db.grant_gard_project_relation group by application_id,gard_id order by count(*) desc;
-select application_id,gard_id, count(*) FROM rdas_db.grant_gard_project_relation group by application_id,gard_id having count(*)>1 order by count(*) desc;
-'''
+def text_has_all_words(text_words: Iterable[str], term: str) -> bool:
+    """Return True when every token in term appears in the text token list."""
 
-word_pattern = re.compile(r'\b\w+\b')
+    word_set = set(text_words)
 
-hf_token = os.getenv("HUGGINGFACE_TOKEN")
+    for word in split_sentence(term):
+        if word not in word_set:
+            return False
 
-# ---------------------------------------------------------------------------------------------------------------------------------------------------------
-
-def split_sentence(sentence):    
-    words = word_pattern.findall(sentence)# Use the pre-compiled pattern for splitting
-    return words
-
-def word_matching(text, word):
-   for i in  split_sentence(word):
-     if i not in text:
-        return False
-   return True
-
-def get_gard_title(text, list_chcek):
-
-    if list_chcek in ['Synonyms_stem','Synonyms_sw_stem','Synonyms_stem_bow','Synonyms_sw_stem_bow']: 
-        text1=_stem_text(text.lower())
-    elif list_chcek in [ 'Synonyms_sw_nltk']  :          
-        text1=_remove_stop_words(text.lower())
-    else:                                                  
-        text1=text.lower()
-
-    #print(text1)
-    text2=split_sentence(text1)
-    #print(text2)
-    
-    out=dict()
-    list_chcek = list_chcek.lower()
-    for gard in gard_processed_names:
-
-        gardName = gard['name'] 
-        gard_names_to_check = gard[list_chcek]
-        
-        for _name in gard_names_to_check:
-            if _name in text1 and word_matching(text2, _name):
-                count = text2.count(_name) if len(_name.split()) == 1 else text1.count(_name)
-
-                out[gardName] = [out[gardName][0] + count] if gardName in out else [count] 
-                
-    return out
+    return True
 
 
-def get_gard_title_stem_exact(text):
-    exact_matching = get_gard_title(text, 'Synonyms_sw_bow') or {}
-    stemming_check = get_gard_title(text, 'Synonyms_sw_stem_bow') or {}
-    combined_dict = {**exact_matching, **stemming_check}  # Merge dictionaries
-    #print(f'combined_dict\n{combined_dict}')
+def safe_split_terms(value: Any) -> List[str]:
+    """Split $$$-delimited GARD processed-name fields into clean term lists."""
 
-    # Remove keys that are part of another key
-    keys_to_remove = {key1 for key1 in combined_dict for key2 in combined_dict if key1 != key2 and key1 in key2}
-    combined_dict = {key: 1 for key in combined_dict if key not in keys_to_remove}
+    if value is None:
+        return []
 
-    return combined_dict or None
-
-
-def is_about_term(input_text, target_term):
-    # Load ClinicalBERT model and tokenizer
-    model_name = "emilyalsentzer/Bio_ClinicalBERT"
-    # ClinicalBERT: "emilyalsentzer/Bio_ClinicalBERT"
-    tokenizer = AutoTokenizer.from_pretrained(model_name, token=hf_token)
-    model = AutoModel.from_pretrained(model_name, token=hf_token)
-    # Tokenize input text and target term
-    input_tokens = tokenizer(input_text, return_tensors="pt", padding=True, truncation=True, max_length=512)
-    term_tokens = tokenizer(target_term, return_tensors="pt", padding=True, truncation=True, max_length=512)
-    # Get embeddings from ClinicalBERT
-    with torch.no_grad():
-        input_embedding = model(**input_tokens).last_hidden_state.mean(dim=1)
-        term_embedding = model(**term_tokens).last_hidden_state.mean(dim=1)
-    # Calculate cosine similarity between text and term
-    similarity = util.pytorch_cos_sim(input_embedding, term_embedding)
-    # Define a threshold for similarity
-    similarity_threshold = 0.7
-    # Return True if similarity is above the threshold, indicating the text is about the term
-    return similarity.item() #> similarity_threshold
-
- 
-def normalize(x):
-   if x < 20:
-       return math.log(x) / math.log(20)
-   else:
-    return 1
-   
-def normalize_combined_dictionary(input_text,title_,dict1, dict2, dict3, dict4,min_, max_,type):
-    if    type =='title':      factor=20
-    elif  type =='statement':  factor=2
-    else: factor=1
-    dict1 = {key: value * 5 for key, value in dict1.items()}
-    # Make the values of the second dictionary two times
-    dict2 = {key: value * 7 for key, value in dict2.items()}
-    dict3 = {key: value * 3 for key, value in dict3.items()}
-    # Combine all dictionaries
-    combined_dict = {key: dict1.get(key, 0) + dict2.get(key, 0) + dict3.get(key, 0) + dict4.get(key, 0) for key in set(dict1) | set(dict2) | set(dict3) | set(dict4)}
-    # Normalize the values of the combined dictionary
-    total_frequency = sum(combined_dict.values())
-    # Check if total_frequency is zero to avoid division by zero
-    if total_frequency == 0:
-        return {}
-    normalized_dict = {key: value   for key, value in combined_dict.items()}
-    result_dict = {}
-    for key, value in normalized_dict.items():
-        #if  is_about_term(input_text.lower(), key) >=0.5:
-        #sen_has_gard=get_sen(input_text.lower(), key,title_)
-
-        #!!! No SourceDescription in the new code, just let defin=key
-        #defin=get_def(key)
-        defin = key
-        try:
-          #result_dict[key] = [20 if  type =='title' else 1+(factor*value //2), is_about_term(sen_has_gard,  defin), is_about_term(input_text.lower(),  defin), sen_has_gard]
-          result_dict[key] = [normalize(20 if  type =='title' else 1+(factor*value //2)),  is_about_term(input_text.lower(),  defin)]
-
-        except:
-          try:
-              #result_dict[key] = [20 if  type =='title' else 1+ (factor*value //2), is_about_term(sen_has_gard[:2000],  defin[:2000]), is_about_term(input_text.lower()[:2000],  defin[:2000]), sen_has_gard]
-              result_dict[key] = [normalize(20 if  type =='title' else 1+ (factor*value //2)), is_about_term(input_text.lower()[:2000],  defin[:2000])]
-          except:
-              try:
-                  result_dict[key] = [normalize(20 if  type =='title' else 1+ (factor*value //2)) ,  is_about_term(input_text.lower()[:1500],  defin[:1500])]
-                  #result_dict[key] = [20 if  type =='title' else 1+ (factor*value //2) , is_about_term(sen_has_gard[:1500],  defin[:1500]), is_about_term(input_text.lower()[:1500],  defin[:1500]), sen_has_gard]
-
-              except:
-                  #result_dict[key] = [20 if  type =='title' else 1+ (factor*value //2) , is_about_term(sen_has_gard[:1000],   defin[:1000]), is_about_term(input_text.lower()[:500],  defin[:1000]), sen_has_gard]
-                  result_dict[key] = [normalize(20 if  type =='title' else 1+ (factor*value //2)) , is_about_term(input_text.lower()[:500],  defin[:1000])]
-
-    return result_dict
+    return [
+        term
+        for term in str(value).split(GARD_TERM_SEPARATOR)
+        if term
+    ]
 
 
-# Function to determine verb tense
-def get_verb_tense(verb):
-    if "VBD" in verb.tag_:
-        return "past"
-    elif ("MD" in verb.tag_ and "will" in verb.lemma_.lower()) or ('aim' in verb.lemma_.lower() ) :
-        return "future"
-    elif "VBP" in verb.tag_ or "VBZ" in verb.tag_:
-        return "present"
-    else:
-        return "unknown"
+def load_gard_processed_names() -> List[Dict[str, Any]]:
+    """Load processed GARD names and term lists from MySQL."""
 
-# Function to determine if a sentence is negated
-def is_sentence_negated(sentence):
-    for token in sentence:
-        if token.dep_ == "neg":
-            return True
-    return False
-
-
-def check_sen(text):
-  # Process the text
-  doc = nlp(text)
-  # Iterate over sentences in the document
-  first_sentence = ''
-  priority, future_positive, present_positive, positive='','','',''
-
-  for i, sent in enumerate(doc.sents, 1):
-    # Initialize a set to store unique tenses in the sentence
-    sentence_tenses = set()
-    # Iterate over tokens in the sentence
-    for token in sent:
-        # Check if the token is a verb
-        if token.pos == spacy.symbols.VERB or token.pos == spacy.symbols.AUX:
-            # Check the tense of the verb
-            tense = get_verb_tense(token)
-            sentence_tenses.add(tense)
-
-    # Determine the overall tense of the sentence
-    if is_sentence_negated(sent)==False and  ("past" not in sentence_tenses):
-        if i == 1:    first_sentence = sent.text
-        #positive+=sent.text
-        elif  ("the goal of" in sent.text.lower()) or ("aim" in sent.text.lower()):
-            priority+=sent.text
-        elif "future" in sentence_tenses:
-           future_positive+=sent.text
-        elif "present" in sentence_tenses and is_sentence_negated(sent)==False:
-           present_positive+=sent.text
-        if i == 1:    first_sentence = sent.text
-
-
-  return first_sentence,  priority, future_positive, present_positive
-
-
-def stem_text(text):
-    # Initialize the Porter Stemmer
-    stemmer = PorterStemmer()
-    # Remove punctuation
-    text_without_punctuation = re.sub(r'[^\w\s]', '', text)
-    # Tokenize the text into words
-    words = word_tokenize(text_without_punctuation)
-    # Perform stemming on each word
-    stemmed_words = [stemmer.stem(word) for word in words]
-    # Join the stemmed words back into a single string
-    stemmed_text = ' '.join(stemmed_words)
-    return stemmed_text
-
-
-def remove_stop_words(text):
-    stop_words = set(stopwords.words('english'))
-    words = word_tokenize(text)
-    filtered_words = [word for word in words if word.lower() not in stop_words]
-    return ' '.join(filtered_words)
-
-
-def get_gard_abstract(text, list_chcek):
- 
-  if list_chcek in ['Synonyms_stem','Synonyms_sw_stem','Synonyms_stem_bow','Synonyms_sw_stem_bow']: 
-      text1=stem_text(text.lower())
-  elif list_chcek in [ 'Synonyms_sw_nltk']  :          
-      text1=remove_stop_words(text.lower())
-  else:                                                  
-      text1=text.lower()
-  text2=split_sentence(text1)
-
-  out=dict()
-  list_chcek = list_chcek.lower()
-  
-  for gard in gard_processed_names:
-    gardName = gard['name'] 
-    gard_names_to_check = gard[list_chcek]
-    
-    for _name in gard_names_to_check:
-        if _name in text1 and word_matching(text2, _name):
-
-            #count = text2.count(_name) if len(_name.split()) == 1 else text1.count(_name)
-            #out[gardName] = [out[gardName][0] + count] if gardName in out else [count] 
-
-            if len(_name.split()) == 1:
-                count = text2.count(_name)
-            else:
-                count = text1.count(_name)
- 
-            if gardName in out:
-                out[gardName] = [out[gardName][0] + count]
-            else:
-                out[gardName] = [count]
-                 
-  if out== {}: return None,None
-  return out , ''#sen
-
-def _sum_and_update(target_dict, source_dict):
-    for key, value in source_dict.items():
-        target_dict[key] = target_dict.get(key, 0) + sum(value)
-
-
-def combine_dictionaries_count(dict1, dict2): 
-    combined_dict = {}
-    _sum_and_update(combined_dict, dict1)
-    _sum_and_update(combined_dict, dict2)
-    return combined_dict
-
-
- # Remove keys that are part of another key
-def modified_dict(combined_dict):
-    keys_to_remove = set()
-    for key1 in combined_dict:
-        for key2 in combined_dict:
-            if key1 != key2 and (key1 in key2) and (combined_dict[key1] <= combined_dict[key2]):
-                keys_to_remove.add(key1)
-    for key in keys_to_remove:
-        del combined_dict[key]
-        
-    return combined_dict
-
-
-def get_gard_abstract_stem_exact(text):
-  
-  if text and isinstance(text, str):
-    exact_matching, exact_matching_sen=get_gard_abstract(text, 'Synonyms_sw')
-    #print(exact_matching)
-    stemming_chcek, Stemming_chcek_sen=get_gard_abstract(text, 'Synonyms_sw_stem')
-    #print(Stemming_chcek)
-    if exact_matching is None: exact_matching = {}
-    if stemming_chcek is None: stemming_chcek = {}
-    #if exact_matching_sen is None:exact_matching_sen = {}
-    #if Stemming_chcek_sen is None:Stemming_chcek_sen = {}
-
-    combined_dict = combine_dictionaries_count(exact_matching,stemming_chcek)
-    #combined_dict_sen= combine_dictionaries_sent(exact_matching_sen,Stemming_chcek_sen)
-    # Remove keys that are part of another key
-    combined_dict=modified_dict(combined_dict)#,combined_dict_sen)
-    if combined_dict=={}:return {}
-    return combined_dict
-  return {}
-
-
-def get_GARD_with_processed_names():
-
-    def safe_split(value, delimiter='$$$'):
-        return value.split(delimiter) if value is not None else []
+    from baseclass.conn import DBConnection as db
 
     mysql = db().mysql_conn()
-    dict_cursor = mysql.cursor(dictionary=True, buffered=True)
 
-    query = ''' select gardid, name, synonyms, synonyms_sw, synonyms_sw_bow, synonyms_sw_stem, synonyms_sw_stem_bow from grant_gard_processed_names '''
-    dict_cursor.execute(query)
-    rows = dict_cursor.fetchall()
+    if mysql is None:
+        raise ConnectionError("Unable to create MySQL connection.")
 
-    processed_rows = [
+    cursor = None
+
+    try:
+        cursor = mysql.cursor(dictionary=True)
+        cursor.execute(GARD_PROCESSED_NAMES_SQL)
+        rows = cursor.fetchall()
+
+    finally:
+        if cursor is not None:
+            cursor.close()
+
+        if mysql is not None and mysql.is_connected():
+            mysql.close()
+
+    return [
         {
             **row,
-            'synonyms': safe_split(row['synonyms']),
-            'synonyms_sw': safe_split(row['synonyms_sw']),
-            'synonyms_sw_bow': safe_split(row['synonyms_sw_bow']),
-            'synonyms_sw_stem': safe_split(row['synonyms_sw_stem']),
-            'synonyms_sw_stem_bow': safe_split(row['synonyms_sw_stem_bow'])
+            "synonyms": safe_split_terms(row.get("synonyms")),
+            "synonyms_sw": safe_split_terms(row.get("synonyms_sw")),
+            "synonyms_sw_bow": safe_split_terms(row.get("synonyms_sw_bow")),
+            "synonyms_sw_stem": safe_split_terms(row.get("synonyms_sw_stem")),
+            "synonyms_sw_stem_bow": safe_split_terms(row.get("synonyms_sw_stem_bow")),
         }
         for row in rows
     ]
 
-    dict_cursor.close()
-    mysql.close()
 
-    return processed_rows
+def ensure_gard_terms_loaded() -> None:
+    """Load GARD term globals once for this test run."""
 
-# Global ---
-gard_processed_names = get_GARD_with_processed_names()
+    global GARD_PROCESSED_NAMES
+    global GARD_ID_BY_NAME
 
-def get_GARD_id_by_name(gard_name):
-    for gard in gard_processed_names:
-        if gard['name'] == gard_name:
-            return gard['gardid']
-    return None
+    if GARD_PROCESSED_NAMES:
+        return
+
+    GARD_PROCESSED_NAMES = load_gard_processed_names()
+    GARD_ID_BY_NAME = {
+        row["name"]: row["gardid"]
+        for row in GARD_PROCESSED_NAMES
+        if row.get("name")
+    }
 
 
-def process_text_and_normalize(text, project_title, weight_start, weight_end, source_type):
+def get_spacy_model():
+    """Load the spaCy sentence model once for this test run."""
+
+    global SPACY_MODEL
+
+    if SPACY_MODEL is None:
+        import spacy
+
+        SPACY_MODEL = spacy.load("en_core_web_sm")
+
+    return SPACY_MODEL
+
+
+def get_clinicalbert_components():
+    """Load ClinicalBERT tokenizer/model once for this test run."""
+
+    global CLINICAL_BERT_TOKENIZER
+    global CLINICAL_BERT_MODEL
+
+    if CLINICAL_BERT_TOKENIZER is None or CLINICAL_BERT_MODEL is None:
+        from transformers import AutoModel, AutoTokenizer
+
+        # ClinicalBERT model preserved from the original script:
+        # "emilyalsentzer/Bio_ClinicalBERT"
+        model_name = "emilyalsentzer/Bio_ClinicalBERT"
+        hf_token = os.getenv("HUGGINGFACE_TOKEN")
+
+        CLINICAL_BERT_TOKENIZER = AutoTokenizer.from_pretrained(model_name, token=hf_token)
+        CLINICAL_BERT_MODEL = AutoModel.from_pretrained(model_name, token=hf_token)
+        CLINICAL_BERT_MODEL.eval()
+
+    return CLINICAL_BERT_TOKENIZER, CLINICAL_BERT_MODEL
+
+
+def get_gard_terms_for_text(text: str, list_check: str) -> Dict[str, List[int]]:
+    """Find GARD term occurrences in title/abstract text for one term column."""
+
+    ensure_gard_terms_loaded()
+
+    if list_check in {"Synonyms_stem", "Synonyms_sw_stem", "Synonyms_stem_bow", "Synonyms_sw_stem_bow"}:
+        from utils.tools import _stem_text
+
+        normalized_text = _stem_text(text.lower())
+
+    elif list_check in {"Synonyms_sw_nltk"}:
+        from utils.tools import _remove_stop_words
+
+        normalized_text = _remove_stop_words(text.lower())
+
+    else:
+        normalized_text = text.lower()
+
+    text_words = split_sentence(normalized_text)
+    output: Dict[str, List[int]] = {}
+    term_column = list_check.lower()
+
+    for gard in GARD_PROCESSED_NAMES:
+        gard_name = gard["name"]
+
+        if not gard_name:
+            continue
+
+        gard_names_to_check = gard[term_column]
+
+        for gard_term in gard_names_to_check:
+            if gard_term in normalized_text and text_has_all_words(text_words, gard_term):
+                count = text_words.count(gard_term) if len(gard_term.split()) == 1 else normalized_text.count(gard_term)
+                output[gard_name] = [output[gard_name][0] + count] if gard_name in output else [count]
+
+    return output
+
+
+def get_gard_title_stem_exact(text: str) -> Optional[Dict[str, int]]:
+    """Find title matches using exact and stemmed bag-of-words term columns."""
+
+    exact_matching = get_gard_terms_for_text(text, "Synonyms_sw_bow") or {}
+    stemming_check = get_gard_terms_for_text(text, "Synonyms_sw_stem_bow") or {}
+    combined_dict = {**exact_matching, **stemming_check}
+
+    # Remove keys that are part of another key, preserving the original title
+    # matching behavior that prefers the longer disease name.
+    keys_to_remove = {
+        key1
+        for key1 in combined_dict
+        for key2 in combined_dict
+        if key1 != key2 and key1 in key2
+    }
+
+    combined_dict = {
+        key: 1
+        for key in combined_dict
+        if key not in keys_to_remove
+    }
+
+    return combined_dict or None
+
+
+def semantic_similarity(input_text: str, target_term: str) -> float:
     """
-    Processes a given text, extracts information, normalizes it, and returns the result dictionary.
-    Args:
-        text (str): The text to process (e.g., public_health_relevance_statement or abstract_text).
-        project_title (str): The title of the project.
-        weight_start (float): The starting weight for normalization.
-        weight_end (float): The ending weight for normalization.
-        source_type (str): The type of the text source (e.g., 'statement').
+    Calculate ClinicalBERT cosine similarity between text and a GARD term.
+
+    The original script loaded ClinicalBERT inside every call. This version
+    loads the tokenizer/model once and reuses it for all selected test projects.
+    """
+
+    import torch
+    from sentence_transformers import util
+
+    tokenizer, model = get_clinicalbert_components()
+    input_tokens = tokenizer(input_text, return_tensors="pt", padding=True, truncation=True, max_length=512)
+    term_tokens = tokenizer(target_term, return_tensors="pt", padding=True, truncation=True, max_length=512)
+
+    with torch.no_grad():
+        input_embedding = model(**input_tokens).last_hidden_state.mean(dim=1)
+        term_embedding = model(**term_tokens).last_hidden_state.mean(dim=1)
+
+    similarity = util.pytorch_cos_sim(input_embedding, term_embedding)
+    return similarity.item()
+
+
+def semantic_similarity_with_fallback(input_text: str, target_term: str) -> float:
+    """
+    Retry ClinicalBERT similarity with shorter text slices.
+
+    The original code used nested try/except blocks with 2000, 1500, and 500
+    character fallbacks. The sequence is preserved here in a compact loop.
+    """
+
+    fallback_limits = (
+        (None, None),
+        (2000, 2000),
+        (1500, 1500),
+        (500, 1000),
+    )
+    last_error: Optional[Exception] = None
+
+    for text_limit, term_limit in fallback_limits:
+        try:
+            text_value = input_text if text_limit is None else input_text[:text_limit]
+            term_value = target_term if term_limit is None else target_term[:term_limit]
+            return semantic_similarity(text_value, term_value)
+
+        except Exception as exc:
+            last_error = exc
+
+    print(f"ClinicalBERT similarity failed after fallbacks: {last_error}")
+    return 0.0
+
+
+def normalize_score(value: float) -> float:
+    """Normalize confidence score with the original log-base-20 formula."""
+
+    if value < 20:
+        return math.log(value) / math.log(20)
+
+    return 1
+
+
+def normalize_combined_dictionary(input_text: str, dict1: Dict[str, int], dict2: Dict[str, int], dict3: Dict[str, int], dict4: Dict[str, int], source_type: str) -> Dict[str, List[float]]:
+    """Combine weighted match dictionaries and add ClinicalBERT similarity."""
+
+    if source_type == "title":
+        factor = 20
+    elif source_type == "statement":
+        factor = 2
+    else:
+        factor = 1
+
+    # Original relative weights preserved:
+    # - first sentence matches x5
+    # - priority/goal sentence matches x7
+    # - future-positive sentence matches x3
+    # - present-positive sentence matches x1
+    weighted_dict1 = {key: value * 5 for key, value in dict1.items()}
+    weighted_dict2 = {key: value * 7 for key, value in dict2.items()}
+    weighted_dict3 = {key: value * 3 for key, value in dict3.items()}
+
+    combined_dict = {
+        key: weighted_dict1.get(key, 0) + weighted_dict2.get(key, 0) + weighted_dict3.get(key, 0) + dict4.get(key, 0)
+        for key in set(weighted_dict1) | set(weighted_dict2) | set(weighted_dict3) | set(dict4)
+    }
+
+    if sum(combined_dict.values()) == 0:
+        return {}
+
+    result_dict: Dict[str, List[float]] = {}
+
+    for gard_name, value in combined_dict.items():
+        # Original note preserved:
+        # No SourceDescription in the new code, just let defin = key.
+        definition = gard_name
+        score = normalize_score(20 if source_type == "title" else 1 + (factor * value // 2))
+        result_dict[gard_name] = [
+            score,
+            semantic_similarity_with_fallback(input_text.lower(), definition),
+        ]
+
+    return result_dict
+
+
+def get_verb_tense(verb) -> str:
+    """Determine the coarse tense category for one spaCy verb token."""
+
+    if "VBD" in verb.tag_:
+        return "past"
+
+    if ("MD" in verb.tag_ and "will" in verb.lemma_.lower()) or "aim" in verb.lemma_.lower():
+        return "future"
+
+    if "VBP" in verb.tag_ or "VBZ" in verb.tag_:
+        return "present"
+
+    return "unknown"
+
+
+def is_sentence_negated(sentence) -> bool:
+    """Return True when spaCy marks a sentence token as negation."""
+
+    for token in sentence:
+        if token.dep_ == "neg":
+            return True
+
+    return False
+
+
+def check_sentence_priority(text: str) -> Tuple[str, str, str, str]:
+    """
+    Split text into the same priority buckets used by the original script.
+
     Returns:
-        dict: The normalized dictionary if processing was successful and the dictionary is not empty,otherwise None.
+        first_sentence, priority_goal_sentences, future_positive_sentences,
+        present_positive_sentences
     """
-    if text and not text.isspace():
 
-        first_sentence, priority, future_positive, present_positive = check_sen(text)
+    nlp = get_spacy_model()
+    doc = nlp(text)
+    first_sentence = ""
+    priority = ""
+    future_positive = ""
+    present_positive = ""
 
-        name1 = get_gard_abstract_stem_exact(first_sentence)
-        name2 = get_gard_abstract_stem_exact(priority)
-        name3 = get_gard_abstract_stem_exact(future_positive)
-        name4 = get_gard_abstract_stem_exact(present_positive)
+    for index, sentence in enumerate(doc.sents, start=1):
+        sentence_tenses = set()
 
-        result_dict = normalize_combined_dictionary(text, project_title, name1, name2, name3, name4, weight_start, weight_end, source_type)
+        for token in sentence:
+            if token.pos_ in {"VERB", "AUX"}:
+                sentence_tenses.add(get_verb_tense(token))
 
-        if result_dict and result_dict != {}:
-            return result_dict
-    return None
+        if is_sentence_negated(sentence) or "past" in sentence_tenses:
+            continue
+
+        sentence_text = sentence.text
+
+        if index == 1:
+            first_sentence = sentence_text
+        elif "the goal of" in sentence_text.lower() or "aim" in sentence_text.lower():
+            priority += sentence_text
+        elif "future" in sentence_tenses:
+            future_positive += sentence_text
+        elif "present" in sentence_tenses:
+            present_positive += sentence_text
+
+    return first_sentence, priority, future_positive, present_positive
 
 
+def sum_and_update(target_dict: Dict[str, int], source_dict: Dict[str, List[int]]) -> None:
+    """Add source match counts into target_dict."""
 
-def project_gard_relationship(project_title, public_health_relevance_statement, abstract_text):
+    for key, value in source_dict.items():
+        target_dict[key] = target_dict.get(key, 0) + sum(value)
 
-    if all(isinstance(arg, str) for arg in [project_title, public_health_relevance_statement, abstract_text]):
-        return None, ''
 
-    #print('# 1. Processing project_title')
-    if project_title and not project_title.isspace():
+def combine_dictionaries_count(dict1: Dict[str, List[int]], dict2: Dict[str, List[int]]) -> Dict[str, int]:
+    """Combine exact and stemmed match count dictionaries."""
 
-        name_dict = get_gard_title_stem_exact(project_title) 
-        #print(f'name_dict\n{name_dict}')
-        
+    combined_dict: Dict[str, int] = {}
+    sum_and_update(combined_dict, dict1)
+    sum_and_update(combined_dict, dict2)
+    return combined_dict
+
+
+def remove_shorter_contained_keys(combined_dict: Dict[str, int]) -> Dict[str, int]:
+    """Remove disease names that are substrings of stronger/longer matches."""
+
+    keys_to_remove = set()
+
+    for key1 in combined_dict:
+        for key2 in combined_dict:
+            if key1 != key2 and key1 in key2 and combined_dict[key1] <= combined_dict[key2]:
+                keys_to_remove.add(key1)
+
+    for key in keys_to_remove:
+        del combined_dict[key]
+
+    return combined_dict
+
+
+def get_gard_abstract_stem_exact(text: str) -> Dict[str, int]:
+    """Find abstract/statement matches using exact and stemmed GARD terms."""
+
+    if not text or not isinstance(text, str):
+        return {}
+
+    exact_matching = get_gard_terms_for_text(text, "Synonyms_sw") or {}
+    stemming_check = get_gard_terms_for_text(text, "Synonyms_sw_stem") or {}
+    combined_dict = combine_dictionaries_count(exact_matching, stemming_check)
+
+    if not combined_dict:
+        return {}
+
+    return remove_shorter_contained_keys(combined_dict)
+
+
+def get_gard_id_by_name(gard_name: str) -> Optional[str]:
+    """Return the first GARD ID for a disease name, matching historical behavior."""
+
+    ensure_gard_terms_loaded()
+    return GARD_ID_BY_NAME.get(gard_name)
+
+
+def normalize_text_value(value: Any) -> str:
+    """Convert a nullable DB text value to a stripped string."""
+
+    if value is None:
+        return ""
+
+    return str(value).strip()
+
+
+def process_text_and_normalize(text: str, source_type: str) -> Optional[Dict[str, List[float]]]:
+    """Process statement/abstract text and return normalized GARD matches."""
+
+    if not text or text.isspace():
+        return None
+
+    first_sentence, priority, future_positive, present_positive = check_sentence_priority(text)
+    name1 = get_gard_abstract_stem_exact(first_sentence)
+    name2 = get_gard_abstract_stem_exact(priority)
+    name3 = get_gard_abstract_stem_exact(future_positive)
+    name4 = get_gard_abstract_stem_exact(present_positive)
+    result_dict = normalize_combined_dictionary(text, name1, name2, name3, name4, source_type)
+
+    return result_dict or None
+
+
+def project_gard_relationship(project_title: Any, public_health_relevance_statement: Any, abstract_text: Any) -> Tuple[Optional[Dict[str, List[float]]], str]:
+    """Find the highest-priority GARD relationship source for one grant project."""
+
+    title = normalize_text_value(project_title)
+    phr = normalize_text_value(public_health_relevance_statement)
+    abstract = normalize_text_value(abstract_text)
+
+    # The original code returned early when all three values were strings,
+    # which skipped normal rows. The intended guard is to skip rows with no text.
+    if not any((title, phr, abstract)):
+        return None, ""
+
+    # 1. Processing project_title
+    if title:
+        name_dict = get_gard_title_stem_exact(title)
+
         if name_dict:
-            if abstract_text:
-                result_dict = normalize_combined_dictionary(abstract_text, project_title, name_dict, {},{},{}, 1, 1, 'title')
-            else: 
-                result_dict =  normalize_combined_dictionary(project_title, project_title, name_dict, {},{},{}, 1, 1, 'title')
-            #print(f'result_dict\n{result_dict}')
+            similarity_text = abstract or title
+            return normalize_combined_dictionary(similarity_text, name_dict, {}, {}, {}, "title"), "title"
 
-            return result_dict, 'title'
-        
-    
-    #print('# 2. Processing public_health_relevance_statement')
-    if public_health_relevance_statement and not public_health_relevance_statement.isspace():
-        result = process_text_and_normalize(public_health_relevance_statement, project_title, 0.7, 0.9, 'statement')
-        #print(f'{result}')
+    # 2. Processing public_health_relevance_statement
+    if phr:
+        result = process_text_and_normalize(phr, "statement")
 
         if result:
-            return result, 'statement'
+            return result, "statement"
 
-
-    #print('# 3. Processing abstract_text')
-    if abstract_text and not abstract_text.isspace():
-        result = process_text_and_normalize(abstract_text, project_title, 0, 0.7, 'abstract')
-        #print(f'{result}')
+    # 3. Processing abstract_text
+    if abstract:
+        result = process_text_and_normalize(abstract, "abstract")
 
         if result:
-            return result, 'abstract'
-    
-    return None, ''
- 
-    
-if __name__ == '__main__':
- 
-    #
-    #
-    # Test one or more project(s)
-    #
-    #
-    ok = ask_to_continue(f'*** Find relateionships between GARD and Grant Project? *** ')
-    if not ok:
-        sys.exit(Fore.RED + '\n------------------------ Stopped ------------------------\n'+ Style.RESET_ALL)
+            return result, "abstract"
+
+    return None, ""
+
+
+def build_project_select_sql(project_ids: Tuple[int, ...]) -> str:
+    """Build a parameterized SELECT statement for one or more project IDs."""
+
+    placeholders = ", ".join(["%s"] * len(project_ids))
+
+    return f"""
+        SELECT
+            p.id,
+            p.APPLICATION_ID,
+            p.FY,
+            p.PROJECT_TITLE,
+            p.PHR,
+            p.core_project_num,
+            a.ABSTRACT_TEXT
+        FROM rdas_db.grant_project p
+        INNER JOIN rdas_db.grant_abstract a
+            ON p.APPLICATION_ID = a.APPLICATION_ID
+            AND p.FY = a.YEAR
+        WHERE p.id IN ({placeholders})
+    """
+
+
+def build_relationship_rows(project_row: Dict[str, Any], result_dict: Dict[str, List[float]], source_type: str) -> List[Tuple[Any, ...]]:
+    """Convert one project result dictionary into insert-ready tuples."""
+
+    from utils.tools import _normalize_tuple, _val
+
+    application_id = project_row["APPLICATION_ID"]
+    core_project_num = _val(project_row.get("core_project_num"))
+    raw_result = str(result_dict)
+    relationship_rows: List[Tuple[Any, ...]] = []
+
+    for gard_name, value in result_dict.items():
+        confidence_score = value[0]
+        semantic_similarity_value = value[1]
+        gard_id = get_gard_id_by_name(gard_name)
+
+        relationship_rows.append(
+            _normalize_tuple(
+                (
+                    gard_id,
+                    application_id,
+                    gard_name,
+                    source_type,
+                    confidence_score,
+                    semantic_similarity_value,
+                    core_project_num,
+                    raw_result,
+                )
+            )
+        )
+
+    return relationship_rows
+
+
+def flush_relationships(mysql, insert_cursor, insert_values: List[Tuple[Any, ...]]) -> int:
+    """Insert test relationship rows only when SAVE_RESULTS_TO_DB is enabled."""
+
+    if not insert_values:
+        return 0
+
+    try:
+        insert_cursor.executemany(RELATION_INSERT_SQL, insert_values)
+        mysql.commit()
+        inserted_count = len(insert_values)
+        insert_values.clear()
+        return inserted_count
+
+    except Exception:
+        mysql.rollback()
+        raise
+
+
+def process_test_projects(project_ids: Tuple[int, ...] = DEFAULT_TEST_PROJECT_IDS) -> Dict[str, int]:
+    """Run the GARD matching test for selected grant_project IDs."""
+
+    from baseclass.conn import DBConnection as db
+
+    if not project_ids:
+        raise ValueError("project_ids cannot be empty")
 
     mysql = db().mysql_conn()
-    dict_cursor = mysql.cursor(dictionary=True, buffered=True)
 
-    insert_cursor = mysql.cursor(buffered=True) 
-    insert = '''
-        INSERT INTO grant_gard_project_relation (gard_id, application_id, gard_name, source_type, confidence_score, semantic_similarity, core_project_num, raw_result) 
-        VALUES (%s,%s, %s, %s, %s, %s, %s, %s)
-        ''' 
-    
-    # The id of the grant_project table
-    #id= 2397144
-    id=2231557
-    query = f''' 
-            SELECT 
-            p.id, p.APPLICATION_ID, p.FY, p.PROJECT_TITLE, p.PHR, p.core_project_num,
-            a.ABSTRACT_TEXT 
-            FROM rdas_db.grant_project p, rdas_db.grant_abstract a
-            where 
-            p.id={id} 
-            -- p.id in (2351651,2351652,2351653,2351654,2351655,2351656,2351657,2351658,2351659,2351660,2351661,2351662,2351663,2351664,2351665,2351666,2351667,2351668,2351669,2351670,2351671,2351672,2351673,2351674,2351675,2351676,2351677,2351678)
-            AND p.APPLICATION_ID=a.APPLICATION_ID and p.FY=a.YEAR
-        '''  
-    
-    dict_cursor.execute(query)
-    rows = dict_cursor.fetchall()
+    if mysql is None:
+        raise ConnectionError("Unable to create MySQL connection.")
 
-    list_of_tuple = []
-    for row in rows: 
-        id = row['id']           
+    dict_cursor = None
+    insert_cursor = None
+    insert_values: List[Tuple[Any, ...]] = []
+    summary = {
+        "projects_scanned": 0,
+        "projects_with_results": 0,
+        "relationships_inserted": 0,
+    }
 
-        application_id = row['APPLICATION_ID']
+    try:
+        dict_cursor = mysql.cursor(dictionary=True)
+        insert_cursor = mysql.cursor()
+        dict_cursor.execute(build_project_select_sql(project_ids), project_ids)
 
-        print(f'id = {id}, application_id = {application_id}')
-        
-        #year = row['FY']
-        phr = row['PHR']
-        project_title = row['PROJECT_TITLE']
-        abstract_text = row['ABSTRACT_TEXT']
+        while True:
+            rows = dict_cursor.fetchmany(DEFAULT_FETCH_SIZE)
 
-        result_dict, source_type = project_gard_relationship(project_title, phr, abstract_text)
+            if not rows:
+                break
+
+            for row in rows:
+                summary["projects_scanned"] += 1
+                project_id = row["id"]
+                application_id = row["APPLICATION_ID"]
+
+                print(f"id = {project_id}, application_id = {application_id}")
+
+                result_dict, source_type = project_gard_relationship(
+                    row.get("PROJECT_TITLE"),
+                    row.get("PHR"),
+                    row.get("ABSTRACT_TEXT"),
+                )
+
+                print(f"\tapplication_id: {application_id}, source_type: {source_type}")
+                print(f"\t{result_dict}")
+
+                if not result_dict:
+                    continue
+
+                summary["projects_with_results"] += 1
+
+                # Save to database:
+                # The original test script kept this section commented out.
+                # Keep SAVE_RESULTS_TO_DB False unless you explicitly want this
+                # debug script to insert rows into grant_gard_project_relation.
+                if SAVE_RESULTS_TO_DB:
+                    insert_values.extend(build_relationship_rows(row, result_dict, source_type))
+
+        if SAVE_RESULTS_TO_DB:
+            summary["relationships_inserted"] += flush_relationships(
+                mysql,
+                insert_cursor,
+                insert_values,
+            )
+
+    finally:
+        if dict_cursor is not None:
+            dict_cursor.close()
+
+        if insert_cursor is not None:
+            insert_cursor.close()
+
+        if mysql is not None and mysql.is_connected():
+            mysql.close()
+
+    return summary
 
 
-        print(f'\tapplication_id: {application_id}, source_type: {source_type}') 
-        print(f'\t{result_dict}')
+def main() -> int:
+    """Run the selected-project GARD relationship test."""
 
-        # Save to database
-        ''' 
-        for key, value in result_dict.items():            
-            gard_name = key
-            confidence_score = value[0]
-            semantic_similarity = value[1]
-            core_project_num = _val(row['core_project_num'])
-            raw_result = str(result_dict) 
-            gard_id = get_GARD_id_by_name(gard_name)
+    from utils.tools import ask_to_continue
 
-            list_of_tuple.append((gard_id, application_id, gard_name, source_type, confidence_score, semantic_similarity, core_project_num, raw_result))
+    if not ask_to_continue("*** Find relationships between GARD and Grant Project? *** "):
+        print("\n------------------------ Stopped ------------------------\n")
+        return 1
 
-        insert_cursor.executemany(insert, list_of_tuple)    
-        list_of_tuple = []
-        mysql.commit() 
-        ''' 
+    print(f"Testing grant_project IDs: {DEFAULT_TEST_PROJECT_IDS}")
+    print(f"SAVE_RESULTS_TO_DB = {SAVE_RESULTS_TO_DB}")
 
-    dict_cursor.close()
-    insert_cursor.close()
-    mysql.close()
-  
-    print(Fore.BLUE + f'\n=**=**=**=**=**=**=**=**=**=**=**=**=**=**=**= All Done  =**=**=**=**=**=**=**=**=**=**=**=**=**=**=**=\n'+ Style.RESET_ALL)
-   
-    sys.exit()
+    summary = process_test_projects()
+
+    print(
+        "\nGARD-project relationship test complete: "
+        f"projects_scanned={summary['projects_scanned']}, "
+        f"projects_with_results={summary['projects_with_results']}, "
+        f"relationships_inserted={summary['relationships_inserted']}\n"
+    )
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

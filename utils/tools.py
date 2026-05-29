@@ -15,6 +15,7 @@ import unicodedata
 import pandas as pd
 from pathlib import Path
 from datetime import datetime as DT
+from decimal import Decimal, InvalidOperation
 from charset_normalizer import detect
 from typing import Dict, List, Any, Optional
 
@@ -155,6 +156,49 @@ def _append_to_file(filename, text):
 def _append_to_file_and_print(filename, text):
     _append_to_file(filename, text)
     print(text)
+
+
+# -----------------------------------------------------------------------------
+# Numeric Conversion
+# -----------------------------------------------------------------------------
+
+def convert_to_int(value: Any, allow_decimal: bool = False) -> Optional[int]:
+    """
+    Convert a CSV-style numeric value to int.
+
+    Shared import scripts receive numeric fields from CSV files as strings. This
+    helper keeps integer conversion consistent across loaders:
+    - None and blank strings become None so MySQL receives NULL.
+    - Comma separators are accepted for amount/count fields such as "1,234".
+    - Decimal values are rejected by default to catch bad IDs or years.
+    - allow_decimal=True preserves the historical PMC_ID behavior where values
+      such as "6587139.2" are truncated to 6587139.
+    """
+
+    if value is None:
+        return None
+
+    # CSV exports sometimes include comma separators in money/count columns.
+    # Decimal gives stricter parsing than float and avoids precision surprises.
+    text = str(value).strip().replace(",", "")
+
+    if not text:
+        return None
+
+    try:
+        decimal_value = Decimal(text)
+
+    except InvalidOperation as exc:
+        raise ValueError(f"expected an integer value, got {value!r}") from exc
+
+    if not allow_decimal and decimal_value != decimal_value.to_integral_value():
+        raise ValueError(f"expected an integer value, got {value!r}")
+
+    try:
+        return int(decimal_value)
+
+    except (OverflowError, ValueError) as exc:
+        raise ValueError(f"expected an integer value, got {value!r}") from exc
 
 
 # -----------------------------------------------------------------------------
