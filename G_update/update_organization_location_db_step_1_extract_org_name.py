@@ -188,11 +188,14 @@ class OrganizationNameExtractionTask:
 
         LIMIT keeps each database round trip small. ORDER BY id gives stable
         progress, and the processed flag removes saved rows from the next batch.
+        FORCE INDEX is intentional: MariaDB otherwise chooses PRIMARY to satisfy
+        ORDER BY id, which makes later batches rescan millions of already
+        processed rows before it finds the next pending slice.
         """
 
         fetch_sql = f'''
             SELECT id, original_name_in_graph_db
-            FROM {self.TABLE_NAME}
+            FROM {self.TABLE_NAME} FORCE INDEX (gl_ror_processed_idx)
             WHERE ror_id IS NULL
             AND processed IS NULL
             ORDER BY id
