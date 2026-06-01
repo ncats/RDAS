@@ -93,17 +93,8 @@ class EmailClient:
 
         # SMTP send_message needs the full envelope recipient list, including
         # CC recipients, not just the visible To header.
-        recipients = [message["To"]]
-        if message.get("Cc"):
-            recipients.extend([email.strip() for email in message["Cc"].split(",") if email.strip()])
-
-        # Use a connection timeout for opening SMTP and a separate operation
-        # timeout for later SMTP commands.
-        with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=self.smtp_connection_timeout) as server:
-            server.timeout = self.smtp_timeout
-            if self.smtp_starttls_enable:
-                server.starttls()
-            server.send_message(message, to_addrs=recipients)
+        recipients = _recipient_list(message["To"], message.get("Cc"))
+        self._send_message_or_raise(message, recipients)
 
 
     def send_html_alert_email(self, subject: str, payload, title: str = "RDAS Notification", mail_to: str = None, mail_cc: str = None):
@@ -116,15 +107,8 @@ class EmailClient:
         message = self._build_html_message(subject, html_body, mail_to=mail_to, mail_cc=mail_cc)
 
         # Keep this path compatible with string recipients from email_config.json.
-        recipients = [message["To"]]
-        if message.get("Cc"):
-            recipients.extend([email.strip() for email in message["Cc"].split(",") if email.strip()])
-
-        with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=self.smtp_connection_timeout) as server:
-            server.timeout = self.smtp_timeout
-            if self.smtp_starttls_enable:
-                server.starttls()
-            server.send_message(message, to_addrs=recipients)
+        recipients = _recipient_list(message["To"], message.get("Cc"))
+        self._send_message_or_raise(message, recipients)
 
 
     def send_html_summary_email(self, subject: str, all_updates_summary, title: str = "RDAS Alert Summary", mail_to: list = None, mail_cc: list = None):
@@ -152,11 +136,32 @@ class EmailClient:
         # Build a deduplicated list of To and Cc recipients for SMTP delivery.
         recipients = _recipient_list(to_value, cc_value)
 
+        self._send_message_or_raise(message, recipients)
+
+
+    def _send_message_or_raise(self, message: EmailMessage, recipients):
+        """
+        Send an EmailMessage and raise when SMTP refuses any recipient.
+
+        smtplib.send_message() returns a dictionary of refused recipients
+        instead of raising when only some recipients are rejected. Treating that
+        as an error keeps pipeline logs honest about delivery handoff.
+        """
+
+        if not recipients:
+            raise ValueError("Email has no recipients.")
+
+        # Use a connection timeout for opening SMTP and a separate operation
+        # timeout for later SMTP commands.
         with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=self.smtp_connection_timeout) as server:
             server.timeout = self.smtp_timeout
             if self.smtp_starttls_enable:
                 server.starttls()
-            server.send_message(message, to_addrs=recipients)
+            refused_recipients = server.send_message(message, to_addrs=recipients)
+
+        if refused_recipients:
+            refused_list = ", ".join(sorted(refused_recipients))
+            raise RuntimeError(f"SMTP refused recipients: {refused_list}")
 
 
 

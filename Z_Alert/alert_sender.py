@@ -57,7 +57,8 @@ class AlertSender(PipelineBase):
         new data. A summary email is sent to admins after all users are
         processed.
         """
- 
+        firebaseAgent = None
+
         try: 
             # For a single GARD ID, return counts of unsent new clinical trials
             # and new publications. clinical_trial has alert_sent; publication_article
@@ -191,13 +192,17 @@ class AlertSender(PipelineBase):
                  
                 ''' 4. Send alert email to user '''
                 ''' The payload contains only subscriptions that actually had new content, so users do not receive empty disease sections. '''
-                emailClient.send_html_alert_email(
-                    subject = self.subject,
-                    payload = payload,                            
-                    mail_to = user.get('email'),
-                    #mail_to = 'tongan.zhao@nih.gov', # For testing, remove for PRODUCTION
-                    mail_cc = None,
-                )
+                try:
+                    emailClient.send_html_alert_email(
+                        subject = self.subject,
+                        payload = payload,                            
+                        mail_to = user.get('email'),
+                        #mail_to = 'tongan.zhao@nih.gov', # For testing, remove for PRODUCTION
+                        mail_cc = None,
+                    )
+                except Exception as e:
+                    self.logger.error(f"Unable to send alert email to {email}: {e}")
+                    continue
                 
                 self.logger.info(f'\nSent alert to user: {user} - {datetime.now()}')
                 self.logger.info(json.dumps(payload, indent=2, ensure_ascii=False))
@@ -229,6 +234,11 @@ class AlertSender(PipelineBase):
                     if not all_updates_summary:
                         summary_subject = f"{summary_subject} - No Updates"
                         
+                    self.logger.info(
+                        "Sending summary alert email "
+                        f"to {', '.join(summary_recipients)} "
+                        f"with {len(all_updates_summary)} user sections."
+                    )
 
                     emailClient.send_html_summary_email(
                         subject = summary_subject,

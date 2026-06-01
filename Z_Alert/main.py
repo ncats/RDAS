@@ -249,6 +249,7 @@ class AlertPipelineRunner:
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_3 import OrganizationLocationRorLookupTask
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_4 import OrganizationLocationGraphSyncTask
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_5 import DiseaseCountsRefreshTask
+        from pipelines.pipeline_5_followup.task_pipeline_followup_update_6 import AllFilterCountsRefreshTask
 
         self._run_pipeline_task(GardRelationshipCountRefreshTask)
         self._run_pipeline_task(ArticleGeneReviewFlagUpdateTask)
@@ -256,6 +257,7 @@ class AlertPipelineRunner:
         #self._run_pipeline_task(OrganizationLocationRorLookupTask)
         #self._run_pipeline_task(OrganizationLocationGraphSyncTask)
         self._run_pipeline_task(DiseaseCountsRefreshTask)
+        self._run_pipeline_task(AllFilterCountsRefreshTask)
  
 
     def send_alert_emails(self, look_back_days: Optional[int] = None) -> None:
@@ -272,7 +274,6 @@ class AlertPipelineRunner:
 
         except Exception as e:
             self.logger.error(f"send_alert_emails() failed: {e}")
-            raise
 
         finally:
             self._close_task_if_needed(alert_sender)
