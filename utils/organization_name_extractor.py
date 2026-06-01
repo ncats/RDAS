@@ -188,14 +188,20 @@ class OrganizationNameExtractor:
         """Create a strict prompt so the model returns only the organization name."""
 
         return f'''
-                Extract the main organization or institution name from the text below.
-                Return only one clean organization name.
-                Do not include departments, addresses, people, explanations, labels, bullets, emails or quotes.
-                If there is no organization name, return an empty string.
+            Extract the primary organization or institution name from the text below.
 
-                Text:
-                {original_name}
-            '''.strip()
+            Rules:
+            - Return only one clean organization name.
+            - Keep the country name if it is part of the official organization name (e.g., "Bank of China", "University of South Africa", "Government of Canada").
+            - Remove department names, divisions, offices, addresses, personal names, job titles, email addresses, phone numbers, explanations, labels, bullets, and quotation marks.
+            - Do not abbreviate or expand the organization name unless the text explicitly uses that form.
+            - If multiple organizations are present, return the most prominent or primary organization.
+            - If no organization name can be identified, return an empty string.
+            - Return only the organization name and nothing else.
+
+            Text:
+            {original_name}
+        '''.strip()
 
 
     def clean_model_response(self, response_text: Any) -> str:
