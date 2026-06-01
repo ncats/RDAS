@@ -14,7 +14,7 @@ from pipelines.pipeline_base import PipelineBase
 Update GARD nodes with EPI/NHS article counts.
 
 For each GARD ID that has new publication articles, count the new
-EPI/NHS rows and write those counts to the existing GARD node
+EPI/NHS rows and add those counts to the existing GARD node
 countEpiArticles and countNhsArticles properties.
 """
 
@@ -26,13 +26,13 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
 
     BATCH_SIZE = 50
 
-    ''' Write the computed count values to the GARD node counters. '''
+    ''' Add the computed count deltas to the GARD node counters. '''
     BATCH_UPDATE = '''
         UNWIND $chunks AS chunk
         MATCH (d:GARD {gardId: chunk.gardId})
         SET
-            d.countEpiArticles = chunk.countEpiArticles,
-            d.countNhsArticles = chunk.countNhsArticles
+            d.countEpiArticles = COALESCE(d.countEpiArticles, 0) + chunk.countEpiArticles,
+            d.countNhsArticles = COALESCE(d.countNhsArticles, 0) + chunk.countNhsArticles
     '''
 
     # Start from new publication rows, then find the touched GARD IDs through
@@ -189,8 +189,8 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
         chunks = []
 
         for obj in gard_pubmed_objects:
-            # Each chunk contains the count values that BATCH_UPDATE writes to
-            # the existing GARD node counters.
+            # Each chunk contains delta values that BATCH_UPDATE adds to the
+            # existing GARD node counters.
             gard_id = obj.get("gardId")
             present_pubmed_ids = [
                 pubmed_id
