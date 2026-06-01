@@ -1,6 +1,5 @@
 import os
 import sys
-from collections import defaultdict
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -13,39 +12,34 @@ from pipelines.pipeline_base import PipelineBase
 """
 Update GARD nodes with EPI/NHS article counts.
 
-For each GARD ID that has new publication articles, count the new
-EPI/NHS rows and add those counts to the existing GARD node
-countEpiArticles and countNhsArticles properties.
+This follows the same mechanism as C_publication/initializer/x_epi_nhs_count.py:
+batch GARD IDs from publication_gard_searchterm_pubmed_mapping, calculate the
+current full MySQL totals, and write those totals to the GARD node properties.
 """
 
 # Reference: C_publication/initializer/x_epi_nhs_count.py
 
 
 class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
-    """Update GARD EPI/NHS publication counters from publication articles."""
+    """Refresh GARD EPI/NHS publication counters from publication articles."""
 
-    BATCH_SIZE = 50
+    BATCH_SIZE = 300
 
-    ''' Add the computed count deltas to the GARD node counters. '''
+    ''' Write the computed count values to the GARD node counters. '''
     BATCH_UPDATE = '''
         UNWIND $chunks AS chunk
         MATCH (d:GARD {gardId: chunk.gardId})
         SET
-            d.countEpiArticles = COALESCE(d.countEpiArticles, 0) + chunk.countEpiArticles,
-            d.countNhsArticles = COALESCE(d.countNhsArticles, 0) + chunk.countNhsArticles
+            d.countEpiArticles = chunk.countEpiArticles,
+            d.countNhsArticles = chunk.countNhsArticles
     '''
 
-    # Start from new publication rows, then find the touched GARD IDs through
-    # the mapping table.
+    # Match the initializer by refreshing every mapped GARD ID. The grouped
+    # count query below recalculates the full current totals for each batch.
     FETCH_GARD_IDS_QUERY = '''
-        SELECT DISTINCT pgspm.gard_id, pgspm.pubmed_id
-        FROM publication_article AS pa
-        STRAIGHT_JOIN publication_gard_searchterm_pubmed_mapping AS pgspm
-            ON pa.pubmed_id = pgspm.pubmed_id
-        WHERE pa.is_new = 1
-        AND pgspm.gard_id IS NOT NULL
-        AND pgspm.pubmed_id IS NOT NULL
-        ORDER BY pgspm.gard_id, pgspm.pubmed_id
+        SELECT DISTINCT gard_id
+        FROM publication_gard_searchterm_pubmed_mapping
+        WHERE gard_id IS NOT NULL
     '''
 
     def __init__(self):
@@ -59,21 +53,21 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
-        """Find affected GARD IDs, calculate new article counts, and update graph nodes."""
+        """Recalculate current EPI/NHS article totals and update graph nodes."""
 
-        fetch_pair_cursor = None
+        get_gard_ids_cursor = None
         count_cursor = None
         total = 0
         batch_num = 0
 
         try:
-            fetch_pair_cursor = self.mysql.cursor(dictionary=True, buffered=True)
+            get_gard_ids_cursor = self.mysql.cursor(dictionary=True, buffered=True)
             count_cursor = self.mysql.cursor(dictionary=True, buffered=True)
 
-            fetch_pair_cursor.execute(self.FETCH_GARD_IDS_QUERY)
+            get_gard_ids_cursor.execute(self.FETCH_GARD_IDS_QUERY)
 
             while True:
-                rows = fetch_pair_cursor.fetchmany(self.BATCH_SIZE)
+                rows = get_gard_ids_cursor.fetchmany(self.BATCH_SIZE)
 
                 if not rows:
                     self.logger.info("No more rows to fetch.")
@@ -82,16 +76,47 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
                 batch_num += 1
                 self.logger.info(f"--- batch# = {batch_num} ---")
 
-                gard_pubmed_objects = self._build_gard_pubmed_objects(rows)
+                gard_ids = [row["gard_id"] for row in rows if row.get("gard_id")]
 
-                if not gard_pubmed_objects:
-                    self.logger.info("No valid GARD/PubMed pairs found in this batch.")
+                if not gard_ids:
+                    self.logger.info("No valid GARD IDs found in this batch.")
                     continue
 
-                # Count EPI/NHS flags for this batch of GARD IDs before sending
-                # the compact counter deltas to Memgraph.
-                chunks = self._get_epi_nhs_count_chunks(count_cursor, gard_pubmed_objects)
-                print(f'# of chunks = {len(chunks)}')
+                placeholders = ",".join(["%s"] * len(gard_ids))
+                get_counts_query = f'''
+                    SELECT
+                        pgspm.gard_id,
+                        COUNT(a.pubmed_id) AS total_articles,
+                        SUM(a.is_EPI = 1) AS countEpiArticles,
+                        SUM(a.is_NHS = 1) AS countNhsArticles
+                    FROM publication_gard_searchterm_pubmed_mapping pgspm
+                    LEFT JOIN publication_article a
+                        ON pgspm.pubmed_id = a.pubmed_id
+                    WHERE pgspm.gard_id IN ({placeholders})
+                    GROUP BY pgspm.gard_id
+                '''
+
+                count_cursor.execute(get_counts_query, gard_ids)
+                results = count_cursor.fetchall()
+                chunks = []
+
+                for result in results:
+                    gard_id = result["gard_id"]
+                    total_articles = result["total_articles"]
+                    count_epi_articles = result["countEpiArticles"]
+                    count_nhs_articles = result["countNhsArticles"]
+
+                    chunks.append({
+                        "gardId": gard_id,
+                        "countEpiArticles": int(count_epi_articles or 0),
+                        "countNhsArticles": int(count_nhs_articles or 0),
+                    })
+
+                    self.logger.info(
+                        f"gard_id: {gard_id}, total_articles: {total_articles}, "
+                        f"countEpiArticles: {count_epi_articles}, countNhsArticles: {count_nhs_articles}"
+                    )
+
                 if not chunks:
                     self.logger.info("No EPI/NHS count chunks to update in Memgraph.")
                     continue
@@ -100,7 +125,7 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
                     self.memgraph.execute(self.BATCH_UPDATE, {"chunks": chunks})
 
                     total += len(chunks)
-                    self.logger.info(f"Submitted {len(chunks)} GARD EPI/NHS count updates to Memgraph. Total = {total}")
+                    self.logger.info(f"Updated {len(chunks)} GARD EPI/NHS count totals in Memgraph. Total = {total}")
 
                 except Exception as e:
                     self.logger.error(f"Error executing GARD EPI/NHS count batch update: {e}")
@@ -109,111 +134,11 @@ class GardPublicationEpiNhsCountUpdateTask(PipelineBase):
             self.logger.error(f"Error updating GARD EPI/NHS article counts in Memgraph: {e}")
 
         finally:
-            if fetch_pair_cursor:
-                fetch_pair_cursor.close()
+            if get_gard_ids_cursor:
+                get_gard_ids_cursor.close()
 
             if count_cursor:
                 count_cursor.close()
 
             ''' Explicitly close all db connections. '''
             self.close()
-
-
-    def _build_gard_pubmed_objects(self, rows):
-        """Group fetched GARD/PubMed pairs into one object per GARD ID."""
-
-        gard_pubmed_map = defaultdict(set)
-
-        for row in rows:
-            gard_id = row.get("gard_id")
-            pubmed_id = row.get("pubmed_id")
-
-            if not gard_id or pubmed_id is None:
-                continue
-
-            try:
-                pubmed_id = int(pubmed_id)
-            except (TypeError, ValueError):
-                self.logger.warning(f"Invalid PubMed ID skipped for gard_id={gard_id}: {pubmed_id}")
-                continue
-
-            gard_pubmed_map[str(gard_id)].add(pubmed_id)
-
-        return [
-            {
-                "gardId": gard_id,
-                "pubmed_id_list": sorted(pubmed_id_set),
-            }
-            for gard_id, pubmed_id_set in gard_pubmed_map.items()
-        ]
-
-
-    def _get_epi_nhs_count_chunks(self, cursor, gard_pubmed_objects):
-        """Aggregate new EPI/NHS article counts for a batch of GARD IDs."""
-
-        pubmed_ids = sorted({
-            pubmed_id
-            for obj in gard_pubmed_objects
-            for pubmed_id in obj.get("pubmed_id_list", [])
-        })
-
-        if not pubmed_ids:
-            return []
-
-        placeholders = ",".join(["%s"] * len(pubmed_ids))
-        # The GARD/PubMed mapping rows were already fetched and grouped. This
-        # query only reads the article flags for those PMIDs, avoiding another
-        # join against the large mapping table.
-        article_query = f'''
-            SELECT
-                pubmed_id,
-                MAX(LOWER(COALESCE(is_EPI, '')) IN ('1', 'true')) AS is_epi,
-                MAX(LOWER(COALESCE(is_NHS, '')) IN ('1', 'true')) AS is_nhs
-            FROM publication_article
-            WHERE pubmed_id IN ({placeholders})
-            GROUP BY pubmed_id
-        '''
-
-        cursor.execute(article_query, pubmed_ids)
-        results = cursor.fetchall()
-        
-        article_flags = {
-            int(result["pubmed_id"]): {
-                "is_epi": int(result.get("is_epi") or 0),
-                "is_nhs": int(result.get("is_nhs") or 0),
-            }
-            for result in results
-            if result.get("pubmed_id") is not None
-        }
-
-        chunks = []
-
-        for obj in gard_pubmed_objects:
-            # Each chunk contains delta values that BATCH_UPDATE adds to the
-            # existing GARD node counters.
-            gard_id = obj.get("gardId")
-            present_pubmed_ids = [
-                pubmed_id
-                for pubmed_id in obj.get("pubmed_id_list", [])
-                if pubmed_id in article_flags
-            ]
-
-            total_articles = len(present_pubmed_ids)
-            count_epi_articles = sum(article_flags[pubmed_id]["is_epi"] for pubmed_id in present_pubmed_ids)
-            count_nhs_articles = sum(article_flags[pubmed_id]["is_nhs"] for pubmed_id in present_pubmed_ids)
-
-            if total_articles == 0:
-                continue
-
-            chunks.append({
-                "gardId": gard_id,
-                "countEpiArticles": count_epi_articles,
-                "countNhsArticles": count_nhs_articles,
-            })
-
-            self.logger.info(
-                f"gard_id: {gard_id}, total_new_articles: {total_articles}, "
-                f"countEpiArticles: {count_epi_articles}, countNhsArticles: {count_nhs_articles}"
-            )
-
-        return chunks
