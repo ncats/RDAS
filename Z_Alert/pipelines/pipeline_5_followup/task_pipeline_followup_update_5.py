@@ -270,8 +270,7 @@ class DiseaseCountsRefreshTask(PipelineBase):
                     try:
                         # Step 5:
                         # Write the whole GARD batch to Memgraph in one call instead of updating each GARD node separately.
-                        #self.memgraph.execute(batch_update_GARD_nodes_cypher, {"batch": batch})
-                        print('batch_update_GARD_nodes_cypher')
+                        self.memgraph.execute(batch_update_GARD_nodes_cypher, {"batch": batch}) 
                     except Exception as e:
                         self.logger.error(f'{e}')
 
