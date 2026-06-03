@@ -1,10 +1,8 @@
 import os
-import shutil
 import sys
 import time
 from datetime import date, timedelta
-from pathlib import Path
-from typing import Any, Optional, Type
+from typing import Optional
 from dotenv import load_dotenv
 
 _dir = os.path.dirname(__file__)
@@ -15,11 +13,11 @@ sys.path.extend([
 ])
 load_dotenv(os.path.abspath(os.path.join(_dir, "..", ".env")))
 
-from utils.applogger import AppLogger
+from pipeline_runner_base import PipelineRunnerBase
 from utils.tools import _time_hms
 from init_index import MemgraphIndexInitializationTask
 
-class AlertPipelineRunner:
+class AlertPipelineRunner(PipelineRunnerBase):
     """
     This class owns the high-level order only. Each individual pipeline task
     still opens, uses, and closes its own database connections.
@@ -28,14 +26,8 @@ class AlertPipelineRunner:
     def __init__(self, look_back_days: int = 7):
 
         self.look_back_days = look_back_days
-        self.log_dir = os.path.expanduser(os.getenv("ALERT_LOG_DIR", "logs"))
-        os.makedirs(self.log_dir, exist_ok=True)
+        super().__init__()
 
-        class_name = type(self).__name__
-        self.log_file = f"{self.log_dir}/alert-{class_name}.log"
-        self.logger = AppLogger(class_name, self.log_file).get_logger()
-
-        self.logger.info(f'\n\n{"*" * 20} The {class_name} is initialized. {"*" * 20}\n')
         self.logger.info(f"AlertPipelineRunner configured with look_back_days={self.look_back_days}.")
 
 
@@ -307,81 +299,6 @@ class AlertPipelineRunner:
         self._run_pipeline_task(PublicationPipelineWrapUpTask)
         self._run_pipeline_task(PersonPipelineWrapUpTask)
 
-
-
-    def _run_pipeline_task(self, task_class: Type[Any], task_name: Optional[str] = None) -> None:
-        """Run one pipeline task and log the duration."""
-
-        name = task_name or task_class.__name__
-
-        start_time = time.time()
-        task = None
-
-        self.logger.info(f"\n*** Starting task: {name} ***\n")
-
-        try:
-            task = task_class()
-            task.process_new_data()
-
-            elapsed = time.time() - start_time
-            hours, minutes, seconds = _time_hms(elapsed)
-            self.logger.info(f"\n*** Finished task: {name} in {hours} hours, {minutes} minutes, {seconds} seconds ***\n")
-
-        except Exception as e:
-            self.logger.error(f"Task failed: {name}. Error: {e}")
-            raise
-        
-        finally:
-            self._close_task_if_needed(task)
-
- 
-
-    def _close_task_if_needed(self, task) -> None:
-        """Close a child task only if it still owns an open database handle."""
-
-        if task is None:
-            return
-
-        if getattr(task, "mysql", None) is None and getattr(task, "memgraph", None) is None:
-            return
-
-        task.close()
- 
-
-    def _next_available_archive_path(self, path: Path) -> Path:
-        """Return a non-existing archive path without overwriting older logs."""
-
-        count = 1
-        candidate = path
-
-        while candidate.exists():
-            candidate = path.with_name(f"{path.name}.{count}")
-            count += 1
-
-        return candidate
-    
-
-    def _archive_log_files_by_date(self) -> None:
-        """Move top-level log files into a date-stamped archive folder."""
-
-        log_dir = Path(self.log_dir)
-        archive_dir = log_dir / date.today().strftime("%Y%m%d")
-        archive_dir.mkdir(parents=True, exist_ok=True)
-
-        log_files = [
-            path
-            for pattern in ("*.log", "*.log.*")
-            for path in log_dir.glob(pattern)
-            if path.is_file()
-        ]
-
-        for log_file in log_files:
-            target = archive_dir / log_file.name
-            if target.exists():
-                target = self._next_available_archive_path(target)
-
-            shutil.move(str(log_file), str(target))
-
  
 
 if __name__ == "__main__":
@@ -392,78 +309,64 @@ if __name__ == "__main__":
 
     runner = AlertPipelineRunner(look_back_days = LOOK_BACK_DAYS)
 
-    #local helper function
-    def _run_step_with_timing(step_name, step_func) -> None:
-
-        step_start_time = time.time()
-        runner.logger.info(f"\n\n{'*' * 20} Starting {step_name} {'*' * 20}\n")
-
-        try:
-            step_func()
-
-        finally:
-            hours, minutes, seconds = _time_hms(time.time() - step_start_time)
-            runner.logger.info(f"\n\n{'*' * 20} Finished {step_name} in {hours} hours, {minutes} minutes, {seconds} seconds {'*' * 20}\n\n")
-
-
     try:
         # Step 1
-        _run_step_with_timing(
+        runner._run_step_with_timing(
             "Step 1: run_find_new_clinical_trial_and_publication_updates()",
             runner.run_find_new_clinical_trial_and_publication_updates,
         )
         
         # Step 2
-        _run_step_with_timing(
+        runner._run_step_with_timing(
             "Step 2: run_clinical_trial_mysql_updates()",
             runner.run_clinical_trial_mysql_updates,
         )
        
         # Step 3
-        _run_step_with_timing(
+        runner._run_step_with_timing(
             "Step 3: run_publication_mysql_updates()",
             runner.run_publication_mysql_updates,
         )
         
         # Step 4
-        _run_step_with_timing(
+        runner._run_step_with_timing(
             "Step 4: MemgraphIndexInitializationTask().process_new_data()",
             # lambda: MemgraphIndexInitializationTask().process_new_data(),
             lambda: runner.logger.info(f'\n\n{"*" * 30} MemgraphIndexInitializationTask().process_new_data() is disabled {"*" * 30}\n\n')
         )
         
         # Step 5
-        _run_step_with_timing(
+        runner._run_step_with_timing(
             "Step 5: run_clinical_trial_graph_updates()",
             runner.run_clinical_trial_graph_updates,
         )
         
         # Step 6
-        _run_step_with_timing(
+        runner._run_step_with_timing(
             "Step 6: run_publication_graph_updates()",
             runner.run_publication_graph_updates,
         )
         
         # Step 7
-        _run_step_with_timing(
+        runner._run_step_with_timing(
             "Step 7: run_pipeline_followup_updates()",
             runner.run_pipeline_followup_updates,
         )
         
         # Step 8
-        _run_step_with_timing(
+        runner._run_step_with_timing(
             "Step 8: send_alert_emails()",
             runner.send_alert_emails,
         )
         
         # Step 9
-        _run_step_with_timing(
+        runner._run_step_with_timing(
             "Step 9: run_regroup_the_person()",
             runner.run_regroup_the_person,
         )
          
         # Step 10
-        _run_step_with_timing(
+        runner._run_step_with_timing(
             "Step 10: run_pipeline_wrapup()",
             runner.run_pipeline_wrapup,
         )
@@ -477,16 +380,7 @@ if __name__ == "__main__":
         )
 
         """ Flush and close the runner logger. """
-        if getattr(runner, "logger", None):
-            logger = runner.logger
-
-            for handler in list(logger.handlers):
-                handler.flush()
-                handler.close()
-                logger.removeHandler(handler)
-
-            runner.logger = None
-            print("Logger closed")
+        runner.close()
 
         ''' Create a date-stamped archive directory under runner.log_dir, like 20260526, then move all *.log and *.log.* files into it. '''
         runner._archive_log_files_by_date()
