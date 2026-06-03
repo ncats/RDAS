@@ -18,7 +18,12 @@ from baseclass.conn import DBConnection as db
 from utils.applogger import AppLogger
 from utils.tools import _clean, _make_hash_key, _parse_json_list, _time_hms, _to_float, _to_int
 
+'''
+when ror_id = 'N/A' and org_name is null:
 
+name: not changed. This task does not set org.name at all.
+displayName: not changed, because no update chunk is created.
+'''
 class OrganizationLocationGraphUpdateTask:
     """
     Sync completed ROR organization_location rows back into Memgraph.
