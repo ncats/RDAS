@@ -198,7 +198,7 @@ class OrganizationNameExtractionTask:
             FROM {self.TABLE_NAME} FORCE INDEX (gl_ror_processed_idx)
             WHERE ror_id IS NULL
             AND processed IS NULL
-            ORDER BY id
+            ORDER BY id DESC
             LIMIT %s
         '''
 
