@@ -110,8 +110,9 @@ class RORFindOrganizationTask:
 
                 '''
                 Step 2:
-                Process each row in the batch through the ROR API. The lookup
-                method returns one of three values:
+                Process each row in the batch. Rows with an empty extracted
+                name are marked as N/A without calling ROR. The lookup method
+                returns one of three values for non-empty names:
 
                 - tuple: ROR found a chosen organization; save the returned data.
                 - None: ROR did not find a chosen organization; mark as N/A.
@@ -125,6 +126,14 @@ class RORFindOrganizationTask:
                     id = row['id']
                     model_extracted_name = row['model_extracted_name']
                     idx += 1
+
+                    if not self.clean_org_name(model_extracted_name):
+                        not_found_ids.append(id)
+                        self.logger.info(
+                            f"#{idx}, [id]={id}, [model_extracted_name]={model_extracted_name}, "
+                            "[found_name]= N/A, skipped ROR lookup because model_extracted_name is empty"
+                        )
+                        continue
                     
                     val = self.lookup_ror_static(id, model_extracted_name)
 
@@ -639,20 +648,20 @@ class RORFindOrganizationTask:
     def fetch_organization_batch(self) -> List[Dict[str, Any]]: 
 
         '''
-        Fetch only rows prepared by step 1. The ORDER BY id + LIMIT pattern keeps
-        each pass small and deterministic. Rows are removed from future batches
-        when this step writes either a real ror_id or ror_id = 'N/A'.
+        Fetch rows prepared by step 1. Rows with NULL/empty
+        model_extracted_name are intentionally included so this task can mark
+        them ror_id = 'N/A' without calling the ROR API. The ORDER BY id + LIMIT
+        pattern keeps each pass small and deterministic.
         '''
         fetch_query = f'''
             SELECT id, model_extracted_name 
             FROM {self.TABLE_NAME}
             WHERE ror_id IS NULL
             AND processed = %s
-            AND model_extracted_name IS NOT NULL
-            AND model_extracted_name <> ''
             ORDER BY id
             LIMIT %s
         ''' 
+
         cursor = None
 
         try:
