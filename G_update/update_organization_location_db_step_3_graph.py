@@ -54,7 +54,7 @@ class OrganizationLocationGraphUpdateTask:
        same ROR location payload across multiple Organization updates.
     """
 
-    BATCH_SIZE = 200
+    BATCH_SIZE = 2000
     TABLE_NAME = "organization_location"
 
     # Relationship types come from the graph, but they still need to be inserted
@@ -65,7 +65,7 @@ class OrganizationLocationGraphUpdateTask:
         MATCH (org:Organization)
         WHERE org._idx_key IS NOT NULL
           AND org._idx_key <> ''
-          AND (org.ror_id IS NULL OR org.ror_id = '' OR org.ror_id = 'N/A')
+          AND (org.ror_id = '' OR org.ror_id = 'N/A')
           AND ($lastKey IS NULL OR org._idx_key > $lastKey)
         RETURN DISTINCT org._idx_key AS org_idx_key
         ORDER BY org_idx_key
@@ -76,7 +76,7 @@ class OrganizationLocationGraphUpdateTask:
         UNWIND $chunks AS chunk
 
         MATCH (org:Organization {_idx_key: chunk.orgIdxKey})
-        WHERE org.ror_id IS NULL OR org.ror_id = '' OR org.ror_id = 'N/A'
+        WHERE org.ror_id = '' OR org.ror_id = 'N/A'
 
         SET org.displayName = chunk.displayName,
             org.ror_id = chunk.rorId,
