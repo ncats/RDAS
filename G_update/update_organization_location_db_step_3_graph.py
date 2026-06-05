@@ -28,14 +28,30 @@ class OrganizationLocationGraphUpdateTask:
     """
     Sync completed ROR organization_location rows back into Memgraph.
 
-    1. Reads MySQL organization_location rows with a real ROR id.
-    2. Uses original_name_in_graph_db_idx_key to find matching Organization
-       nodes by Organization._idx_key.
-    3. Updates only graph Organization nodes whose ror_id is missing, empty, or
-       "N/A".
-    4. Creates or updates Location nodes when ROR location data exists.
-    5. Merges duplicate Organization nodes by real ror_id.
-    6. Merges duplicate Location nodes by _idx_key.
+    1. Reads graph Organization nodes that still need ROR data. A node is
+       considered pending when Organization._idx_key exists and Organization.ror_id
+       is missing, empty, or "N/A". The graph scan uses keyset pagination by
+       _idx_key so large graphs can be processed in deterministic batches.
+    2. Uses each pending Organization._idx_key to fetch matching MySQL
+       organization_location rows by original_name_in_graph_db_idx_key. For each
+       graph key, only the newest MySQL row is used, and rows with NULL, empty,
+       or "N/A" ror_id values are ignored because they do not represent a real
+       ROR match.
+    3. Updates only pending graph Organization nodes. Existing graph nodes that
+       already have a real ror_id are left unchanged, which prevents this sync
+       from overwriting previously confirmed ROR data. The update writes
+       displayName, ror_id, ROR types, website, established, status, and the
+       updatedFromOrganizationLocation marker.
+    4. Creates or updates Location nodes only when usable ROR location data
+       exists. The Location._idx_key is derived from lat/lng when available,
+       then geonames_id, then a city/state/country/country_code fallback. The
+       Organization is connected with :has_location.
+    5. Merges duplicate Organization nodes that now share the same real ror_id.
+       The lowest Memgraph internal node id is kept, relationships from duplicate
+       nodes are rewired to the keeper, and duplicate nodes are deleted.
+    6. Merges duplicate Location nodes by stable _idx_key using the same
+       relationship-rewire process. This consolidates locations created from the
+       same ROR location payload across multiple Organization updates.
     """
 
     BATCH_SIZE = 200
@@ -216,6 +232,12 @@ class OrganizationLocationGraphUpdateTask:
             return []
 
         placeholders = ", ".join(["%s"] * len(org_idx_keys))
+
+        '''
+        The GROUP BY original_name_in_graph_db_idx_key creates one group per graph organization key, 
+        and MAX(id) AS latest_id chooses the row with the highest MySQL id in each group. 
+        Then the outer query joins back on ol.id = latest.latest_id, so only that newest row is returned for each key.
+        '''
         query = f"""
             SELECT
                 ol.id,
