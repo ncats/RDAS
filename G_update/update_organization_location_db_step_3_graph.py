@@ -18,6 +18,18 @@ from baseclass.conn import DBConnection as db
 from utils.applogger import AppLogger
 from utils.tools import _clean, _make_hash_key, _parse_json_list, _time_hms, _to_float, _to_int
 
+# Show duplicate nodes count with the same ror_id
+''' 
+MATCH (o:Organization)
+WHERE o.ror_id IS NOT NULL
+  AND o.ror_id <> ''
+  AND o.ror_id <> 'N/A'
+WITH o.ror_id AS ror_id, count(o) AS node_count
+WHERE node_count > 1
+RETURN ror_id, node_count
+ORDER BY node_count DESC;
+'''
+
 '''
 when ror_id = 'N/A' and org_name is null:
 
