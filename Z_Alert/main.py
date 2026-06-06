@@ -238,16 +238,11 @@ class AlertPipelineRunner(PipelineRunnerBase):
 
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_1 import GardRelationshipCountRefreshTask
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_2 import ArticleGeneReviewFlagUpdateTask
-        from pipelines.pipeline_5_followup.task_pipeline_followup_update_3 import OrganizationLocationRorLookupTask
-        from pipelines.pipeline_5_followup.task_pipeline_followup_update_4 import OrganizationLocationGraphSyncTask
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_5 import DiseaseCountsRefreshTask
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_6 import DashboardFieldCountsRefreshTask
 
         self._run_pipeline_task(GardRelationshipCountRefreshTask)
         self._run_pipeline_task(ArticleGeneReviewFlagUpdateTask)
-
-        #self._run_pipeline_task(OrganizationLocationRorLookupTask)
-        #self._run_pipeline_task(OrganizationLocationGraphSyncTask)
         self._run_pipeline_task(DiseaseCountsRefreshTask)
         self._run_pipeline_task(DashboardFieldCountsRefreshTask)
  
@@ -278,7 +273,6 @@ class AlertPipelineRunner(PipelineRunnerBase):
         from pipelines.pipeline_6_person.task_person_2_clinical_trial import NewClinicalTrialPersonTask
         from pipelines.pipeline_6_person.task_person_3_grant import NewGrantPersonTask
         from pipelines.pipeline_6_person.task_person_4_grouping import NewPersonGroupingTask
-
         from pipelines.pipeline_6_person.task_person_5_graph import NewPersonAgentGraphTask
        
         self._run_pipeline_task(NewPublicationPersonTask)
@@ -287,6 +281,15 @@ class AlertPipelineRunner(PipelineRunnerBase):
         self._run_pipeline_task(NewPersonGroupingTask)
 
         self._run_pipeline_task(NewPersonAgentGraphTask)
+
+
+    def run_pipeline_maintenance(self) -> None:
+        """Run final graph statistics updates after pipeline data loads finish.""" 
+        from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_1 import OrganizationLocationRorLookupTask
+        from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_2 import OrganizationLocationGraphSyncTask 
+ 
+        self._run_pipeline_task(OrganizationLocationRorLookupTask)
+        self._run_pipeline_task(OrganizationLocationGraphSyncTask)
 
 
     def run_pipeline_wrapup(self) -> None:
@@ -366,6 +369,12 @@ if __name__ == "__main__":
         )
          
         # Step 10
+        runner._run_step_with_timing(
+            "Step 10: run_pipeline_maintenance()",
+            runner.run_pipeline_maintenance,
+        )
+        
+        # Step 11
         runner._run_step_with_timing(
             "Step 10: run_pipeline_wrapup()",
             runner.run_pipeline_wrapup,
