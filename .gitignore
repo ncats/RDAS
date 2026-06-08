@@ -11,6 +11,8 @@
 !/requirements.txt
 *.cypher
 **/data
+**/G_update/*.md
+**/G_update/*.html
 AGENTS.md
 mtu
 test
