@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Add the project root to the Python path when this file is run directly.
 SCRIPT_DIR = Path(__file__).resolve().parent
