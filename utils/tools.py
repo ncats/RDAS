@@ -874,27 +874,15 @@ def _recipient_list(*recipient_values: Any) -> List[str]:
     """
     recipients: List[str] = []
 
-    def append_recipient_value(value: Any) -> None:
-        """Normalize one recipient value and append any concrete emails."""
+    for value in recipient_values:
         if value is None:
-            return
+            continue
 
         if isinstance(value, (list, tuple, set)):
-            # Recurse through nested collections so callers do not need to
-            # flatten config values before passing them into this helper.
-            for nested_value in value:
-                append_recipient_value(nested_value)
-            return
+            recipients.extend(_recipient_list(*value))
+            continue
 
-        # A single string can still contain multiple comma-separated emails,
-        # especially when it came from an environment variable.
-        for email in str(value).split(","):
-            cleaned_email = email.strip()
-            if cleaned_email:
-                recipients.append(cleaned_email)
-
-    for value in recipient_values:
-        append_recipient_value(value)
+        recipients.extend(email.strip() for email in str(value).split(",") if email.strip())
 
     return recipients
 

@@ -221,24 +221,20 @@ class AlertSender(PipelineBase):
             summary is still sent below to report that no updates were found
             for the current alert period.
             '''
-            try: 
+            summary_recipients = []
+            summary_subject = f"{self.subject} Summary"
+
+            try:
                 summary_recipients = _recipient_list(os.getenv("ALERT_SUMMARY_EMAIL_RECIPIENTS"))
 
                 if summary_recipients:
-                    summary_period = (
-                        f"{update_date_start.strftime('%Y-%m-%d')} - "
-                        f"{update_date_end.strftime('%Y-%m-%d')}"
-                    )
 
-                    summary_subject = f"{self.subject} Summary"
+                    summary_period = (f"{update_date_start.strftime('%Y-%m-%d')} - {update_date_end.strftime('%Y-%m-%d')}")
+
                     if not all_updates_summary:
                         summary_subject = f"{summary_subject} - No Updates"
                         
-                    self.logger.info(
-                        "Sending summary alert email "
-                        f"to {', '.join(summary_recipients)} "
-                        f"with {len(all_updates_summary)} user sections."
-                    )
+                    self.logger.info("Sending summary alert email...")
 
                     emailClient.send_html_summary_email(
                         subject = summary_subject,
@@ -249,15 +245,18 @@ class AlertSender(PipelineBase):
                     )
 
                     if all_updates_summary:
-                        self.logger.info(f"Sent summary alert email with {len(all_updates_summary)} user sections.")
+                        self.logger.info(f"Sent summary alert email to {', '.join(summary_recipients)} with {len(all_updates_summary)} user sections.")
                     else:
-                        self.logger.info("Sent summary alert email with no user updates for the current period.")
+                        self.logger.info(f"Sent summary alert email to {', '.join(summary_recipients)} with no user updates for the current period.")
                 else:
                     self.logger.error("ALERT_SUMMARY_EMAIL_RECIPIENTS is empty. Summary alert email was not sent.")
 
             except Exception as e:
-                self.logger.error(f"Unable to send summary alert email: {e}")
-
+                recipient_text = ", ".join(summary_recipients) if summary_recipients else "<not resolved>"
+                self.logger.exception(
+                    "emailClient.send_html_summary_email failed "
+                    f"for recipients={recipient_text}, subject={summary_subject!r}: {e}"
+                )
         finally:
             # Explicitly close the db connections
             self.close()
