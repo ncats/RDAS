@@ -172,3 +172,9 @@ class GardRelationshipCountRefreshTask(PipelineBase):
         finally:
             ''' Explicitly close all db connections. '''
             self.close()
+
+
+if __name__ == '__main__':
+
+    task = GardRelationshipCountRefreshTask()
+    task.process_new_data()
