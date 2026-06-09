@@ -74,6 +74,7 @@ class OrganizationLocationNodeTypeAndIdUpdater():
         #self.clinical_trial_node_type_and_id_update()
         #self.grant_node_type_and_id_update()
         #self.person_node_type_and_id_update()
+        pass
 
 
 
