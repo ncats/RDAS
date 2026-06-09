@@ -287,9 +287,11 @@ class AlertPipelineRunner(PipelineRunnerBase):
         """Run final graph statistics updates after pipeline data loads finish.""" 
         from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_1 import OrganizationLocationRorLookupTask
         from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_2 import OrganizationLocationGraphSyncTask 
+        from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_3 import NewOrganizationSourceTrackingTask
  
         self._run_pipeline_task(OrganizationLocationRorLookupTask)
         self._run_pipeline_task(OrganizationLocationGraphSyncTask)
+        self._run_pipeline_task(NewOrganizationSourceTrackingTask)
 
 
     def run_pipeline_wrapup(self) -> None:
