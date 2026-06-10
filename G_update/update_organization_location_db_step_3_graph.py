@@ -40,15 +40,13 @@ class OrganizationLocationGraphUpdateTask:
     """
     Sync completed ROR organization_location rows back into Memgraph.
 
-    1. Reads graph Organization nodes that still need ROR data. A node is
-       considered pending when Organization._idx_key exists and Organization.ror_id
-       is missing, empty, or "N/A". The graph scan uses keyset pagination by
-       _idx_key so large graphs can be processed in deterministic batches.
-    2. Uses each pending Organization._idx_key to fetch matching MySQL
-       organization_location rows by original_name_in_graph_db_idx_key. For each
-       graph key, only the newest MySQL row is used, and rows with NULL, empty,
-       or "N/A" ror_id values are ignored because they do not represent a real
-       ROR match.
+    1. Reads MySQL organization_location rows with real ROR ids first. Rows are
+       scanned newest-first by MySQL id, so the first row seen for each
+       original_name_in_graph_db_idx_key is the newest real-ROR row for that
+       graph Organization key.
+    2. Updates matching graph Organization nodes by Organization._idx_key. This
+       avoids scanning large batches of graph Organization nodes that have no
+       matching real-ROR MySQL row.
     3. Updates only pending graph Organization nodes. Existing graph nodes that
        already have a real ror_id are left unchanged, which prevents this sync
        from overwriting previously confirmed ROR data. The update writes
@@ -73,22 +71,11 @@ class OrganizationLocationGraphUpdateTask:
     # into Cypher as literals. Keep a strict identifier check before doing that.
     RELATIONSHIP_TYPE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-    FETCH_PENDING_GRAPH_ORG_KEYS_QUERY = """
-        MATCH (org:Organization)
-        WHERE org._idx_key IS NOT NULL
-          AND org._idx_key <> ''
-          AND (org.ror_id = '' OR org.ror_id = 'N/A')
-          AND ($lastKey IS NULL OR org._idx_key > $lastKey)
-        RETURN DISTINCT org._idx_key AS org_idx_key
-        ORDER BY org_idx_key
-        LIMIT $limit
-    """
-
     BATCH_UPDATE_ORGANIZATIONS = """
         UNWIND $chunks AS chunk
 
         MATCH (org:Organization {_idx_key: chunk.orgIdxKey})
-        WHERE org.ror_id = '' OR org.ror_id = 'N/A'
+        WHERE org.ror_id IS NULL OR org.ror_id = '' OR org.ror_id = 'N/A'
 
         SET org.displayName = chunk.displayName,
             org.ror_id = chunk.rorId,
@@ -177,34 +164,59 @@ class OrganizationLocationGraphUpdateTask:
 
     def sync_real_ror_rows_to_graph(self) -> int:
         """
-        Find graph Organization nodes that still need ROR data, then look up
-        only those _idx_key values in MySQL.
+        Read real-ROR MySQL rows first, then update matching graph nodes.
 
         is_new is deliberately not used here. The source-of-truth filters are:
-        graph ror_id is missing/empty/N/A, and MySQL has a usable real ror_id
-        for the same original_name_in_graph_db_idx_key.
+        MySQL has a usable real ror_id, and the graph Organization with the
+        same original_name_in_graph_db_idx_key still has missing/empty/N/A
+        ror_id.
+
+        The old implementation scanned pending graph Organization keys first.
+        That can waste a lot of time when most pending graph keys have no real
+        ROR row in MySQL. This implementation scans MySQL rows newest-first and
+        only sends real-ROR candidates to Memgraph.
         """
 
         total_updated = 0
+        total_mysql_rows = 0
+        total_unique_keys = 0
         batch_num = 0
-        last_key = None
+        last_id = None
+        seen_org_idx_keys = set()
 
         while True:
-            org_idx_keys = self.fetch_pending_graph_org_keys(last_key)
+            rows = self.fetch_mysql_real_ror_rows_before_id(last_id)
 
-            if not org_idx_keys:
-                self.logger.info("No more pending graph Organization nodes to sync.")
+            if not rows:
+                self.logger.info(
+                    "No more MySQL organization_location rows with real ROR ids to sync. "
+                    f"mysql_rows_read={total_mysql_rows}, unique_org_keys={total_unique_keys}."
+                )
                 break
 
             batch_num += 1
-            last_key = org_idx_keys[-1]
-            rows = self.fetch_mysql_ror_rows_for_graph_keys(org_idx_keys)
-            chunks = self.create_organization_location_chunks(rows)
+            last_id = rows[-1]["id"]
+            total_mysql_rows += len(rows)
+
+            latest_rows = []
+
+            for row in rows:
+                org_idx_key = row.get("original_name_in_graph_db_idx_key")
+
+                if not org_idx_key or org_idx_key in seen_org_idx_keys:
+                    continue
+
+                seen_org_idx_keys.add(org_idx_key)
+                latest_rows.append(row)
+
+            total_unique_keys += len(latest_rows)
+
+            chunks = self.create_organization_location_chunks(latest_rows)
 
             if not chunks:
                 self.logger.info(
-                    f"Batch #{batch_num}: graph_keys={len(org_idx_keys)}, "
-                    "no matching MySQL rows with real ROR ids."
+                    f"Batch #{batch_num}: mysql_rows={len(rows)}, "
+                    f"newest_unique_keys={len(latest_rows)}, no valid graph update chunks."
                 )
                 continue
 
@@ -213,7 +225,7 @@ class OrganizationLocationGraphUpdateTask:
 
             with_location = sum(1 for chunk in chunks if chunk["hasLocation"])
             self.logger.info(
-                f"Batch #{batch_num}: graph_keys={len(org_idx_keys)}, mysql_rows={len(rows)}, "
+                f"Batch #{batch_num}: mysql_rows={len(rows)}, newest_unique_keys={len(latest_rows)}, "
                 f"chunks={len(chunks)}, updated_graph_nodes={updated_count}, "
                 f"with_location={with_location}, total_updated={total_updated}."
             )
@@ -221,75 +233,60 @@ class OrganizationLocationGraphUpdateTask:
         return total_updated
 
 
-    def fetch_pending_graph_org_keys(self, last_key: Optional[str]) -> List[str]:
-        """Fetch one keyset-paginated batch of graph Organization _idx_key values."""
-
-        rows = self.memgraph.execute_and_fetch(
-            self.FETCH_PENDING_GRAPH_ORG_KEYS_QUERY,
-            {"lastKey": last_key, "limit": self.BATCH_SIZE},
-        )
-
-        return [row["org_idx_key"] for row in rows if row.get("org_idx_key")]
-
-
-    def fetch_mysql_ror_rows_for_graph_keys(self, org_idx_keys: List[str]) -> List[Dict[str, Any]]:
+    def fetch_mysql_real_ror_rows_before_id(self, last_id: Optional[int]) -> List[Dict[str, Any]]:
         """
-        Fetch the newest real-ROR organization_location row for each graph key.
+        Fetch real-ROR organization_location rows newest-first.
 
-        The relevant MySQL indexes are original_name_in_graph_db_idx_key and
-        ror_id, both documented in rdas_db_indexes.txt.
+        Because rows are ordered by id DESC, the first row encountered for an
+        original_name_in_graph_db_idx_key is the newest real-ROR row for that
+        Organization key. sync_real_ror_rows_to_graph keeps a set of keys that
+        have already been seen and ignores older rows for the same key.
         """
 
-        if not org_idx_keys:
-            return []
+        id_filter = ""
+        params: List[Any] = []
 
-        placeholders = ", ".join(["%s"] * len(org_idx_keys))
+        if last_id is not None:
+            id_filter = "AND id < %s"
+            params.append(last_id)
 
-        '''
-        The GROUP BY original_name_in_graph_db_idx_key creates one group per graph organization key, 
-        and MAX(id) AS latest_id chooses the row with the highest MySQL id in each group. 
-        Then the outer query joins back on ol.id = latest.latest_id, so only that newest row is returned for each key.
-        '''
         query = f"""
             SELECT
-                ol.id,
-                ol.ror_id,
-                ol.org_name,
-                ol.original_name_in_graph_db,
-                ol.original_name_in_graph_db_idx_key,
-                ol.website,
-                ol.city,
-                ol.state,
-                ol.country,
-                ol.country_code,
-                ol.lat,
-                ol.lng,
-                ol.geonames_id,
-                ol.established,
-                ol.status,
-                ol.types,
-                ol.full_data
-            FROM {self.TABLE_NAME} ol
-            INNER JOIN (
-                SELECT
-                    original_name_in_graph_db_idx_key,
-                    MAX(id) AS latest_id
-                FROM {self.TABLE_NAME}
-                WHERE original_name_in_graph_db_idx_key IN ({placeholders})
-                  AND ror_id IS NOT NULL
-                  AND TRIM(ror_id) <> ''
-                  AND UPPER(TRIM(ror_id)) <> 'N/A'
-                GROUP BY original_name_in_graph_db_idx_key
-            ) latest
-                ON ol.id = latest.latest_id
-            ORDER BY ol.id
+                id,
+                ror_id,
+                org_name,
+                original_name_in_graph_db,
+                original_name_in_graph_db_idx_key,
+                website,
+                city,
+                state,
+                country,
+                country_code,
+                lat,
+                lng,
+                geonames_id,
+                established,
+                status,
+                types,
+                full_data
+            FROM {self.TABLE_NAME}
+            WHERE original_name_in_graph_db_idx_key IS NOT NULL
+              AND original_name_in_graph_db_idx_key <> ''
+              AND ror_id IS NOT NULL
+              AND TRIM(ror_id) <> ''
+              AND UPPER(TRIM(ror_id)) <> 'N/A'
+              {id_filter}
+            ORDER BY id DESC
+            LIMIT %s
         """
+
+        params.append(self.BATCH_SIZE)
 
         cursor = None
 
         try:
             cursor = self.mysql.cursor(dictionary=True, buffered=True)
-            cursor.execute(query, tuple(org_idx_keys))
+            cursor.execute(query, tuple(params))
             return cursor.fetchall()
 
         finally:
