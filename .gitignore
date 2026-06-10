@@ -13,6 +13,7 @@
 **/data
 **/G_update/*.md
 **/G_update/*.html
+**/G_update/*.sql
 AGENTS.md
 mtu
 test
