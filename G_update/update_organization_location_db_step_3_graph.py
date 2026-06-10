@@ -174,7 +174,9 @@ class OrganizationLocationGraphUpdateTask:
         The old implementation scanned pending graph Organization keys first.
         That can waste a lot of time when most pending graph keys have no real
         ROR row in MySQL. This implementation scans MySQL rows newest-first and
-        only sends real-ROR candidates to Memgraph.
+        only sends real-ROR candidates to Memgraph. Before running the update
+        query, it asks Memgraph which candidate keys are still pending so
+        already-updated or missing graph nodes can be skipped quickly.
         """
 
         total_updated = 0
@@ -220,17 +222,68 @@ class OrganizationLocationGraphUpdateTask:
                 )
                 continue
 
-            updated_count = self.execute_graph_update(chunks)
+            pending_org_idx_keys = self.fetch_pending_graph_org_keys_for_chunks(chunks)
+
+            if not pending_org_idx_keys:
+                self.logger.info(
+                    f"Batch #{batch_num}: mysql_rows={len(rows)}, newest_unique_keys={len(latest_rows)}, "
+                    f"chunks={len(chunks)}, pending_graph_keys=0, skipped graph update."
+                )
+                continue
+
+            pending_chunks = [
+                chunk
+                for chunk in chunks
+                if chunk["orgIdxKey"] in pending_org_idx_keys
+            ]
+
+            updated_count = self.execute_graph_update(pending_chunks)
             total_updated += updated_count
 
-            with_location = sum(1 for chunk in chunks if chunk["hasLocation"])
+            with_location = sum(1 for chunk in pending_chunks if chunk["hasLocation"])
             self.logger.info(
                 f"Batch #{batch_num}: mysql_rows={len(rows)}, newest_unique_keys={len(latest_rows)}, "
-                f"chunks={len(chunks)}, updated_graph_nodes={updated_count}, "
+                f"chunks={len(chunks)}, pending_graph_keys={len(pending_org_idx_keys)}, "
+                f"updated_graph_nodes={updated_count}, "
                 f"with_location={with_location}, total_updated={total_updated}."
             )
 
         return total_updated
+
+
+    def fetch_pending_graph_org_keys_for_chunks(self, chunks: List[Dict[str, Any]]) -> Set[str]:
+        """
+        Return Organization keys from this batch that still need ROR data.
+
+        The MySQL-first scan can encounter many real-ROR rows for graph nodes
+        that are already updated, or for keys that do not exist in Memgraph.
+        This precheck avoids running the heavier update/Location merge query
+        when no candidate key is actually pending in the graph.
+        """
+
+        org_idx_keys = sorted({
+            chunk["orgIdxKey"]
+            for chunk in chunks
+            if chunk.get("orgIdxKey")
+        })
+
+        if not org_idx_keys:
+            return set()
+
+        query = """
+            UNWIND $orgIdxKeys AS orgIdxKey
+            MATCH (org:Organization {_idx_key: orgIdxKey})
+            WHERE org.ror_id IS NULL OR org.ror_id = '' OR org.ror_id = 'N/A'
+            RETURN DISTINCT org._idx_key AS org_idx_key
+        """
+
+        rows = self.memgraph.execute_and_fetch(query, {"orgIdxKeys": org_idx_keys})
+
+        return {
+            row["org_idx_key"]
+            for row in rows
+            if row.get("org_idx_key")
+        }
 
 
     def fetch_mysql_real_ror_rows_before_id(self, last_id: Optional[int]) -> List[Dict[str, Any]]:
