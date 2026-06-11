@@ -44,12 +44,13 @@ class GrantPipelineRunner(PipelineRunnerBase):
 
         """ Upload project files into MySQL. """
         from pipelines.pipeline_4_grant.task_grant_3 import GrantProjectUploadTask
-        from pipelines.pipeline_4_grant.task_grant_4 import GrantPublicationUploadTask
-
         #self._run_pipeline_task(GrantProjectUploadTask, years=[LAST_YEAR])
-        self._run_pipeline_task(GrantPublicationUploadTask, years=[LAST_YEAR])
 
+        from pipelines.pipeline_4_grant.task_grant_4 import GrantPublicationUploadTask
+        #self._run_pipeline_task(GrantPublicationUploadTask, years=[LAST_YEAR])
 
+        from pipelines.pipeline_4_grant.task_grant_5 import GrantAbstractUploadTask       
+        self._run_pipeline_task(GrantAbstractUploadTask, years=[LAST_YEAR])
 
 
 
