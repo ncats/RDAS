@@ -83,7 +83,7 @@ NLTK data note preserved from the original script:
 """
 # Reference: D_grant/init_8_process_GARD_names.py
 
-# If `rdas_db.gard` changes, rebuild or refresh `grant_gard_processed_names`
+# If `rdas_db.gard` table changes, rebuild or refresh `grant_gard_processed_names`
 # so the processed search terms stay aligned with the source GARD labels.
 
 import time
@@ -256,30 +256,6 @@ def build_processed_terms(name: Any, synonyms: Any) -> Tuple[str, str, str, str]
     )
 
 
-def build_update_tuple(row: Dict[str, Any]) -> Tuple[Any, ...]:
-    """Build one UPDATE parameter tuple from one grant_gard_processed_names row."""
-
-    from utils.tools import _normalize_tuple
-
-    processed_values = _normalize_tuple(
-        build_processed_terms(
-            row.get("name"),
-            row.get("synonyms"),
-        )
-    )
-
-    # The WHERE parameters intentionally use raw database values. Normalizing the
-    # natural key fields could prevent the UPDATE from matching rows containing
-    # non-ASCII labels.
-    return (
-        *processed_values,
-        row.get("gardid"),
-        row.get("name"),
-        row.get("data_source"),
-        row.get("synonyms"),
-    )
-
-
 class GrantGardNameProcessingTask(GrantPipelineBase):
     """Refresh GARD processed-name search columns used by grant matching."""
 
@@ -324,7 +300,7 @@ class GrantGardNameProcessingTask(GrantPipelineBase):
                 if not rows:
                     break
 
-                update_values = [build_update_tuple(row) for row in rows]
+                update_values = [self._build_update_tuple(row) for row in rows]
 
                 try:
                     update_cursor.executemany(UPDATE_SQL, update_values)
@@ -365,6 +341,32 @@ class GrantGardNameProcessingTask(GrantPipelineBase):
             self.logger.info(f"Total time elapsed: {hours} hours, {minutes} minutes, {seconds} seconds")
 
             self.close()
+
+
+    def _build_update_tuple(self, row: Dict[str, Any]) -> Tuple[Any, ...]:
+        """Build one UPDATE parameter tuple from one grant_gard_processed_names row."""
+
+        from utils.tools import _normalize_tuple
+
+        self.logger.info(f"Processed GARD name row: gardid={row.get('gardid')}, gard_name={row.get('name')}")
+
+        processed_values = _normalize_tuple(
+            build_processed_terms(
+                row.get("name"),
+                row.get("synonyms"),
+            )
+        )
+
+        # The WHERE parameters intentionally use raw database values. Normalizing
+        # the natural key fields could prevent the UPDATE from matching rows
+        # containing non-ASCII labels.
+        return (
+            *processed_values,
+            row.get("gardid"),
+            row.get("name"),
+            row.get("data_source"),
+            row.get("synonyms"),
+        )
 
 
 if __name__ == "__main__":

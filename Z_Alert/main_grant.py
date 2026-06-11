@@ -41,24 +41,31 @@ class GrantPipelineRunner(PipelineRunnerBase):
 
         """ Upload project files into MySQL. """
         from pipelines.pipeline_4_grant.task_grant_3 import GrantProjectUploadTask
-        #self._run_pipeline_task(GrantProjectUploadTask, years=[LAST_YEAR])
+        self._run_pipeline_task(GrantProjectUploadTask, years=[LAST_YEAR])
 
         from pipelines.pipeline_4_grant.task_grant_4 import GrantPublicationUploadTask
-        #self._run_pipeline_task(GrantPublicationUploadTask, years=[LAST_YEAR])
+        self._run_pipeline_task(GrantPublicationUploadTask, years=[LAST_YEAR])
 
         from pipelines.pipeline_4_grant.task_grant_5 import GrantAbstractUploadTask       
-        #self._run_pipeline_task(GrantAbstractUploadTask, years=[LAST_YEAR])
+        self._run_pipeline_task(GrantAbstractUploadTask, years=[LAST_YEAR])
 
         from pipelines.pipeline_4_grant.task_grant_6 import GrantLinktableUploadTask
-        #self._run_pipeline_task(GrantLinktableUploadTask, years=[LAST_YEAR])
+        self._run_pipeline_task(GrantLinktableUploadTask, years=[LAST_YEAR])
 
         from pipelines.pipeline_4_grant.task_grant_7 import GrantClinicalStudyUploadTask
-        #self._run_pipeline_task(GrantClinicalStudyUploadTask, years=[LAST_YEAR])
+        self._run_pipeline_task(GrantClinicalStudyUploadTask, years=[LAST_YEAR])
 
         from pipelines.pipeline_4_grant.task_grant_8 import GrantPatentUploadTask
         self._run_pipeline_task(GrantPatentUploadTask)
 
 
+    """ Step 3 """
+    def build_relationship(self) -> None:
+
+        # If `rdas_db.gard` table changes, rebuild or refresh `grant_gard_processed_names`
+        # so the processed search terms stay aligned with the source GARD labels.
+        from pipelines.pipeline_4_grant.task_grant_9 import GrantGardNameProcessingTask
+        self._run_pipeline_task(GrantGardNameProcessingTask)
 
 
 if __name__ == "__main__":
@@ -80,8 +87,17 @@ if __name__ == "__main__":
         # Step 2
         runner._run_step_with_timing(
             "Step 2: upload_reporters_data_to_mysql()",
-            lambda: runner.upload_reporters_data_to_mysql(),
+            #lambda: runner.upload_reporters_data_to_mysql(),
+            lambda: runner.logger.info("\n\n*** Skip Step 2 ***\n\n"),
         )
+
+        # Step 3
+        runner._run_step_with_timing(
+            "Step 3: build_relationship()",
+            #lambda: runner.logger.info("\n\n*** Skip Step 3 ***\n\n"),
+            lambda: runner.build_relationship(),
+        )
+
 
 
     finally:
