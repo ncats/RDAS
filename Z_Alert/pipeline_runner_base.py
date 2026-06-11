@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Callable, Optional, Type
 
+from pipelines.pipeline_error_logging import attach_pipeline_error_file_handler, remove_pipeline_error_file_handler
 from utils.applogger import AppLogger
 from utils.tools import _time_hms
 
@@ -28,22 +29,33 @@ class PipelineRunnerBase:
         name = task_name or task_class.__name__
         start_time = time.time()
         task = None
+        pipeline_error_handler = None
+        pipeline_error_handler_added = False
 
         self.logger.info(f"\n*** Starting task: {name} ***\n")
 
         try:
+            pipeline_error_handler, pipeline_error_handler_added = attach_pipeline_error_file_handler(
+                self.logger,
+                self.log_dir,
+                module_name=task_class.__module__,
+                task_class=task_class,
+            )
             task = task_class(**kwargs)
             task.process_new_data()
 
             hours, minutes, seconds = _time_hms(time.time() - start_time)
             self.logger.info(f"\n*** Finished task: {name} in {hours} hours, {minutes} minutes, {seconds} seconds ***\n")
 
-        except Exception as e:
-            self.logger.error(f"Task failed: {name}. Error: {e}")
+        except Exception:
+            self.logger.exception(f"Task failed: {name}.")
             raise
 
         finally:
             self._close_task_if_needed(task)
+
+            if pipeline_error_handler_added:
+                remove_pipeline_error_file_handler(self.logger, pipeline_error_handler)
 
 
     def _run_step_with_timing(self, step_name: str, step_func: Callable[[], None]) -> None:

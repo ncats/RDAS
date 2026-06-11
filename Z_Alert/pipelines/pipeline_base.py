@@ -14,6 +14,7 @@ load_dotenv(os.path.abspath(os.path.join(_dir, "../..", ".env")))
 
 from utils.applogger import AppLogger
 from baseclass.conn import DBConnection as db
+from pipelines.pipeline_error_logging import attach_pipeline_error_file_handler
 from utils.tools import _date_string
 
 class PipelineBase(ABC):
@@ -43,6 +44,7 @@ class PipelineBase(ABC):
         #self.log_file = f"{self.log_dir}/alert-{class_name}-{_date_string()}.log"
 
         self.logger = AppLogger(class_name, self.log_file).get_logger()
+        attach_pipeline_error_file_handler(self.logger, self.log_dir, module_name=type(self).__module__, task_class=type(self))
         self.logger.info(f'\n\n{"*" * 20} The {class_name} is initialized. {"*" * 20}\n')
 
 
