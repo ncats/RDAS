@@ -6,20 +6,20 @@ from typing import Dict, List, Tuple
 import requests
 from requests import Session
 
-from pipelines.pipeline_4_grant.grant_base import BASE_DIR, BASE_URL, GrantPipelineBase
+from pipelines.pipeline_4_grant.grant_base import GrantPipelineBase
 from utils.tools import _time_hms
 
 DOWNLOAD_SOURCES: Tuple[Dict[str, str], ...] = (
     {
         "name": "patents",
-        "url": f"{BASE_URL}/patents/download",
+        "endpoint": "patents/download",
         "directory": "patents",
         "filename": "Patents.csv",
         "zip_filename": "nih_patents.zip",
     },
     {
         "name": "clinicalstudies",
-        "url": f"{BASE_URL}/clinicalstudies/download",
+        "endpoint": "clinicalstudies/download",
         "directory": "clinical_studies",
         "filename": "ClinicalStudies.csv",
         "zip_filename": "nih_clinicalstudies.zip",
@@ -61,7 +61,7 @@ class GrantPatentClinicalStudyDownloadTask(GrantPipelineBase):
             "utf8_converted_directories": 0,
         }
 
-        self.logger.info(f"Starting NIH RePORTER patent/clinical-study download task: data_dir={BASE_DIR}")
+        self.logger.info(f"Starting NIH RePORTER patent/clinical-study download task: data_dir={self.BASE_DIR}")
 
         try:
             with requests.Session() as session:
@@ -75,7 +75,7 @@ class GrantPatentClinicalStudyDownloadTask(GrantPipelineBase):
                 self.logger.error(f"NIH RePORTER patent/clinical-study download incomplete. Summary={summary}")
                 raise RuntimeError("NIH RePORTER patent/clinical-study download failed; skipping UTF-8 conversion.")
 
-            summary["utf8_converted_directories"] = self._convert_directories_to_utf8([BASE_DIR / source["directory"] for source in DOWNLOAD_SOURCES])
+            summary["utf8_converted_directories"] = self._convert_directories_to_utf8([self.BASE_DIR / source["directory"] for source in DOWNLOAD_SOURCES])
 
             self.logger.info(f"Completed NIH RePORTER patent/clinical-study download task. Summary={summary}")
 
@@ -94,9 +94,10 @@ class GrantPatentClinicalStudyDownloadTask(GrantPipelineBase):
     def _download_source(self, source: Dict[str, str], session: Session, summary: Dict[str, int]) -> bool:
         """Download one NIH non-year exporter file."""
 
-        output_dir = BASE_DIR / source["directory"]
+        output_dir = self.BASE_DIR / source["directory"]
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        download_url = f"{self.BASE_URL}/{source['endpoint']}"
         target_csv = output_dir / source["filename"]
         temp_path = output_dir / f"{source['filename']}.part"
 
@@ -104,7 +105,7 @@ class GrantPatentClinicalStudyDownloadTask(GrantPipelineBase):
             if temp_path.exists():
                 temp_path.unlink()
 
-            self._stream_download(source["url"], temp_path, session)
+            self._stream_download(download_url, temp_path, session)
 
             if zipfile.is_zipfile(temp_path):
                 summary["zip_files_checked"] += 1
@@ -125,7 +126,7 @@ class GrantPatentClinicalStudyDownloadTask(GrantPipelineBase):
             return True
 
         except Exception:
-            self.logger.exception(f"Failed to download NIH {source['name']} file from {source['url']} to {output_dir}")
+            self.logger.exception(f"Failed to download NIH {source['name']} file from {download_url} to {output_dir}")
 
             if temp_path.exists():
                 temp_path.unlink()

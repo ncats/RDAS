@@ -22,24 +22,6 @@ sys.path.extend([
 
 from pipelines.pipeline_base import PipelineBase
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SCRIPT_DIR.parents[2]
-BASE_DIR = PROJECT_ROOT / "Z_Alert" / "pipelines" / "pipeline_4_grant" / "data"
-DEFAULT_PROJECTS_DIR = BASE_DIR / "projects"
-DEFAULT_PUBLICATIONS_DIR = BASE_DIR / "publications"
-DEFAULT_BATCH_SIZE = 1000
-MIN_REPORTER_PROJECT_YEAR = 2000
-MAX_REPORTER_PROJECT_YEAR = date.today().year
-LATEST_COMPLETED_REPORTER_YEAR = date.today().year - 1
-
-BASE_URL = "https://reporter.nih.gov/exporter"
-DEFAULT_EXPORTER_CATEGORIES = ("projects", "abstracts", "publications", "linktables")
-DEFAULT_CHUNK_SIZE = 1024 * 1024
-DEFAULT_REQUEST_TIMEOUT = (10, 120)
-GRANT_ERROR_LOG_FILE = "alert-grant-errors.log"
-GRANT_ERROR_LOG_MAX_BYTES = 1024 * 1024 * 10
-GRANT_ERROR_LOG_BACKUP_COUNT = 10
-
 
 def attach_grant_error_file_handler(logger, log_dir: os.PathLike) -> None:
     """Attach a shared grant ERROR-only rotating file handler to a logger."""
@@ -47,7 +29,7 @@ def attach_grant_error_file_handler(logger, log_dir: os.PathLike) -> None:
     if logger is None:
         return
 
-    error_log_path = Path(log_dir) / GRANT_ERROR_LOG_FILE
+    error_log_path = Path(log_dir) / GrantPipelineBase.GRANT_ERROR_LOG_FILE
     resolved_error_log_path = str(error_log_path.resolve())
 
     for handler in logger.handlers:
@@ -56,8 +38,8 @@ def attach_grant_error_file_handler(logger, log_dir: os.PathLike) -> None:
 
     error_handler = RotatingFileHandler(
         resolved_error_log_path,
-        maxBytes=GRANT_ERROR_LOG_MAX_BYTES,
-        backupCount=GRANT_ERROR_LOG_BACKUP_COUNT,
+        maxBytes=GrantPipelineBase.GRANT_ERROR_LOG_MAX_BYTES,
+        backupCount=GrantPipelineBase.GRANT_ERROR_LOG_BACKUP_COUNT,
     )
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s [%(name)s:%(filename)s:%(lineno)d]: %(message)s"))
@@ -67,6 +49,25 @@ def attach_grant_error_file_handler(logger, log_dir: os.PathLike) -> None:
 
 class GrantPipelineBase(PipelineBase):
     """Shared helpers for grant alert pipeline tasks."""
+
+    SCRIPT_DIR = Path(__file__).resolve().parent
+    PROJECT_ROOT = SCRIPT_DIR.parents[2]
+    BASE_DIR = PROJECT_ROOT / "Z_Alert" / "pipelines" / "pipeline_4_grant" / "data"
+    DEFAULT_PROJECTS_DIR = BASE_DIR / "projects"
+    DEFAULT_PUBLICATIONS_DIR = BASE_DIR / "publications"
+    DEFAULT_ABSTRACTS_DIR = BASE_DIR / "abstracts"
+    DEFAULT_BATCH_SIZE = 1000
+    MIN_REPORTER_PROJECT_YEAR = 2000
+    MAX_REPORTER_PROJECT_YEAR = date.today().year
+    LATEST_COMPLETED_REPORTER_YEAR = date.today().year - 1
+
+    BASE_URL = "https://reporter.nih.gov/exporter"
+    DEFAULT_EXPORTER_CATEGORIES = ("projects", "abstracts", "publications", "linktables")
+    DEFAULT_CHUNK_SIZE = 1024 * 1024
+    DEFAULT_REQUEST_TIMEOUT = (10, 120)
+    GRANT_ERROR_LOG_FILE = "alert-grant-errors.log"
+    GRANT_ERROR_LOG_MAX_BYTES = 1024 * 1024 * 10
+    GRANT_ERROR_LOG_BACKUP_COUNT = 10
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -79,18 +80,19 @@ class GrantPipelineBase(PipelineBase):
         attach_grant_error_file_handler(getattr(self, "logger", None), self.log_dir)
 
 
-    def _stream_download(self, url: str, output_path: Path, session: Optional[Session] = None, timeout: Tuple[int, int] = DEFAULT_REQUEST_TIMEOUT) -> None:
+    def _stream_download(self, url: str, output_path: Path, session: Optional[Session] = None, timeout: Optional[Tuple[int, int]] = None) -> None:
         """Stream one URL to disk."""
 
         close_session = session is None
         http = session or requests.Session()
+        timeout = timeout or self.DEFAULT_REQUEST_TIMEOUT
 
         try:
             with http.get(url, stream=True, timeout=timeout) as response:
                 response.raise_for_status()
 
                 with output_path.open("wb") as file_obj:
-                    for chunk in response.iter_content(chunk_size=DEFAULT_CHUNK_SIZE):
+                    for chunk in response.iter_content(chunk_size=self.DEFAULT_CHUNK_SIZE):
                         if not chunk:
                             continue
 
@@ -101,10 +103,11 @@ class GrantPipelineBase(PipelineBase):
                 http.close()
 
 
-    def _download_file(self, url: str, filename: os.PathLike, session: Optional[Session] = None, timeout: Tuple[int, int] = DEFAULT_REQUEST_TIMEOUT) -> bool:
+    def _download_file(self, url: str, filename: os.PathLike, session: Optional[Session] = None, timeout: Optional[Tuple[int, int]] = None) -> bool:
         """Download one URL to disk using a temporary .part file."""
 
         output_path = Path(filename)
+        timeout = timeout or self.DEFAULT_REQUEST_TIMEOUT
 
         if output_path.exists():
             self.logger.info(f"Skipping {output_path.name}; file already exists.")
@@ -205,8 +208,11 @@ class GrantPipelineBase(PipelineBase):
                 max_csv_field_size = int(max_csv_field_size / 10)
 
 
-    def _resolve_years(self, years: Optional[Sequence[int]], required: bool = False, default_year: Optional[int] = None, min_year: int = MIN_REPORTER_PROJECT_YEAR, max_year: int = MAX_REPORTER_PROJECT_YEAR) -> List[int]:
+    def _resolve_years(self, years: Optional[Sequence[int]], required: bool = False, default_year: Optional[int] = None, min_year: Optional[int] = None, max_year: Optional[int] = None) -> List[int]:
         """Validate caller-provided fiscal years."""
+
+        min_year = self.MIN_REPORTER_PROJECT_YEAR if min_year is None else min_year
+        max_year = self.MAX_REPORTER_PROJECT_YEAR if max_year is None else max_year
 
         if years is None:
             if required:
@@ -249,8 +255,8 @@ class GrantPipelineBase(PipelineBase):
 
         year = int(match.group(1))
 
-        if year < MIN_REPORTER_PROJECT_YEAR or year > MAX_REPORTER_PROJECT_YEAR:
-            raise ValueError(f"Year {year} is outside the expected {export_label} range {MIN_REPORTER_PROJECT_YEAR}-{MAX_REPORTER_PROJECT_YEAR}.")
+        if year < self.MIN_REPORTER_PROJECT_YEAR or year > self.MAX_REPORTER_PROJECT_YEAR:
+            raise ValueError(f"Year {year} is outside the expected {export_label} range {self.MIN_REPORTER_PROJECT_YEAR}-{self.MAX_REPORTER_PROJECT_YEAR}.")
 
         return year
 

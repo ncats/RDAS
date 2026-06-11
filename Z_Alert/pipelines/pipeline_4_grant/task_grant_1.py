@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Sequence
 
 import requests
 
-from pipelines.pipeline_4_grant.grant_base import BASE_DIR, BASE_URL, DEFAULT_EXPORTER_CATEGORIES, LATEST_COMPLETED_REPORTER_YEAR, GrantPipelineBase
+from pipelines.pipeline_4_grant.grant_base import GrantPipelineBase
 from utils.tools import _time_hms
 
 """
@@ -25,12 +25,12 @@ are always unzipped, then the selected category folders are converted to UTF-8.
 class GrantExporterDownloadTask(GrantPipelineBase):
     """Download, unzip, and UTF-8 normalize NIH RePORTER grant export files by year."""
 
-    VALID_CATEGORIES = set(DEFAULT_EXPORTER_CATEGORIES)
+    VALID_CATEGORIES = set(GrantPipelineBase.DEFAULT_EXPORTER_CATEGORIES)
 
     def __init__(self, years: Optional[Sequence[int]] = None, categories: Optional[Sequence[str]] = None):
         super().__init__(init_mysql=False, init_memgraph=False)
 
-        self.years = self._resolve_years(years, default_year=LATEST_COMPLETED_REPORTER_YEAR, min_year=LATEST_COMPLETED_REPORTER_YEAR - 1, max_year=LATEST_COMPLETED_REPORTER_YEAR)
+        self.years = self._resolve_years(years, default_year=self.LATEST_COMPLETED_REPORTER_YEAR, min_year=self.LATEST_COMPLETED_REPORTER_YEAR - 1, max_year=self.LATEST_COMPLETED_REPORTER_YEAR)
         self.categories = self._resolve_categories(categories)
 
 
@@ -51,19 +51,19 @@ class GrantExporterDownloadTask(GrantPipelineBase):
             "utf8_converted_categories": 0,
         }
 
-        self.logger.info(f"Starting NIH RePORTER grant download task: categories={self.categories}, years={self.years}, unzip=True, convert_utf8=True, data_dir={BASE_DIR}")
+        self.logger.info(f"Starting NIH RePORTER grant download task: categories={self.categories}, years={self.years}, unzip=True, convert_utf8=True, data_dir={self.BASE_DIR}")
 
         try:
             with requests.Session() as session:
 
                 for category in self.categories:
 
-                    category_dir = BASE_DIR / category
+                    category_dir = self.BASE_DIR / category
                     category_dir.mkdir(parents=True, exist_ok=True)
 
                     for year in self.years:
                         zip_path = category_dir / f"nih_{category}_{year}.zip"
-                        url = f"{BASE_URL}/{category}/download/{year}"
+                        url = f"{self.BASE_URL}/{category}/download/{year}"
 
                         if self._download_file(url, zip_path, session=session):
                             summary["downloaded_or_existing"] += 1
@@ -76,7 +76,7 @@ class GrantExporterDownloadTask(GrantPipelineBase):
                 self.logger.error(f"NIH RePORTER grant download incomplete. Summary={summary}")
                 raise RuntimeError("NIH RePORTER grant download or unzip failed; skipping UTF-8 conversion.")
 
-            summary["utf8_converted_categories"] = self._convert_directories_to_utf8([BASE_DIR / category for category in self.categories])
+            summary["utf8_converted_categories"] = self._convert_directories_to_utf8([self.BASE_DIR / category for category in self.categories])
 
             self.logger.info(f"Completed NIH RePORTER grant download task. Summary={summary}")
 
@@ -111,7 +111,7 @@ class GrantExporterDownloadTask(GrantPipelineBase):
         """Resolve and validate grant exporter categories."""
 
         if categories is None:
-            categories = DEFAULT_EXPORTER_CATEGORIES
+            categories = self.DEFAULT_EXPORTER_CATEGORIES
 
         cleaned_categories = []
 

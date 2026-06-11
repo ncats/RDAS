@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-from datetime import date
 
 from dotenv import load_dotenv
 
@@ -14,13 +13,13 @@ sys.path.extend([
 load_dotenv(os.path.abspath(os.path.join(_dir, "..", ".env")))
 
 from pipeline_runner_base import PipelineRunnerBase
-from pipelines.pipeline_4_grant.grant_base import attach_grant_error_file_handler
+from pipelines.pipeline_4_grant.grant_base import GrantPipelineBase, attach_grant_error_file_handler
 from utils.tools import _time_hms
 
 
 
 # This year's data may not be published yet.
-LAST_YEAR = date.today().year - 1
+LAST_YEAR = GrantPipelineBase.LATEST_COMPLETED_REPORTER_YEAR
 
 class GrantPipelineRunner(PipelineRunnerBase):
     """Run grant-specific alert pipeline tasks without touching Z_Alert/main.py."""

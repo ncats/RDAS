@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from pipelines.pipeline_4_grant.grant_base import BASE_DIR, GrantPipelineBase
+from pipelines.pipeline_4_grant.grant_base import GrantPipelineBase
 from utils.tools import _time_hms
 
 
@@ -32,7 +32,6 @@ row when that pair already exists.
 # Reference: D_grant/init_4_upload_abstracts_to_mysql_db.py
 
 TABLE_NAME = "grant_abstract"
-DEFAULT_ABSTRACTS_DIR = BASE_DIR / "abstracts"
 ABSTRACT_FILE_PREFIX = "RePORTER_PRJABS_C_FY"
 
 GRANT_ABSTRACT_UPSERT_SQL = """
@@ -65,12 +64,12 @@ ABSTRACT_TEXT_FIELD_INDEX = next(index for index, field in enumerate(ABSTRACT_FI
 class GrantAbstractUploadTask(GrantPipelineBase):
     """Upsert downloaded NIH RePORTER abstract CSV rows into MySQL grant_abstract."""
 
-    def __init__(self, years: Sequence[int], abstracts_dir: os.PathLike = DEFAULT_ABSTRACTS_DIR):
+    def __init__(self, years: Sequence[int], abstracts_dir: Optional[os.PathLike] = None):
 
         super().__init__(init_mysql=True, init_memgraph=False)
 
         self.years = self._resolve_years(years, required=True)
-        self.abstracts_dir = Path(abstracts_dir).expanduser().resolve()
+        self.abstracts_dir = Path(abstracts_dir or self.DEFAULT_ABSTRACTS_DIR).expanduser().resolve()
         self.batch_size = 20
 
 

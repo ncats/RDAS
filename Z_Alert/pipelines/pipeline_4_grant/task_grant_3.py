@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from pipelines.pipeline_4_grant.grant_base import DEFAULT_BATCH_SIZE, DEFAULT_PROJECTS_DIR, GrantPipelineBase
+from pipelines.pipeline_4_grant.grant_base import GrantPipelineBase
 from utils.tools import _time_hms
 
 
@@ -107,12 +107,12 @@ POST_2005_PROJECT_FIELDS: Tuple[FieldConfig, ...] = (
 class GrantProjectUploadTask(GrantPipelineBase):
     """Upsert downloaded NIH RePORTER project CSV rows into MySQL grant_project."""
 
-    def __init__(self, years: Sequence[int], projects_dir: os.PathLike = DEFAULT_PROJECTS_DIR, batch_size: int = DEFAULT_BATCH_SIZE):
+    def __init__(self, years: Sequence[int], projects_dir: Optional[os.PathLike] = None, batch_size: Optional[int] = None):
         super().__init__(init_mysql=True, init_memgraph=False)
 
         self.years = self._resolve_years(years, required=True)
-        self.projects_dir = Path(projects_dir).expanduser().resolve()
-        self.batch_size = batch_size
+        self.projects_dir = Path(projects_dir or self.DEFAULT_PROJECTS_DIR).expanduser().resolve()
+        self.batch_size = batch_size if batch_size is not None else self.DEFAULT_BATCH_SIZE
 
 
     def find_new_data(self, gard_node) -> None:
