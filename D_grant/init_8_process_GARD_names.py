@@ -48,6 +48,33 @@ NLTK data note preserved from the original script:
         wget --no-check-certificate https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/english_wordnet.zip
 """
 
+'''
+These are derived search-term columns used for matching grant text against GARD disease names/synonyms.
+
+1. Synonyms_sw: normalized GARD name + synonyms.
+
+    lowercased
+    ASCII-normalized
+    duplicates removed
+    terms shorter than/equal to 4 chars removed, except sars
+
+2. Synonyms_sw_bow: same as Synonyms_sw, but with extra word-order variants for two-word terms.
+
+    Example: fanconi anemia also adds anemia fanconi
+    bow likely means “bag of words”
+
+3. Synonyms_sw_stem: stemmed versions of the normalized terms.
+
+    Uses _stem_text() from utils.tools
+    Example conceptually: diseases -> diseas
+
+4. Synonyms_sw_stem_bow: stemmed terms plus the two-word order variants.
+
+    It combines the stemmed form and the bag-of-words permutation behavior.
+
+Important note: even though the column name has sw, the script says it does not remove stop words. That name is historical/misleading.
+'''
+
 import os
 import sys
 from itertools import permutations
