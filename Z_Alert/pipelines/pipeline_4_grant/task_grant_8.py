@@ -17,11 +17,11 @@ patent export is not fiscal-year-specific, so this task intentionally does not
 accept a years argument. It processes the patent CSV files currently downloaded
 under the grant pipeline patents data directory.
 
-Each patent row is identified by `(PATENT_ID, PROJECT_ID)`. A patent can be
-linked to more than one NIH project, so PATENT_ID alone is not enough for
-idempotent alert-pipeline reloads. If the pair already exists, the task
-refreshes PATENT_TITLE/PATENT_ORG_NAME and sets `is_new = 1`. If the pair is
-missing, the task inserts a new row with `is_new = 1`.
+Each patent row is identified by the unique key `(PATENT_ID, PROJECT_ID)`. A
+patent can be linked to more than one NIH project, so PATENT_ID alone is not
+enough for idempotent alert-pipeline reloads. This task uses `INSERT IGNORE`:
+existing patent/project pairs are skipped without changing their current
+`is_new` value, and missing pairs are inserted with `is_new = 1`.
 
 Rows missing PATENT_ID or PROJECT_ID are skipped because they cannot be safely
 matched on a rerun.
@@ -29,20 +29,15 @@ matched on a rerun.
 
 # Reference: D_grant/init_7_upload_patents_to_mysql.py
 
+#
+# SELECT DISTINCT DATE(created) FROM rdas_db.grant_patent;
+#
+
 TABLE_NAME = "grant_patent"
 
 GRANT_PATENT_INSERT_SQL = """
-    INSERT INTO `grant_patent` (`PATENT_ID`, `PROJECT_ID`, `PATENT_TITLE`, `PATENT_ORG_NAME`, `is_new`)
+    INSERT IGNORE INTO `grant_patent` (`PATENT_ID`, `PROJECT_ID`, `PATENT_TITLE`, `PATENT_ORG_NAME`, `is_new`)
     VALUES (%s, %s, %s, %s, %s)
-"""
-
-GRANT_PATENT_UPDATE_SQL = """
-    UPDATE `grant_patent`
-    SET `PATENT_TITLE` = %s,
-        `PATENT_ORG_NAME` = %s,
-        `is_new` = 1
-    WHERE `PATENT_ID` = %s
-      AND `PROJECT_ID` = %s
 """
 
 
@@ -82,7 +77,7 @@ class GrantPatentUploadTask(GrantPipelineBase):
 
 
     def process_new_data(self) -> None:
-        """Read patent CSV files and insert/update rows."""
+        """Read patent CSV files and insert only new patent/project rows."""
 
         from utils.tools import detect_file_encoding
 
@@ -91,7 +86,7 @@ class GrantPatentUploadTask(GrantPipelineBase):
             "files_processed": 0,
             "rows_seen": 0,
             "rows_inserted": 0,
-            "rows_updated": 0,
+            "rows_skipped_existing": 0,
             "rows_skipped_missing_key": 0,
             "failed_files": 0,
         }
@@ -122,7 +117,7 @@ class GrantPatentUploadTask(GrantPipelineBase):
                     file_summary = {
                         "rows_seen": 0,
                         "rows_inserted": 0,
-                        "rows_updated": 0,
+                        "rows_skipped_existing": 0,
                         "rows_skipped_missing_key": 0,
                     }
                     row_batch: List[Tuple[Any, ...]] = []
@@ -157,7 +152,7 @@ class GrantPatentUploadTask(GrantPipelineBase):
 
                     summary["files_processed"] += 1
 
-                    for key in ("rows_seen", "rows_inserted", "rows_updated", "rows_skipped_missing_key"):
+                    for key in ("rows_seen", "rows_inserted", "rows_skipped_existing", "rows_skipped_missing_key"):
                         summary[key] += file_summary[key]
 
                     self.logger.info(f"Finished {csv_file.name}: {file_summary}")
@@ -186,35 +181,27 @@ class GrantPatentUploadTask(GrantPipelineBase):
 
 
     def _flush_row_batch(self, cursor: Any, row_batch: List[Tuple[Any, ...]], summary: Dict[str, int]) -> None:
-        """Insert missing patent rows and refresh existing rows."""
+        """Insert new patent rows and leave existing rows unchanged."""
 
-        # grant_patent has no unique key for `(PATENT_ID, PROJECT_ID)`.
-        # Deduping and checking existing keys prevents duplicate rows when this
-        # annual alert task is rerun against the same Patents.csv export.
+        # The unique key on `(PATENT_ID, PROJECT_ID)` lets MySQL handle
+        # duplicate detection cheaply. `INSERT IGNORE` keeps this task
+        # insert-only: existing historical patents are skipped without changing
+        # `is_new`, while genuinely new patent/project pairs get `is_new = 1`.
         deduped_rows = self._dedupe_rows_by_patent_key(row_batch)
-        existing_keys = self._get_existing_patent_keys(cursor, deduped_rows)
         insert_values = []
-        update_values = []
 
         for row_values in deduped_rows:
             patent_id = row_values[PATENT_ID_FIELD_INDEX]
             project_id = row_values[PROJECT_ID_FIELD_INDEX]
             patent_title = row_values[PATENT_TITLE_FIELD_INDEX]
             patent_org_name = row_values[PATENT_ORG_NAME_FIELD_INDEX]
-            key = (patent_id, project_id)
-
-            if key in existing_keys:
-                update_values.append((patent_title, patent_org_name, patent_id, project_id))
-            else:
-                insert_values.append((patent_id, project_id, patent_title, patent_org_name, 1))
-
-        if update_values:
-            cursor.executemany(GRANT_PATENT_UPDATE_SQL, update_values)
-            summary["rows_updated"] += len(update_values)
+            insert_values.append((patent_id, project_id, patent_title, patent_org_name, 1))
 
         if insert_values:
             cursor.executemany(GRANT_PATENT_INSERT_SQL, insert_values)
-            summary["rows_inserted"] += len(insert_values)
+            inserted_count = cursor.rowcount
+            summary["rows_inserted"] += inserted_count
+            summary["rows_skipped_existing"] += len(insert_values) - inserted_count
 
 
     def _dedupe_rows_by_patent_key(self, row_batch: List[Tuple[Any, ...]]) -> List[Tuple[Any, ...]]:
@@ -227,32 +214,6 @@ class GrantPatentUploadTask(GrantPipelineBase):
             rows_by_patent_key[key] = row_values
 
         return list(rows_by_patent_key.values())
-
-
-    def _get_existing_patent_keys(self, cursor: Any, rows: Sequence[Tuple[Any, ...]]) -> set:
-        """Return existing `(PATENT_ID, PROJECT_ID)` keys for one batch."""
-
-        if not rows:
-            return set()
-
-        project_ids = sorted({row[PROJECT_ID_FIELD_INDEX] for row in rows if row[PROJECT_ID_FIELD_INDEX] is not None})
-
-        if not project_ids:
-            return set()
-
-        # grant_patent has an index on PROJECT_ID. Fetch by the batched project
-        # values, then use the returned PATENT_ID values for exact idempotent
-        # insert/update decisions.
-        placeholders = ", ".join(["%s"] * len(project_ids))
-        query = f"""
-            SELECT DISTINCT `PATENT_ID`, `PROJECT_ID`
-            FROM `{TABLE_NAME}`
-            WHERE `PROJECT_ID` IN ({placeholders})
-        """
-
-        cursor.execute(query, tuple(project_ids))
-
-        return {(row[0], row[1]) for row in cursor.fetchall()}
 
 
     def _build_row_values(self, filename: str, row_number: int, row: Dict[str, Any], fields: Sequence[PatentField]) -> Tuple[Any, ...]:
