@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from pipelines.pipeline_4_grant.grant_base import BASE_DIR, DEFAULT_BATCH_SIZE, GrantPipelineBase
+from pipelines.pipeline_4_grant.grant_base import BASE_DIR, GrantPipelineBase
 from utils.tools import _time_hms
 
 
@@ -170,16 +170,16 @@ class GrantAbstractUploadTask(GrantPipelineBase):
 
                     self.logger.info(f"Finished {csv_file.name}: {file_summary}")
 
-                except Exception as e:
+                except Exception:
                     summary["failed_files"] += 1
                     self.mysql.rollback()
-                    self.logger.error(f"Failed to upload {csv_file.name}: {e}")
+                    self.logger.exception(f"Failed to upload grant abstract file={csv_file.name}, year={year}, file_summary={file_summary}. Rolled back this file and continuing.")
                     continue
 
             self.logger.info(f"Completed grant abstract upload. Summary={summary}")
 
-        except Exception as e:
-            self.logger.error(f"GrantAbstractUploadTask failed: {e}")
+        except Exception:
+            self.logger.exception(f"GrantAbstractUploadTask failed. years={self.years}, abstracts_dir={self.abstracts_dir}, summary={summary}")
             raise
 
         finally:

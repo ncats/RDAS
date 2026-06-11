@@ -209,16 +209,16 @@ class GrantProjectUploadTask(GrantPipelineBase):
 
                     self.logger.info(f"Finished {csv_file.name}: {file_summary}")
 
-                except Exception as e:
+                except Exception:
                     summary["failed_files"] += 1
                     self.mysql.rollback()
-                    self.logger.error(f"Failed to upload {csv_file.name}: {e}")
+                    self.logger.exception(f"Failed to upload grant project file={csv_file.name}, year={year}, file_summary={file_summary}. Rolled back this file.")
                     raise
 
             self.logger.info(f"Completed grant project upload. Summary={summary}")
 
-        except Exception as e:
-            self.logger.error(f"GrantProjectUploadTask failed: {e}")
+        except Exception:
+            self.logger.exception(f"GrantProjectUploadTask failed. years={self.years}, projects_dir={self.projects_dir}, summary={summary}")
             raise
 
         finally:

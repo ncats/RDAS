@@ -1,10 +1,12 @@
 import csv
+import logging
 import os
 import re
 import shutil
 import sys
 import zipfile
 from datetime import date
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
@@ -34,10 +36,48 @@ BASE_URL = "https://reporter.nih.gov/exporter"
 DEFAULT_EXPORTER_CATEGORIES = ("projects", "abstracts", "publications", "linktables")
 DEFAULT_CHUNK_SIZE = 1024 * 1024
 DEFAULT_REQUEST_TIMEOUT = (10, 120)
+GRANT_ERROR_LOG_FILE = "alert-grant-errors.log"
+GRANT_ERROR_LOG_MAX_BYTES = 1024 * 1024 * 10
+GRANT_ERROR_LOG_BACKUP_COUNT = 10
+
+
+def attach_grant_error_file_handler(logger, log_dir: os.PathLike) -> None:
+    """Attach a shared grant ERROR-only rotating file handler to a logger."""
+
+    if logger is None:
+        return
+
+    error_log_path = Path(log_dir) / GRANT_ERROR_LOG_FILE
+    resolved_error_log_path = str(error_log_path.resolve())
+
+    for handler in logger.handlers:
+        if getattr(handler, "_grant_error_log_path", None) == resolved_error_log_path:
+            return
+
+    error_handler = RotatingFileHandler(
+        resolved_error_log_path,
+        maxBytes=GRANT_ERROR_LOG_MAX_BYTES,
+        backupCount=GRANT_ERROR_LOG_BACKUP_COUNT,
+    )
+    error_handler.setLevel(logging.ERROR)
+    error_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s [%(name)s:%(filename)s:%(lineno)d]: %(message)s"))
+    error_handler._grant_error_log_path = resolved_error_log_path
+    logger.addHandler(error_handler)
 
 
 class GrantPipelineBase(PipelineBase):
     """Shared helpers for grant alert pipeline tasks."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._attach_grant_error_file_handler()
+
+
+    def _attach_grant_error_file_handler(self) -> None:
+        """Write every grant task ERROR log to a shared grant error log file."""
+
+        attach_grant_error_file_handler(getattr(self, "logger", None), self.log_dir)
+
 
     def _stream_download(self, url: str, output_path: Path, session: Optional[Session] = None, timeout: Tuple[int, int] = DEFAULT_REQUEST_TIMEOUT) -> None:
         """Stream one URL to disk."""
@@ -83,7 +123,7 @@ class GrantPipelineBase(PipelineBase):
             return True
 
         except (OSError, requests.RequestException) as e:
-            self.logger.error(f"Failed to download {url}: {e}")
+            self.logger.exception(f"Failed to download {url} to {output_path}")
 
             if temp_path.exists():
                 temp_path.unlink()

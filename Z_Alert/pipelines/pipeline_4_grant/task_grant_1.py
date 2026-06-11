@@ -80,8 +80,8 @@ class GrantExporterDownloadTask(GrantPipelineBase):
 
             self.logger.info(f"Completed NIH RePORTER grant download task. Summary={summary}")
 
-        except Exception as e:
-            self.logger.error(f"GrantExporterDownloadTask failed: {e}")
+        except Exception:
+            self.logger.exception(f"GrantExporterDownloadTask failed. categories={self.categories}, years={self.years}, summary={summary}")
             raise
 
         finally:
@@ -102,9 +102,9 @@ class GrantExporterDownloadTask(GrantPipelineBase):
             summary["extracted_files"] += extracted_count
             self.logger.info(f"Extracted {zip_path.name}: {extracted_count} file(s)")
 
-        except Exception as e:
+        except Exception:
             summary["unzip_failed"] += 1
-            self.logger.error(f"Failed to unzip {zip_path}: {e}")
+            self.logger.exception(f"Failed to unzip {zip_path} into {output_dir}")
 
 
     def _resolve_categories(self, categories: Optional[Sequence[str]]) -> List[str]:

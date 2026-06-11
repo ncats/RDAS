@@ -79,8 +79,8 @@ class GrantPatentClinicalStudyDownloadTask(GrantPipelineBase):
 
             self.logger.info(f"Completed NIH RePORTER patent/clinical-study download task. Summary={summary}")
 
-        except Exception as e:
-            self.logger.error(f"GrantPatentClinicalStudyDownloadTask failed: {e}")
+        except Exception:
+            self.logger.exception(f"GrantPatentClinicalStudyDownloadTask failed. summary={summary}")
             raise
 
         finally:
@@ -124,8 +124,8 @@ class GrantPatentClinicalStudyDownloadTask(GrantPipelineBase):
 
             return True
 
-        except Exception as e:
-            self.logger.error(f"Failed to download NIH {source['name']} file from {source['url']}: {e}")
+        except Exception:
+            self.logger.exception(f"Failed to download NIH {source['name']} file from {source['url']} to {output_dir}")
 
             if temp_path.exists():
                 temp_path.unlink()

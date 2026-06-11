@@ -14,6 +14,7 @@ sys.path.extend([
 load_dotenv(os.path.abspath(os.path.join(_dir, "..", ".env")))
 
 from pipeline_runner_base import PipelineRunnerBase
+from pipelines.pipeline_4_grant.grant_base import attach_grant_error_file_handler
 from utils.tools import _time_hms
 
 
@@ -26,6 +27,7 @@ class GrantPipelineRunner(PipelineRunnerBase):
 
     def __init__(self):
         super().__init__()
+        attach_grant_error_file_handler(self.logger, self.log_dir)
 
     """ Step 1 """
     def download_reporters_data(self) -> None:
