@@ -31,6 +31,7 @@ class GrantPipelineBase(PipelineBase):
     DEFAULT_PUBLICATIONS_DIR = BASE_DIR / "publications"
     DEFAULT_ABSTRACTS_DIR = BASE_DIR / "abstracts"
     DEFAULT_LINKTABLES_DIR = BASE_DIR / "linktables"
+    DEFAULT_CLINICAL_STUDIES_DIR = BASE_DIR / "clinical_studies"
     DEFAULT_BATCH_SIZE = 1000
     MIN_REPORTER_PROJECT_YEAR = 2000
     MAX_REPORTER_PROJECT_YEAR = date.today().year

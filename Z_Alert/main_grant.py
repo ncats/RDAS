@@ -50,7 +50,12 @@ class GrantPipelineRunner(PipelineRunnerBase):
         #self._run_pipeline_task(GrantAbstractUploadTask, years=[LAST_YEAR])
 
         from pipelines.pipeline_4_grant.task_grant_6 import GrantLinktableUploadTask
-        self._run_pipeline_task(GrantLinktableUploadTask, years=[LAST_YEAR])
+        #self._run_pipeline_task(GrantLinktableUploadTask, years=[LAST_YEAR])
+
+        from pipelines.pipeline_4_grant.task_grant_7 import GrantClinicalStudyUploadTask
+        self._run_pipeline_task(GrantClinicalStudyUploadTask, years=[LAST_YEAR])
+
+        
 
 
 
