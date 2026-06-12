@@ -49,7 +49,9 @@ class PipelineRunnerBase:
 
         except Exception:
             self.logger.exception(f"Task failed: {name}.")
-            raise
+            hours, minutes, seconds = _time_hms(time.time() - start_time)
+            self.logger.error(f"\n*** Continuing after failed task: {name} in {hours} hours, {minutes} minutes, {seconds} seconds ***\n")
+            return
 
         finally:
             self._close_task_if_needed(task)
