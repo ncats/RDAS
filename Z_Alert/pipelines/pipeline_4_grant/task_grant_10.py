@@ -2,10 +2,19 @@
 Find relationships between GARD diseases and NIH grant projects.
 
 This alert-pipeline task is based on
-`D_grant/init_9_GARD_and_Project_relationship.multi.py`. It reads pending new
-`grant_project` rows that have matching `grant_abstract` text and no existing
-`grant_gard_project_relation` rows, searches title/PHR/abstract text for
-processed GARD disease terms, scores matches, and inserts relationship rows.
+`D_grant/init_9_GARD_and_Project_relationship.multi.py`.
+
+It processes only new grant projects (`grant_project.is_new = 1`). A project is
+eligible when it has a matching abstract row and does not already have rows in
+`grant_gard_project_relation`.
+For each eligible project, the task searches the project title, PHR,
+and abstract for processed GARD disease terms, scores any matches,
+and inserts the resulting GARD-project relationship rows.
+
+To speed up processing, the task splits eligible `grant_project.id` ranges
+across multiple worker processes. Each worker opens its own MySQL connection,
+loads the processed GARD disease terms once, scans its assigned projects, and
+writes relationship rows in batches.
 
 Required inputs:
     `grant_project`
@@ -38,6 +47,8 @@ NLTK data note preserved from the initializer:
         wget --no-check-certificate https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/stopwords.zip
         wget --no-check-certificate https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/english_wordnet.zip
 """
+
+# Reference: D_grant/init_9_GARD_and_Project_relationship.multi.py
 
 import math
 import os
