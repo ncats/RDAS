@@ -37,6 +37,9 @@ download/extraction.
 
 # Reference: https://github.com/ncats/RDAS/blob/f7369b363ba2a4a1714b98e1303add9bc6732d91/D_grant/init_1_download_and_unzip_grant_files.py
 
+"""
+This task downloads: Patents, Clinical Studies
+"""
 
 class GrantPatentClinicalStudyDownloadTask(GrantPipelineBase):
     """Download, extract if needed, and UTF-8 normalize patent and clinical-study CSV files."""
@@ -65,6 +68,7 @@ class GrantPatentClinicalStudyDownloadTask(GrantPipelineBase):
 
         try:
             with requests.Session() as session:
+
                 for source in DOWNLOAD_SOURCES:
                     if self._download_source(source, session, summary):
                         summary["downloaded"] += 1
@@ -73,7 +77,7 @@ class GrantPatentClinicalStudyDownloadTask(GrantPipelineBase):
 
             if summary["download_failed"]:
                 self.logger.error(f"NIH RePORTER patent/clinical-study download incomplete. Summary={summary}")
-                raise RuntimeError("NIH RePORTER patent/clinical-study download failed; skipping UTF-8 conversion.")
+                return
 
             summary["utf8_converted_directories"] = self._convert_directories_to_utf8([self.BASE_DIR / source["directory"] for source in DOWNLOAD_SOURCES])
 
@@ -81,7 +85,7 @@ class GrantPatentClinicalStudyDownloadTask(GrantPipelineBase):
 
         except Exception:
             self.logger.exception(f"GrantPatentClinicalStudyDownloadTask failed. summary={summary}")
-            raise
+            return
 
         finally:
             hours, minutes, seconds = _time_hms(time.time() - start_time)
