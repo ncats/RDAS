@@ -582,9 +582,8 @@ def flush_relationships(mysql, insert_cursor, insert_values: List[Tuple[Any, ...
     """
 
     try:
-        #insert_cursor.executemany(RELATION_INSERT_SQL, insert_values)
-        print(insert_values)
-        #mysql.commit()
+        insert_cursor.executemany(RELATION_INSERT_SQL, insert_values) 
+        mysql.commit()
         inserted_count = len(insert_values)
         insert_values.clear()
         return inserted_count, 0
