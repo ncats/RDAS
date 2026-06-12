@@ -22,6 +22,9 @@ are always unzipped, then the selected category folders are converted to UTF-8.
 # Reference: D_grant/init_1_download_and_unzip_grant_files.py
 
 
+"""
+This task downloads: Projects, Abstracts, Publications, Linktables
+"""
 class GrantExporterDownloadTask(GrantPipelineBase):
     """Download, unzip, and UTF-8 normalize NIH RePORTER grant export files by year."""
 
