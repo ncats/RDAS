@@ -62,10 +62,16 @@ class GrantPipelineRunner(PipelineRunnerBase):
     """ Step 3 """
     def build_relationship(self) -> None:
 
-        # If `rdas_db.gard` table changes, rebuild or refresh `grant_gard_processed_names`
+        # Only if `rdas_db.gard` table changes, REBUILD or REFRESH `grant_gard_processed_names`
         # so the processed search terms stay aligned with the source GARD labels.
         from pipelines.pipeline_4_grant.task_grant_9 import GrantGardNameProcessingTask
-        self._run_pipeline_task(GrantGardNameProcessingTask)
+        #self._run_pipeline_task(GrantGardNameProcessingTask)
+
+        from pipelines.pipeline_4_grant.task_grant_10 import GrantGardProjectRelationshipTask
+        self._run_pipeline_task(GrantGardProjectRelationshipTask)
+
+        from pipelines.pipeline_4_grant.task_grant_11 import GrantProjectAnnotationTask
+        self._run_pipeline_task(GrantProjectAnnotationTask)
 
 
 if __name__ == "__main__":
