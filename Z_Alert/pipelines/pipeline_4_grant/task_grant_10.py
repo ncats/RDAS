@@ -9,7 +9,7 @@ eligible when it has a matching abstract row and does not already have rows in
 `grant_gard_project_relation`.
 For each eligible project, the task searches the project title, PHR,
 and abstract for processed GARD disease terms, scores any matches,
-and inserts the resulting GARD-project relationship rows.
+and inserts the resulting GARD-project relationship rows with `is_new = 1`.
 
 To speed up processing, the task splits eligible `grant_project.id` ranges
 across multiple worker processes. Each worker opens its own MySQL connection,
@@ -109,6 +109,15 @@ PROJECT_SELECT_SQL = """
         p.id BETWEEN %s AND %s
         AND p.is_new = 1
         AND gpr.application_id IS NULL
+"""
+
+MARK_CURRENT_RELATIONSHIPS_NEW_SQL = """
+    UPDATE grant_gard_project_relation AS gpr
+    INNER JOIN grant_project AS p
+        ON p.APPLICATION_ID = gpr.application_id
+        AND p.is_new = 1
+    SET gpr.is_new = 1
+    WHERE COALESCE(gpr.is_new, 0) <> 1
 """
 
 
@@ -576,9 +585,10 @@ def flush_relationships(mysql, insert_cursor, insert_values: List[Tuple[Any, ...
             confidence_score,
             semantic_similarity,
             core_project_num,
-            raw_result
+            raw_result,
+            is_new
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1)
     """
 
     try:
@@ -757,12 +767,20 @@ class GrantGardProjectRelationshipTask(GrantPipelineBase):
             "projects_with_results": 0,
             "projects_failed": 0,
             "relationships_inserted": 0,
+            "relationships_marked_new": 0,
             "relationship_insert_failed_batches": 0,
             "failed_ranges": 0,
         }
 
         try: 
             LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+            if self.mysql is None:
+                self.logger.error("Unable to create MySQL connection.")
+                return
+
+            total_summary["relationships_marked_new"] = self._mark_current_relationships_new()
+            self.mysql.commit()
 
             min_id, max_id = self._get_pending_project_id_bounds()
 
@@ -810,6 +828,25 @@ class GrantGardProjectRelationshipTask(GrantPipelineBase):
             hours, minutes, seconds = _time_hms(time.time() - start_time)
             self.logger.info(f"Total time elapsed: {hours} hours, {minutes} minutes, {seconds} seconds")
             self.close()
+
+
+    def _mark_current_relationships_new(self) -> int:
+        """Mark existing GARD-project relationships for current new projects."""
+
+        cursor = None
+
+        try:
+            cursor = self.mysql.cursor()
+            cursor.execute(MARK_CURRENT_RELATIONSHIPS_NEW_SQL)
+
+            if cursor.rowcount and cursor.rowcount > 0:
+                return cursor.rowcount
+
+            return 0
+
+        finally:
+            if cursor is not None:
+                cursor.close()
 
 
     

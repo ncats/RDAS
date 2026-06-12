@@ -13,7 +13,8 @@ abstracts.
 Processing flow:
     1. Add any missing new-project application IDs from
        `grant_gard_project_relation` into the work table
-       `grant_gard_project_relation_unique_application_id`.
+       `grant_gard_project_relation_unique_application_id`, and mark the
+       current new-project work rows with `is_new = 1`.
     2. Select pending work-table rows where `project_annotation_processed` is
        NULL and the matching `grant_project` row has `is_new = 1`.
     3. Fetch the matching `grant_abstract` text using `APPLICATION_ID` plus
@@ -23,7 +24,8 @@ Processing flow:
     5. De-duplicate annotations by `(application_id, concept_id)`, keeping the
        highest model score when both models produce the same concept.
     6. Insert only annotation rows that do not already exist in
-       `grant_project_annotation`.
+       `grant_project_annotation`, marking inserted/current rows with
+       `is_new = 1`.
     7. Mark the processed work-table ID range only after annotation generation
        and insertion finish successfully.
 
@@ -93,9 +95,21 @@ PENDING_NEW_APPLICATION_IDS_SQL = """
 
 WORK_TABLE_INSERT_SQL = """
     INSERT INTO grant_gard_project_relation_unique_application_id (
-        application_id
+        application_id,
+        is_new
     )
-    VALUES (%s)
+    VALUES (%s, 1)
+"""
+
+MARK_CURRENT_WORK_ROWS_NEW_SQL = """
+    UPDATE grant_gard_project_relation_unique_application_id AS gpru
+    INNER JOIN grant_project AS p
+        ON p.APPLICATION_ID = gpru.application_id
+        AND p.is_new = 1
+    INNER JOIN grant_gard_project_relation AS gpr
+        ON gpr.application_id = gpru.application_id
+    SET gpru.is_new = 1
+    WHERE COALESCE(gpru.is_new, 0) <> 1
 """
 
 PENDING_BOUNDS_SQL = """
@@ -137,9 +151,10 @@ ANNOTATION_INSERT_IF_MISSING_SQL = """
         semantic_types,
         semantic_type_names,
         aliases,
-        definition
+        definition,
+        is_new
     )
-    SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s
+    SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, 1
     WHERE NOT EXISTS (
         SELECT 1
         FROM grant_project_annotation AS existing
@@ -148,6 +163,19 @@ ANNOTATION_INSERT_IF_MISSING_SQL = """
             AND existing.concept_id <=> %s
         LIMIT 1
     )
+"""
+
+MARK_RANGE_ANNOTATIONS_NEW_SQL = """
+    UPDATE grant_project_annotation AS pa
+    INNER JOIN grant_gard_project_relation_unique_application_id AS gpru
+        ON gpru.application_id = pa.application_id
+    INNER JOIN grant_project AS p
+        ON p.APPLICATION_ID = gpru.application_id
+        AND p.is_new = 1
+    SET pa.is_new = 1
+    WHERE
+        gpru.id BETWEEN %s AND %s
+        AND COALESCE(pa.is_new, 0) <> 1
 """
 
 MARK_RANGE_PROCESSED_SQL = """
@@ -201,7 +229,9 @@ class GrantProjectAnnotationTask(GrantPipelineBase):
             "annotations_generated": 0,
             "annotations_deduplicated": 0,
             "annotations_inserted": 0,
+            "annotations_marked_new": 0,
             "work_rows_marked_processed": 0,
+            "work_rows_marked_new": 0,
         }
 
         try:
@@ -216,6 +246,7 @@ class GrantProjectAnnotationTask(GrantPipelineBase):
             # In the alert pipeline, task_grant_10 may have just inserted new
             # relationship rows, so sync missing new application IDs here.
             summary["work_rows_inserted"] = self._sync_new_work_table_rows()
+            summary["work_rows_marked_new"] = self._mark_current_work_rows_new()
             self.mysql.commit()
 
             models = self._load_models()
@@ -246,6 +277,7 @@ class GrantProjectAnnotationTask(GrantPipelineBase):
                         self.mysql.rollback()
                         continue
 
+                    marked_new_count = self._mark_range_annotations_new(start_id, end_id)
                     marked_count = self._mark_id_range_processed(start_id, end_id)
                     self.mysql.commit()
 
@@ -253,6 +285,7 @@ class GrantProjectAnnotationTask(GrantPipelineBase):
                     summary["annotations_generated"] += range_summary["generated_count"]
                     summary["annotations_deduplicated"] += range_summary["deduplicated_count"]
                     summary["annotations_inserted"] += range_summary["inserted_count"]
+                    summary["annotations_marked_new"] += marked_new_count
                     summary["work_rows_marked_processed"] += marked_count
 
                     self.logger.info(
@@ -261,6 +294,7 @@ class GrantProjectAnnotationTask(GrantPipelineBase):
                         f"generated={range_summary['generated_count']}, "
                         f"deduplicated={range_summary['deduplicated_count']}, "
                         f"inserted={range_summary['inserted_count']}, "
+                        f"marked_new={marked_new_count}, "
                         f"marked_processed={marked_count}"
                     )
 
@@ -358,6 +392,25 @@ class GrantProjectAnnotationTask(GrantPipelineBase):
 
             if read_cursor is not None:
                 read_cursor.close()
+
+
+    def _mark_current_work_rows_new(self) -> int:
+        """Mark work-table rows linked to current new projects as `is_new = 1`."""
+
+        cursor = None
+
+        try:
+            cursor = self.mysql.cursor()
+            cursor.execute(MARK_CURRENT_WORK_ROWS_NEW_SQL)
+
+            if cursor.rowcount and cursor.rowcount > 0:
+                return cursor.rowcount
+
+            return 0
+
+        finally:
+            if cursor is not None:
+                cursor.close()
 
 
     def _load_models(self) -> Tuple[ModelResource, ...]:
@@ -632,6 +685,25 @@ class GrantProjectAnnotationTask(GrantPipelineBase):
         try:
             cursor = self.mysql.cursor()
             cursor.execute(MARK_RANGE_PROCESSED_SQL, (PROCESSED_FLAG, start_id, end_id))
+
+            if cursor.rowcount and cursor.rowcount > 0:
+                return cursor.rowcount
+
+            return 0
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+
+    def _mark_range_annotations_new(self, start_id: int, end_id: int) -> int:
+        """Mark existing annotation rows in a completed new-project range as new."""
+
+        cursor = None
+
+        try:
+            cursor = self.mysql.cursor()
+            cursor.execute(MARK_RANGE_ANNOTATIONS_NEW_SQL, (start_id, end_id))
 
             if cursor.rowcount and cursor.rowcount > 0:
                 return cursor.rowcount
