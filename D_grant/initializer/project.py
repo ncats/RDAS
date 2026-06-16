@@ -6,7 +6,7 @@ import time
 from baseclass.init_base import InitBase
 from utils.minmaxid import MinMaxIdLoader
 from utils.file_appender import FileAppender
-from utils.tools import _id_range_generator, _format_dollars, _curr_timestamp, _time_hms, _date_string, _set_value_for_none
+from utils.tools import _id_range_generator, _curr_timestamp, _time_hms, _date_string, _set_value_for_none, _to_number_or_blank
 
 
 # 1. Initialize the Grant Project nodes
@@ -53,7 +53,9 @@ class ProjectInitializer(InitBase):
                     gpru.id, 
 
                     p.application_id, p.application_type, p.project_title, p.project_terms,
-                    p.ACTIVITY, p.FY, p.PHR, p.TOTAL_COST, p.SUPPORT_YEAR,
+                    p.ACTIVITY, p.FY, p.PHR, p.SUPPORT_YEAR,
+                    p.TOTAL_COST AS total_cost_1,
+                    p.DIRECT_COST_AMT + p.INDIRECT_COST_AMT AS total_cost_2,
                     p.FOA_NUMBER, p.FULL_PROJECT_NUM, p.CORE_PROJECT_NUM, p.CFDA_CODE, p.SERIAL_NUMBER,
                     p.STUDY_SECTION, p.STUDY_SECTION_NAME, p.FUNDING_MECHANISM,
 
@@ -80,7 +82,13 @@ class ProjectInitializer(InitBase):
                 total += 1
                 row = _set_value_for_none(row)
 
-                total_cost = row['TOTAL_COST']
+                # Prefer the calculated direct + indirect amount. If either side
+                # is missing and MySQL returns NULL for the sum, fall back to the
+                # exported TOTAL_COST value.
+                total_cost = row['total_cost_2']
+
+                if total_cost is None:
+                    total_cost = row['total_cost_1']
                 
                 batch_chunks.append({
                     "applicationId": row['application_id'], #convert to string
@@ -101,7 +109,7 @@ class ProjectInitializer(InitBase):
                     "supportYear": row['SUPPORT_YEAR'],
                     "terms": row['project_terms'],
                     "title": row['project_title'],
-                    "totalCost": _format_dollars(total_cost) if total_cost not in (None, '') and int(total_cost) > 0  else ''
+                    "totalCost": _to_number_or_blank(total_cost)
                 })
 
             
@@ -141,9 +149,3 @@ class ProjectInitializer(InitBase):
         self.appender.close()
 
 
-       
-
-
-
-
-            

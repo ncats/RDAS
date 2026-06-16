@@ -1,12 +1,11 @@
 import os
 import sys
-from decimal import Decimal, InvalidOperation
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
    
 from baseclass.init_base import InitBase
 from utils.minmaxid import MinMaxIdLoader
 from utils.file_appender import FileAppender
-from utils.tools import _id_range_generator, _val, _curr_timestamp, _date_string, _set_value_for_none
+from utils.tools import _id_range_generator, _val, _curr_timestamp, _date_string, _set_value_for_none, _to_number_or_blank
 
 # 1. Create CoreProject nodes
 class CoreProjectInitializer(InitBase):
@@ -102,7 +101,7 @@ class CoreProjectInitializer(InitBase):
                 chunks.append({
                     "applicationId":  row['application_id'],                   
                     "coreProjectNumber":  core_project_num,
-                    "totalCost": self._to_number_or_blank(total_cost)
+                    "totalCost": _to_number_or_blank(total_cost)
                 })
               
             self.memgraph.execute(batch_create, {"chunks": chunks})   
@@ -115,39 +114,3 @@ class CoreProjectInitializer(InitBase):
 
         self.appender.log_stdout(f'\n\n{_curr_timestamp()} {"="*50} Done Total = {total} {"="*50}\n\n')
         self.appender.close()
-
-
-    def _to_number_or_blank(self, value):
-        """
-        Convert the selected MySQL total cost to a Python number.
-        If MySQL has no cost value, keep CoreProject.totalCost as an empty string.
-        """
-
-        if value is None:
-            return ''
-
-        if isinstance(value, str) and value.strip() == '':
-            return ''
-
-        if isinstance(value, int) and not isinstance(value, bool):
-            return value
-
-        if isinstance(value, float):
-            return int(value) if value.is_integer() else value
-
-        if isinstance(value, Decimal):
-            return int(value) if value == value.to_integral_value() else float(value)
-
-        try:
-            number = Decimal(str(value).strip().replace(',', ''))
-        except (InvalidOperation, ValueError):
-            return ''
-
-        return int(number) if number == number.to_integral_value() else float(number)
-        
-
-
-            
-
-
-            
