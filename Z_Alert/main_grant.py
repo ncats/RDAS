@@ -73,6 +73,24 @@ class GrantPipelineRunner(PipelineRunnerBase):
         from pipelines.pipeline_4_grant.task_grant_11 import GrantProjectAnnotationTask
         self._run_pipeline_task(GrantProjectAnnotationTask)
 
+        
+    """ Step 4 """
+    def followup_updates(self) -> None:
+
+        from pipelines.pipeline_4_grant.task_grant_12 import GrantPublicationArticleImportTask
+        #self._run_pipeline_task(GrantPublicationArticleImportTask)
+
+        from pipelines.pipeline_3_publication.task_publication_2 import PublicationEpiNhsClassificationTask
+        self._run_pipeline_task(PublicationEpiNhsClassificationTask)
+
+
+
+    """ Step 5 """
+    def run_pipeline_wrapup(self) -> None:
+        print('\n\n*** Skip Step 5 - run_pipeline_wrapup() ***\n\n')
+        pass
+
+
 
 if __name__ == "__main__":
     
@@ -100,10 +118,23 @@ if __name__ == "__main__":
         # Step 3
         runner._run_step_with_timing(
             "Step 3: build_relationship()",
-            #lambda: runner.logger.info("\n\n*** Skip Step 3 ***\n\n"),
-            lambda: runner.build_relationship(),
+            lambda: runner.logger.info("\n\n*** Skip Step 3 ***\n\n"),
+            #lambda: runner.build_relationship(),
         )
 
+
+        # Step 4
+        runner._run_step_with_timing(
+            "Step 4: followup_updates()",
+            #lambda: runner.logger.info("\n\n*** Skip Step 4 ***\n\n"),
+            lambda: runner.followup_updates(),
+        )
+
+        # Step 5
+        runner._run_step_with_timing(
+            "Step 5: run_pipeline_wrapup()",
+            runner.run_pipeline_wrapup,
+        )
 
 
     finally:
