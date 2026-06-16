@@ -201,6 +201,38 @@ def convert_to_int(value: Any, allow_decimal: bool = False) -> Optional[int]:
         raise ValueError(f"expected an integer value, got {value!r}") from exc
 
 
+def _to_number_or_blank(value: Any) -> Any:
+    """
+    Convert a cost-like database value to a Python number.
+
+    Grant graph initializers use this for Memgraph numeric properties. Missing,
+    blank, or unparseable values become an empty string so legacy graph behavior
+    for unknown costs stays unchanged.
+    """
+
+    if value is None:
+        return ''
+
+    if isinstance(value, str) and value.strip() == '':
+        return ''
+
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else value
+
+    if isinstance(value, Decimal):
+        return int(value) if value == value.to_integral_value() else float(value)
+
+    try:
+        number = Decimal(str(value).strip().replace(',', ''))
+    except (InvalidOperation, ValueError):
+        return ''
+
+    return int(number) if number == number.to_integral_value() else float(number)
+
+
 # -----------------------------------------------------------------------------
 # Encoding / File Conversion
 # -----------------------------------------------------------------------------
