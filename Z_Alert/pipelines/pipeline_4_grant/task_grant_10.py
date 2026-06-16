@@ -742,7 +742,7 @@ def merge_summary(total_summary: Dict[str, int], range_summary: Dict[str, int]) 
 class GrantGardProjectRelationshipTask(GrantPipelineBase):
     """Find and insert GARD disease relationships for pending grant projects."""
 
-    def __init__(self, id_step: int = DEFAULT_ID_STEP, range_batch_size: int = DEFAULT_RANGE_BATCH_SIZE, fetch_size: int = DEFAULT_FETCH_SIZE, insert_batch_size: int = DEFAULT_INSERT_BATCH_SIZE, num_processes: int = DEFAULT_NUM_PROCESSES):
+    def __init__(self, id_step: int = DEFAULT_ID_STEP, range_batch_size: int = DEFAULT_RANGE_BATCH_SIZE, fetch_size: int = DEFAULT_FETCH_SIZE, insert_batch_size: int = DEFAULT_INSERT_BATCH_SIZE, num_processes = 10):
 
         super().__init__(init_mysql=True, init_memgraph=False)
         self.id_step = id_step
