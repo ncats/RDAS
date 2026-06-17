@@ -90,10 +90,24 @@ class GrantPipelineRunner(PipelineRunnerBase):
         #self._run_pipeline_task(NewPatentGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_5 import NewGrantAnnotationGraphTask
-        self._run_pipeline_task(NewGrantAnnotationGraphTask)
+        #self._run_pipeline_task(NewGrantAnnotationGraphTask)
+
+        from pipelines.pipeline_4_grant.task_grant_graph_6 import NewCoreProjectGardRelationshipGraphTask
+        #self._run_pipeline_task(NewCoreProjectGardRelationshipGraphTask)
 
 
+        """
+        Notes:
+            This NewCoreProjectArticleRelationshipGraphTask expects Article and CoreProject nodes to already exist in Memgraph.
+            Run the publication NewPublicationArticleGraphTask and task_grant_graph_3.py before this
+            task so both MATCH clauses can create the relationship.
+        """
+        ''' Re-use '''
+        from pipelines.pipeline_3_publication.task_publication_graph_1 import NewPublicationArticleGraphTask
+        self._run_pipeline_task(NewPublicationArticleGraphTask)
 
+        from pipelines.pipeline_4_grant.task_grant_graph_7 import NewCoreProjectArticleRelationshipGraphTask
+        self._run_pipeline_task(NewCoreProjectArticleRelationshipGraphTask)
 
         
 
