@@ -78,16 +78,22 @@ class GrantPipelineRunner(PipelineRunnerBase):
     def graph_updates(self) -> None:
 
         from pipelines.pipeline_4_grant.task_grant_graph_1 import NewProjectGraphTask
-        self._run_pipeline_task(NewProjectGraphTask)
+        #self._run_pipeline_task(NewProjectGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_2 import NewGardProjectRelationshipGraphTask
-        self._run_pipeline_task(NewGardProjectRelationshipGraphTask)
+        #self._run_pipeline_task(NewGardProjectRelationshipGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_3 import NewCoreProjectGraphTask
-        self._run_pipeline_task(NewCoreProjectGraphTask)
+        #self._run_pipeline_task(NewCoreProjectGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_4 import NewPatentGraphTask
-        self._run_pipeline_task(NewPatentGraphTask)
+        #self._run_pipeline_task(NewPatentGraphTask)
+
+        from pipelines.pipeline_4_grant.task_grant_graph_5 import NewGrantAnnotationGraphTask
+        self._run_pipeline_task(NewGrantAnnotationGraphTask)
+
+
+
 
         
 
@@ -95,7 +101,7 @@ class GrantPipelineRunner(PipelineRunnerBase):
     def followup_updates(self) -> None:
 
         from pipelines.pipeline_4_grant.task_grant_12 import GrantPublicationArticleImportTask
-        #self._run_pipeline_task(GrantPublicationArticleImportTask)
+        self._run_pipeline_task(GrantPublicationArticleImportTask)
 
         ''' Re-use '''
         from pipelines.pipeline_3_publication.task_publication_2 import PublicationEpiNhsClassificationTask
