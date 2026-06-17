@@ -110,8 +110,10 @@ class GrantPipelineRunner(PipelineRunnerBase):
         #self._run_pipeline_task(NewCoreProjectArticleRelationshipGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_8 import NewCoreProjectClinicalTrialRelationshipGraphTask
-        self._run_pipeline_task(NewCoreProjectClinicalTrialRelationshipGraphTask)
+        #self._run_pipeline_task(NewCoreProjectClinicalTrialRelationshipGraphTask)
 
+        from pipelines.pipeline_4_grant.task_grant_graph_9 import NewFundingIcGraphTask
+        self._run_pipeline_task(NewFundingIcGraphTask) 
 
         
 
