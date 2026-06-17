@@ -104,10 +104,14 @@ class GrantPipelineRunner(PipelineRunnerBase):
         """
         ''' Re-use '''
         from pipelines.pipeline_3_publication.task_publication_graph_1 import NewPublicationArticleGraphTask
-        self._run_pipeline_task(NewPublicationArticleGraphTask)
+        #self._run_pipeline_task(NewPublicationArticleGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_7 import NewCoreProjectArticleRelationshipGraphTask
-        self._run_pipeline_task(NewCoreProjectArticleRelationshipGraphTask)
+        #self._run_pipeline_task(NewCoreProjectArticleRelationshipGraphTask)
+
+        from pipelines.pipeline_4_grant.task_grant_graph_8 import NewCoreProjectClinicalTrialRelationshipGraphTask
+        self._run_pipeline_task(NewCoreProjectClinicalTrialRelationshipGraphTask)
+
 
         
 
