@@ -1,0 +1,317 @@
+Omics_type,Sequencing_type,Sequencing_library,Omics_type_norm,Assay_type_norm,Sequencing_library_norm,Annotation
+['Epigenomics'],ATAC-seq,genomic DNA,Epigenomics,ATAC-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],ATAC-seq,polyA RNA,Epigenomics,ATAC-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],Bisulfite-Seq,genomic DNA,Epigenomics,Bisulfite-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],Bisulfite-Seq,total RNA,Epigenomics,Bisulfite-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],ChIA-PET,genomic DNA,Epigenomics,ChIA-PET,,"indicated by ""epigenoimcs"""
+['Epigenomics'],ChIP-Seq,genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],DNase-Hypersensitivity,genomic DNA,Epigenomics,DNase-Hypersensitivity,,"indicated by ""epigenoimcs"""
+['Epigenomics'],FAIRE-seq,genomic DNA,Epigenomics,FAIRE-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],Hi-C,genomic DNA,Epigenomics,Hi-C assay,,"indicated by ""epigenoimcs""and hi-c"
+['Epigenomics'],MBD-Seq,genomic DNA,Epigenomics,MBD-Seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],MBD-Seq,other,Epigenomics,MBD-Seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],MNase-Seq,genomic DNA,Epigenomics,MNase-Seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],MeDIP-Seq,genomic DNA,Epigenomics,MeDIP-Seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],OTHER,"['genomic DNA', 'other']",Epigenomics,Other,,"indicated by ""epigenoimcs"""
+['Epigenomics'],OTHER,genomic DNA,Epigenomics,Other,,"indicated by ""epigenoimcs"""
+['Epigenomics'],OTHER,polyA RNA,Epigenomics,Other,,"indicated by ""epigenoimcs"""
+['Epigenomics'],RNA-Seq,genomic DNA,Epigenomics,RNA-Seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],RNA-Seq,polyA RNA,Epigenomics,RNA-Seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],RNA-Seq,total RNA,Epigenomics,RNA-Seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],"['', 'Bisulfite-Seq', 'ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,Bisulfite-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],"['ATAC-seq', 'ChIP-Seq']",genomic DNA,Epigenomics,ATAC-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],"['ATAC-seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],"['Bisulfite-Seq', 'ChIP-Seq', 'MeDIP-Seq']",genomic DNA,Epigenomics,Bisulfite-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],"['Bisulfite-Seq', 'ChIP-Seq', 'OTHER']",genomic DNA,Epigenomics,Bisulfite-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],"['Bisulfite-Seq', 'OTHER']",genomic DNA,Epigenomics,Bisulfite-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],"['ChIP-Seq', 'DNase-Hypersensitivity']",genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],"['ChIP-Seq', 'FAIRE-seq']",genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],"['ChIP-Seq', 'MNase-Seq']",genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],"['ChIP-Seq', 'MeDIP-Seq']",genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],"['ChIP-Seq', 'OTHER']",genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],"['ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,ChIP-seq,,"indicated by ""epigenoimcs"""
+['Epigenomics'],,"['genomic DNA', 'total RNA']",Epigenomics,Other,,"indicated by ""epigenoimcs"""
+['Epigenomics'],,genomic DNA,Epigenomics,Other,,"indicated by ""epigenoimcs"""
+['Epigenomics'],,total RNA,Epigenomics,Other,,"indicated by ""epigenoimcs"""
+"['Genome sequencing and assembly, Genome sequencing, Transcriptome or Gene expression']",RNA-Seq,polyA RNA,Transcriptomics,RNA-Seq,polyA RNA,
+"['Genome sequencing and assembly, Raw sequence reads']",RNA-Seq,polyA RNA,Transcriptomics,RNA-Seq,polyA RNA,
+"['Genome sequencing and assembly, Raw sequence reads, Genome sequencing, Assembly']",RNA-Seq,total RNA,Transcriptomics,RNA-Seq,total RNA,
+['Genome sequencing'],ChIP-Seq,genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+"['Genome sequencing, Exome, Transcriptome or Gene expression']",ATAC-seq,genomic DNA,Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+"['Genome sequencing, Exome, Transcriptome or Gene expression']",RNA-Seq,total RNA,Transcriptomics,RNA-Seq,total RNA,
+"['Genome sequencing, Exome, Transcriptome or Gene expression']","['ATAC-seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+['Metagenome'],RNA-Seq,total RNA,Genomics,Metagenomics ,,
+['Phenotype or Genotype'],RNA-Seq,total RNA,Transcriptomics,RNA-Seq,total RNA,
+['Phenotype or Genotype'],"['ATAC-seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+['Proteome'],,other,Proteomics,Other,,
+['Proteome'],,protein,Proteomics,Other,,
+['Raw sequence reads'],ATAC-seq,genomic DNA,Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+['Raw sequence reads'],ChIP-Seq,genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+['Raw sequence reads'],Hi-C,genomic DNA,Epigenomics,Hi-C assay,,"indicated by ""Hi-c"""
+['Raw sequence reads'],OTHER,"['polyA RNA', 'protein']",Transcriptomics,Other,,
+['Raw sequence reads'],OTHER,genomic DNA,Genomics,Other,,
+['Raw sequence reads'],OTHER,polyA RNA,Transcriptomics,Other,,
+['Raw sequence reads'],RNA-Seq,polyA RNA,Transcriptomics,RNA-Seq,,
+['Raw sequence reads'],RNA-Seq,total RNA,Transcriptomics,RNA-Seq,,
+['Raw sequence reads'],"['ChIP-Seq', 'RIP-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+['Raw sequence reads'],"['ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+['Raw sequence reads'],"['Hi-C', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,Hi-C assay,,"indicated by ""Hi-c"""
+['Raw sequence reads'],"['OTHER', 'RNA-Seq']","['polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Raw sequence reads'],"['RIP-Seq', 'RNA-Seq']","['polyA RNA', 'total RNA']",Epigenomics,RNA immunoprecipitation,,
+['Raw sequence reads'],,total RNA,Transcriptomics,Other,,
+"['Raw sequence reads, Epigenomics']","['ATAC-seq', 'ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,ATAC-seq,,"indicated by ""epigenoimcs"""
+"['Raw sequence reads, Genome sequencing, Epigenomics, Transcriptome or Gene expression, Other']","['ATAC-seq', 'ChIP-Seq']",genomic DNA,Epigenomics,ATAC-seq,,"indicated by ""epigenoimcs"""
+"['Raw sequence reads, Genome sequencing, Transcriptome or Gene expression']",RNA-Seq,total RNA,Transcriptomics,RNA-Seq,total RNA,
+"['Raw sequence reads, Targeted Locus (Loci), Transcriptome or Gene expression']",RNA-Seq,polyA RNA,Transcriptomics,RNA-Seq,polyA RNA,
+"['Raw sequence reads, Transcriptome or Gene expression']",OTHER,polyA RNA,Transcriptomics,Other,,
+"['Raw sequence reads, Transcriptome or Gene expression']",RNA-Seq,polyA RNA,Transcriptomics,RNA-Seq,polyA RNA,
+['Targeted Locus (Loci)'],RNA-Seq,total RNA,Transcriptomics,RNA-Seq,total RNA,
+['Transcriptome or Gene expression'],ATAC-seq,genomic DNA,Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+['Transcriptome or Gene expression'],Bisulfite-Seq,genomic DNA,Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+['Transcriptome or Gene expression'],Hi-C,genomic DNA,Epigenomics,Hi-C assay,,"indicated by ""Hi-c"""
+['Transcriptome or Gene expression'],OTHER,"['polyA RNA', 'protein']",Transcriptomics,Other,,
+['Transcriptome or Gene expression'],OTHER,"['polyA RNA', 'total RNA']",Transcriptomics,Other,,
+['Transcriptome or Gene expression'],OTHER,polyA RNA,Transcriptomics,Other,,
+['Transcriptome or Gene expression'],OTHER,total RNA,Transcriptomics,Other,,
+['Transcriptome or Gene expression'],RIP-Seq,polyA RNA,Epigenomics,RNA immunoprecipitation,,
+['Transcriptome or Gene expression'],RIP-Seq,total RNA,Epigenomics,RNA immunoprecipitation,,
+['Transcriptome or Gene expression'],RNA-Seq,"['cytoplasmic RNA', 'nuclear RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,"['genomic DNA', 'polyA RNA']",Genomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,"['nuclear RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,"['other', 'polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,"['other', 'polyA RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,"['polyA RNA', 'protein', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,"['polyA RNA', 'protein']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,"['polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,"['protein', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,cytoplasmic RNA,Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,genomic DNA,Genomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,nuclear RNA,Transcriptomics,RNA-Seq,nuclear RNA,
+['Transcriptome or Gene expression'],RNA-Seq,polyA RNA,Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,protein,Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],RNA-Seq,total RNA,Transcriptomics,RNA-Seq,total RNA,
+['Transcriptome or Gene expression'],"['', 'RNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['Bisulfite-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+['Transcriptome or Gene expression'],"['OTHER', 'RNA-Seq']","['other', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['OTHER', 'RNA-Seq']","['polyA RNA', 'protein']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['OTHER', 'RNA-Seq']","['polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['OTHER', 'RNA-Seq']","['protein', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['OTHER', 'RNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['RIP-Seq', 'RNA-Seq', 'ncRNA-Seq']","['polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['RIP-Seq', 'RNA-Seq']","['polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['RIP-Seq', 'RNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['RNA-Seq', 'miRNA-Seq']","['polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['RNA-Seq', 'miRNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['RNA-Seq', 'ncRNA-Seq']","['polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['RNA-Seq', 'ncRNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],"['RNA-Seq', 'ssRNA-seq']",total RNA,Transcriptomics,Single cell sequencing,,
+['Transcriptome or Gene expression'],[],[],Other,Other,,
+['Transcriptome or Gene expression'],miRNA-Seq,other,Transcriptomics,RNA-Seq,miRNA-Seq,
+['Transcriptome or Gene expression'],miRNA-Seq,polyA RNA,Transcriptomics,RNA-Seq,miRNA-Seq,
+['Transcriptome or Gene expression'],miRNA-Seq,total RNA,Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],ncRNA-Seq,"['cytoplasmic RNA', 'nuclear RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],ncRNA-Seq,other,Transcriptomics,RNA-Seq,ncRNA-Seq,
+['Transcriptome or Gene expression'],ncRNA-Seq,total RNA,Transcriptomics,RNA-Seq,,
+['Transcriptome or Gene expression'],ssRNA-seq,polyA RNA,Transcriptomics,Single cell sequencing,,
+['Transcriptome or Gene expression'],ssRNA-seq,total RNA,Transcriptomics,Single cell sequencing,,
+['Transcriptome or Gene expression'],,"['cytoplasmic RNA', 'total RNA']",Transcriptomics,Other,,
+['Transcriptome or Gene expression'],,"['genomic DNA', 'total RNA']",Genomics,Other,,
+['Transcriptome or Gene expression'],,"['other', 'total RNA']",Transcriptomics,Other,,
+['Transcriptome or Gene expression'],,"['polyA RNA', 'total RNA']",Transcriptomics,Other,,
+['Transcriptome or Gene expression'],,genomic DNA,Genomics,Other,,
+['Transcriptome or Gene expression'],,other,Transcriptomics,Other,,
+['Transcriptome or Gene expression'],,polyA RNA,Transcriptomics,Other,,
+['Transcriptome or Gene expression'],,total RNA,Transcriptomics,Other,,
+['Variation'],ChIP-Seq,genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+['Variation'],OTHER,"['genomic DNA', 'other']",Genomics,Other,,
+['Variation'],OTHER,genomic DNA,Genomics,Other,,
+['Variation'],RNA-Seq,total RNA,Transcriptomics,RNA-Seq,,
+['Variation'],,"['genomic DNA', 'nuclear RNA']",Genomics,Other,,
+['Variation'],,genomic DNA,Genomics,Other,,
+[],ATAC-seq,genomic DNA,Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],Bisulfite-Seq,genomic DNA,Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],ChIP-Seq,"['genomic DNA', 'polyA RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],ChIP-Seq,genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],DNase-Hypersensitivity,genomic DNA,Epigenomics,DNase-Hypersensitivity,,
+[],Hi-C,genomic DNA,Epigenomics,Hi-C assay,,"indicated by ""Hi-c"""
+[],OTHER,"['genomic DNA', 'other', 'polyA RNA']",Genomics,Other,,
+[],OTHER,"['genomic DNA', 'other']",Genomics,Other,,
+[],OTHER,"['genomic DNA', 'polyA RNA', 'protein']",Genomics,Other,,
+[],OTHER,"['genomic DNA', 'polyA RNA']",Genomics,Other,,
+[],OTHER,"['genomic DNA', 'total RNA']",Genomics,Other,,
+[],OTHER,"['other', 'polyA RNA', 'protein']",Transcriptomics,RNA-Seq,,
+[],OTHER,"['other', 'polyA RNA']",Transcriptomics,Other,,
+[],OTHER,"['other', 'total RNA']",Transcriptomics,Other,,
+[],OTHER,"['polyA RNA', 'protein']",Transcriptomics,RNA-Seq,,
+[],OTHER,"['polyA RNA', 'total RNA']",Transcriptomics,Other,,
+[],OTHER,"['protein', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],OTHER,cytoplasmic RNA,Transcriptomics,Other,cytoplasmic RNA,
+[],OTHER,genomic DNA,Genomics,Other,,
+[],OTHER,nuclear RNA,Transcriptomics,Other,nuclear RNA,
+[],OTHER,other,Other,Other,,
+[],OTHER,polyA RNA,Transcriptomics,Other,,
+[],OTHER,protein,Proteomics,Other,,
+[],OTHER,total RNA,Transcriptomics,Other,,
+[],RIP-Seq,"['other', 'total RNA']",Epigenomics,RNA immunoprecipitation,,
+[],RIP-Seq,other,Epigenomics,RNA immunoprecipitation,,
+[],RIP-Seq,polyA RNA,Epigenomics,RNA immunoprecipitation,,
+[],RIP-Seq,total RNA,Epigenomics,RNA immunoprecipitation,,
+[],RNA-Seq,"['cytoplasmic RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],RNA-Seq,"['genomic DNA', 'total RNA']",Genomics,RNA-Seq,,
+[],RNA-Seq,"['other', 'polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],RNA-Seq,"['other', 'protein', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],RNA-Seq,"['polyA RNA', 'protein']",Transcriptomics,RNA-Seq,,
+[],RNA-Seq,"['polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],RNA-Seq,"['protein', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],RNA-Seq,polyA RNA,Transcriptomics,RNA-Seq,,
+[],RNA-Seq,total RNA,Transcriptomics,RNA-Seq,,
+[],SELEX,protein,Proteomics,SELEX,,
+[],Tn-Seq,genomic DNA,Genomics,Tn-Seq,,
+[],"['', 'ATAC-seq', 'Bisulfite-Seq', 'ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['', 'ATAC-seq']",genomic DNA,Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['', 'Bisulfite-Seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['', 'Bisulfite-Seq']","['genomic DNA', 'total RNA']",Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['', 'Bisulfite-Seq']",genomic DNA,Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['', 'ChIP-Seq', 'DNase-Hypersensitivity', 'OTHER']",genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['', 'ChIP-Seq', 'DNase-Hypersensitivity', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['', 'ChIP-Seq', 'DNase-Hypersensitivity']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['', 'ChIP-Seq', 'FAIRE-seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['', 'ChIP-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['', 'ChIP-Seq', 'OTHER']","['genomic DNA', 'protein']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['', 'ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['', 'ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['', 'ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['', 'ChIP-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['', 'ChIP-Seq']",genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['', 'DNase-Hypersensitivity']","['genomic DNA', 'total RNA']",Epigenomics,DNase-Hypersensitivity,,
+[],"['', 'MeDIP-Seq']","['genomic DNA', 'total RNA']",Epigenomics,MeDIP-Seq,,
+[],"['', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Genomics,RNA-Seq,,
+[],"['', 'OTHER']","['protein', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['', 'OTHER']",genomic DNA,Genomics,Other,,
+[],"['', 'OTHER']",total RNA,Transcriptomics,RNA-Seq,,
+[],"['', 'RNA-Seq', 'miRNA-Seq']","['genomic DNA', 'total RNA']",Genomics,RNA-Seq,,
+[],"['', 'RNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Genomics,RNA-Seq,,
+[],"['', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Genomics,RNA-Seq,,
+[],"['', 'RNA-Seq']","['genomic DNA', 'total RNA']",Genomics,RNA-Seq,,
+[],"['', 'RNA-Seq']","['other', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['', 'RNA-Seq']","['polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['', 'RNA-Seq']","['protein', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['', 'RNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+[],"['', 'miRNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+[],"['', 'ncRNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+[],"['ATAC-seq', 'Bisulfite-Seq', 'ChIP-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'Bisulfite-Seq', 'ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'Bisulfite-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'Bisulfite-Seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'Bisulfite-Seq', 'RNA-Seq']",polyA RNA,Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'ChIP-Seq', 'Hi-C', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'ChIP-Seq', 'Hi-C', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'ChIP-Seq', 'Hi-C']",genomic DNA,Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'ChIP-Seq', 'MeDIP-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'ChIP-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'ChIP-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'ChIP-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'ChIP-Seq']",genomic DNA,Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'Hi-C', 'OTHER']",genomic DNA,Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'OTHER', 'RIP-Seq', 'RNA-Seq', 'miRNA-Seq', 'ssRNA-seq']","['genomic DNA', 'other', 'polyA RNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'other', 'polyA RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'other', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'protein', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'OTHER']","['genomic DNA', 'nuclear RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'OTHER']",genomic DNA,Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'RNA-Seq', 'miRNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'RNA-Seq']","['genomic DNA', 'nuclear RNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'RNA-Seq']","['genomic DNA', 'nuclear RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'RNA-Seq']","['other', 'total RNA']",Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'RNA-Seq']",polyA RNA,Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['ATAC-seq', 'RNA-Seq']",total RNA,Epigenomics,ATAC-seq,,"indicated by ""ATAC-seq"""
+[],"['Bisulfite-Seq', 'ChIP-Seq', 'Hi-C', 'OTHER', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['Bisulfite-Seq', 'ChIP-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['Bisulfite-Seq', 'ChIP-Seq', 'OTHER']",genomic DNA,Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['Bisulfite-Seq', 'ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['Bisulfite-Seq', 'ChIP-Seq']",genomic DNA,Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['Bisulfite-Seq', 'MNase-Seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['Bisulfite-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['Bisulfite-Seq', 'OTHER']","['genomic DNA', 'polyA RNA']",Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['Bisulfite-Seq', 'OTHER']",genomic DNA,Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['Bisulfite-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['Bisulfite-Seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,Bisulfite-seq,,"indicated by ""bisulfite-seq"""
+[],"['ChIA-PET', 'ChIP-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'Hi-C', 'OTHER', 'RIP-Seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'Hi-C', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'Hi-C', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'OTHER', 'RNA-Seq', 'WGS']","['genomic DNA', 'nuclear RNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'other', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'OTHER']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'OTHER']",genomic DNA,Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'RIP-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'RIP-Seq', 'RNA-Seq']",total RNA,Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'RIP-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['ChIP-Seq', 'RNA-Seq']",total RNA,Epigenomics,ChIP-seq,,"indicated by ""ChIP-seq"""
+[],"['DNase-Hypersensitivity', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,DNase-Hypersensitivity,,
+[],"['FAIRE-seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Epigenomics,FAIRE-seq,,
+[],"['Hi-C', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,Hi-C assay,,"indicated by ""Hi-c"""
+[],"['Hi-C', 'OTHER']","['genomic DNA', 'polyA RNA']",Epigenomics,Hi-C assay,,"indicated by ""Hi-c"""
+[],"['Hi-C', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,Hi-C assay,,"indicated by ""Hi-c"""
+[],"['MNase-Seq', 'OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,MNase-Seq,,
+[],"['MeDIP-Seq', 'RNA-Seq']","['genomic DNA', 'total RNA']",Epigenomics,MeDIP-Seq,,
+[],"['OTHER', 'RIP-Seq', 'RNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Epigenomics,RNA immunoprecipitation,,
+[],"['OTHER', 'RIP-Seq', 'RNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'RIP-Seq']","['genomic DNA', 'total RNA']",Epigenomics,RNA immunoprecipitation,,
+[],"['OTHER', 'RIP-Seq']",total RNA,Epigenomics,RNA immunoprecipitation,,
+[],"['OTHER', 'RNA-Seq', 'miRNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Genomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq', 'ncRNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['cytoplasmic RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['genomic DNA', 'nuclear RNA']",Genomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['genomic DNA', 'other', 'polyA RNA']",Genomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['genomic DNA', 'polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['genomic DNA', 'polyA RNA']",Genomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['genomic DNA', 'total RNA']",Genomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['nuclear RNA', 'other', 'polyA RNA']",Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['other', 'polyA RNA', 'protein']",Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['other', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['polyA RNA', 'protein', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['polyA RNA', 'protein']",Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']","['protein', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']",polyA RNA,Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'RNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+[],"['OTHER', 'ssRNA-seq']","['polyA RNA', 'total RNA']",Transcriptomics,Single cell sequencing,,
+[],"['RIP-Seq', 'RNA-Seq', 'ncRNA-Seq']",total RNA,Epigenomics,RNA immunoprecipitation,,
+[],"['RIP-Seq', 'RNA-Seq']","['other', 'total RNA']",Epigenomics,RNA immunoprecipitation,,
+[],"['RIP-Seq', 'RNA-Seq']","['polyA RNA', 'total RNA']",Epigenomics,RNA immunoprecipitation,,
+[],"['RIP-Seq', 'RNA-Seq']",polyA RNA,Epigenomics,RNA immunoprecipitation,,
+[],"['RIP-Seq', 'RNA-Seq']",total RNA,Epigenomics,RNA immunoprecipitation,,
+[],"['RIP-Seq', 'ncRNA-Seq']",total RNA,Epigenomics,RNA immunoprecipitation,,
+[],"['RNA-Seq', 'miRNA-Seq']","['other', 'polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['RNA-Seq', 'miRNA-Seq']","['polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['RNA-Seq', 'miRNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+[],"['RNA-Seq', 'ncRNA-Seq']","['polyA RNA', 'total RNA']",Transcriptomics,RNA-Seq,,
+[],"['RNA-Seq', 'ncRNA-Seq']",total RNA,Transcriptomics,RNA-Seq,,
+[],"['RNA-Seq', 'ssRNA-seq']","['polyA RNA', 'total RNA']",Transcriptomics,Single cell sequencing,,
+[],[],[],Other,Other,,
+[],ncRNA-Seq,total RNA,Transcriptomics,RNA-Seq,,
+[],ssRNA-seq,total RNA,Transcriptomics,Single cell sequencing,,
+[],,"['genomic DNA', 'polyA RNA', 'total RNA']",Genomics,Other,,
+[],,"['genomic DNA', 'total RNA']",Genomics,Other,,
+[],,"['other', 'protein']",Proteomics,Other,,
+[],,"['other', 'total RNA']",Transcriptomics,Other,,
+[],,genomic DNA,Genomics,Other,,
+[],,other,Transcriptomics,Other,,
+[],,polyA RNA,Transcriptomics,Other,,
+[],,protein,Proteomics,Other,,
+[],,total RNA,Transcriptomics,Other,,

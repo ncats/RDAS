@@ -1,0 +1,4 @@
+cutoff,reviewed_labels,reviewed_correct,manual_accuracy
+0.70,150,67,0.44666666666666666
+0.75,100,45,0.45
+0.80,50,24,0.48

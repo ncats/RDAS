@@ -1,0 +1,334 @@
+label,count,best_reference_label,best_similarity_score,assigned_category,assigned_at_0_70,assigned_at_0_75,assigned_at_0_80
+genotype,46776,host genotype,0.7619047619047619,Biospecimen Organism,True,True,False
+batch,9770,batch id,0.7692307692307693,External_sample_id,True,True,False
+genotype/variation,6816,mouse genotype/variation,0.8571428571428571,Biospecimen Organism,True,True,True
+replicate,5824,replicate id,0.8571428571428571,External_sample_id,True,True,True
+clinical info,3680,clinical diagnosis,0.7741935483870968,Biospecimen Disease Condition,True,True,False
+histology,3618,histopathology,0.782608695652174,Biospecimen Disease Condition,True,True,False
+plate,3492,plate id,0.7692307692307693,External_sample_id,True,True,False
+region,2915,regimen,0.7692307692307693,Treatment Dosage Regimen,True,True,False
+site,2620,side,0.75,External_sample_id,True,True,False
+stimulation,2378,cell stimulation,0.8148148148148148,Biospecimen Type,True,True,True
+location,2284,location/side,0.7619047619047619,External_sample_id,True,True,False
+phenotype,1959,cell phenotype,0.782608695652174,Biospecimen Type,True,True,False
+experiment,1725,experimental day,0.7692307692307693,Biospecimen Age,True,True,False
+source,1670,source id,0.8,External_sample_id,True,True,True
+datatype description,1606,age description,0.8,Biospecimen Age,True,True,True
+collection_method,1517,collection time,0.75,Biospecimen Age,True,True,False
+well,1500,cell,0.75,Biospecimen Type,True,True,False
+segment type,1492,treatment type,0.7692307692307693,Treatment,True,True,False
+tag,1317,stage,0.75,Biospecimen Age,True,True,False
+culture,1264,culture age,0.7777777777777778,Biospecimen Age,True,True,False
+animal,1261,animal id,0.8,External_sample_id,True,True,True
+clinical status,1187,clinical stage,0.8275862068965517,Biospecimen Age,True,True,True
+primary site,1010,primary tumor site,0.8,Biospecimen Disease Condition,True,True,True
+fraction,1003,age fraction,0.8,Biospecimen Age,True,True,True
+lab description,997,age description,0.8666666666666667,Biospecimen Age,True,True,True
+infected with,898,infected host,0.7692307692307693,Biospecimen Organism,True,True,False
+survival_yr,876,survival year,0.8333333333333334,Biospecimen Age,True,True,True
+clone,871,clone id,0.7692307692307693,External_sample_id,True,True,False
+morphology,764,cell morphology,0.8,Biospecimen Type,True,True,True
+study,741,studyid,0.8333333333333334,External_sample_id,True,True,True
+case number,726,cell number,0.8181818181818182,Biospecimen Type,True,True,True
+chip_antibody_lot,696,chip_antibody_provider,0.7692307692307693,External_sample_id,True,True,False
+response,667,drug response,0.7619047619047619,Treatment,True,True,False
+os_status,656,mouse status,0.7619047619047619,Biospecimen Organism,True,True,False
+transduction,629,cell transduction,0.8275862068965517,Biospecimen Type,True,True,True
+brain region,595,brain tumor region,0.8,Biospecimen Disease Condition,True,True,True
+selection,567,mouse selection,0.75,Biospecimen Organism,True,True,False
+growth phase,558,growth stage,0.75,Biospecimen Age,True,True,False
+case,551,cage,0.75,Biospecimen Age,True,True,False
+resistance,506,drug resistance,0.8,Treatment,True,True,True
+date harvest,500,time harvest,0.8333333333333334,Biospecimen Age,True,True,True
+library preparation method,500,library preparation protocol,0.8148148148148148,Treatment Dosage Regimen,True,True,True
+sorted compartment,500,tissue compartment,0.7777777777777778,Biospecimen Type,True,True,False
+surgery number,500,usage number,0.7692307692307693,Biospecimen Age,True,True,False
+animal replicate,500,animal treatment,0.75,Treatment,True,True,False
+who category,493,tumor category,0.7692307692307693,Biospecimen Disease Condition,True,True,False
+population,477,cell population,0.8,Biospecimen Type,True,True,True
+vital status,450,covid status,0.75,External_sample_id,True,True,False
+survival,444,survival time,0.7619047619047619,Biospecimen Age,True,True,False
+array,407,array id,0.7692307692307693,External_sample_id,True,True,False
+vaccination,404,vaccination dose,0.8148148148148148,Treatment Dosage Regimen,True,True,True
+initial ich volume,399,initial tumor volume,0.7894736842105263,Biospecimen Disease Condition,True,True,False
+induction date,385,induction time,0.8571428571428571,Biospecimen Age,True,True,True
+library date,385,library id,0.8181818181818182,External_sample_id,True,True,True
+exposure,381,exposure time,0.7619047619047619,Biospecimen Age,True,True,False
+chip antibody vendor,380,antibody vendor id,0.7894736842105263,External_sample_id,True,True,False
+classification,369,classification group,0.8235294117647058,Treatment,True,True,True
+who grade,367,tumor who grade,0.75,Biospecimen Disease Condition,True,True,False
+replicate description,362,treatment description,0.8095238095238095,Treatment,True,True,True
+mutation,354,duration,0.75,Treatment Dosage Regimen,True,True,False
+source type,345,source cell type,0.8148148148148148,Biospecimen Type,True,True,True
+culture type,334,culture time,0.8333333333333334,Biospecimen Age,True,True,True
+development,310,development stage,0.7857142857142857,Biospecimen Age,True,True,False
+education,300,duration,0.8235294117647058,Treatment Dosage Regimen,True,True,True
+OS status,297,mouse status,0.8571428571428571,Biospecimen Organism,True,True,True
+category,296,age_category,0.8,Biospecimen Age,True,True,True
+experiment type,295,experimental day,0.7741935483870968,Biospecimen Age,True,True,False
+description,294,age description,0.8461538461538461,Biospecimen Age,True,True,True
+library preparation,277,library preparation protocol,0.8085106382978723,Treatment Dosage Regimen,True,True,True
+genome/variation,266,mouse genotype/variation,0.75,Biospecimen Organism,True,True,False
+immunization,265,immunization dose,0.8275862068965517,Treatment Dosage Regimen,True,True,True
+volunteer code,250,volunteer id,0.8461538461538461,External_sample_id,True,True,True
+number of malaria infections,250,malaria infection,0.7555555555555555,Biospecimen Disease Condition,True,True,False
+genetic modification,227,chemical modification,0.7804878048780488,Treatment,True,True,False
+section,219,infection,0.75,Biospecimen Disease Condition,True,True,False
+state,214,stage,0.8,Biospecimen Age,True,True,True
+differentiation batch,207,differentiation day,0.85,Biospecimen Age,True,True,True
+library,198,library id,0.8235294117647058,External_sample_id,True,True,True
+brain location,197,treatment location,0.75,Treatment,True,True,False
+experimental replicate,196,experimental group,0.75,Treatment,True,True,False
+plate_number,195,patient number,0.7692307692307693,External_sample_id,True,True,False
+growth medium,193,growth time,0.75,Biospecimen Age,True,True,False
+number of relapses,192,number of cells,0.7878787878787878,Biospecimen Type,True,True,False
+case/control,191,case or control,0.8148148148148148,Treatment,True,True,True
+infection_status,189,infection status,0.9375,Biospecimen Disease Condition,True,True,True
+vaccination route,188,vaccination dose,0.8484848484848485,Treatment Dosage Regimen,True,True,True
+couple number,188,mouse number,0.8,Biospecimen Organism,True,True,True
+Histopathological diagnostic,180,histological diagnosis,0.84,Biospecimen Disease Condition,True,True,True
+molecular subtype,176,molecular subgroup,0.8,Treatment,True,True,True
+Cause of death,172,age of death,0.8461538461538461,Biospecimen Age,True,True,True
+hours post-invasion,172,hours post infection,0.7692307692307693,Biospecimen Disease Condition,True,True,False
+volunteer,171,volunteer id,0.8571428571428571,External_sample_id,True,True,True
+survival cluster,170,survival time,0.7586206896551724,Biospecimen Age,True,True,False
+differentiation,169,differentiation day,0.8823529411764706,Biospecimen Age,True,True,True
+preparation,169,cell preparation,0.8148148148148148,Biospecimen Type,True,True,True
+overall.survival.months,168,overall.survival.time,0.8181818181818182,Biospecimen Age,True,True,True
+subset,168,subject,0.7692307692307693,External_sample_id,True,True,False
+protect outcome,167,treatment outcome,0.75,Treatment,True,True,False
+hours post invasion,162,hours post infection,0.8205128205128205,Biospecimen Disease Condition,True,True,True
+mechanical ventilation,162,mechanical condition,0.8095238095238095,Biospecimen Disease Condition,True,True,True
+other_medication,158,acute medication,0.75,Treatment,True,True,False
+os_month,156,os month,0.875,Biospecimen Age,True,True,True
+differentiation_method,152,differentiation_age,0.8292682926829268,Biospecimen Age,True,True,True
+antibody description,151,condition description,0.7804878048780488,Biospecimen Disease Condition,True,True,False
+Phenotype,141,cell phenotype,0.782608695652174,Biospecimen Type,True,True,False
+cag,140,cage,0.8571428571428571,Biospecimen Age,True,True,True
+pathogens,138,pathogen strain,0.75,Biospecimen Organism,True,True,False
+inflammation status,135,infection status,0.8,Biospecimen Disease Condition,True,True,True
+family,134,family id,0.8,External_sample_id,True,True,True
+injection_type,132,infection type,0.8571428571428571,Biospecimen Disease Condition,True,True,True
+line type,123,cell line type,0.782608695652174,Biospecimen Type,True,True,False
+biologics,120,biological sex,0.782608695652174,Biospecimen Sex,True,True,False
+line number,117,sample number,0.75,External_sample_id,True,True,False
+culture media,116,culture days,0.8,Biospecimen Age,True,True,True
+array batch,116,array barcode,0.75,External_sample_id,True,True,False
+immune status,113,mouse status,0.8,Biospecimen Organism,True,True,True
+isolation source,113,isolation stage,0.7741935483870968,Biospecimen Age,True,True,False
+Histology,107,histopathology,0.782608695652174,Biospecimen Disease Condition,True,True,False
+growth media,106,growth time,0.782608695652174,Biospecimen Age,True,True,False
+clinical phenotype,103,cell phenotype,0.8125,Biospecimen Type,True,True,True
+infected,101,time infected,0.7619047619047619,Biospecimen Age,True,True,False
+localization,99,tumor localization,0.8,Biospecimen Disease Condition,True,True,True
+case_phenotype,97,cell phenotype,0.7857142857142857,Biospecimen Type,True,True,False
+isolate type,97,disease type,0.75,Biospecimen Disease Condition,True,True,False
+als phenotype,96,cell phenotype,0.8148148148148148,Biospecimen Type,True,True,True
+animal name,95,animal age,0.8571428571428571,Biospecimen Age,True,True,True
+parasite line,95,parasite strain,0.7857142857142857,Biospecimen Organism,True,True,False
+vaccination boost,92,vaccination dose,0.8484848484848485,Treatment Dosage Regimen,True,True,True
+sub-population,92,cell subpopulation,0.8125,Biospecimen Type,True,True,True
+location of onset,92,location of tumors,0.8,Biospecimen Disease Condition,True,True,True
+health status,92,cell status,0.75,Biospecimen Type,True,True,False
+bacterial lysate,88,bacterial cells,0.7741935483870968,Biospecimen Type,True,True,False
+clinical type,85,clinical stage,0.8148148148148148,Biospecimen Age,True,True,True
+culture method,84,culture time,0.7692307692307693,Biospecimen Age,True,True,False
+dissection,84,disease location,0.7692307692307693,Biospecimen Disease Condition,True,True,False
+responder,84,responder cells,0.75,Biospecimen Type,True,True,False
+infectious challenge,82,infectious agent,0.7777777777777778,Biospecimen Age,True,True,False
+experiment label,82,experimental day,0.75,Biospecimen Age,True,True,False
+viral status,82,viral strain,0.75,Biospecimen Organism,True,True,False
+simulation,80,cell stimulation,0.7692307692307693,Biospecimen Type,True,True,False
+folder name,79,slide name,0.7619047619047619,External_sample_id,True,True,False
+karyotype,77,cell karyotype,0.782608695652174,Biospecimen Type,True,True,False
+injection site,73,infection state,0.8275862068965517,Biospecimen Disease Condition,True,True,True
+clinical indication,72,clinical condition,0.8648648648648649,Biospecimen Disease Condition,True,True,True
+experimental status,72,experimental day,0.8,Biospecimen Age,True,True,True
+sort population,72,sample population,0.75,External_sample_id,True,True,False
+variant type,72,vaccine type,0.75,Treatment,True,True,False
+parental origin,70,parental strain,0.8,Biospecimen Organism,True,True,True
+Degree of differentiation,69,stage of differentiation,0.8571428571428571,Biospecimen Age,True,True,True
+compartment,69,cell compartment,0.8148148148148148,Biospecimen Type,True,True,True
+size,66,side,0.75,External_sample_id,True,True,False
+derivation,65,duration,0.7777777777777778,Treatment Dosage Regimen,True,True,False
+roi type,64,organoid type,0.7619047619047619,External_sample_id,True,True,False
+number of_mice,62,number of_samples,0.7741935483870968,External_sample_id,True,True,False
+Subsets,60,subjects,0.8,External_sample_id,True,True,True
+Case,60,cage,0.75,Biospecimen Age,True,True,False
+replicates,58,replicate id,0.8181818181818182,External_sample_id,True,True,True
+library input,58,library id,0.782608695652174,External_sample_id,True,True,False
+sampling site,57,sampling time,0.8461538461538461,Biospecimen Age,True,True,True
+induction,57,induration,0.8421052631578947,Treatment Dosage Regimen,True,True,True
+experimental set,57,experimental day,0.8125,Biospecimen Age,True,True,True
+lesion status,57,infection status,0.7586206896551724,Biospecimen Disease Condition,True,True,False
+Differentiation Method,55,differentiation time,0.8571428571428571,Biospecimen Age,True,True,True
+parental line,55,parental cell line,0.8387096774193549,Biospecimen Type,True,True,True
+clinic status,54,cancer status,0.7692307692307693,Biospecimen Disease Condition,True,True,False
+FISH origin,53,tissue origin,0.75,Biospecimen Type,True,True,False
+Genotype,52,host genotype,0.7619047619047619,Biospecimen Organism,True,True,False
+metastatic site,50,metastatic tumor site,0.8333333333333334,Biospecimen Disease Condition,True,True,True
+health_status,50,donor_health_status,0.8125,External_sample_id,True,True,True
+study number,50,study sample number,0.7741935483870968,External_sample_id,True,True,False
+bar code,49,barcode,0.9333333333333333,External_sample_id,True,True,True
+hours_post_infection,48,hours post infection,0.9,Biospecimen Disease Condition,True,True,True
+experiment batch,48,experimental day,0.75,Biospecimen Age,True,True,False
+isolation,47,isolation stage,0.75,Biospecimen Age,True,True,False
+surface marker,46,cell surface marker,0.8484848484848485,Biospecimen Type,True,True,True
+person,46,person id,0.8,External_sample_id,True,True,True
+inoculation,45,inoculation dose,0.8148148148148148,Treatment Dosage Regimen,True,True,True
+growth type,44,growth time,0.8181818181818182,Biospecimen Age,True,True,True
+vendor,44,vendor id,0.8,External_sample_id,True,True,True
+translocation,44,treatment location,0.7741935483870968,Treatment,True,True,False
+collection date,43,collection day,0.896551724137931,Biospecimen Age,True,True,True
+differentiation status,43,differentiation stage,0.8837209302325582,Biospecimen Age,True,True,True
+injection,42,infection,0.8888888888888888,Biospecimen Disease Condition,True,True,True
+state of culture,42,age of  culture,0.8387096774193549,Biospecimen Age,True,True,True
+specificity,42,specific-host,0.75,Biospecimen Organism,True,True,False
+er status,41,cancer status,0.8181818181818182,Biospecimen Disease Condition,True,True,True
+overall.survival,40,overall.survival.time,0.8648648648648649,Biospecimen Age,True,True,True
+collection,40,collection day,0.8333333333333334,Biospecimen Age,True,True,True
+experimental repeat,39,experimental group,0.8108108108108109,Treatment,True,True,True
+specific,39,specific-host,0.7619047619047619,Biospecimen Organism,True,True,False
+neuropathological.information,39,neuropathological_diagnosis,0.75,Biospecimen Disease Condition,True,True,False
+genomic modification,38,chemical modification,0.8292682926829268,Treatment,True,True,True
+experimental batch,38,experimental day,0.8235294117647058,Biospecimen Age,True,True,True
+pooled,38,pool id,0.7692307692307693,External_sample_id,True,True,False
+Source,37,source id,0.8,External_sample_id,True,True,True
+experimental,36,experimental day,0.8571428571428571,Biospecimen Age,True,True,True
+indication,36,induration,0.8,Treatment Dosage Regimen,True,True,True
+Clinical Status,35,clinical stage,0.8275862068965517,Biospecimen Age,True,True,True
+experimental design,35,experimental day,0.8,Biospecimen Age,True,True,True
+hours post fertilization,35,hours post infection,0.7727272727272727,Biospecimen Disease Condition,True,True,False
+donation source,35,control source,0.7586206896551724,Treatment,True,True,False
+labversion description,35,age description,0.7567567567567568,Biospecimen Age,True,True,False
+Type of Surgery,34,year of surgery,0.8666666666666667,Biospecimen Age,True,True,True
+body site,34,biopsy site,0.8,Biospecimen Type,True,True,True
+tretment,33,treatment,0.9411764705882353,Treatment,True,True,True
+infectious,33,infection,0.8421052631578947,Biospecimen Disease Condition,True,True,True
+viral infected,33,viral infection,0.8275862068965517,Biospecimen Disease Condition,True,True,True
+parasite isolate,33,parasite stage,0.8,Biospecimen Age,True,True,True
+gene,33,gender,0.8,Biospecimen Sex,True,True,True
+chip-antibody vendor,33,antibody vendor id,0.7894736842105263,External_sample_id,True,True,False
+clinical phenotypes,33,cell phenotype,0.7878787878787878,Biospecimen Type,True,True,False
+alternative_name,33,alternative sample name,0.7692307692307693,External_sample_id,True,True,False
+animal number,32,animal id number,0.896551724137931,External_sample_id,True,True,True
+water type,32,cancer type,0.7619047619047619,Biospecimen Disease Condition,True,True,False
+maternal health status,31,maternal disease status,0.8,Biospecimen Disease Condition,True,True,True
+differentiation state,30,differentiation stage,0.9523809523809523,Biospecimen Age,True,True,True
+single or double infected,30,single or double infection,0.9019607843137255,Biospecimen Disease Condition,True,True,True
+sampling point,30,sampling timepoint,0.875,Biospecimen Age,True,True,True
+virus added,30,virus dose,0.7619047619047619,Treatment Dosage Regimen,True,True,False
+phenotypes,30,cell phenotype,0.75,Biospecimen Type,True,True,False
+plate code,28,patient code,0.8181818181818182,External_sample_id,True,True,True
+culture status,28,culture stage,0.8148148148148148,Biospecimen Age,True,True,True
+experimental factor,28,experimental day,0.8,Biospecimen Age,True,True,True
+genetic modifications,28,chemical modification,0.7619047619047619,Treatment,True,True,False
+series,27,species,0.7692307692307693,Biospecimen Organism,True,True,False
+clone phenotype,26,cell phenotype,0.8275862068965517,Biospecimen Type,True,True,True
+harvesting,26,harvesting time,0.8,Biospecimen Age,True,True,True
+collection_date,25,collection day,0.8275862068965517,Biospecimen Age,True,True,True
+twin status,25,tissue status,0.75,Biospecimen Type,True,True,False
+hours post-infection,24,hours post infection,0.95,Biospecimen Disease Condition,True,True,True
+interaction status,24,infection status,0.8823529411764706,Biospecimen Disease Condition,True,True,True
+channel type,24,cancer type,0.782608695652174,Biospecimen Disease Condition,True,True,False
+clone type,24,cancer type,0.7619047619047619,Biospecimen Disease Condition,True,True,False
+pair status,24,cancer status,0.75,Biospecimen Disease Condition,True,True,False
+os months,23,os month,0.9411764705882353,Biospecimen Age,True,True,True
+strand,22,strain,0.8333333333333334,Biospecimen Organism,True,True,True
+replicate type,22,replicate id,0.7692307692307693,External_sample_id,True,True,False
+antibody vendor name,21,antibody vendor id,0.8421052631578947,External_sample_id,True,True,True
+Karyotype,21,cell karyotype,0.782608695652174,Biospecimen Type,True,True,False
+infection_state,20,infection state,0.9333333333333333,Biospecimen Disease Condition,True,True,True
+vaccination state,20,vaccination dose,0.8484848484848485,Treatment Dosage Regimen,True,True,True
+Cause of Death,20,age of death,0.8461538461538461,Biospecimen Age,True,True,True
+type of death,20,age of death,0.8,Biospecimen Age,True,True,True
+enrichment,20,cell enrichment,0.8,Biospecimen Type,True,True,True
+lot number,20,cell number,0.7619047619047619,Biospecimen Type,True,True,False
+library kit,19,library id,0.8571428571428571,External_sample_id,True,True,True
+collection point,18,collection timepoint,0.8888888888888888,Biospecimen Age,True,True,True
+overall survival,18,overall.survival.time,0.8108108108108109,Biospecimen Age,True,True,True
+experimental variable,18,experimental day,0.7567567567567568,Biospecimen Age,True,True,False
+collection buffer,18,collection time,0.75,Biospecimen Age,True,True,False
+vital_status,18,covid_status,0.75,External_sample_id,True,True,False
+translocations,18,treatment location,0.75,Treatment,True,True,False
+culture batch,18,culture age,0.75,Biospecimen Age,True,True,False
+family code,16,family id,0.8,External_sample_id,True,True,True
+dementia status,16,treatment status,0.7741935483870968,Treatment,True,True,False
+common name,16,sample common name,0.7586206896551724,External_sample_id,True,True,False
+source/differentiation,16,days of differentiation,0.7555555555555555,Biospecimen Age,True,True,False
+phase description,15,age description,0.875,Biospecimen Age,True,True,True
+surface markers,15,cell surface markers,0.8571428571428571,Biospecimen Type,True,True,True
+polarization state,15,polarization treatment,0.85,Treatment,True,True,True
+animal no,15,animal id,0.7777777777777778,External_sample_id,True,True,False
+experiment name,15,experimental day,0.7741935483870968,Biospecimen Age,True,True,False
+es line,15,cell line,0.75,Biospecimen Type,True,True,False
+stim,15,time,0.75,Biospecimen Age,True,True,False
+length of culture,15,age of  culture,0.75,Biospecimen Age,True,True,False
+experimental run,14,experimental group,0.8823529411764706,Treatment,True,True,True
+genotype/varation,14,mouse genotype/variation,0.8292682926829268,Biospecimen Organism,True,True,True
+alternative name,14,alternative sample name,0.8205128205128205,External_sample_id,True,True,True
+vaccination status,14,infection status,0.7647058823529411,Biospecimen Disease Condition,True,True,False
+sorted population,13,sample population,0.7647058823529411,External_sample_id,True,True,False
+antibody vendor,12,antibody vendor id,0.9090909090909091,External_sample_id,True,True,True
+immunization route,12,immunization dose,0.8571428571428571,Treatment Dosage Regimen,True,True,True
+incubation period,12,infection period,0.8484848484848485,Biospecimen Disease Condition,True,True,True
+biological source,12,biological sex,0.8387096774193549,Biospecimen Sex,True,True,True
+long description,12,age description,0.8387096774193549,Biospecimen Age,True,True,True
+fold enrichment,12,cell enrichment,0.8,Biospecimen Type,True,True,True
+radiation response,12,patient response,0.7647058823529411,External_sample_id,True,True,False
+type of insertion,12,site of infection,0.7647058823529411,Biospecimen Disease Condition,True,True,False
+clone name,12,cell line name,0.75,Biospecimen Type,True,True,False
+efflux status,12,cell status,0.75,Biospecimen Type,True,True,False
+source muscle,12,source cell,0.75,Biospecimen Type,True,True,False
+clinical manifestation,12,clinical condition,0.75,Biospecimen Disease Condition,True,True,False
+sediment,12,specimen,0.75,Biospecimen Type,True,True,False
+maternal state,10,maternal age,0.8461538461538461,Biospecimen Age,True,True,True
+library backbone,10,library barcode,0.8387096774193549,External_sample_id,True,True,True
+anatomic site,10,tissue anatomic site,0.7878787878787878,Biospecimen Type,True,True,False
+viral inactivation,10,viral infection,0.7878787878787878,Biospecimen Disease Condition,True,True,False
+malaria status,10,malaria strain,0.7857142857142857,Biospecimen Organism,True,True,False
+culture medium,10,culture time,0.7692307692307693,Biospecimen Age,True,True,False
+number of animals,10,number of_samples,0.7647058823529411,External_sample_id,True,True,False
+initial preparation,10,tissue preparation,0.7567567567567568,Biospecimen Type,True,True,False
+date of isolation,9,day of isolation,0.9090909090909091,Biospecimen Age,True,True,True
+subpopulation,9,cell subpopulation,0.8387096774193549,Biospecimen Type,True,True,True
+genotype background,9,cell type background,0.8205128205128205,Biospecimen Type,True,True,True
+differentiation replicate,9,differentiation time point,0.7843137254901961,Biospecimen Age,True,True,False
+antibody name,9,antibody treatment,0.7741935483870968,Treatment,True,True,False
+mutation frequency,9,treatment frequency,0.7567567567567568,Treatment,True,True,False
+derived culture,9,derived cell_type,0.75,Biospecimen Type,True,True,False
+process order,9,process day,0.75,Biospecimen Age,True,True,False
+environmental factor,8,environmental condition,0.7906976744186046,Biospecimen Disease Condition,True,True,False
+nes status,8,cancer status,0.782608695652174,Biospecimen Disease Condition,True,True,False
+activation,8,activation agent,0.7692307692307693,Biospecimen Age,True,True,False
+ps status,8,mouse status,0.7619047619047619,Biospecimen Organism,True,True,False
+nitrogen source,8,control source,0.7586206896551724,Treatment,True,True,False
+incubation,7,incubation time,0.8,Biospecimen Age,True,True,True
+stain,6,strain,0.9090909090909091,Biospecimen Organism,True,True,True
+replicate number,6,sample replicate number,0.8205128205128205,External_sample_id,True,True,True
+round of selection,6,rounds of infection,0.8108108108108109,Biospecimen Disease Condition,True,True,True
+als status,6,sample status,0.782608695652174,External_sample_id,True,True,False
+hippocampal sclerosis,6,hippocampal slice id,0.7804878048780488,External_sample_id,True,True,False
+life cycle,6,life cycle stage,0.7692307692307693,Biospecimen Age,True,True,False
+antibody lot,6,antibody group,0.7692307692307693,Treatment,True,True,False
+tubules with spermatocytes,6,tubules with round spermatids,0.7636363636363637,External_sample_id,True,True,False
+tic class,6,tissue class,0.7619047619047619,Biospecimen Type,True,True,False
+fraction/population,6,patient population,0.7567567567567568,External_sample_id,True,True,False
+zinc status,6,cancer status,0.75,Biospecimen Disease Condition,True,True,False
+nodal status,6,covid status,0.75,External_sample_id,True,True,False
+Growth Medium,6,growth time,0.75,Biospecimen Age,True,True,False
+culture variation,5,culture duration,0.8484848484848485,Treatment Dosage Regimen,True,True,True
+sorted,5,sorter day,0.75,Biospecimen Age,True,True,False
+number of_animals,4,number of_samples,0.8235294117647058,External_sample_id,True,True,True
+data type description,4,age description,0.7777777777777778,Biospecimen Age,True,True,False
+associated geo,4,associate geo_sample,0.7647058823529411,External_sample_id,True,True,False
+background mice,4,background strain,0.75,Biospecimen Organism,True,True,False
+developmental state,3,developmental stage,0.9473684210526315,Biospecimen Age,True,True,True
+histopathological diagnostic,3,histological diagnosis,0.84,Biospecimen Disease Condition,True,True,True
+Morphology,3,cell morphology,0.8,Biospecimen Type,True,True,True
+reference lot,3,reference condition,0.75,Biospecimen Disease Condition,True,True,False
+reference cat,3,reference condition,0.75,Biospecimen Disease Condition,True,True,False
+cause of death,2,age of death,0.8461538461538461,Biospecimen Age,True,True,True
+clip antibody vendor,2,antibody vendor id,0.7894736842105263,External_sample_id,True,True,False
+hot,1,host,0.8571428571428571,Biospecimen Organism,True,True,True
+incubation partner,1,incubation time,0.7878787878787878,Biospecimen Age,True,True,False

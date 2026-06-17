@@ -1,0 +1,4975 @@
+name,count
+tissue,157196
+cell type,97260
+age,73415
+treatment,71874
+gender,53178
+Sex,47903
+genotype,46776
+strain,41490
+cell line,40278
+disease state,31657
+time,17068
+disease,14111
+time point,12459
+group,11700
+diagnosis,11647
+condition,10956
+ethnicity,10118
+sample type,10037
+batch,9770
+timepoint,9424
+patient id,8310
+infection,8270
+individual,8008
+race,7888
+genotype/variation,6816
+subject id,6726
+replicate,5824
+donor,5515
+subject,5499
+chip antibody,5153
+developmental stage,5106
+disease status,4806
+antibody,4446
+Stage,4189
+patient,4121
+day,3722
+clinical info,3680
+visit,3653
+histology,3618
+agent,3539
+vaccine,3535
+plate,3492
+tissue type,3471
+subject status,3306
+protocol,3271
+bmi,3259
+tumor type,3082
+cohort,3031
+region,2915
+age in years,2898
+molecule subtype,2882
+housing condition,2815
+sample id,2694
+subjectid,2672
+site,2620
+smoking status,2577
+sample,2422
+segment,2380
+stimulation,2378
+strain background,2334
+location,2284
+organismpart,2192
+pasi,2192
+diseasestate,2186
+sample group,2179
+clinical diagnosis,2111
+organism part,2102
+celltype,2035
+phenotype,1959
+pathologic status,1940
+histologic diagnosis,1936
+tissue anatomic site,1936
+grade,1888
+type,1856
+mouse id,1755
+donor id,1737
+experiment,1725
+hiv status,1705
+slide no,1700
+psa-psoriatic arthritis,1700
+cell description,1693
+reference,1682
+source,1670
+participant id,1666
+Age,1662
+cell sex,1656
+controlid,1655
+molecule type,1618
+datatype description,1606
+datatype,1603
+tumor grade,1602
+sex,1601
+library type,1600
+tst,1588
+passage,1586
+cell,1531
+tcga subtype,1529
+molecule,1522
+dataset,1520
+mgmt status,1518
+collection_method,1517
+cell organism,1508
+well,1500
+Tissue,1499
+segment type,1492
+dose,1480
+roi,1459
+strain/background,1449
+deduplicatedreads,1447
+trimmedreads,1447
+sequencingsaturation,1447
+alignedreads,1447
+rawreads,1447
+stitchedreads,1447
+roi x coordinate,1444
+roi y coordinate,1444
+virus,1436
+surgical status,1417
+phillips subtype,1417
+infection status,1402
+tumor location,1401
+date,1400
+tumor stage,1390
+infection states,1389
+biological replicate,1375
+kps,1369
+hb,1364
+donor_id,1361
+outcome,1324
+tag,1317
+rin,1300
+biomaterial_type,1293
+mouse strain,1292
+culture,1264
+animal,1261
+antibody vendorid,1258
+antibody vendorname,1245
+patientid,1239
+mmse,1234
+batch id,1213
+tissue source,1209
+individual id,1208
+assay,1202
+antibody targetdescription,1200
+clinical status,1187
+geographical region,1182
+labversion,1180
+roi number,1177
+Gender,1172
+protection,1172
+lab,1170
+barcode,1156
+patient_id,1152
+disease group,1144
+corticosteroids,1140
+antibody antibodydescription,1138
+passages,1138
+class,1132
+labexpid,1110
+treatment description,1095
+temperature,1094
+tissue/cell type,1069
+final diagnosis,1067
+isolate,1067
+status,1055
+area,1053
+material,1047
+library prep,1030
+animal id,1019
+primary site,1010
+fraction,1003
+cell subtype,1002
+patient diagnosis,1001
+enrollment batch,1000
+covid-19 status,1000
+enrollment date t0,1000
+bc run_id,1000
+pipeline version,1000
+censored,1000
+biocollection id,1000
+provider,1000
+parity,998
+lab description,997
+background strain,997
+subtype,994
+cdna synthesis,993
+treatmentshort,992
+pasi.baseline,992
+platesimple,992
+pasi75.response,992
+pasi.week4,992
+pasi.week12,992
+biomaterial_provider,987
+patient gender,977
+extraction_protocol,970
+experiment_type,970
+moi,969
+medium,949
+tuberculin skin test,938
+drug treatment,934
+albumin,923
+treated with,920
+m. tuberculosis culture,911
+country of serum collection,911
+bcg scar or history,911
+acid fast bacilli (afb) smear microscopy,911
+previous history of active tb,911
+organ failure,910
+infected with,898
+development stage,897
+culture result,894
+hematocrit,883
+tb status,881
+survival_yr,876
+site_onset,876
+age_onset,876
+cell_type,875
+clone,871
+hemoglobin,865
+model,861
+bin,855
+qft,854
+cell line id,847
+idh status,842
+sampleID,841
+metastasis,840
+age description,839
+extraction_protocol_sonication_cycles,838
+extraction_protocol_type_of_sonicator,838
+cancer status,837
+donor_ethnicity,835
+donor_health_status,835
+donor_age,835
+donor_sex,835
+mouse model,822
+birth_place,813
+severity score,811
+method,810
+cell subset,806
+chip_protocol,804
+geographic location,804
+chip_protocol_chromatin_amount,804
+adjusted household density,804
+infant's sex,804
+disease stage,804
+delivery,804
+agricultural animals,804
+companion animals,804
+mother's age,804
+bmi code,804
+time post-partum,804
+softwareversion,795
+treatment group,792
+rpa,791
+hours post infection,779
+wbc,779
+tissue preparation,779
+treatment time,775
+disease severity,774
+morphology,764
+control,757
+fev1 % predicted,753
+neutrophils,749
+stress,744
+tissue of origin,744
+participant,742
+study,741
+infection protocol,740
+stimulus,736
+control description,731
+background,730
+patient viral load,726
+case number,726
+cell karyotype,726
+histology subtype1,722
+patient group,721
+cell lineage,713
+idh1 status,709
+chip_antibody_catalog,708
+sample source,708
+chip_antibody_provider,708
+sample alias,707
+sample common name,707
+os,703
+chip_antibody_lot,696
+sequencing_batch,685
+genetic background,683
+chip_protocol_bead_type,680
+chip_antibody,680
+chip_protocol_antibody_amount,680
+chip_protocol_bead_amount,680
+first_diagnosis,678
+working_diagnosis,678
+smoker,670
+field_site,669
+response,667
+irradiated,667
+hospitalized,665
+tissue_type,661
+atmosphere,661
+tumor grading,658
+treatment duration,657
+os_status,656
+growth protocol,654
+sample collection site,652
+fev1 %_predicted,648
+chest x-ray,644
+age group,642
+flowcell,640
+Race,638
+strain description,638
+infection time,635
+year,633
+transduction,629
+transfection,629
+severity,619
+epithelial,618
+ploidy,616
+first vaccination,614
+second vaccination,614
+geographic origin,610
+patient sample id,610
+pathology,605
+subgroup,601
+sample.id,597
+nanostring_id,597
+cartridgeid,597
+lane.number,597
+generlf,597
+fovcount,597
+bindingdensity,597
+fovcounted,597
+scannerid,597
+stageposition,597
+patient age,597
+systemapf,597
+center,596
+brain region,595
+crp,593
+ID,584
+illness,574
+passage_if_expanded,572
+selection,567
+weight,567
+lane,566
+qpcr plasmodium species,562
+naturally exposed or unexposed to plasmodium sp. parasites,562
+p53 mutation,560
+cftr genotype,560
+growth phase,558
+igra,557
+selection marker,554
+doubling time,553
+sars-cov-2 pcr,552
+sars-cov-2 rpm,552
+dnamage,551
+case,551
+Ethnicity,547
+Illness,546
+sorted cells,546
+infectious agent,546
+sort,542
+covid_status,538
+host,536
+pid,536
+groups,535
+recipient,534
+collection time point,533
+pmd_min,531
+duration,530
+disease duration,527
+cluster,527
+treg donor,527
+pcr2 cy. no,527
+origin,525
+nhl subtype,524
+slide,522
+donor age,518
+originating cell line,515
+facs sorting,512
+molecular subgroup,509
+biomaterial,508
+per lymphosstained,507
+disease_category,507
+resistance,506
+ChIP,506
+cell population,505
+sample_code,503
+organ/tissue,503
+previousdiagnosisoftb,501
+meconium ileus surrogate variable 21,500
+persistent ps aer status,500
+b_symptoms,500
+age_at_diagnosis,500
+meconium ileus surrogate variable 22,500
+patient classification at first sample,500
+meconium ileus surrogate variable 16,500
+meconium ileus surrogate variable 20,500
+meconium ileus surrogate variable 18,500
+meconium ileus surrogate variable 17,500
+age of onset of persistent ps aer or censored age,500
+meconium ileus surrogate variable 15,500
+sample_pre_active_treatment,500
+tss enrichment,500
+meconium ileus status,500
+genotype pc1,500
+filtered peaks,500
+meconium ileus surrogate variable 13,500
+genotype pc2,500
+genotype pc3,500
+genotype pc4,500
+genotype pc5,500
+genotype pc6,500
+genotype pc7,500
+consortium lung phenotype surrogate variable,500
+meconium ileus surrogate variable 1,500
+meconium ileus surrogate variable 14,500
+xpert,500
+meconium ileus surrogate variable 12,500
+conf_combine_unc,500
+quantiferon test,500
+t-spot. tb test,500
+discharged_to,500
+days_in_hospital,500
+immunization dose,500
+title,500
+dosanjh,500
+ed_disposition,500
+age of enrollment,500
+meconium ileus surrogate variable 23,500
+os_followup_y,500
+conf_entropy,500
+conf_combine_gcb,500
+meconium ileus surrogate variable 11,500
+conf_combine_abc,500
+pred_combine,500
+microdissection,500
+reagent,500
+probe_detection,500
+qc_fail,500
+case_diagnostic_subtype_icdo3,500
+diagnostic_group,500
+timetonegativity,500
+mgit,500
+meconium ileus surrogate variable 3,500
+tgrv,500
+meconium ileus surrogate variable 2,500
+days since first sample,500
+meconium ileus surrogate variable 4,500
+totfa,500
+p_il1ra,500
+whr,500
+in vivo passage,500
+sequencingbatch,500
+external id,500
+passedqc,500
+cancer site,500
+disease staging,500
+p_crp,500
+waist_circumference,500
+hip_circumference,500
+ffmass,500
+p_adipon,500
+meconium ileus surrogate variable 5,500
+matsuda,500
+extract name,500
+source_organism,500
+p_proi0,500
+systbp,500
+fsc.w.x,500
+assay name,500
+b_ghba1c,500
+diastbp,500
+sample_name,500
+fsc.h.x,500
+chest x-ray description,500
+gfr,500
+p_ffa0,500
+percent.ercc,500
+nfeature rna,500
+meconium ileus surrogate variable 6,500
+meconium ileus surrogate variable 8,500
+meconium ileus surrogate variable 9,500
+frip,500
+meconium ileus surrogate variable 10,500
+treatmentresult,500
+in_pmid_32187361,500
+in_pmid_30408148,500
+meconium ileus surrogate variable 7,500
+meconium ileus surrogate variable 19,500
+p_ins0,500
+fsc.a.x,500
+s_tottg,500
+s_totalc,500
+pfam_dbd,500
+array_design,500
+s_ldlc,500
+dev_stage,500
+s_hdlc,500
+chemical compound,500
+homair,500
+vendor id,500
+p_gl0,500
+ncount rna,500
+sorted compartment,500
+covid_hosp_days,500
+seurat clusters,500
+afb smear grade,500
+acuity.max,500
+fev1/fvc,500
+platform_id_id design,500
+white_blood_cell_count,500
+cluster_label,500
+segmented_neutrophils,500
+patient category,500
+sample class,500
+nrbc_absolute,500
+malaria_status,500
+nrbc_percent,500
+days since vaccine,500
+injection_roi,500
+meth-plate,500
+surgery number,500
+multisector,500
+classification group,500
+rna-seq plate,500
+meconium ileus surrogate variable 25,500
+platelet_count,500
+injection_materials,500
+hemisphere_name,500
+dbd source organism,500
+animal replicate,500
+project,500
+sample id alt,500
+library preparation method,500
+dbd,500
+time harvest,500
+assigned cluster,500
+date hyb,500
+match,500
+allele nominal,500
+sid,500
+date_m0,500
+plate_location,500
+date_m3_5,500
+time_to_malaria,500
+clinicaldiagnosis,500
+age_at_draw,500
+well address,500
+date harvest,500
+allele actual,500
+plate id,500
+tsne cluster,500
+smear_results,500
+predicted parent celltype,500
+days_from_att,500
+genotype_abbreviation,500
+neoplastic,500
+cancersite,500
+in_covid_aki_dataset,500
+immature_granulocytes_percent,500
+culture_result,500
+connectivity_zscore,500
+predicted celltype,500
+viral_positivity,500
+volunteer id,500
+fev1% predicted,500
+age_weeks,500
+institutional tumor diagnosis,500
+blood sample id,500
+waz,500
+immature_granulocytes_absolute,500
+consortium lung phenotype,500
+timepoint biopsy,500
+patient_asymptomatic,500
+eptborptb,500
+neutrophils_absolute,500
+admitted_to_icu,500
+blood sample_id,500
+library prep_plate,500
+sampling time_point_label,500
+days since_first_sample,500
+patient classification_at_first_sample,500
+covid-19 positive,500
+crna plate,500
+affy_batch,500
+supplier,500
+cell line code,500
+disease location,500
+cosmic id,500
+cmv status,500
+risk for tb,500
+induced,500
+n1_ct,500
+haz,500
+malaria_before_m3_5,500
+hiv positive,500
+facs.date,500
+cell projection,500
+recent boostrix,500
+instrument model,500
+exp_component_name,500
+external_donor_name,500
+full_genotype,500
+facs_population_plan,500
+meconium ileus surrogate variable 26,500
+conf_combine_mhg,500
+meconium ileus surrogate variable 24,500
+smear microscopy,500
+ethnicity1,500
+basophils_absolute,500
+pcr,500
+qtf-git,500
+tspot.tb,500
+basophils_percent,500
+eosinophils_absolute,500
+eosinophils_percent,500
+monocyte_absolute,500
+monocyte_percent,500
+lymphocyte_absolute,500
+lymphocyte_percent,500
+malaria_transmission,500
+in_covid_only_dataset,500
+contributing institute,499
+pcr cq,499
+curative_intent,496
+ldh,496
+sampledate at t0,496
+firstline_regimen,496
+sequencing batch,494
+tumor,494
+who category,493
+age_at_death_years,492
+disease_duration_years,492
+thal_amyloid_phase,492
+braak_asyn_stage,492
+clinical_diagnosis,492
+dementia,492
+braak_nft_stage,492
+cerad_stage,492
+neuropathological_diagnosis,492
+amp_plate,492
+duplicate_pair,492
+protocol description,492
+failed_genotyping_qc,492
+is_technical_replicate,492
+slide_position,492
+sequencing parameters,490
+cinsarc,489
+assayed molecule,489
+material support,489
+Strain,486
+passage number,485
+sars-cov-2 positivity,484
+diagnostic_mean,484
+comorbidities,481
+pathogen,478
+population,477
+library name,476
+contributing person,476
+infected with/healthy control,476
+brainbank,475
+personid,475
+broadbrainregion,475
+postmorteminterval,475
+dnamagewindsorized,475
+caglength,475
+esr,475
+code,473
+culture condition,472
+tissue_depot,471
+hyb chamber,470
+sample name,470
+monkeyid,470
+synchroset,470
+pittid,470
+red blood cells,460
+lymphs,460
+death,460
+performance_status_ecog,459
+line,459
+white blood cells,458
+FDG avidity,458
+FDG group,458
+isolation_method,455
+timing sx,455
+research pcr,455
+sample timing,455
+vaccine doses,455
+vl copies,455
+timing dx,455
+covid cat,455
+covid,455
+skin type,452
+vital status,450
+survival_status,450
+days_from_att_categ,450
+subgroup_att,450
+progression,448
+site of infection,447
+prior treatment,445
+survival,444
+breed,443
+subject_id,442
+predicted dlco,441
+cancer type,439
+infection code,438
+genome build,438
+sample material,438
+diseasestatus,437
+specimen,434
+time.to.tb.months,434
+time.from.exposure.months,434
+ffs,433
+culture conditions,432
+label,431
+immunocompromised status,429
+concentration,427
+wt/mut,426
+derived from hesc/ipsc,426
+hd/asd,426
+disease_status,426
+bait,425
+pcr1 cy. no,422
+chain,422
+techn. replicate,422
+sample collection time,421
+parasitemia,419
+media,417
+nanopore methylation_call,415
+reference diagnosis,415
+nanopore methylation_class_family_call,415
+outlier,414
+shRNA,414
+library well,412
+num_extranodal,412
+library plate,412
+genotypic pc2,410
+gxbdataset_biirinternal,410
+genotypic pc1,410
+array,407
+condition description,405
+date collected,404
+vaccination,404
+ols,403
+sequencing lane,401
+star_genome_mapped,399
+modified rankin score at 1 year post-ich,399
+initial ich volume,399
+day of trial,399
+glasgow coma score,399
+nih stroke score,399
+1 yr gcs <4,399
+senot determined,399
+fastq_frag_count,399
+gene_count,399
+adjusted disease severity index,399
+rrna_count,399
+hrs after symptom onset,399
+techrep,399
+prct_trans_mapped,399
+trans_mapped,399
+prct_rrna,399
+prct_star_genome_mapped,399
+response_group,398
+symptomatic or asymptomatic at sample collection,397
+qpcr screening for plasmodium genus,397
+grouping,395
+platelet,394
+nuclei count,393
+day post infection,391
+non human primate individual id,390
+age at death,387
+days since vaccination,387
+vaccine side effects,387
+vaccine type,387
+age at sample drawn,387
+induction date,385
+library date,385
+tau_a1,384
+antigen,384
+tau_a2,384
+nanostring plexset set in rcc files,384
+roicoordinatey,383
+sampling timepoint,383
+loq,383
+roicoordinatex,383
+markers,382
+technique,381
+exposure,381
+sample preparation,380
+chip antibody vendor,380
+tst skin test,379
+recruiting site,379
+tspot,379
+quantiferon,379
+sample_group,377
+slide id,377
+octn2,374
+aza tolerant,374
+smoking amount,374
+smoking stop date,374
+smoking start date,374
+casenote review date,374
+aza treated,374
+last followup date,374
+ibd affected relatives,374
+nod 1007 fs,374
+igr2198,374
+igr2230,374
+dlg5 133a,374
+octn1,374
+diagnosis date,374
+nod 908,374
+blood obtained,374
+other illnesses,374
+symptoms onset date,374
+birth date,374
+procedure date,374
+indictation for procedure,374
+nod 702,374
+wcc,374
+family history,374
+current medication,374
+joint problems,374
+igr2096,374
+subject group,371
+strain/genotype,371
+ipi_score,370
+binding density,370
+cap score,369
+mouse number,369
+classification,369
+cap_d_group,369
+aoinucleicount,368
+who grade,367
+gold stage,366
+chip antibody cat,365
+pcr test for sars-cov-2,364
+qc flag - low signal,363
+year of surgery,363
+tissue structure,363
+covid-19 ish status,363
+surface area,363
+history,363
+note,363
+negative normalization factor,363
+hyb-code,363
+tissue substructure,363
+sars-cov-2 rna ish,363
+replicate description,362
+age in year,362
+link,362
+organ,361
+growth condition,359
+ssc subtype,358
+experiment group,354
+mutation,354
+previous diagnosis of tb,354
+mouse,354
+sample group_label,353
+days of differentiation,353
+treatment location,353
+age at_treatment,353
+treatment age_group,353
+preoperative karnofsky performance status,352
+who,349
+rpa class,349
+source type,345
+karnofsky performance status before starting chemo-radiotherapy,345
+nuclei_counts,345
+amplification,341
+additional conditions,340
+sars-cov-2 voc,340
+egfr_amplification,340
+sample number within subject,339
+disease symptom,339
+skin,338
+chemotherapy,337
+sirna,335
+sample collection,335
+culture type,334
+animal_id,334
+tissue id,333
+rna source,333
+total number of genomic aberrations,332
+follow up years,332
+with or without clonal heterogeneity,332
+international prognostic index,332
+dead or alive at the end of follow-up,332
+animal age,330
+x coordinate,330
+aoi surface area,330
+y coordinate,330
+antibodies/tags,329
+obtainedby,328
+seizure,328
+treatment/time point,328
+other diseases,325
+monkey id,324
+amplification cycles,324
+pasi75 response at week 12,324
+idh1 mutation status,323
+disease type,322
+parasite strain,322
+animal sex,320
+colony of_origin,320
+cell phenotype,319
+scanheight,319
+ventilation,319
+scanoffsetx,319
+scanwidth,319
+dosage,319
+slide_scanid,319
+scanoffsety,319
+lotid,319
+week,317
+osteogenesis day,317
+msc source,317
+smoke,317
+donor category,317
+hemoglobin genotype,315
+asthma,314
+abs monos by lymphos,313
+abs eosinophils,313
+per monos by lymphos,313
+visit_date,313
+timepoint_months,313
+uk_arrival_year,313
+smear_result,313
+age_at_baseline_visit,313
+per lymphocytes,313
+tb_disease_type,313
+slide name,313
+per neutrophils,313
+abs neutrophils,313
+abs lymphocytes,313
+abs monocytes,313
+per monocytes,313
+paired rna-seq,312
+hb phenotype,311
+per eosinophils,310
+development,310
+disease subtype,308
+vaccinegroup,308
+cdk4_amplification,307
+cdkn2a_b_deletion,307
+mdm4_amplification,307
+pdgfra_amplification,307
+mdm2_amplification,307
+chr20_gain,307
+chr10_loss,307
+pten_deletion,307
+chr7_gain,307
+idh2 mutation status,307
+chr19_gain,307
+mean corpuscular volume,306
+vaccine v2,305
+vaccine v1,305
+aoisurfacearea,304
+cartridgebarcode,304
+sample time,302
+trachea region,301
+education,300
+p53 Status,300
+sampletype,300
+job/role,300
+CellLine,300
+BioSourceType,300
+DiseaseState,300
+Individual,300
+TargetedCellType,300
+Prior Treatment,300
+OrganismPart,300
+InitialTimePoint,300
+cells,299
+chip-antibody,298
+OS status,297
+treatment administration route,296
+treatment frequency,296
+category,296
+diffuse at baseline sample,295
+anti-rna polymerase iii,295
+anti-centromere,295
+technical replicate,295
+experiment type,295
+MDR Function,295
+anti-topoisomerase i,295
+description,294
+mrss at baseline sample,293
+hiv,292
+age at diagnosis,291
+tnm,290
+pseudomonas aeruginosa surrogate variable 1,290
+round of sequencing,288
+treatment1,288
+pfs,287
+index,287
+platinumfreeinterval.mos,286
+pfs.mos,286
+differentiation stage,286
+path.stage,286
+surgical.outcome,286
+diagnosis.of.record,286
+recurrence,286
+diagnosis.after.path.re.review,286
+tcga_subtype_pro,286
+tcga_subtype_mes,286
+tcga_subtype_imr,286
+tcga_subtype_dif,286
+vitalstatus,286
+os.mos,286
+platinumstatus,286
+stic,286
+birth defects,285
+developmental/speech disorder,285
+ct,285
+mri,285
+neurological disorder,285
+genetic testing,285
+cerebral palsy,285
+autoimmune disorder,285
+mutational subclass,285
+study group,285
+gastrointestinal disorder,285
+psychiatric disorder,285
+medications/vitamin names,284
+allergies,284
+covid-19-related medication and anti-microbials,284
+unpublished,284
+diet,284
+sars-cov-2,284
+tcr single cell sequencing,284
+single cell sequencing platform_id,284
+covid-19 severity,284
+city,284
+datasets,284
+bcr single cell sequencing,284
+diabetes,283
+virus strain,283
+lung disease,283
+chronic diseases,282
+volume,282
+molecular.diagnosis,280
+gcb.abc.signature,280
+stimulant,280
+drug,278
+age at baseline visit,277
+library preparation,277
+geographical location,277
+aoi,277
+codeos,275
+ezh2,275
+vaccination.assignment,275
+description of day,275
+protectionstatus,275
+codeffs,275
+subject number,272
+primary.tumor,271
+tissue.type,271
+irf4.prediction,271
+used for analysis,271
+irf4.status,271
+training.test,271
+irf4.probability,271
+tumor_name,270
+gene-level raw fpkm profile  file_download_link,270
+differentiation day,270
+block_name,270
+specimen_name,270
+rna_well_id,270
+structure acronym,270
+euthanized_due_to_pulmonary_tb,268
+day_of_euthanasia,268
+h3f3a status,268
+percent_weight_loss,268
+centre,268
+lung_mtb_burden,268
+hc coded,267
+radiation administered prior to tumor resection,267
+hc,267
+chemotx administered prior to tumor resection,267
+temodar administered prior to tumor resection,267
+set,267
+genome/variation,266
+immunization,265
+sample_set,265
+visit day,265
+pmi,265
+condition/tp dx,264
+tumour type,263
+induration_mm,262
+biopsy,260
+read length,259
+donor_id_blinded,258
+experimental group,256
+regimen,256
+chemo before tp,256
+per cd16pos cd3neg,255
+per cd20,255
+normalizedsmokinghistoryinpackyears,254
+diseasestaging,254
+cns subregion,253
+per cd3stained,253
+histological diagnosis,253
+per cd8,252
+transfected with,252
+align_input,251
+library_prep_date,251
+intronic_reads,251
+nuclear_reads,251
+intergenic_reads,251
+extract_date,251
+tb,251
+mtrna_reads,251
+passqc,251
+rrna_reads,251
+reads_all,251
+bfcohort,251
+tb_binary,251
+reads_trimmed_filtered,251
+micro_ref_stndrd,251
+align_unique,251
+align_multi,251
+align_tooshort,251
+exon_ratio,251
+duplication_rate,251
+intron_exon_ratio,251
+bias53,251
+exonic_reads,251
+sample_group_granular,251
+rrna_fraction,251
+ftcount,251
+lunit_score,251
+qxr_score,251
+cad4tb_score,251
+semiquant,250
+number of malaria infections,250
+volunteer code,250
+diseas state,248
+treatment dose,248
+molecular classification,248
+who.classification.2021,245
+surgical_interval_mo,245
+codel_status,245
+age_diagnosis_years,245
+recurrent_status,245
+idh_status,245
+tcga.subtype,245
+heidelberg_meth_subtype,245
+tumor localization,243
+repeat,243
+monocytes,242
+age of onset,240
+rna-sample type,240
+donor type,240
+basename,240
+paired samples,239
+season,238
+samplename,238
+original geo accession,238
+sars-cov2_rpm,237
+other information,236
+sorting strategy,234
+escape,233
+covid-19,233
+ca19-9,232
+karnofsky index,232
+treatment arm,232
+intrinsic subtype,231
+plts,231
+diffuse,231
+patient.code,231
+fvc at baseline visit,231
+1p/19q status,228
+dx,228
+hist.score,228
+pcv,227
+blood collection tube coating,227
+genetic modification,227
+dysplasia now,226
+Tumor stage,226
+sample_type,226
+broad diagnosis,226
+tumor category,226
+behavior at diagnosis,226
+dys broad location,226
+TimeUnit,225
+serostatus,224
+bcg vaccinated,224
+sorter day,224
+lymphgen_class_myc_pmid_32187361,222
+pid_pmid_32187361,222
+hmrn_class_aic_pmid_32187361,222
+modified_hmrn_class_pmid_32187361,222
+lymphgen_class_pmid_32187361,222
+disease activity,221
+subject condition,221
+tissue subtype,220
+coriell cell line repository identifier,220
+facs purification,219
+section,219
+codon129 genotype,219
+mrc scale,219
+treatment withdrawal,217
+animalid,217
+treatment initiation,217
+cdkn2a,216
+feeding,215
+cd4 count,215
+library protocol,215
+state,214
+transgene,213
+health state,213
+subject diagnosis,213
+active ingredient,212
+bal sampling date,212
+prescription drugs,212
+mtb challenged,212
+recreational drugs,212
+cigarette smoker,212
+sexually transmitted infections,212
+art start year,212
+medical.history,212
+quantiferon tb reagent,212
+sample day,212
+baseline hiv_rna,211
+tissue region,211
+baseline cd4,211
+treatment-outcome code,211
+timing,211
+processing,210
+tissue/sample type,209
+library quality,208
+blood_group,208
+sampling_timepoint,208
+bioreplicate id,207
+stimulation condition,207
+time post-stimulation,207
+in vivo or in vitro,207
+differentiation batch,207
+hyb position on 8-plex array,207
+hybridization batch,206
+visit number,205
+pair,205
+cell types,205
+developmental_stage,204
+primary diagnosis,204
+light condition,203
+malaria strain,203
+ild subtype,203
+responder cell line,203
+1 mouse or pool of 3 mice,203
+knockout,203
+diagnosis total,202
+diagnosis splen flex,202
+lauren classification,202
+anatomic_location,202
+followup total,202
+followup splen flex,202
+followup recto sigmoid,202
+followup rectum,202
+inflammation_status,202
+diagnosis hep flex,202
+aza at present,202
+diagnosis recto sigmoid,202
+diagnosis rectum,202
+uc flare up,202
+run_date,202
+ucss,202
+calprotectin,202
+followup hep flex,202
+days_symptom_onset,201
+patient_visit,201
+patient_age,201
+pregnancy status,201
+ajcc stage,201
+olink_sample_id,201
+anatomic location,201
+lung pathology,200
+muscle mass,200
+radiation.therapy,200
+log10 body mass index,200
+log10 matsuda insulin sensitivity index,200
+waist to hip ratio,200
+log10 bioimpedance,200
+per basophils,200
+ageatsampling,200
+overall.survival..days,200
+reference genome_for_processed_files,200
+fat mass,200
+reference genome_for_alignment,200
+tumor_entity_subtype,200
+sampling time,199
+patient sex,199
+time_since_onset,198
+primed,198
+library,198
+grey/whitematter,198
+treatment protocol,197
+brain location,197
+experimental replicate,196
+cancertype,196
+nf1,196
+designphase,196
+self_reported_race,195
+cell line of origin,195
+patient code,195
+plate_number,195
+cirrhosis present,195
+chronic hypertension,194
+evlp type,194
+clinical spectrum nih classification,194
+ga,194
+growth medium,193
+number of relapses,192
+pasi75resp,192
+Gleason Grade,192
+microbiota status,192
+survival after surgery,192
+sputum_culture,191
+cdna prep,191
+case/control,191
+region of birth,191
+sputum_smear,191
+biopsy type,190
+day post treament,190
+death with metastasis,189
+infection_status,189
+vaccination route,188
+outcome related,188
+couple number,188
+chr10q_loss,188
+sars cov2_hx,188
+growth,187
+rna sample id,187
+bacterium,186
+hours,186
+period,186
+infected/uninfected,186
+sequencing run,186
+buffer,186
+extraction date,185
+draw_date,185
+comment,184
+patient subgroup,184
+LabeledExtract,183
+patient number,183
+wga,182
+rip antibody,182
+hybridization protocol,182
+antibody manufacturer,182
+dna sample,182
+stimulation time and condition,182
+cell source,181
+pfs_status,181
+neoplasia type,181
+study id,181
+day post hct,181
+mgmtstatus,181
+symptom severity,180
+Histopathological diagnostic,180
+viral shedding,180
+sample tissue,179
+tst result,179
+fetal sex,179
+tissue/cell line,179
+ntd status,179
+uhdrs tfc,178
+uhdrs tms,178
+symptomatic,178
+age at year 1,178
+egfr,178
+expanded allele cag repeat count,178
+paired microarray,177
+factor,177
+age at_diagnosis,177
+dev stage,177
+paired material support,177
+ffpe quality,177
+lineage,176
+molecular subtype,176
+mtb_strain,176
+mgmt,174
+day of differentiation,174
+input,174
+sample_id,173
+biosample encode accession,173
+atcc id,172
+diagnosis rectal,172
+followup anal perianal,172
+diagnosis colonic,172
+hours post-invasion,172
+diagnosis details,172
+followup vienna classific,172
+behavior at followup,172
+diagnosis stricture fistu,172
+Cause of death,172
+treatment response,172
+ocp,172
+diagnosis anal perianal,172
+diagnosis vienna classifi,172
+harvey bradshaw,172
+sars-cov-2 infection,172
+further operations,172
+stoma ileal,172
+followup rectal,172
+followup ileal,172
+followup colonic,172
+diagnosis oral,172
+cdai,172
+diagnosis ileal,172
+followup oral,172
+smoking,171
+volunteer,171
+diseaselocation,170
+living,170
+survival time,170
+tumorgrading,170
+hc_85_samples,170
+survival cluster,170
+preparation,169
+differentiation,169
+disease_state,169
+vaccine group,168
+genotype huntington,168
+h37rv genotype,168
+ancestry,168
+enzymatic treatment,168
+subset,168
+days since covid-19 diagnosis,168
+0 = no,168
+harmonized disease score,168
+timepoint_postchallenge,168
+overall.survival.months,168
+donorid,168
+long-covid symptoms,168
+duration of illness,168
+deceased paired biopsies,168
+log grans_nx,167
+log mtb_cfu,167
+de-identified donor,167
+grans nx,167
+pitt id,167
+total mtb_cfu,167
+dose group,167
+timeafterbcg,167
+bcg dose_log10,167
+protect outcome,167
+mahpic non human primate individual id,166
+tssue,166
+tma,166
+hypertension,165
+symptomatic or asymtomatic at sample collection,165
+qpcr screening for plasmodium,165
+efficacy,164
+lentiviral transduction,164
+days post drug,164
+relative sox9_level,163
+pre-eclampsia,163
+tnm stage,163
+biorep,163
+collection time point (#) or necropsy,162
+mechanical ventilation,162
+group description,162
+hours post invasion,162
+seisure frequency,162
+antibody catalog,161
+inhibitor treatment,161
+tissue archive method,160
+parasite stage,160
+tumor full_name,160
+strain name,160
+abo,160
+mtb culture,159
+study participant,159
+disease_group_dme,158
+disease_group,158
+post_mortem_interval,158
+post_mortem_interval_unit,158
+buffer_volume_unit,158
+ammount_cells,158
+hba1c,158
+disease_group_detailed,158
+sample_site,158
+ffs_status,158
+time-point,158
+protein exchange,158
+dme,158
+eye,158
+samplenumber,158
+other_medication,158
+spike-in cell_type,158
+spike-in cell_line,158
+buffer_volume,158
+duration_diabetis,158
+ammount_cells_unit,158
+dr_severity_score,158
+diabetes_medication,158
+fov,156
+prognosis,156
+study_origin,156
+deceased unpaired biopsies,156
+os_month,156
+days after infection,156
+k13 allele,156
+illumina_index,156
+brain bank,156
+chip antibody lot,156
+cag_repeat,156
+age_binned,156
+conversion,156
+parasitemia category,155
+malaria rd test,155
+log2 parasitemia,155
+library prep. kit,155
+genotypic pc3,155
+tissue origin,155
+overexpression 1,154
+overexpression 2,154
+dm,154
+idh1/2 genotype,153
+restriction enzyme,153
+pdgfra,152
+pten,152
+mdm4,152
+sequencing type,152
+gleason,152
+differentiation_stage,152
+differentiation_method,152
+survival status,152
+rb1,152
+classifier_mes,152
+classifier_rtk2,152
+pathology_note,152
+classifier_rtk1,152
+cdk4,152
+blood.source,151
+aerosol.run,151
+biomaterial provider,151
+antibody description,151
+p53 status,151
+sequencing.lane,151
+cage,151
+lung.cfus,151
+age.days,151
+tb.status,151
+infection.time.point.days,151
+lane.ordinal,151
+embryonic stage,150
+anemia status at baseline,150
+pf infection status,150
+sample recovery type,150
+ajcc uicc stage,150
+splice variant,150
+clinical diagnosis specimen,150
+sbv challenge gold standard,150
+sequencing date,150
+parasite density,150
+clinical diagnosis patient,150
+temp max,150
+hct,150
+sample_barcode,149
+excision year,149
+flipi_score,149
+hybridizationdate,149
+rnaextractiondate,149
+fluidigm c1 capture chip size,149
+malign,148
+slide_id,148
+"deceased donors, only left kidney included in the analysis",148
+notes,148
+hc_74_samples,148
+adapter,147
+knockdown,147
+patient's condition,147
+side,146
+"biopsy data, villus height to crypt depth",146
+transplant type,145
+total_mtb_cfu,144
+time after bcg,144
+distinct stages of tb,144
+grans_nx,144
+log_mtb_cfu,144
+vax_dose,144
+time points,144
+dose_group,144
+vax_group,144
+pitt_id,144
+qft result,144
+protect_outcome,144
+cell type_at_ko/kd,143
+pneumocystis colonization,143
+target gene,143
+tst in mm,143
+identifier,142
+cell_line,142
+Phenotype,141
+patient treatment,141
+mgmt_status,141
+psa,141
+chip target,141
+facs markers,141
+bal_smear,140
+exposure_latent,140
+smear of index case,140
+modal x-ray grade,140
+cag,140
+s. haematobium at baseline,140
+bal_culture,140
+strandedness,140
+index_case_disease_site,140
+isolate_sensitivity,140
+distance from the tumor center,140
+crebbp,138
+obtainedby description,138
+ecog,138
+ep300,138
+foxo1,138
+pasi score,138
+tissue notes,138
+card11,138
+m7-flipi score,138
+arid1a,138
+mef2b,138
+pathogens,138
+foxp1,137
+obesity,137
+tumor subgroup,137
+subjects,137
+m7_flipi,137
+modified gene-expression profiling (mgep) score,137
+previously treated for nhl,137
+fvc,137
+caseid,137
+sars-cov-2 infected,136
+treatement,136
+dna methylation subgroup,136
+Other,136
+egfr status,135
+stress exposure,135
+inflammation status,135
+sample origin,135
+family,134
+time since steroid dose,134
+host cell,134
+collectiondate,134
+cellcount,134
+responder cells,134
+cell fraction,134
+years since diagnosis,134
+culture duration,134
+components,133
+biopsy site,133
+Time,132
+donor_genotype,132
+tissue-of-origin,132
+injection_type,132
+histopathology,132
+sample collection time post infection,130
+ip antibody,130
+dnase_protocol,129
+technology,128
+skin disease,128
+pcr positivity,127
+biological sex,127
+wg signature status,127
+fibrinogen,126
+ventilator-free days,126
+icu,126
+apacheii,126
+charlson score,126
+sofa,126
+genetic class,126
+target molecule,126
+associated controlled-vocabulary terms,126
+dmax<=20cm,126
+symptom,125
+gvhd,125
+mutation_carrier_status,124
+tfc_disease_stage,124
+tfc_score,124
+sequencing pool,124
+mouse genotype/variation,124
+cag_repeats,124
+t cell subset,123
+day-post-infection,123
+phase,123
+igra test_result,123
+single intradermal_comparative_tuberculin_test_(sictt)_result,123
+interferon gamma_release_assay_(igra)_test_starting_material,123
+ifga bovine_-_ifga_avian,123
+ifga bovine,123
+line type,123
+ifga nil,123
+ifga avian,123
+Diagnosis,122
+tumor subtype,122
+time post infection,121
+protocol number,121
+anca,121
+scan id,120
+nsaids,120
+infectivity,120
+arthropathymeds,120
+pcr result,120
+sequencing provider_id,120
+batch group,120
+qc status,120
+application,120
+das score,120
+sulfasalazine,120
+leflumide,120
+enzyme,120
+plaquenil,120
+steroids,120
+othermeds,120
+country,120
+biologics,120
+ehrlichia strain,120
+rituximab,120
+met_amplification,119
+tissue processing,119
+stimulation protocol,119
+other batch,118
+bmt recipient,118
+cell part,118
+serum type,118
+day after seeding,118
+bmt donor,118
+exposed stress,118
+visitid,117
+date of array,117
+line number,117
+batch.date,116
+marrow,116
+nhl or chl,116
+subtype/fl grade,116
+array batch,116
+cell culture,116
+hospital,116
+os month,116
+culture media,116
+infection agent,116
+day of_tumor_harvest,116
+harvesting time,115
+biosample confirmed diagnosis,114
+neurosphere derivation time,113
+tert promoter status,113
+immune status,113
+isolation source,113
+previous treatments,113
+vaccine regimen,112
+fragments in clean bam,112
+idh,112
+cell line source,112
+days after positive pcr results,111
+postmortem delay,111
+omicron sublineage,111
+parasite clearance halflife upon artemisinin treatment in patient,110
+cd4+ t cell subset,110
+mouse_id,110
+causes hf,110
+sensor,110
+donor code,110
+total cholesterol,109
+type of sample,109
+t2d/ir,109
+tryglicerides,109
+fibrosis degree,109
+fasting glycemia,109
+sentrix id,108
+cell type/line,108
+day_posthct,108
+spike-in,108
+hdl-cholesterol,108
+sentrix position,108
+patient population,108
+clinical condition,108
+"culture, stage, strain, harvest timepoint, estimated developmental age",108
+ldl-cholesterol,108
+dayposthct,107
+post-mortem interval,107
+Histology,107
+adt,107
+collection time,106
+readtype description,106
+interim pet response,106
+readtype,106
+primary tissues,106
+lmr>2.1,106
+time after treatment,106
+mic,106
+other,106
+growth media,106
+crispr library,105
+variety,105
+admission,105
+pasi_total,105
+age at sampling,105
+sample age proxy,105
+prnp codon 129 genotype,105
+subjid,105
+mrc scale score,105
+chip-seq antibody,105
+race/ethnicity,105
+drug dose,105
+infection group,105
+primary/recurrent,105
+day_post_hct,105
+scar,104
+timepointunit,104
+Outcome,104
+watch and wait,104
+patient condition,104
+worm infection,104
+timecollected,104
+family id,104
+colloquialtimeofday,104
+lighttreatment,104
+female,104
+braak,103
+small rna,103
+circumstances,103
+clinical phenotype,103
+sample subseries,103
+lesion,103
+target,102
+replicate mouse,102
+ph,102
+matched pair id,102
+stimulation duration,102
+gestational age,102
+lymphoma type,102
+infected,101
+rf,101
+diagnosis at bl,101
+ml_dataset,101
+Usage number,101
+das44,101
+wellbeing,101
+Filter number,101
+pain,101
+pseudotime,101
+diagnosis at year = 1,101
+swollen joints,101
+tender joints,101
+Exposures,101
+geo series,101
+ccp2,101
+geo accession,101
+symp.dur,101
+library strategy,101
+remission,101
+Tumor size,101
+response to artemsinin,101
+replicate id,101
+cortical_score,100
+cag_adj_estimated_onset,100
+cag_adj_striatal_score,100
+average library size,100
+striatal_score,100
+estimated_onset,100
+viral load,100
+donor number,100
+serotype,100
+duration_adj_striatal_score,100
+exposure time,100
+hto,100
+channel count,100
+followup months,100
+age of psoriasis onset,100
+current status,100
+sdh status,100
+litter,99
+hemisphere,99
+hours post-treatment,99
+localization,99
+treatment time point,98
+retinopathy,97
+disease_extension,97
+microarray_batch,97
+isolate type,97
+Smoking status,97
+cdeis,97
+endoscopic_mayo_score,97
+partial cdeis,97
+ko induction_time,97
+endoscopic_activity,97
+vector,97
+case_phenotype,97
+idh1,97
+mycn status,97
+tumor status,97
+incubation conditions,96
+"5, farthest",96
+sars-cov-2 infection state,96
+biosample confirmed sub-diagnosis,96
+age at transplant,96
+time of blood draw,96
+primary disease,96
+reporter,96
+atrx,96
+days post-vaccination,96
+ribosomal rna delpetion strategy,96
+culture_conditions,96
+volunteer number,96
+viral strain,96
+developmental stage rna isolation,96
+als phenotype,96
+individual identifier,96
+transplanted organ,96
+roi lot,95
+specimen_barcode,95
+sars-cov2 status,95
+imprkrt16w12,95
+imprepi.thickness,95
+parasite line,95
+imprkrt16w12_75,95
+animal name,95
+improvementtpssatw12,95
+pasi75_w12,95
+improvementpasiatw12,95
+cell stimulation,95
+endoscopic mayo subscore,94
+mitotic index,94
+xenograft line,94
+chemistry,94
+sequencing library,94
+qrds,94
+mouse identifier,94
+neuropathological diagnosis,94
+lps treatment,93
+Condition,93
+microglia media,93
+sirna treatment,93
+traf3ip2 genotype,92
+location of onset,92
+smoker or non smoker,92
+alchool use or not,92
+other pathologies,92
+therapy used,92
+vaccination boost,92
+familial anamnesis,92
+age.at.operation,92
+transduced with,92
+exposed to,92
+tumor.in.left.right.lobe,92
+fusion transcrit,92
+multifocal,92
+cinsarc group,92
+rqi,92
+purification,92
+post-mortem interval in hours,92
+subdivision of stimulated animals based on time of epilepsy developmentepilepsy development,92
+n0,92
+lymphocyte.reaction,92
+largest.dimension.ln.metastasis..cm,92
+subdivision of stimulated animals based on epilepsy development at given time point,92
+number.of.invaded.lymph.nodes..on.total.investigated.lymph.nodes,92
+health status,92
+mutational.status,92
+subdivision of stimulated animals based on seizure number,92
+extrathyroidal.extension..where,92
+vascular.invasion,92
+histological..subtype,92
+vaccination dose,92
+ibrutnib sensitivity,92
+capsular.effraction.lnm,92
+sub-population,92
+largest.dimension..primary.tumor..cm,92
+survival characteristics,92
+patient source,91
+tumour stage,91
+tumor region,91
+biopsy number for this subject,91
+disease_stage,91
+pcr screening for sars-cov-2,90
+days post onset of symptoms,90
+rna type,90
+onset,90
+p53 ihc,90
+cell state,90
+"age, months",90
+ct_aspergilloma,89
+ct_nod_cav,89
+survival_time,89
+ctscore,89
+ct_severity,89
+disease_duration,89
+ct_extent,89
+ct_nodules,89
+ct_severe_cav,89
+ct_consolidation,89
+ct_tib,89
+tlc,89
+Status,89
+sample number,89
+grna,89
+fev1,89
+eae clinical score,89
+Patient,89
+Group,89
+idh1 mutation,89
+tlco,89
+kco,89
+replicate # in experiment,88
+unique_subject_identifier,88
+tumour location,88
+progression_free_survival,88
+cell compartment,88
+progression_free_survival_censor,88
+bacterial lysate,88
+sample collection time post virus infection,87
+disease category,87
+age of death,87
+trial arm,87
+hour post infection,87
+antibiotic treatment,87
+sequencing,86
+cell subpopulation,86
+experiment year_month,86
+virus type,86
+unsorted or sorted,86
+AGE,86
+cattle breed,85
+main comorbidities,85
+clinical type,85
+surgery,85
+clinical stage,85
+tdtomato labeling,84
+cre driver,84
+apoe4,84
+patient comorbidity,84
+passes qc checks,84
+yfp labeling,84
+mouse line abbreviation,84
+pre_alveolar macrophageplification,84
+tumor type/grade,84
+dissection,84
+input material,84
+culture method,84
+rcas vector,84
+vonsattel grade,84
+responder,84
+tissue/treatment id,84
+overexpression,84
+survival time in months,84
+host genotype,84
+instance,84
+tissue compartment,83
+alias,83
+virus infection,83
+cell line background,82
+latent tb status at blood draw,82
+experiment label,82
+infectious challenge,82
+draw day,82
+viral status,82
+average tagmented library size,82
+prophylaxis,81
+e64-treatment,81
+donor_type,81
+dissolved oxygen,81
+integrative analysis,81
+pool no,81
+3' adapter sequence,81
+healthy control,81
+cell density,81
+subclass,80
+simulation,80
+cdkn2a methylation,80
+correctedtod,80
+causeofdeath,80
+pten methylation,80
+idh mut status,80
+mannerofdeath,80
+tobaccoatod,80
+tissuestoragetime_month,80
+bloodtexicology,80
+rpf_rin,80
+exercise intensity,80
+avgph,80
+tp53 seq,80
+egfr amp,80
+p-pras40 ihc,80
+timeofdeath,80
+pten del,80
+pdgfra ihc,80
+exposure condition,80
+number of cells,80
+animal identifier,80
+control/intervention,80
+medicationsatodc,80
+rtsq30,79
+umiq30,79
+pkc file,79
+adapter sequence,79
+specimen site,79
+expression,79
+challenge,79
+folder name,79
+infectious_dose,79
+library id,79
+panel,79
+relapse time,79
+primary recurrent,79
+infected host,79
+bacterial strain,79
+fracture site,78
+cell number,78
+gfap status,78
+patient identifier,78
+mib,78
+treatment2,78
+tumour,78
+bcg state,78
+age patient,78
+viral family,78
+stage of repair process,78
+viral genus,78
+covid infection_status,77
+lentivirus,77
+karyotype,77
+culture days,77
+geo expression data,77
+biopsytime,77
+covid severity_status,77
+tissue group,77
+sentrix.id,76
+bacterial infection,76
+desease state,76
+steroids_cat,76
+averageage,76
+nasal_steroids,76
+any_immune,76
+treatment status,76
+surgery type,76
+averagebodymassindex,76
+cancer stage,76
+steroids_daily_pred_mg,76
+immune_or_nasal,76
+huntingtondiseasestatus,76
+source tissue,76
+vdi,76
+smoking_status,76
+smoking_pkyrs,76
+host strain,76
+blood island injection at 28 hpf,76
+rna population,76
+c4 = egpa,76
+replicate / experiment,75
+infection duration,75
+minimum counts per cell threshold used to remove background barcodes,75
+lesional (ls) vs. nonlesional (nl) vs. normal,75
+bvas,75
+post-mortem delay,75
+peptide,75
+preservation method,75
+genotype/varaition,75
+number of pooled individuals,75
+indrops version,75
+pool id,75
+infection state,75
+library index sequence used to demultiplex,75
+minimum reads per cell during initial processing,75
+cell lines,75
+ClinicalInformation,75
+spike-ins,75
+bone-marrow grafting type,74
+bone-marrow grafting status,74
+parental tumor subtype,74
+perturbation/epigenome editor,74
+clinical outcome,74
+sample plate,74
+growth stage,74
+lung log10cfu,74
+mouse line,74
+tp53,74
+radiation,74
+activation agent,74
+ear treatment,74
+sequeneced tissue name,73
+tb-status,73
+injected virus,73
+preliminary diagnosis,73
+Type,73
+injection site,73
+experimental status,72
+clinical indication,72
+patient identification number,72
+sentrix_id,72
+b. pertussis strain,72
+sort population,72
+transgenic line,72
+therapy,72
+tcm syndrome,72
+hd genotype,72
+batch of sequencing,72
+sentrix_position,72
+metastasis site,72
+variant type,72
+b. pertussis year of isolation,72
+vzv antigen,71
+treatment 1,71
+storage,71
+sample description,71
+compound,71
+primary tumor site,71
+gca,71
+tumor contact with subventricular zone yes/no,71
+nf1 inheritance,70
+facial dysmorphism,70
+scoliosis,70
+lisch nodules,70
+microdeletion sub-type,70
+cutaneous neurofibromas,70
+subcutaneous neurofibromas,70
+skin-fold freckling,70
+host mice strain,70
+passage of pdx,70
+tags,70
+originial tumor id,70
+plexiform neurofibromas,70
+parental origin,70
+glioma,70
+fetus,70
+rna isolation kit,70
+igm,70
+cxcl11_12,70
+learning disabilities,70
+anatomical location,70
+cxcl12,70
+donor covid_status,70
+rna extraction_protocol,70
+biological drug,70
+ackr3,70
+embryo,70
+age at initiation,70
+lesional (ls) vs. normal,69
+mrna-seq reads,69
+trasplant donor origin,69
+Genetic background,69
+Lymph node involvement,69
+ezh2 mutation,69
+Degree of differentiation,69
+dpi,69
+treatment_timeline,69
+compartment,69
+alcohol,69
+host vendor,69
+host strain/background,69
+Histological type,69
+fl grade,68
+primary_recurrent,68
+idh_mutation,68
+mouse selection,68
+structure,67
+steroid,67
+restriction enzymes,67
+day blood taken,67
+vs type,67
+ebv.status,66
+clinically_aggressive,66
+lf,66
+histological.type,66
+ann arbor stage,66
+prior_surg,66
+number of immunization boost,66
+prior_rt,66
+mnp_score,66
+mnp_classifier,66
+postop_growth_rate_percentyr,66
+backbone,66
+eor,66
+preop_growth_rate_percentyr,66
+lffp,66
+tissue status,66
+genetic variants,66
+modulation mg,66
+stabilized with,66
+sampling.time,66
+chip epitope,66
+day cfu measured,66
+size,66
+control or als,65
+derivation,65
+kit/pdgfra mutation site,65
+metastatic tumor site,65
+cell markers,65
+risk,65
+tumor histology,65
+hpi,65
+malaria infection,65
+response to eribulin,65
+treatment_duration,65
+treatment 2,65
+kit/pdgfra mutation type,65
+kit dna_extraction,65
+iPSc clone name,65
+id simple,64
+tumor localisation,64
+cag repeat size,64
+hadzi-vonsattel striatal score,64
+geo_sample_id,64
+clinical trial phase,64
+methylation_geo_id,64
+idontma,64
+id sample,64
+vector treatment,64
+severity_score,64
+roilabel,64
+fetalgender,64
+covidstatus,64
+harvest time,64
+sequencing method,64
+cnccs derived from,64
+lesion_size,64
+previous drug treatment,64
+rounds_to_cure2,64
+age at time t0 in years,64
+library_batch,64
+rounds_to_cure,64
+antibodies,64
+hadzi-vonsattel cortical score,64
+immune border,64
+lesion_label2,64
+dth,64
+roi type,64
+ki67 percentage,64
+cytology,64
+ivygap,64
+infiltration,64
+genes mutated for this sample from patient,64
+presence_of_parasites_lesion,64
+days_after_pcr,64
+with_lesion_sample,64
+lesion_label,64
+ki67,64
+parasite_numbers_lesion_qpcr,64
+lesion_disease_factor,64
+lib size,64
+lymphocyte_count,64
+total skin score,64
+serum vitamin d <15ng/ml,64
+lobe,64
+living paired biopsies,64
+dth_mm2,64
+illness_duration,64
+comments,64
+enrichment method,63
+minutes of mrna decay,63
+library prep person,63
+overall.survival.time,63
+days post infection,63
+rna sample number,63
+ref id,63
+ifih1-rs1990760,63
+genotype/strain,62
+vaccine administered,62
+surgical treatment,62
+antibody group,62
+extraintestinal manifestations,62
+other biologic medicines use,62
+azathioprine use,62
+rectal mesalazine use,62
+stool frequency,62
+life stage,62
+number of_mice,62
+carbon source,62
+glucocorticoids use,62
+oral mesalazine use,62
+date sampled,62
+sulfalazine use,62
+bleeding,62
+collection day,62
+deleted_gene,62
+time in culture,62
+aspiration site,61
+ethinicity,61
+patient_no,61
+source cell type,61
+time of sample collection,61
+tcr repertoire,61
+infection type exposure,61
+infected with sars-cov-2,61
+clinical presentation,61
+cag repeats,60
+pediatric patient,60
+tcr,60
+tissue/cell info,60
+ras score,60
+angiogenesis score,60
+p53 score,60
+egfr score,60
+sample name in supplementary file,60
+prodromal status,60
+dystonia,60
+duration of infection,60
+casegroup,60
+cartridge,60
+subject age,60
+labeling agent,60
+bru labeling time,60
+alive,60
+time between bru labeling and rna extraction,60
+rapamycin treated,60
+seks,60
+ifn type,60
+Case,60
+primary tumor,60
+rna_integrity,60
+Subsets,60
+time after bcg vaccination,60
+fvc less than 70,60
+eosinophils,60
+stimulated with b . pertussis,60
+stage,60
+pertactin genotype,60
+days after stimulation,60
+csp,60
+vector constructs,60
+corrector,60
+dyt1 mutation status,60
+pathogen exposure,60
+viral challenge,60
+agvhd developed,60
+mapped te_cell line info,60
+Grading of acute GVHD,60
+SEX,60
+patient no,60
+coo,60
+rnaextractedfrom,59
+apoe genotype,59
+covid status,59
+sorted cell_type,59
+fvc predicted,59
+sandwich type,59
+biofluid,59
+gene deletion status,58
+survival year,58
+types,58
+cells detected,58
+tissue derivation,58
+pcr status,58
+endotype,58
+malaria retinopathy,58
+respirations per minute,58
+cycling,58
+library input,58
+location of lesion,58
+experimental condition,58
+replicates,58
+local skin score,58
+mrss,58
+subtypes,58
+mouse age,57
+alternative sample name,57
+culture platform,57
+treatment outcome,57
+time after infection,57
+endpoint,57
+lesion status,57
+treatment/timepoint,57
+library-type,57
+mutation class,57
+experimental set,57
+rabbit group,57
+modifications,57
+induction,57
+patient response,57
+rabbit id,57
+sampling site,57
+tissue collection,56
+plasmid,56
+symptoms,56
+primary/metastasis,56
+fas ligand level,56
+3 = severe changes,56
+malignant tumor,56
+dlco predicted,56
+study_id,56
+lymph node number,56
+commercial source,56
+grwoth condition,56
+topography,56
+glioblastoma subtype,56
+eae scores,56
+age and disease,56
+data tissue_collection,56
+sequencing id,56
+debris removal,56
+cough,56
+developemental stage,56
+dyspnea / tachypnea,56
+publication id,56
+copd,56
+fever,56
+sars-cov-2 genomes / 10^6 rnasep copies,56
+3 = numerous,56
+3 = fibrotic,56
+cvrf,56
+i7 index,56
+cag length,56
+pfspz dose,55
+disease model,55
+Sample ID,55
+gpi,55
+exitus,55
+year of isolation,55
+Differentiation Method,55
+upper or lower extremity,55
+family_history,55
+tuchmi id,55
+volar or non-volar,55
+parental line,55
+growth pattern,55
+tuberculosis_history,55
+mdm genotype,54
+sofa score,54
+copy number gain,54
+timepoint_description,54
+laboratory strain,54
+organ system,54
+match degree,54
+sort strategy,54
+clinic status,54
+primary mutation,54
+initial tumor increase/(-)decrease,54
+gvhd stage,54
+age at blood collection,54
+perturbation,54
+perturbation class,54
+library version,54
+ribosomal rna depletion strategy,54
+mdm donor,54
+kit mutation,54
+organoid line,53
+collected_by,53
+platform,53
+thymalfasin treatment,53
+age at surgery,53
+FISH origin,53
+EBV,53
+rna sample,53
+granuloma,53
+cfu,53
+samples of different individuals pooled,53
+als mutation,53
+sample/subject id,53
+rna extraction method,52
+route administered,52
+sporozoite age,52
+psoriasis duration,52
+genetic specifics,52
+Genotype,52
+pregnancy,52
+isolation method,52
+sars-cov-2 genotype,52
+biological_replicate,52
+reason for intubation,52
+tumor size,52
+30 day mortality,52
+igg used for ip,52
+egfrviii statue,52
+hispanic ethnicity,52
+brain metastasis,52
+cross-linked,52
+lrti pathogen,52
+lrti type,52
+vehicle,51
+oxygen percentage,51
+tumor_grading,51
+infection strain,51
+day of tissue harvest,51
+last follow-up,51
+lymph node,51
+cut&tag antibody,51
+days_to_tb,51
+extract_protocol,51
+organism_status,51
+dosage 1,51
+dosage 2,51
+tumor side,51
+treatment stage,51
+organism_part,51
+clinical_history,51
+recipient strain,51
+specific heart region,51
+age/gender,51
+cerebral performance category score,50
+injury/age,50
+Mouse ID,50
+strain info,50
+health_status,50
+rna,50
+study number,50
+anti-retroviral therapy,50
+metastatic site,50
+age in_yrs,50
+biosourcetype,50
+other organ lesion,49
+ago protein,49
+mtb strain,49
+parental cell line,49
+decrease of vision,49
+mutations,49
+bar code,49
+swollen eyelid,49
+sex/age,49
+idh mutation,49
+tumor source,49
+diplopia,49
+hours_post_infection,48
+treatment category,48
+block in gpr file,48
+treatment_time,48
+facs marker,48
+subject gender,48
+treatment_duration_in_hours,48
+sample/time point,48
+slide tissue area,48
+day post-infection,48
+260/280,48
+260/230,48
+rna integrity score,48
+kit,48
+replicats,48
+stem cell,48
+onset site,48
+resistance to hiv-1 following ifn treatment,48
+alsfrs,48
+anti-jo1 status,48
+scan method,48
+group label,48
+sample prep,48
+tisuue type,48
+mosquito,48
+experiment batch,48
+batchid,48
+subbatchid,48
+librarytype,48
+sequencingrunid,48
+experimental day,48
+infection statut,48
+conditions,47
+conditioning received,47
+dissected embryo id number,47
+symptons,47
+age fracture,47
+tumorsphere,47
+syndrome,47
+cjd subtype,47
+treament,47
+treatment prior to second surgery,47
+relapse,47
+isolation,47
+sample name_2,47
+codon 129,47
+proximal sars-cov-2 nucleocapsid protein,47
+diesease status,47
+graft source,47
+title_2,47
+cell surface marker,47
+processing batch,46
+tnf,46
+bw loss in 6 months prior to surgery,46
+run id,46
+monocytes_count,46
+littermate,46
+parasite density on admission,46
+person,46
+rna label,46
+surface marker,46
+lane id,46
+mean.corpuscular.volume,46
+ethnic group,46
+BREAST,46
+developmental stage/tissue,46
+lymphocytes_count,46
+sample id cat,46
+plasma epo ria,46
+mip1-beta,46
+total bilirubin,46
+derived from,46
+parental strain,46
+biol. repl,46
+il-1b,46
+hiv screen,46
+rbc.distribution.width,46
+plasma pfhrp2,46
+lifetimechronicandoracuteatodinfectiousorinflammatorydiagnosis,46
+patient/control id,46
+mip1-alpha,46
+hb genotype,46
+mcp-1,46
+plasma ho-1,46
+ifn-gamma,46
+to concatenate,46
+rna fraction,46
+2h alt,46
+ip-10,46
+il-12 p70,46
+over-expression,46
+il-8,46
+il-6,46
+systemic sclerosis subtype,46
+il-1ra,46
+neun,46
+wbc.count,46
+neutrophils_count,46
+il-10,46
+cov-2 variant,45
+immunosuppression,45
+day 28_agvhd_response,45
+fvc %predicted,45
+type of library,45
+vaccine administration,45
+cell surface markers,45
+severity binary,45
+inoculation,45
+tissue acquisition,45
+severe_eosinophilia,45
+subject/sample source id,45
+active_disease,45
+radiation sensitivity,45
+cell line / strain,45
+major_organ_involvement,45
+differeniation stage,45
+digestives_symptoms,45
+temozolomide sensitivity,45
+host cell line,45
+patient sample,45
+tumour size,45
+days post-infection,45
+serologic response status,45
+bcl2.break,45
+bcl6.break,45
+modality,44
+relative sox9 level,44
+cell/tissue type,44
+clinical phenotype details,44
+translocation,44
+ct value,44
+sample_nhp_id,44
+time of sampling,44
+intervention group,44
+donor-nhp_id,44
+growth type,44
+receptor status,44
+total rna source,44
+vendor,44
+tumour site,44
+host organism,44
+survival group,44
+histological grade,44
+histone mark,44
+strain source,44
+IL6,43
+VCAM1,43
+condition 1,43
+differentiation status,43
+Lymphotactin,43
+Tissue Factor,43
+condition 2,43
+TGFa,43
+days ill,43
+nutritional state,43
+TNFa,43
+subject's disease state,43
+hf concentration,43
+prior chemotherapy,43
+collection date,43
+cell type neun status,43
+day of collection,43
+kg,43
+P-selectin,43
+temp,43
+maternal age,42
+Donor type,42
+experimental variables,42
+length of exposure,42
+days post exposure,42
+days post_infection,42
+IL12p70,42
+age and_strain,42
+progerin,42
+antibody treatment,42
+h. bilis infection,42
+average gic50,42
+IL15,42
+main group,42
+rnase,42
+derived from hesc or ipsc,42
+properties,42
+time post-vaccination,42
+HLA match,42
+state of culture,42
+subclone,42
+injection,42
+Conditioning,42
+IL10,42
+Followup,42
+GVHD stage Skin-Liver-Gut,42
+number cag repeats,42
+differentiation time,42
+specificity,42
+markers used for sorting,42
+Cluster,42
+age years,42
+baseline fvcpp,42
+baseline fevpp,42
+Blood drawn post BMT,42
+sample date_yyyymmdd,42
+lentiviral infection,42
+age/disease timepoint,42
+tissue subtype/brodmann area,41
+fusion,41
+er status,41
+post-treatment day,41
+Disease,41
+l. pneumophila infection,41
+cpg island methylator phenotype (cimp) subgroup,41
+her2 status,41
+pr status,41
+tumor/control,41
+anti-pd1-therapy,40
+repeated samples,40
+sample.name,40
+hemolysis score,40
+overall.survival,40
+batch_id,40
+collection,40
+oxygen flow,40
+treatments,40
+transfection experiment,40
+source cell,40
+injected lentivirus,40
+gel_bead_version,40
+sequencing_method,40
+passaged in,40
+days post-prime,40
+disease phase,40
+patient reference,40
+nicotine,40
+patient id no,40
+microenvironment,40
+percentage of tumor cells,40
+m. tuberculosis strain,40
+sample condition,40
+who class,40
+clinical.diagnosis.history,39
+dcodewk,39
+diagnosis_descriptcion,39
+amyloid,39
+braaklb,39
+pmd,39
+profession,39
+neuropathological.information,39
+wcode,39
+ab_score,39
+age at biopsy date,39
+freezer,39
+ocode,39
+specific,39
+tau_score,39
+dcodeprot,39
+immnosuppressive,39
+csf,39
+"normal individual, Tissue",39
+autopsy,39
+nbb,39
+dcode,39
+2021 classification,39
+cause.of.death,39
+qualifying condition,39
+pten.mutation,39
+egfr.mutation,39
+tp53.mutation,39
+pdgfra.amplification,39
+uniprotkb id,39
+radiation exposure,39
+cdkn2a.2g.loss,39
+lentiviral vector,39
+egfr.amplification,39
+tumor.grade,39
+days post challenge,39
+sample pool,39
+pipeline.version,39
+clofazimine treatment,39
+tisue/cell type,39
+experimental repeat,39
+idh.status,39
+construct,38
+hereditary status,38
+ighv status,38
+Virus Strain,38
+isocitrate dehydrogenase 1 status,38
+tissue type analyzed,38
+ev genotype,38
+data file subset,38
+experimental batch,38
+ev donor,38
+histological response,38
+sample_time,38
+rna subtype,38
+isogenic_group,38
+host cell type,38
+postsurgical-treatment,38
+imatinib responder,38
+cells_loaded,38
+mgmt.status,38
+nulliparous,38
+labor,38
+deliveryroute,38
+resection,38
+genomic modification,38
+pooled,38
+xenograft source,38
+meningioma type,37
+sf,37
+paired with,37
+tumor vs. normal,37
+BRCA1/2 mutation,37
+perturbation type,37
+Cycle,37
+workflow,37
+Family History,37
+Cell type,37
+antibody catalog number,37
+library_generation_pcr_number_cycles,37
+library_generation_pcr_polymerase_type,37
+library_generation_pcr_product_isolation_protocol,37
+Source,37
+library_generation_pcr_thermocycling_program,37
+donor no,37
+library_generation_pcr_primer_conc,37
+translocation status of ccnd2,37
+cdca7l expression,37
+drug concentration,37
+mating type,37
+exptl time,37
+virus-stimulation,37
+library prep kit,37
+library_generation_pcr_f_primer_sequence,37
+data type,37
+sample case,37
+library_generation_pcr_r_primer_sequence,37
+skin anatomy,36
+medicine,36
+maximal prior disease extend,36
+tw culture results,36
+time post-treatment,36
+indication,36
+viral infection,36
+primary cells,36
+conditional ly6e knock-out,36
+locale,36
+parasite,36
+disease diagnosis,36
+relation to individuals with wd,36
+ki67.score,36
+subject label,36
+irf4/mum1.expr,36
+individuals,36
+tagid,36
+l.pn infection,36
+tagseq,36
+tna extraction_method,36
+hours of infection,36
+clone id,36
+subject id/diagnosis,36
+endoscopic mayo score,36
+clinical information,36
+duration in hours,36
+inhibitor removal,36
+location type,36
+antibody catalog/vendor,36
+lc status,36
+cd10.expr,36
+myc.break,36
+batch number,36
+irf4 genotype,36
+miRNA,36
+experimental,36
+timepoint_in_hours,36
+library preperation date,36
+transl,36
+environment,36
+ln involvement,36
+Mouse model,36
+extranodal,36
+growth time mins,36
+first-line therapy,36
+day transplantation,36
+number of replicates,36
+barcoded replicate,36
+water salinity,36
+clinical group,36
+organ obtained,36
+rna-extraction date,36
+ipi,36
+sample from primary gbm diagnosis,36
+developmental stages,35
+flow cytometry cell subset proportions,35
+brodmann area,35
+biopsy vs surgical resection,35
+btic id,35
+person id,35
+nonunion type,35
+host_cell_line,35
+MALT1 Tx,35
+donation source,35
+contiguous with mpnst,35
+hours post fertilization,35
+labversion description,35
+primary vs metastatic,35
+scorad,35
+Age of Onset,35
+strain  background,35
+years of disease,35
+nf1 diagnosis,35
+Age at interview & blood sampling,35
+family history of nf1,35
+Twin Pair ID,35
+Clinical Status,35
+cre,35
+culture age,35
+experimental design,35
+pulldown,35
+TNM stage,34
+Age at time of surgery,34
+Packyears,34
+dna_preparation_adaptor_sequence,34
+untreated/treated,34
+characterstics,34
+Location of distant metastasis,34
+dna_preparation_post-ligation_fragment_size_selection,34
+Type of Surgery,34
+bisulfite_conversion_percent,34
+dna_preparation_fragment_size_range,34
+conditioned media origin,34
+treated stem cells,34
+library_generation_pcr_template_conc,34
+tandem repeat number,34
+Metastases,34
+Location tumor,34
+dna_preparation_initial_dna_qnty,34
+dna_preparation_adaptor_ligation_protocol,34
+Tumor type,34
+bisulfite_conversion_protocol,34
+eae status,34
+method of preservation,34
+Dead/Alive,34
+COPD,34
+cell tye,34
+asbestos-fiber count,34
+morphotype,34
+day of isolation,34
+FEV1,34
+body site,34
+reprogramming method,34
+disease subset,34
+time_point,34
+conditioned media type,34
+dexamethasone status,34
+Sample code,34
+Tissue type,34
+GOLD stage,34
+p53 Model,33
+gene,33
+genetic variants inheritance,33
+bedaquiline dose,33
+treatment_gefitinib,33
+alternative_name,33
+total volume,33
+infectious,33
+cell treatment,33
+srcap crispr edit,33
+h2a.z crispr edit,33
+sars-cov-2 strain,33
+definite analysis,33
+age at collection,33
+parasite isolate,33
+growth conditions,33
+time post initiation of treatment,33
+chip-antibody cat,33
+core code,33
+sputum smear status,33
+induce ifnÎ²,33
+gdnf-stimulated,33
+chip-antibody vendor,33
+viral infected,33
+hrs post cpgb stimulation,33
+name_in_pmid_21471286,33
+extract protocol,33
+clinical phenotypes,33
+isolate sensitivity,33
+tretment,33
+transposase,32
+disrupted gene id,32
+virus accession number,32
+animal number,32
+zygosity,32
+nhp id,32
+alzheimers status,32
+plasmodium strain,32
+cultivation,32
+twins,32
+KIT mutation,32
+plasmodium falciparum infection status,32
+infection type,32
+tb_status,32
+diffuse/limited,32
+age post-hatch,32
+uv irradiation,32
+virus taxon id,32
+water type,32
+hiv_status,32
+time after treatment (and reversal) in hours,32
+tetracycline,32
+adt/hto,31
+sgrna pool,31
+paired patient,31
+single or double infection,31
+lymphoma subtype,31
+iPS,31
+age at time of collection,31
+gbm classification,31
+antibody status,31
+study sample number,31
+chl subtype,31
+treatment before challenge,31
+maternal health status,31
+Cell line,31
+cell line name,31
+b cell type,31
+gestational stage,31
+gvhd status,31
+age fraction,31
+treatment/passsage,31
+sample beneath,30
+single or double infected,30
+viral concentration,30
+pna,30
+induction time,30
+virus added,30
+normal vs covid-19,30
+tissue from postmortem or living patient,30
+line name in manuscript,30
+age of pregnant women,30
+neural tube defect,30
+tcell type,30
+source cell line,30
+age at skin biopsy,30
+derived cell line,30
+cell line/type,30
+vaccinated,30
+tumor tissue source,30
+cell passage,30
+rna prep,30
+pre-treatment,30
+lentiviral mediated overexpression,30
+pretreatment time,30
+biopsied region,30
+schedule,30
+Time after induction,30
+tumor organ site,30
+pathological diagonosis,30
+biogroup,30
+transgene1,30
+transgene2,30
+preparation method,30
+differentiation state,30
+phenotypes,30
+library barcode,30
+Medication at blood sampling,30
+knock-in line,30
+post-operative day,30
+rsk1 protein group,30
+sampling point,30
+beadchip section,30
+tw serology results,30
+beadchip barcode,30
+tb strain,30
+brain section,30
+test,30
+spikeinpool,30
+rifapentine (10mm) treated,30
+p. berghei anka-infected,30
+sequencing run / batch,30
+cell culture condition,30
+cell-type,30
+estimated sample purity,30
+"gender,age, tissue type",30
+vaccinated status,30
+fresh frozen (ff) or ffpe,30
+note_other,30
+a260/a280 ratio,30
+rifampin (10mm) treated,30
+p53_status,30
+chemical treatment,30
+parental-strain,30
+promoter,30
+microarray hybridization date,30
+status of disease 5 years,30
+egfr variant,30
+primary_recurrence,30
+no treatment,30
+rifabutin (10mm) treated,30
+knockout status,30
+vehicle (methanol at 0.0025%) treated,30
+treatment_effect,30
+growth time,30
+subject 2 gender,29
+th-mycn mouse genotype,29
+subject 2 age,29
+treatment concentration,29
+cf diagnosis,29
+creatinine,29
+Î¼g cy3 probe hybridized,29
+strain origin,29
+icu_los,29
+los,29
+leukocyte,29
+chip antibody catalog,29
+lymphocytes,29
+subject 2,29
+skin score done by mdm,29
+subject 1 age,29
+subject 1 gender,29
+subject 1,29
+pmol cy3/Î¼g crna,29
+tumor cell line,29
+pseudomonas infection,29
+in vitro or in vivo,29
+infection route,29
+age at examination,29
+geographical origin,29
+clinical_subgroup,29
+immunosuppressors,29
+affected status,29
+procalcitonin,29
+billirubin,29
+sbp_worst_24h,29
+lactate,29
+imatinib naive/resistant,29
+derived from metastatic site,29
+qsofa_admission,29
+qsofa_cat,29
+sofa_baseline,29
+cell cycle stage,29
+microorganism_source_of_infection,29
+mitotic activity,29
+kit expression,29
+cd4 t-cell_count,29
+wga platform_id,29
+gbm subtype,29
+cd69 status,29
+Pathogen,29
+cd117 status,29
+sofa_admission,29
+gcs_worst_24h,29
+microorganism_blood,29
+fio2_worst_24h,29
+spo2_worst_24h,29
+gentype,29
+other_comorbidities,29
+temp_worst_24h,29
+dbp_worst_24h,29
+map_worst_24h,29
+rr_worst_24h,29
+hr_worst_24h,29
+pao2_worst_24h,29
+ltbi status,28
+pulmonary.disease,28
+irc,28
+hta,28
+chip anitbody,28
+tobacco,28
+mv,28
+time infected,28
+cancer.past,28
+zika mcherry reporter status,28
+fb-pmt treatment,28
+psiquiatric,28
+dev_stage at treatment initiation,28
+culture status,28
+active cancer,28
+sum.risk.factors,28
+age at rna isolation,28
+cardiovascular.disease,28
+polyq length,28
+hepatopaty,28
+Ethnic group,28
+donor status,28
+psoriasis area-and-severity index,28
+rin value,28
+genetic modifications,28
+experimental factor,28
+plate code,28
+growth temperature,28
+study protocol,28
+skin phenotype,28
+spike-in organism,28
+jkr-0937 group,28
+nf2 association,28
+bone marrow mononuclear cells sorted from,28
+number of individuals per sample,28
+biopsy collection date,28
+stress condition,28
+incubated with,27
+psoriasis subtype,27
+cell stage,27
+lung radiation dose,27
+cell type source,27
+additional cell lineages present in dataset,27
+transfection time,27
+participant condition,27
+sampling location,27
+participant 2_sex,27
+tissues,27
+participant 2_food_allergy_status,27
+rna_seq_protocol,27
+participant 2_id,27
+participant 1_food_allergy_status,27
+participant 1_sex,27
+participant 1_id,27
+cd44,27
+cxr findings,27
+qft-git,27
+pulmonary compartment,27
+specific primer,27
+sort fraction,27
+intubation_days,27
+interval_death_symptoms_onset_days,27
+pmi_h,27
+h3.3_status,27
+tagtreatment,27
+follicular lymphoma grade,27
+run,27
+culture results,27
+series,27
+ifn-a2b,27
+haematological tumor,27
+participantid,27
+mappedreads,27
+klrg1 marker,27
+5' race primer+adapter,27
+hospitalization,27
+median cv,27
+Age of patient,26
+Duration of psoriasis,26
+pfs.days,26
+pfs.status.censorship,26
+time since sclerosis,26
+Patient identifyier,26
+time since transplant,26
+Overall erythema,26
+Body surface area,26
+culture stage,26
+Induration,26
+donor group,26
+degree of infiltrate,26
+primary cell line,26
+Transgene,26
+Passage,26
+pdxs,26
+previous severity,26
+clone phenotype,26
+clinical,26
+acute skin gvhd,26
+oncologic diagnosis,26
+sclerotic bsa,26
+scd+asthma,26
+skin score,26
+time point days,26
+scd,26
+sample.type,26
+variant,26
+cell samples,26
+cel line,26
+pair.nr,26
+initial p. aeruginosa isolate source,26
+rna extracted from,26
+pfs.time.month,26
+Scaling,26
+gender source,26
+time designation after sclerosis,26
+prior systemic therapy,26
+current pred dose,26
+current systemic therapy,26
+other cgvhd,26
+harvesting,26
+arrayrun,25
+collection_date,25
+ectopic expression,25
+body part,25
+clincal phenotype,25
+twin status,25
+ebv,25
+develpmental stage,25
+death_time,25
+strain/isolate,25
+pathological type,25
+hx_of_gvhd,24
+develomental stage,24
+Construct,24
+shRNA depletion type,24
+pharmacologic treatment type,24
+cell or tissue type,24
+hours of mrna decay,24
+ex vivo infection,24
+interaction status,24
+disease course,24
+aso concentration,24
+rna extraction_method,24
+disease onset,24
+Mouse strain,24
+tert expr,24
+time post_injury,24
+pdc.dtr,24
+pair status,24
+hdh genotype,24
+mouse dietary condition,24
+extract,24
+isrib concentration,24
+differentiation_age,24
+percent_aligned,24
+treatment condition/type,24
+dif,24
+exogenous gene expressed,24
+total rna input,24
+cell preparation,24
+gametocyte status,24
+biological_replicate_number,24
+technical_replicate_number,24
+os_group_median,24
+os_days,24
+date_lastimaging,24
+embryonic day,24
+date_lastfu,24
+date_death,24
+library outgrowth conditions,24
+ercc mix,24
+time post-infection,24
+tumor_size,24
+tumor identifier,24
+idh1_mut,24
+mgmt_methyl,24
+blood island injection,24
+date_dx,24
+cd8 t-cell_count,24
+starting cell,24
+harvest time post treatment,24
+resection_type,24
+spinal cord region,24
+wilms tumor sample,24
+hours post-infection,24
+monocyte,24
+anatomical site,24
+ghd,24
+channel type,24
+days post treatment,24
+seq_index,24
+hyb number,24
+4c viewpoint,24
+tissue subgroup,24
+multiseq barcodes_per_sample_group,24
+clone type,24
+time post treatment,24
+5' adapter ligation method,24
+pathogen strain,24
+pouchitis diagnosis,24
+cell line/tissue source,24
+cell line/tissue,24
+implantation,24
+fip status,24
+biological replicates,24
+cfu delivered,24
+mouse exhibiting symptoms on the day of sample collection,24
+full-length cdna enrichment,24
+ibmec differentiation media volume,24
+parental/reprogrammed state,24
+array id,24
+cytokine exposure,24
+sequencing_day,24
+cd133,24
+date timepoint 1 month post-booster,24
+sorted cell type,24
+lymphocyte,24
+organoid status,24
+peakgh mcg/l,24
+sex steroid priming,24
+experimental reapeat,24
+rv1963c induction state,24
+morphologic form,24
+estimated age,24
+subect status,24
+nf1-affectation status,24
+sampling time point,24
+date 2nd dose bnt162b2,24
+day of collection/passage,24
+date timepoint 3 months post-booster,24
+date 1st dose bnt162b2,24
+oerturbation type,24
+vasopressor,24
+environmental condition,24
+co-culture,24
+sequencing_chip,24
+mortality,24
+molecular condition,24
+covid-19 viremia diagnosis,24
+covid-19 titer,24
+age at timepoint 0,24
+date timepoint 6 months post-booster,24
+tumor sample,23
+comorbidity,23
+passage post cre infection,23
+molecule source,23
+drug administration,23
+maternal disease status,23
+histological subtype,23
+iPSc source,23
+peripheral blood,23
+medical history,23
+sex predicted,23
+os months,23
+donor line,23
+cell dissociation,23
+sepsis stage,23
+p. amoebophila strain,22
+tumor_site,22
+cells/condition,22
+a. castellanii strain,22
+odn,22
+overexpression vector,22
+injected with,22
+associated primary tumor no,22
+metastatic status,22
+l. pneumophila strain,22
+oxygen level,22
+generation,22
+race_ethnicity,22
+de-identified research code,22
+other treatment,22
+strand,22
+cfu group,22
+htt status,22
+replicate type,22
+flowcell id,22
+in vitro transduction,22
+duration of treatment,22
+eae clinical_score,22
+viral rna detected,22
+cut&run antibody,22
+immunophenotype,22
+decode_name,22
+Sample Group,22
+IT15 CAG repeats,22
+fever day,22
+1p/19q,22
+pre-operation radiology,22
+sample status,22
+organism,22
+treatment effect,22
+antibody vendor/catalog,22
+disease condition,22
+modification,22
+respiratory score,21
+somatic mutation,21
+gfp intensity,21
+chemical probe,21
+section nr,21
+antibody target description,21
+htt genotype,21
+genotype/variatation,21
+antibody vendor name,21
+generation/colony,21
+stimulated with,21
+corticosteroids treatment,21
+prbid,21
+illumina index number,21
+developed metastases or not,21
+growth medium/treatment,21
+Karyotype,21
+patient's gender,21
+rna substrate investigated,21
+patient's clinical presentation,21
+hippocampal slice id,21
+electrophysiology,21
+si rna,21
+cultured glioblastoma sample,21
+donor strain,20
+Sample,20
+RIN1,20
+enrichment,20
+vaccination state,20
+At Risk,20
+gant-61 sensitivity,20
+MaternalAge,20
+Parity,20
+StudyID,20
+sars-cov-2 ihc,20
+InfantSex,20
+arthritis,20
+human sci,20
+ba8s18s,20
+glioma model,20
+erythema nodule,20
+who_type_07,20
+Biomaterial,20
+cell transduction,20
+HT29 cells were transfected with siRNA (according to treatment protocol). siRNA,20
+cell marker,20
+lot number,20
+molecular subtype/phenotypic state,20
+human tissue source,20
+Shear exposure,20
+calcium level,20
+oral ulcer,20
+genital ulcer,20
+multimer,20
+ocular involvement,20
+vascular involvement,20
+cns involvement,20
+ba_rin,20
+gastrointestinal involvement,20
+clinpathdx,20
+RNAi treatment,20
+h-v cortical score,20
+sorting,20
+Chief Disease,20
+Order Code,20
+Sample Type,20
+tumoral content,20
+status sample,20
+viral copies/mg tissue,20
+ki67 proliferation marker,20
+infection_state,20
+sox11 status,20
+Post Mortem Interval,20
+samples,20
+Treatment,20
+harvest dpi,20
+h-v striatal score,20
+patient line,20
+Death Cause,20
+virus subtype,20
+xenograft donor id,20
+fed with,20
+Cause of Death,20
+sars-cov-2 innoculation dose,20
+chip processing date,20
+Brain pH,20
+eae day,20
+xenograft pair,20
+injection age,20
+Inflammation,20
+pepd status,20
+type of death,20
+assessement of tissue quality,20
+animal id number,20
+aav vector,19
+ki67 proliferation index,19
+carcinoid syndrome,19
+disease outcome,19
+duration of untreated disease in month,19
+age at onset,19
+radically operated,19
+cold ischemia time,19
+donation time,19
+g207 treatment,19
+strains,19
+drug response,19
+tumor origin,19
+genetic engineering,19
+desiccation,19
+library kit,19
+timepoint_progressors,19
+number of htt polyq repeats,19
+facs-sort criteria,19
+treatment_type,19
+time of treatment,19
+isolation stage,19
+tumor model,19
+sort purification strategy,19
+time point post infection,19
+mni_z,19
+mni_x,19
+brodmann areas,19
+categories_progressors,19
+mni_y,19
+fus aggregation state,19
+tspo cluster,18
+overall survival,18
+radiology,18
+chronic htn,18
+chromosome 22 monosomy,18
+febrile seizure,18
+donor race,18
+culture format,18
+experimental variable,18
+nb differentiation degree,18
+injury model,18
+menstrual phase,18
+sort-gate,18
+chip-seq condition,18
+wt allele cag repeat number,18
+expression construct,18
+medip antibody,18
+date of array hybridisation,18
+culture batch,18
+age of disease onset percentile,18
+age of disease onset,18
+experiment grouping,18
+hd allele cag repeat number,18
+reference epigenome spike-in,18
+sentrix row,18
+infection host,18
+samplegroup,18
+years with hd,18
+mechanical condition,18
+tocilizumab treatment,18
+compound concentration,18
+"donor age, sex",18
+timie,18
+cellular_component,18
+s63845 sensitivity,18
+inducible transgene,18
+tspo expression,18
+reason for liver resection,18
+drug resistance,18
+collection buffer,18
+rna seq_run,18
+vital_status,18
+sample id in rnaseq analysis,18
+patient tumor related pain status,18
+digestion protocol,18
+time post-exposure,18
+t cell activation status,18
+tissue location,18
+age_category,18
+htn,18
+collection point,18
+icu admission,18
+hospital admission,18
+translocations,18
+a1c,18
+height-m,18
+weight-kg,18
+ribodepleted,18
+construct expression,18
+time post bloodmeal,18
+her2,18
+protein expression,18
+mtdna content,17
+parasite/gametocyte stage,17
+composite,17
+viral,17
+absolute cd4 count,17
+level,17
+aligned reads,17
+trimmed reads,17
+raw reads,17
+subject status/id,17
+art treatment,17
+stitched reads,17
+patientcorecode,17
+cell type origin,17
+mouse individual id,17
+day of development,17
+protein,17
+maintissue,17
+clip antibody,17
+sort gate,17
+age at onset of nf2 symptoms,17
+deduplicated reads,17
+sequencing saturation,17
+Labeling Condition,17
+other dx,17
+Hybridization Time,17
+age in months,17
+Wash Condition,17
+transduced,17
+easi/pasi,16
+dex treatment,16
+parent_strain,16
+gene_knockout,16
+ChronicPM,16
+source/differentiation,16
+brain tumor region,16
+serum,16
+common name,16
+cellosaurus id,16
+ethambutol dose,16
+chronic jet lag (cjl) conditions,16
+s. aureus,16
+period of cjl,16
+chx treatment,16
+cell population isolated from ltbmc,16
+zic1 injection,16
+genotype pdgfb gene,16
+genotype trp53,16
+devlopmental stage,16
+pax3 injection,16
+sorting fraction,16
+trasfection,16
+baseline seizure_frequency,16
+viralrna,16
+10x genomics chemistry,16
+adipogenic potential,16
+neovax status,16
+lung section/portion,16
+venetoclax resistance,16
+stn sensitivity,16
+starting amount of total rna,16
+chondrogenic potential,16
+genotype of original donor,16
+kiaaa159-braf fusion,16
+seizure group,16
+pool,16
+treatment agent,16
+compound treatment,16
+sorted fraction,16
+oxygen,16
+labeling protocol,16
+genotype rbpj gene,16
+family code,16
+day of protocol,16
+stn/ibrutinib sensitivity,16
+tmz sensitivity,16
+ecm condition,16
+Patient Number,16
+time post vaccinatino,16
+initial tumor volume,16
+cytogenetic,16
+strain/model,16
+aortic valve,16
+biological eplicate,16
+viral titre,16
+mode of growth,16
+fibrillin fragment,16
+rna extraction,16
+developmental age,16
+dementia status,16
+time of_treatment,16
+RNAi,16
+treatment/infection,16
+autism diagnostic,16
+mantle cell lymphoma (mcl) line,16
+mouse group,16
+quorum sensing (qs) phenotype,16
+cold ischemia_time,16
+performance,16
+ar or asthma,16
+cell status,16
+incubation time,16
+alk mutation status,16
+p218 dose,16
+age tier,16
+mrss score,16
+has_drug,16
+observed tumor grade,16
+mouse id tag,16
+patient_status,16
+fasting,16
+location of tumors,16
+osteogenic potential,16
+vascular support,16
+data analysis id,16
+has_pressure,16
+virus moi,15
+length of culture,15
+h3.3 expression,15
+genes analysed,15
+animal no,15
+sample_label,15
+experiment name,15
+sequencing library id,15
+incidence,15
+gfp,15
+lentivirus infection,15
+risk grade,15
+drug resistant_tb,15
+library preparation protocol,15
+stim,15
+disease classification,15
+lab code,15
+or-s1 concentration,15
+rip,15
+rin number,15
+age of  culture,15
+glioma grade,15
+gender composition,15
+virus dose,15
+differentiation time point,15
+precursor,15
+manuscript library id,15
+catalog number,15
+gel bead version,15
+tumortype,15
+cell line_name,15
+previous diagnosis_of_tb,15
+polarization state,15
+cell_origin,15
+Disputed,15
+surface markers,15
+weekly dosing,15
+bcg scar,15
+a260/a230,15
+primers,15
+phase description,15
+sample name as in counts.txt.gz,15
+verapamil dose,15
+detachment,15
+es line,15
+malignancy class,15
+sample subgroup,15
+tretament,15
+tissue class,15
+tumor class,15
+a260/a280,15
+cd117 staining,15
+pulmonary cavitation,15
+specific-host,15
+age at blood draw,14
+psgl1 status,14
+develoment stage,14
+subset group,14
+brain tumor,14
+Lab ID,14
+genotype/varation,14
+fbn1 genotype,14
+case or control,14
+antigenic stimulation,14
+tg,14
+vaccination status,14
+location/side,14
+hind-limb paralysis,14
+gfp detection,14
+original cell line,14
+sarscov2_infection,14
+differeniation days,14
+disease in non-fip,14
+fcov infection,14
+measure,14
+tisse type,14
+patients,14
+ubi,14
+cell origin,14
+alternative name,14
+vaccination_status,14
+h37rv,14
+pretreatment,14
+genotype abbreviation,14
+experimental run,14
+immune infiltration,14
+sorting profile,14
+ppq sensitivity,13
+paradigm,13
+phlorophore,13
+transplant,13
+sorted population,13
+cell lining,13
+plasmodium berghei strain,13
+jcv replication rate,13
+shrna,13
+functional connectivity,13
+serology,13
+cag repeat,13
+onset age,13
+material type,13
+anti-human sod1 mir,13
+Weight,13
+placental sex,13
+mtap,13
+egfr amplification status,13
+adeno-associated virus injection,13
+bcl2,13
+bcl6,13
+harvest time point,13
+sars-cov-2 status,13
+hpsc,13
+time to relapse,13
+receptor expression,13
+genotyping,13
+pooling,13
+block storage,13
+Tumor Stage,13
+risk group,13
+pfcrt allele,13
+cd8 status,12
+long description,12
+internal sample id,12
+internal patient id,12
+cd3 status,12
+cd4 status,12
+cd45ra status,12
+estimated developmental age,12
+surgical indication,12
+technical replicates,12
+model type,12
+total/partial resection,12
+pre- or post-challenge,12
+fetal lung tissue donor,12
+duration of disease,12
+incubated in,12
+MASTECTOMY,12
+biological source,12
+chemical,12
+melanoma cell type,12
+microarray autogain intensity,12
+rbpms,12
+maturation to macrophage,12
+molarity of infection,12
+escherichia spp,12
+incubation period,12
+diease,12
+chronological age,12
+haemophilus spp,12
+il-8 concentration pg/ml,12
+neutrophil elastase levels,12
+nf1-associated,12
+original tumor,12
+pluripotent,12
+coriell accession,12
+fold enrichment,12
+replica,12
+chemical modification,12
+donor fibroblasts,12
+cutandtag antibody,12
+p75 positive,12
+sample identifier,12
+nacl,12
+melanoma,12
+scale,12
+knockdown target,12
+day of organoid differentiation,12
+major reason_for_surgery,12
+final age at death,12
+duration of cultivation,12
+cell line passage,12
+drinking,12
+blood pressure,12
+culture ph,12
+death day,12
+type of cultivation plate,12
+replicate experiment,12
+name of tissue,12
+company,12
+days under treatment,12
+polarization treatment,12
+treatment type,12
+acute medication,12
+uv/non-uv,12
+chronic medication,12
+antibiotictx,12
+subcellular fraction,12
+renal biopsy,12
+batch of rna isolation,12
+histological findings of renal specimen,12
+ng/ul,12
+dietary regiment,12
+mouse stain,12
+sediment,12
+illumina lane,12
+submission date,12
+hrg expression,12
+inoculation dose,12
+cd34+ hsc donor,12
+surgical approach,12
+clinical manifestation,12
+foxp3 expression,12
+type of insertion,12
+insertion site distance to gene,12
+piggybac insertion site,12
+associated diseses,12
+interstitial pneumonia,12
+engraftment,12
+angiography,12
+staphyloccus spp,12
+chromosome 9 status,12
+product,12
+sorting probe,12
+Sample group,12
+oxygen tension,12
+disease grade,12
+rift valley fever virus,12
+days,12
+viewpoint_analysed,12
+mg2,12
+time after virus injection,12
+div,12
+clone name,12
+brain tissue,12
+agent concentration,12
+lentivirus infected,12
+treatment of mice,12
+xenograft host,12
+monoclonal antibody,12
+ATCC,12
+antibody 1,12
+treatment_dose,12
+antibody vendor,12
+matched l/nl_sample,12
+clarithromycin dose,12
+clone background/id,12
+unique sample identifier,12
+mtb infection,12
+growth phase of cells,12
+autophagy induction,12
+treatment condition,12
+Tumor tissue,12
+age at biopsy,12
+gbm grade,12
+cell type background,12
+radiation response,12
+challenged with,12
+cell line type,12
+operator,12
+start od595,12
+strain id,12
+cell line origin,12
+tb-infection status,12
+worst itch_numeric_rating_scale_(wi-nrs)_score,12
+investigator's global_assessment_(iga)_severity_score,12
+monoclonal antibody supplier,12
+xenografts host mice,12
+antibody 2,12
+sirna type,12
+tumor cell type,12
+time after i.p. injections,12
+seizures/month,12
+source muscle,12
+developmental stage/tumor stage,12
+analysis group,12
+sequenced molecule,12
+sgrna,12
+genetic_modification,12
+4c-seq secondary enzyme,12
+tcr gene,12
+4c-seq primary enzyme,12
+transfection construct,12
+silencing vector,12
+immortalized,12
+mouse status,12
+rel. mir-25 expression,12
+transfection efficiency,12
+group id,12
+tumor inoculation,12
+recombinant proteins,12
+irradiation of gsc,12
+diagnosis2,12
+Drug,12
+time of_dox_treatment,12
+immunization route,12
+muc16 expression,12
+growth factors added on day 0,12
+glioblastoma stem cell culture,12
+primary cell type,12
+density gradient region,12
+"age, yrs",12
+smarcb1 expression,12
+illumina adapter,12
+host age,12
+time point in the model of dormancy,12
+isolation of tumor cells,12
+expressing,12
+efflux status,12
+nik pathway mutation,12
+time post-immunization,12
+oxygenation,12
+scrnaseq method,11
+salt.score,11
+c9orf72-als,11
+tumorgenecity,11
+tb subgroup,11
+organoid generation,11
+array barcode,11
+species,11
+plasmids used,11
+metastatic/primary,11
+primary/ recurrent,11
+ascl1 status,11
+Genetype,11
+integrated diagnosis,11
+recurrent/primary,11
+transfection dosage,11
+duration of infected with pneumocystis,11
+py strain,11
+area/tissue,11
+alopecia.improvement.pct,11
+antibody used,11
+donor id/status,11
+embryos pooled,11
+celll type,11
+antigen capture,11
+plating,11
+chip antibody manufacturer,11
+dsmz no,11
+alopecia.score.post.impovement,11
+urine protein,11
+hydrogen peroxide treatment,11
+initial preparation,10
+h3f3a mutant,10
+anatomic site,10
+lung section,10
+zf vector,10
+enhancer utilized for cell sorting,10
+age at study start,10
+before or after treatment,10
+trt,10
+type of hspn,10
+time of last follow up in months,10
+hist1h3b mutant,10
+"recommended for detection of GATA1 of mouse, rat and human origin. Antibody Target",10
+source id,10
+course of hspn,10
+tissue donor,10
+genotype/disease state,10
+gfap ihc,10
+hto id,10
+mgmt promoter methylation,10
+culture medium,10
+day after intubation,10
+actb2,10
+pcr cycles,10
+viral inactivation,10
+antigen reactivity,10
+inrc therapy response,10
+idh1 mutant,10
+oligo2 ihc,10
+subclone id,10
+rna sample type,10
+symptom duration,10
+treatment/sample type,10
+co-culture condition,10
+chromosome 1p deletion,10
+age of culture when rna harvested,10
+intensive care,10
+merip antibody,10
+chip antibody details,10
+pcr kit,10
+cutting enzymes,10
+PM Status,10
+age at harvest,10
+tp-0903 treatment,10
+transcription factor expression level,10
+camp treatment/level,10
+gestational days,10
+driver gene,10
+ad26.cov. dose,10
+inrg risk stratification,10
+library backbone,10
+il18r1 profile,10
+nf1b,10
+metabolic activity,10
+day post transplant,10
+library label_name,10
+graft recipient strain,10
+cell line for infection,10
+nf1a,10
+malaria status,10
+tissure,10
+bacteria,10
+graft donor strain,10
+Developmental stage,10
+subclone derived from u87mg,10
+chip antibody vandor,10
+status after 5 years,10
+PMD 2,10
+transgenic strain,10
+original biopsy for this patient,10
+polr genotype,10
+animals pooled,10
+maternal state,10
+number of animals,10
+isolated by,10
+CFstatus,10
+age at diagnosis in months,10
+inss disease stage,10
+rescue,10
+PM status,10
+cell model id,10
+injected cell line,10
+tumour cell line used for conditioning medium,9
+process order,9
+process day,9
+oxygen condition,9
+genotype background,9
+exacerbation day,9
+anatomical region,9
+number of_samples,9
+sorting criteria,9
+transduced gene,9
+treatment timing,9
+in vitro lps stimulation,9
+embryo phenotype,9
+geatational days,9
+etiology,9
+host mouse strain,9
+antibody maker,9
+conditioned medium,9
+age/time point,9
+diagnostic ct,9
+cre transgene,9
+subpopulation,9
+hit.status,9
+disase,9
+m.tb culturing coonditions,9
+myc.status,9
+m.tb strain,9
+nember of_samples,9
+infection period,9
+differentiation replicate,9
+h37ra strain,9
+infection rate,9
+weight phenotype,9
+germline mutation,9
+antibody name,9
+cell-subtype,9
+lentiviral transfuction,9
+cytokine secretion,9
+galassi grade,9
+parental cell type,9
+line number according to ninds human genetics resource center dna and cell line repository,9
+number of cag repeats,9
+age range,9
+data presented in the manuscript,9
+cell treated with 2% dmso before infection,9
+ecacc no,9
+time of day,9
+mutation frequency,9
+derived culture,9
+ards,9
+knockout group,9
+subject identifier,9
+resistance profile,9
+growth factors in the culture medium,9
+date of isolation,9
+virus 1 infection,9
+idh-status,9
+virus 2 infection,9
+cel population,9
+sample region,8
+sirna knockdown,8
+culture/treatment,8
+cell number per well,8
+embryo stage,8
+Tgmitfa,8
+transduced shrna,8
+phase of growth,8
+cognitive impairment,8
+quorum sensing status,8
+well diameter in um,8
+molecule purification,8
+c. immitis-infection susceptibility,8
+posttransfection,8
+infection with arthroconidia of c. immitis,8
+post-mortem control case,8
+macrophages,8
+genotype 1,8
+anatomic segment,8
+flourescent marker,8
+activation,8
+growing media conditions,8
+sample code,8
+exogenous treatment,8
+incubation temperature,8
+hpfh,8
+hr1 concentration,8
+digestion enzyme,8
+crispr status,8
+p-bi-tat treatment,8
+nes status,8
+klf1k288x mutation,8
+m. tuberculosis rna,8
+allele,8
+hbf level,8
+clinical comments,8
+disease feature,8
+hamburger and hamilton (hh) stage,8
+survivin localisation,8
+Disease state,8
+derived cell_type,8
+original strain,8
+mds subtype,8
+gc cell pool,8
+transient expression,8
+portion of branchial arch,8
+time point of infection,8
+shRNA number,8
+cartilage pellets,8
+day after transplantation,8
+peptide genotype,8
+secondary antibody,8
+htt polyq,8
+myopathic motor_unit_potentials,8
+"fibrillation potentials,_psws",8
+growth phase/media,8
+ps status,8
+increased insertional_activity,8
+environmental factor,8
+achr binding_ab_positive,8
+cav3/cavin1 mutation,8
+nitrogen source,8
+microglia population,8
+metavir score,8
+overexpressing,8
+ifngamma,8
+genotype 2,8
+covid-19 infection,8
+qc name,8
+age of_diagnosis,8
+sequencing plate,8
+vaccine dose,8
+genotype/treatment,8
+notch1 mutation/expression,8
+shRNA type,8
+timpoint,8
+time since first diagnosis,8
+multiome_modality,8
+age of_onset,8
+cell tyep,8
+neuroblastoma cell line,8
+fus variant,8
+cre status,8
+mitfa,8
+life cycle stage,8
+mutation details,8
+whomax level,8
+selection pressure drugs,8
+mgso4,8
+treatment/group,8
+primary antibody,8
+conditioned media source,8
+shRNA knockdown,8
+tau-redstar expression,8
+uv treatment,8
+rts reaction buffer,8
+sample name synonym,7
+time of_drug_treatment,7
+host tissue,7
+encode accession,7
+incubation,7
+virus genus,7
+chip antibody lot #'2,7
+ggt,7
+Species,7
+ast,7
+bilirubin,7
+alt,7
+chip antibody manufacturers,7
+chip antibody catalog #'s,7
+animal treatment,7
+cell type implantation,7
+virus family,7
+infectious strain,7
+patient age at diagnosis,7
+iclip antibody,7
+skinfold back thickness,7
+culture/clone_id,7
+"developmental stage, weeks",7
+passage/days,7
+shRNA sequence,7
+doi,7
+neural crest-derived,7
+eclip antibody,7
+ap,7
+cx43 expression,7
+PMD 1,7
+histotype,7
+cell type depletion,7
+behavior,6
+Growth Medium,6
+human cell genotype/variation,6
+redstar,6
+ligand side,6
+cross,6
+cocultured with,6
+mouse cell genotype/variation,6
+cftr deletion,6
+Cell strain,6
+origin2,6
+origin1,6
+exposed pollutants,6
+azf deletion,6
+genotype/variaton,6
+sentrixid_sentrixposition,6
+retrieval of sperm from the tese,6
+tubular shadows,6
+protocols,6
+retroviral expression,6
+time after stimulation,6
+age of donor/age of host,6
+tubules sertoli cell only,6
+round of selection,6
+b35 vs c pair,6
+b35 vs b8,6
+devepopmental stage,6
+hairpin,6
+tubules with round spermatids,6
+tubules with elongated spermatids,6
+bergmann-kliesch score,6
+xenograft recipient mice strain,6
+days from treatment,6
+nitrogen,6
+life cycle,6
+molecule subtypes,6
+expression level,6
+tic class,6
+chip antibody reference,6
+chemoterapy drug,6
+wbc count,6
+somatic transgene,6
+tubules with spermatogonia,6
+differentiated cell type,6
+disease name,6
+mean number of oocysts,6
+oocyst prevalence,6
+cytokine production pattern,6
+kr-72 treatment,6
+antibody cat,6
+sampling post confirm,6
+wnt status,6
+days_since_positive_test,6
+stable knockdown,6
+m_abscessus_intracellularlevels,6
+sample state,6
+day post neural induction,6
+age category,6
+antibody lot,6
+b35 vs c,6
+cell type_2,6
+sipool,6
+cell type_1,6
+siv status,6
+tubules with spermatocytes,6
+tn5,6
+dms treatment,6
+antibodies/tag,6
+platlets,6
+m. smegmatis infection status,6
+body weight,6
+sample replicate number,6
+source gender,6
+dignosis,6
+c9orf72 repeat size,6
+smple type,6
+treated with lentivirus,6
+vaccinated with,6
+yap/taz status,6
+fluid,6
+Bra,6
+cell phase,6
+tumor position,6
+number of half-sclerotomes,6
+hippocampal sclerosis,6
+parental/ne-like state,6
+cytokine expression,6
+human tumor cell line,6
+strain_recipient,6
+replicate number,6
+n animals,6
+developmental stage/age,6
+Sex of recipient mice,6
+Sex of donor mice,6
+strain donor,6
+source patient gender,6
+strain recipient,6
+treatment time-point,6
+targeted sequencing,6
+site of_disease_onset,6
+tissur,6
+als status,6
+zone,6
+testosterone treated,6
+genotype of founder fish,6
+zinc status,6
+sorted cell,6
+Sample_reference,6
+cell subsets,6
+stain,6
+Labeling_reference,6
+sorted subset of cells,6
+variation,6
+Extraction_reference,6
+Extraction_amount,6
+time after exposure,6
+genotype & treatment,6
+derived cell type,6
+Subject_reference,6
+Extraction_concentration,6
+gene induction,6
+sample population,6
+pqsA,6
+mother from,6
+day post sars-cov-2,6
+hashtag antibodies,6
+gsc,6
+nodal status,6
+fraction/population,6
+num. arrays,6
+hairpin rna,6
+methylation-enrichment,6
+tobacco use,6
+facs-sorted cell_type,6
+klf4 genotype,6
+sample barcode,6
+media supplement,6
+tnm classification,6
+extraction batch,6
+b35 vs b8 pair,6
+ARN_quality,6
+distant metastasis,6
+In vitro Passage Number,6
+mpo genotype,6
+tissue storage,6
+mating pair,6
+oligo set,6
+mice,6
+iPSc passage,6
+overexpressed target,6
+cell strain,6
+bactin,6
+expression plasmid,6
+daxx status,6
+stem cell clone,6
+drug (ibrutinib) sensitivity,6
+differention day,6
+abcb5,6
+group_tag,6
+cell morphology,6
+subject relationship,6
+shRNA transfection,6
+collection timepoint,6
+organoid formation,6
+ngs_platform_id,5
+pten status,5
+donor sex,5
+in-line barcodes,5
+tissue type type,5
+tranplanted with,5
+invasive behavior,5
+arrayexpress repository sample id,5
+library_strategy,5
+MD,5
+term source ref,5
+cataog number,5
+cell line_infection,5
+global glomerulosclerosis,5
+ifta,5
+marker,5
+culture variation,5
+PMD 3,5
+aCGH,5
+term accession number,5
+of passage,5
+crestin,5
+cmo,5
+cytogenetics,5
+biopsy position,5
+time between dexamethasone administration to t1 blood draw,5
+treehouse id,5
+depletion,5
+Gli1creERT,5
+spike protein used,5
+puromycin selection,5
+sorted,5
+cancer predisposition,5
+karyotyping abnormal,5
+hybrid,5
+original tumor type,5
+days in culture,5
+transfection molecule,5
+post-symptom onset,5
+id,5
+pull-down,5
+mycn amplification,5
+mapalgorithm description,4
+mouse genotype,4
+hla allele,4
+express,4
+knock-in,4
+associate geo_sample,4
+isolation column,4
+pdx specificitiescharacteristics,4
+chip-seq antybody,4
+m.cvipi activity,4
+antibody lot number,4
+shRNA seq,4
+associated geo,4
+stage of disease,4
+eletroporated with,4
+pdl,4
+patient-derived cell line,4
+subect_id,4
+bhlhe40,4
+sample age,4
+number of_animals,4
+eae score,4
+mm stage,4
+passages after establishing stable clones,4
+imq treatment,4
+"Lung carcinoma cell line, ATCC number",4
+par1-3 (pwar1) viewpoint adapter sequence,4
+ipw viewpoint adapter sequence,4
+immunology,4
+treatment/agent,4
+tissue zone,4
+control id,4
+antibody vendor id,4
+afip risk calssification,4
+bmp4 sensitivity,4
+gbm cell population,4
+cell barcode suffix for aggr file,4
+antibody antibody description,4
+shRNA transduced,4
+data type description,4
+culture time,4
+length of infection,4
+acidity,4
+ctcf antibody,4
+mapalgorithm,4
+cocultured,4
+epitope mapping within amino acids 138-158 of myogenin of rat origin. Antibody Target,4
+treament condition,4
+plasmodium infection,4
+media additions,4
+suz12b,4
+source organ,4
+donor gender,4
+suz12a,4
+number of_tracheas,4
+"U6-nf1a-gRNA, mitfa",4
+oxygen status,4
+rna composition,4
+biolobical replicate,4
+atac-seq performed (#) days post treatment with small molecules,4
+pygfp,4
+cd45 status,4
+experiment performed in,4
+strategy,4
+background mice,4
+days of final differentiation,4
+OMP-IRES-tTA,4
+mice group,4
+cell enrichment,4
+phase growth,4
+car-t type,4
+days cultured after cd71+ isolation at day 6,4
+donor disease state,4
+culture supplement,4
+days differentiated,4
+nb treatment,4
+in vivo timepoint,4
+infrequent clonal strain code,4
+morpholino injection at 1-cell stage,4
+australian epidemic strain-1 code,4
+exposesd to,4
+transposon (mini-tn5) knock out,4
+responder status,4
+vector construct,4
+Cells,4
+ab treatment,4
+growth_condition,4
+PMD 5,4
+blood,4
+chip magnetic beads,4
+host mouse_tissue,4
+gating,4
+car-t treatment,4
+growth properties,4
+5Â´barcode,4
+imatinib-resistance,4
+4c protocol,4
+viral load tertile,3
+vt sample,3
+igf1r localization,3
+iclip antibody cat,3
+severity grade,3
+iclip antibody vendor,3
+infection time point,3
+large cell lung cancer Derived from metastatic site,3
+histopathological diagnostic,3
+excersice type,3
+mrna_preparation_fragment_size_range,3
+rna_preparation_reverse_transcription_protocol,3
+hvc enrichment method,3
+mrna_preparation_initial_mrna_qnty,3
+totalseq hto barcode,3
+transfected vector,3
+extraction_protocol_mrna_enrichment,3
+rna_preparation_5'_rna_adapter_ligation_protocol,3
+diffuse vs limited,3
+totalseq hto,3
+dlbcl molecular subtype,3
+library_generation_pcr_template,3
+rna_preparation_reverse_transcription_primer_sequence,3
+days_post_infection,3
+rna_preparation_5'_dephosphorylation,3
+rna_preparation_3'_rna adapter_ligation_protocol,3
+rna_preparation_3'_rna_adapter_sequence,3
+rna_preparation_5'_rna_adapter_sequence,3
+Morphology,3
+Organ,3
+reactivity,3
+cell subpopulation/marker,3
+donor diagnosis,3
+cell characterization,3
+allergy,3
+rna_preparation_5'_phosphorylation,3
+mcherry,3
+assay type,3
+anatomic site of tumour origin,3
+control source,3
+bacteria tissue,3
+immortalization method,3
+treatment / timepoint,3
+cell lilne,3
+months post infection,3
+Pseudomonas aeruginosa total RNA was isolated from PAO1-psrA,3
+mouse tissue,3
+cd4+ t cells from ot-2 mice day,3
+trans-gene,3
+bacterial cells,3
+details,3
+viral load copies/ml,3
+fibrosis,3
+shRNA construct,3
+tissue extraction,3
+reference lot,3
+ng/Âµl,3
+extraction_protocol_fragmentation,3
+molecular diagnosis,3
+overexpression status,3
+non-small cell lung cancer Derived from metastatic site,3
+experimental conditions,3
+developmental state,3
+host cells,3
+skin score at biopsy site,3
+adar2 status,3
+bacteria strain,3
+embryo characteristic,3
+reference cat,3
+"Male, 65 years, Primary sites",2
+cell sybtype,2
+ragiographic region,2
+cnv_met_amp,2
+cnv_cdk4_amp,2
+"Female, 59 years, Primary sites",2
+cnv_rb1_del,2
+cnv_cdkn2a_b_del,2
+tisue,2
+aso,2
+data_type,2
+stable transfection,2
+rounds of infection,2
+solvent,2
+cnv_pten_del,2
+cell line source age,2
+sample tag_information,2
+cnv_mdm4_amp,2
+months_survival,2
+progression_status,2
+months_progression,2
+cnv_pdgfra_amp,2
+cell mixing ratio,2
+cnv_mdm2_amp,2
+cell line source tissue,2
+PMD 0,2
+passenge,2
+sars-ncov-2 status,2
+mitf,2
+cell mixture,2
+facs,2
+PMD 7,2
+stage of differentiation,2
+organoid type,2
+cause of death,2
+x-ray radiation,2
+transplanted with,2
+catalog,2
+PMD,2
+treatment_term_name,2
+duration_units,2
+gsc line validated for self-renewal by neurosphere formation,2
+cell line source gender,2
+"BRAIN (CEREBELLUM), BIOPSY",2
+par-clip,2
+trangene,2
+test condition,2
+domain,2
+"BREAST, EXCISIONAL BIOPSY",2
+Hdh genotype,2
+affinity purification,2
+facs strategy,2
+OVARY,2
+MODIFIED RADICAL MASTECTOMY,2
+AXILLARY NODE,2
+BREST,2
+softwareversion description,2
+"BREAST, LOCAL EXCISION",2
+pasaages,2
+ligation,2
+"PER SUBMITTED REPORT, MASTECTOMY",2
+transient overexpression,2
+clip antibody vendor,2
+clip antibody cat,2
+reference condition,2
+tumor who grade,2
+inoculated site,2
+PARTIAL MASTECTOMY,2
+genotype/variataion,2
+COMPLETION MASTECTOMY,2
+cnv_egfr_amp,2
+"LUNG, LUL LOBECTOMY",2
+cnv_chr7_gain,2
+hashing antibodies,2
+cell sub-popuation,2
+cnv_chr10_loss,2
+cnv_chr19_gain,2
+cnv_chr20_gain,2
+mutant_idh1_2,2
+postnatal day,2
+feature type,2
+dsrna,2
+SENTINEL AXILLARY LYMPH NODE,2
+chip seq antibody,2
+life form,2
+selection media,2
+source cells,2
+"BREAST, MASTECTOMY",2
+"BREAST, LUMPECTOMY",2
+phenotye,2
+osition,1
+positive Down screening risk,1
+a small infarction in right parietal white matter,1
+growing conditio,1
+"Female, 57 years, Primary sites",1
+age of patient when tumor sample obtained,1
+sdhb,1
+cd34,1
+Alveolar bone marrow as a cell source for regenerative medicine,1
+Growth day at 37 degree of Celsius,1
+dog-1,1
+mitotic rate,1
+injected cells,1
+paired patien,1
+C. neoformans H99 was coincubated with J774A.1 macrophages at a ratio of 10,1
+hot,1
+Infection Status,1
+incubation partner,1
+"Male, 37 years, Primary sites",1
+cell lie,1
+19q intact) ATRX protein status (IHC,1
+epitope is a synthetic peptide,1
+small cell lung cancer Derived from metastatic site,1
+mesothelioma [23570] Derived from metastatic site,1
+"Female, 72 years, Primary sites",1
+transfectant,1
+mammalian host,1
+epitope mapping at the C-terminus of Stat3 of mouse origin. Antibody Target,1
+"Male, 59 years, Primary sites",1
+small molecule,1
+"Male, 72 years, Primary sites",1
+zebrafish strain,1
+sratin,1
+passage no,1
+differences between alveolar and iliac bone marrow stromal cells. J Bone Miner Res 20,1
+10x barcode,1
+NIH Approval Number,1
+"Male, 60 years, Primary sites",1
