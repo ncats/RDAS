@@ -78,22 +78,22 @@ class GrantPipelineRunner(PipelineRunnerBase):
     def graph_updates(self) -> None:
 
         from pipelines.pipeline_4_grant.task_grant_graph_1 import NewProjectGraphTask
-        #self._run_pipeline_task(NewProjectGraphTask)
+        self._run_pipeline_task(NewProjectGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_2 import NewGardProjectRelationshipGraphTask
-        #self._run_pipeline_task(NewGardProjectRelationshipGraphTask)
+        self._run_pipeline_task(NewGardProjectRelationshipGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_3 import NewCoreProjectGraphTask
-        #self._run_pipeline_task(NewCoreProjectGraphTask)
+        self._run_pipeline_task(NewCoreProjectGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_4 import NewPatentGraphTask
-        #self._run_pipeline_task(NewPatentGraphTask)
+        self._run_pipeline_task(NewPatentGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_5 import NewGrantAnnotationGraphTask
-        #self._run_pipeline_task(NewGrantAnnotationGraphTask)
+        self._run_pipeline_task(NewGrantAnnotationGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_6 import NewCoreProjectGardRelationshipGraphTask
-        #self._run_pipeline_task(NewCoreProjectGardRelationshipGraphTask)
+        self._run_pipeline_task(NewCoreProjectGardRelationshipGraphTask)
 
 
         """
@@ -104,13 +104,13 @@ class GrantPipelineRunner(PipelineRunnerBase):
         """
         ''' Re-use '''
         from pipelines.pipeline_3_publication.task_publication_graph_1 import NewPublicationArticleGraphTask
-        #self._run_pipeline_task(NewPublicationArticleGraphTask)
+        self._run_pipeline_task(NewPublicationArticleGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_7 import NewCoreProjectArticleRelationshipGraphTask
-        #self._run_pipeline_task(NewCoreProjectArticleRelationshipGraphTask)
+        self._run_pipeline_task(NewCoreProjectArticleRelationshipGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_8 import NewCoreProjectClinicalTrialRelationshipGraphTask
-        #self._run_pipeline_task(NewCoreProjectClinicalTrialRelationshipGraphTask)
+        self._run_pipeline_task(NewCoreProjectClinicalTrialRelationshipGraphTask)
 
         from pipelines.pipeline_4_grant.task_grant_graph_9 import NewFundingIcGraphTask
         self._run_pipeline_task(NewFundingIcGraphTask) 
@@ -148,22 +148,22 @@ if __name__ == "__main__":
         # Step 1
         runner._run_step_with_timing(
             "Step 1: download_reporters_data()",
-            lambda: runner.logger.info("\n\n*** Skip Step 1 ***\n\n"),
-            # lambda: runner.download_reporters_data(),
+            #lambda: runner.logger.info("\n\n*** Skip Step 1 ***\n\n"),
+            lambda: runner.download_reporters_data(),
         )
 
         # Step 2
         runner._run_step_with_timing(
             "Step 2: upload_reporters_data_to_mysql()",
-            lambda: runner.logger.info("\n\n*** Skip Step 2 ***\n\n"),
-            #lambda: runner.upload_reporters_data_to_mysql(),
+            #lambda: runner.logger.info("\n\n*** Skip Step 2 ***\n\n"),
+            lambda: runner.upload_reporters_data_to_mysql(),
         )
 
         # Step 3
         runner._run_step_with_timing(
             "Step 3: build_relationship()",
-            lambda: runner.logger.info("\n\n*** Skip Step 3 ***\n\n"),
-            #lambda: runner.build_relationship(),
+            #lambda: runner.logger.info("\n\n*** Skip Step 3 ***\n\n"),
+            lambda: runner.build_relationship(),
         )
 
         # Step 4
@@ -176,15 +176,15 @@ if __name__ == "__main__":
         # Step 5
         runner._run_step_with_timing(
             "Step 5: followup_updates()",
-            lambda: runner.logger.info("\n\n*** Skip Step 5 ***\n\n"),
-            #lambda: runner.followup_updates(),
+            #lambda: runner.logger.info("\n\n*** Skip Step 5 ***\n\n"),
+            lambda: runner.followup_updates(),
         )
 
         # Step 6
         runner._run_step_with_timing(
             "Step 6: run_pipeline_wrapup()",
-            lambda: runner.logger.info("\n\n*** Skip Step 6 ***\n\n"),
-            #runner.run_pipeline_wrapup,
+            #lambda: runner.logger.info("\n\n*** Skip Step 6 ***\n\n"),
+            lambda: runner.run_pipeline_wrapup(),
         )
 
 
