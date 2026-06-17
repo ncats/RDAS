@@ -75,6 +75,23 @@ class GrantPipelineRunner(PipelineRunnerBase):
 
         
     """ Step 4 """
+    def graph_updates(self) -> None:
+
+        from pipelines.pipeline_4_grant.task_grant_graph_1 import NewProjectGraphTask
+        self._run_pipeline_task(NewProjectGraphTask)
+
+        from pipelines.pipeline_4_grant.task_grant_graph_2 import NewGardProjectRelationshipGraphTask
+        self._run_pipeline_task(NewGardProjectRelationshipGraphTask)
+
+        from pipelines.pipeline_4_grant.task_grant_graph_3 import NewCoreProjectGraphTask
+        self._run_pipeline_task(NewCoreProjectGraphTask)
+
+        from pipelines.pipeline_4_grant.task_grant_graph_4 import NewPatentGraphTask
+        self._run_pipeline_task(NewPatentGraphTask)
+
+        
+
+    """ Step 5 """
     def followup_updates(self) -> None:
 
         from pipelines.pipeline_4_grant.task_grant_12 import GrantPublicationArticleImportTask
@@ -86,10 +103,10 @@ class GrantPipelineRunner(PipelineRunnerBase):
 
 
 
-    """ Step 5 """
+    """ Step 6 """
     def run_pipeline_wrapup(self) -> None:
-        print('\n\n*** Skip Step 5 - run_pipeline_wrapup() ***\n\n')
-        pass
+        from pipelines.pipeline_4_grant.task_grant_pipeline_wrapup import GrantPipelineWrapUpTask 
+        self._run_pipeline_task(GrantPipelineWrapUpTask)
 
 
 
@@ -105,15 +122,15 @@ if __name__ == "__main__":
         # Step 1
         runner._run_step_with_timing(
             "Step 1: download_reporters_data()",
-            # lambda: runner.download_reporters_data(),
             lambda: runner.logger.info("\n\n*** Skip Step 1 ***\n\n"),
+            # lambda: runner.download_reporters_data(),
         )
 
         # Step 2
         runner._run_step_with_timing(
             "Step 2: upload_reporters_data_to_mysql()",
-            #lambda: runner.upload_reporters_data_to_mysql(),
             lambda: runner.logger.info("\n\n*** Skip Step 2 ***\n\n"),
+            #lambda: runner.upload_reporters_data_to_mysql(),
         )
 
         # Step 3
@@ -123,18 +140,25 @@ if __name__ == "__main__":
             #lambda: runner.build_relationship(),
         )
 
-
         # Step 4
         runner._run_step_with_timing(
-            "Step 4: followup_updates()",
+            "Step 4: graph_updates()",
             #lambda: runner.logger.info("\n\n*** Skip Step 4 ***\n\n"),
-            lambda: runner.followup_updates(),
+            lambda: runner.graph_updates(),
         )
 
         # Step 5
         runner._run_step_with_timing(
-            "Step 5: run_pipeline_wrapup()",
-            runner.run_pipeline_wrapup,
+            "Step 5: followup_updates()",
+            lambda: runner.logger.info("\n\n*** Skip Step 5 ***\n\n"),
+            #lambda: runner.followup_updates(),
+        )
+
+        # Step 6
+        runner._run_step_with_timing(
+            "Step 6: run_pipeline_wrapup()",
+            lambda: runner.logger.info("\n\n*** Skip Step 6 ***\n\n"),
+            #runner.run_pipeline_wrapup,
         )
 
 

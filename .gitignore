@@ -43,6 +43,7 @@ F_person/riea/Moon_*.csv
 # Non-Python analysis/support files/
 D_grant/init_10_linktable_PMID_already_exist_in_Publication_db.sql
 D_grant/init_9_GARD_and_Project_relationship.single.explanation.txt
+D_grant/grant_gard_confidence_similarity_research_ideas.html
 D_grant/init_9_GARD_and_Project_relationship.md
 D_grant/table.sql
 F_person/0_create_associate_id_int_column.sql
