@@ -1,0 +1,15 @@
+transformers 
+sentence-transformers 
+pandas 
+ast
+itertools 
+nltk
+re
+spacy
+torch
+tqdm 
+time
+datetime
+random
+numpy 
+math

@@ -1,0 +1,57 @@
+"id","size","shape","color","label"
+"STITCH
+staurosporine(CID100005279)",23.4041717210363,"dot","#00FF00FF","STITCH
+staurosporine(CID100005279)"
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity",25.9880557196737,"dot","#00FF00FF","GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity"
+"Protein kinase domain",25.9880557196737,"dot","#00FF00FF","Protein kinase domain"
+"GO:0004672 protein kinase
+activity",25.9880557196737,"dot","#00FF00A0","GO:0004672 protein kinase
+activity"
+"Ponatinib",20.1379842118407,"dot","#00FF0096","Ponatinib"
+"GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor",26.2774173579028,"dot","#00FF0082","GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor"
+"GO:0006468 protein
+phosphorylation",29.3327095415685,"dot","#00FF0082","GO:0006468 protein
+phosphorylation"
+"GO:0010033 response to
+organic substance",32.2056083940823,"dot","#00FF007F","GO:0010033 response to
+organic substance"
+"GO:1901700 response to
+oxygen-containing compound",29.3327095415685,"dot","#00FF006F","GO:1901700 response to
+oxygen-containing compound"
+"GO:0016310 phosphorylation",29.7811330282358,"dot","#00FF0063","GO:0016310 phosphorylation"
+"GO:0010646 reg. of cell
+communication",32.3900896994218,"dot","#00FF005A","GO:0010646 reg. of cell
+communication"
+"GO:0042221 response to
+chemical",33.7866596595258,"dot","#00FF005A","GO:0042221 response to
+chemical"
+"GO:0016301 kinase activity",26.2774173579028,"dot","#00FF0053","GO:0016301 kinase activity"
+"R-HSA-162582 Signal
+Transduction",31.2455906527268,"dot","#00FF0051","R-HSA-162582 Signal
+Transduction"
+"GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",26.8376701378026,"dot","#00FF004D","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups"
+"GO:1901698 response to
+nitrogen compound",27.3751374095653,"dot","#00FF004A","GO:1901698 response to
+nitrogen compound"
+"GO:0032879 reg. of
+localization",31.2455906527268,"dot","#00FF0043","GO:0032879 reg. of
+localization"
+"GO:0023051 reg. of signaling",32.2056083940823,"dot","#00FF0042","GO:0023051 reg. of signaling"
+"GO:0010243 response to
+organonitrogen compound",26.8376701378026,"dot","#00FF0039","GO:0010243 response to
+organonitrogen compound"
+"ENSP00000302564 interacting
+protein",23.7574258692098,"dot","#00FF0033","ENSP00000302564 interacting
+protein"

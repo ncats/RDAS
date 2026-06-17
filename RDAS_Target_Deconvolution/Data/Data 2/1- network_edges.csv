@@ -1,0 +1,430 @@
+"from","to","width"
+"STITCH
+staurosporine(CID100005279)","GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity",1.5125
+"STITCH
+staurosporine(CID100005279)","Protein kinase domain",1.5125
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","Protein kinase domain",5
+"STITCH
+staurosporine(CID100005279)","GO:0004672 protein kinase
+activity",1.5125
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","GO:0004672 protein kinase
+activity",5
+"Protein kinase domain","GO:0004672 protein kinase
+activity",5
+"STITCH
+staurosporine(CID100005279)","Ponatinib",0.775941230486685
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","Ponatinib",1.05551497443389
+"Protein kinase domain","Ponatinib",1.05551497443389
+"GO:0004672 protein kinase
+activity","Ponatinib",1.05551497443389
+"STITCH
+staurosporine(CID100005279)","GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor",1.43961927424153
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor",4.72608024691358
+"Protein kinase domain","GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor",4.72608024691358
+"GO:0004672 protein kinase
+activity","GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor",4.72608024691358
+"Ponatinib","GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor",1.00069252077563
+"STITCH
+staurosporine(CID100005279)","GO:0006468 protein
+phosphorylation",1.25
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","GO:0006468 protein
+phosphorylation",2.65842013888889
+"Protein kinase domain","GO:0006468 protein
+phosphorylation",2.65842013888889
+"GO:0004672 protein kinase
+activity","GO:0006468 protein
+phosphorylation",2.65842013888889
+"Ponatinib","GO:0006468 protein
+phosphorylation",0.783420138888888
+"GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor","GO:0006468 protein
+phosphorylation",2.8125
+"STITCH
+staurosporine(CID100005279)","GO:0010033 response to
+organic substance",0.476859861591696
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","GO:0010033 response to
+organic substance",0.540439106774253
+"Protein kinase domain","GO:0010033 response to
+organic substance",0.540439106774253
+"GO:0004672 protein kinase
+activity","GO:0010033 response to
+organic substance",0.540439106774253
+"GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor","GO:0010033 response to
+organic substance",0.586413961343593
+"GO:0006468 protein
+phosphorylation","GO:0010033 response to
+organic substance",0.918367346938777
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","GO:1901700 response to
+oxygen-containing compound",0.503905265810026
+"Protein kinase domain","GO:1901700 response to
+oxygen-containing compound",0.503905265810026
+"GO:0004672 protein kinase
+activity","GO:1901700 response to
+oxygen-containing compound",0.503905265810026
+"GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor","GO:1901700 response to
+oxygen-containing compound",0.48828125
+"GO:0006468 protein
+phosphorylation","GO:1901700 response to
+oxygen-containing compound",0.847750865051903
+"GO:0010033 response to
+organic substance","GO:1901700 response to
+oxygen-containing compound",2.78281683043588
+"STITCH
+staurosporine(CID100005279)","GO:0016310 phosphorylation",1.15569526627219
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","GO:0016310 phosphorylation",2.45
+"Protein kinase domain","GO:0016310 phosphorylation",2.45
+"GO:0004672 protein kinase
+activity","GO:0016310 phosphorylation",2.45
+"Ponatinib","GO:0016310 phosphorylation",0.722
+"GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor","GO:0016310 phosphorylation",2.592
+"GO:0006468 protein
+phosphorylation","GO:0016310 phosphorylation",4.608
+"GO:0010033 response to
+organic substance","GO:0016310 phosphorylation",0.950032873109797
+"GO:1901700 response to
+oxygen-containing compound","GO:0016310 phosphorylation",0.883217811384164
+"STITCH
+staurosporine(CID100005279)","GO:0010646 reg. of cell
+communication",0.589218088661171
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","GO:0010646 reg. of cell
+communication",0.883217811384164
+"Protein kinase domain","GO:0010646 reg. of cell
+communication",0.883217811384164
+"GO:0004672 protein kinase
+activity","GO:0010646 reg. of cell
+communication",0.883217811384164
+"GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor","GO:0010646 reg. of cell
+communication",0.945179584120982
+"GO:0006468 protein
+phosphorylation","GO:0010646 reg. of cell
+communication",1.58698670898631
+"GO:0010033 response to
+organic substance","GO:0010646 reg. of cell
+communication",1.9429920728622
+"GO:1901700 response to
+oxygen-containing compound","GO:0010646 reg. of cell
+communication",1.35485081628823
+"GO:0016310 phosphorylation","GO:0010646 reg. of cell
+communication",1.62133487654321
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","GO:0042221 response to
+chemical",0.528125
+"Protein kinase domain","GO:0042221 response to
+chemical",0.528125
+"GO:0004672 protein kinase
+activity","GO:0042221 response to
+chemical",0.528125
+"GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor","GO:0042221 response to
+chemical",0.56953125
+"GO:0006468 protein
+phosphorylation","GO:0042221 response to
+chemical",0.940629989838873
+"GO:0010033 response to
+organic substance","GO:0042221 response to
+chemical",3.81273556833961
+"GO:1901700 response to
+oxygen-containing compound","GO:0042221 response to
+chemical",2.28526086094029
+"GO:0016310 phosphorylation","GO:0042221 response to
+chemical",0.970096371882084
+"GO:0010646 reg. of cell
+communication","GO:0042221 response to
+chemical",2.01070791195717
+"STITCH
+staurosporine(CID100005279)","GO:0016301 kinase activity",1.43961927424153
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","GO:0016301 kinase activity",4.72608024691358
+"Protein kinase domain","GO:0016301 kinase activity",4.72608024691358
+"GO:0004672 protein kinase
+activity","GO:0016301 kinase activity",4.72608024691358
+"Ponatinib","GO:0016301 kinase activity",1.00069252077563
+"GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor","GO:0016301 kinase activity",5
+"GO:0006468 protein
+phosphorylation","GO:0016301 kinase activity",2.8125
+"GO:0010033 response to
+organic substance","GO:0016301 kinase activity",0.586413961343593
+"GO:1901700 response to
+oxygen-containing compound","GO:0016301 kinase activity",0.48828125
+"GO:0016310 phosphorylation","GO:0016301 kinase activity",2.592
+"GO:0010646 reg. of cell
+communication","GO:0016301 kinase activity",0.945179584120982
+"GO:0042221 response to
+chemical","GO:0016301 kinase activity",0.56953125
+"STITCH
+staurosporine(CID100005279)","R-HSA-162582 Signal
+Transduction",0.555555555555554
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","R-HSA-162582 Signal
+Transduction",0.862721893491123
+"Protein kinase domain","R-HSA-162582 Signal
+Transduction",0.862721893491123
+"GO:0004672 protein kinase
+activity","R-HSA-162582 Signal
+Transduction",0.862721893491123
+"GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor","R-HSA-162582 Signal
+Transduction",0.927810650887575
+"GO:0006468 protein
+phosphorylation","R-HSA-162582 Signal
+Transduction",1.05034722222222
+"GO:0010033 response to
+organic substance","R-HSA-162582 Signal
+Transduction",1.60058864265928
+"GO:1901700 response to
+oxygen-containing compound","R-HSA-162582 Signal
+Transduction",0.960780634265342
+"GO:0016310 phosphorylation","R-HSA-162582 Signal
+Transduction",1.18152006172839
+"GO:0010646 reg. of cell
+communication","R-HSA-162582 Signal
+Transduction",1.55928487097318
+"GO:0042221 response to
+chemical","R-HSA-162582 Signal
+Transduction",1.57346817370613
+"GO:0016301 kinase activity","R-HSA-162582 Signal
+Transduction",0.927810650887575
+"STITCH
+staurosporine(CID100005279)","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",1.30881557598702
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",4.24168975069252
+"Protein kinase domain","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",4.24168975069252
+"GO:0004672 protein kinase
+activity","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",4.24168975069252
+"Ponatinib","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",0.903125
+"GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",4.48753462603879
+"GO:0006468 protein
+phosphorylation","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",2.592
+"GO:0010033 response to
+organic substance","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",0.555555555555554
+"GO:1901700 response to
+oxygen-containing compound","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",0.459136822773186
+"GO:0016310 phosphorylation","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",2.39644970414201
+"GO:0010646 reg. of cell
+communication","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",0.98061224489796
+"GO:0042221 response to
+chemical","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",0.59746989788142
+"GO:0016301 kinase activity","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",4.48753462603879
+"R-HSA-162582 Signal
+Transduction","GO:0016772 transferase
+activity transferring
+phosphorus-containing groups",0.965335169880623
+"GO:0006468 protein
+phosphorylation","GO:1901698 response to
+nitrogen compound",0.555555555555554
+"GO:0010033 response to
+organic substance","GO:1901698 response to
+nitrogen compound",1.91609977324263
+"GO:1901700 response to
+oxygen-containing compound","GO:1901698 response to
+nitrogen compound",3.47222222222222
+"GO:0016310 phosphorylation","GO:1901698 response to
+nitrogen compound",0.589218088661171
+"GO:0010646 reg. of cell
+communication","GO:1901698 response to
+nitrogen compound",1.11122448979592
+"GO:0042221 response to
+chemical","GO:1901698 response to
+nitrogen compound",1.58698670898631
+"R-HSA-162582 Signal
+Transduction","GO:1901698 response to
+nitrogen compound",0.743877551020409
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","GO:0032879 reg. of
+localization",0.696146134996659
+"Protein kinase domain","GO:0032879 reg. of
+localization",0.696146134996659
+"GO:0004672 protein kinase
+activity","GO:0032879 reg. of
+localization",0.696146134996659
+"GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor","GO:0032879 reg. of
+localization",0.752951659612385
+"GO:0006468 protein
+phosphorylation","GO:0032879 reg. of
+localization",1.05034722222222
+"GO:0010033 response to
+organic substance","GO:0032879 reg. of
+localization",1.84897735573411
+"GO:1901700 response to
+oxygen-containing compound","GO:0032879 reg. of
+localization",1.60837603029628
+"GO:0016310 phosphorylation","GO:0032879 reg. of
+localization",1.08463126290111
+"GO:0010646 reg. of cell
+communication","GO:0032879 reg. of
+localization",1.55928487097318
+"GO:0042221 response to
+chemical","GO:0032879 reg. of
+localization",1.92356994071463
+"GO:0016301 kinase activity","GO:0032879 reg. of
+localization",0.752951659612385
+"R-HSA-162582 Signal
+Transduction","GO:0032879 reg. of
+localization",1.352
+"GO:0016772 transferase
+activity transferring
+phosphorus-containing groups","GO:0032879 reg. of
+localization",0.873245711739808
+"GO:1901698 response to
+nitrogen compound","GO:0032879 reg. of
+localization",1.00245043439519
+"STITCH
+staurosporine(CID100005279)","GO:0023051 reg. of signaling",0.607208448117541
+"GO:0004712 protein
+serine/threonine/tyrosine
+kinase activity","GO:0023051 reg. of signaling",0.909385813148788
+"Protein kinase domain","GO:0023051 reg. of signaling",0.909385813148788
+"GO:0004672 protein kinase
+activity","GO:0023051 reg. of signaling",0.909385813148788
+"GO:0016773 phosphotransferase
+activity alcohol group as
+acceptor","GO:0023051 reg. of signaling",0.973183391003459
+"GO:0006468 protein
+phosphorylation","GO:0023051 reg. of signaling",1.63265306122449
+"GO:0010033 response to
+organic substance","GO:0023051 reg. of signaling",1.8628773823579
+"GO:1901700 response to
+oxygen-containing compound","GO:0023051 reg. of signaling",1.284481140927
+"GO:0016310 phosphorylation","GO:0023051 reg. of signaling",1.66732791112874
+"GO:0010646 reg. of cell
+communication","GO:0023051 reg. of signaling",4.84252960443436
+"GO:0042221 response to
+chemical","GO:0023051 reg. of signaling",1.93411659726353
+"GO:0016301 kinase activity","GO:0023051 reg. of signaling",0.973183391003459
+"R-HSA-162582 Signal
+Transduction","GO:0023051 reg. of signaling",1.60058864265928
+"GO:0016772 transferase
+activity transferring
+phosphorus-containing groups","GO:0023051 reg. of signaling",1.00924175593363
+"GO:1901698 response to
+nitrogen compound","GO:0023051 reg. of signaling",1.04489795918367
+"GO:0032879 reg. of
+localization","GO:0023051 reg. of signaling",1.48760330578512
+"GO:0006468 protein
+phosphorylation","GO:0010243 response to
+organonitrogen compound",0.52189349112426
+"GO:0010033 response to
+organic substance","GO:0010243 response to
+organonitrogen compound",1.87825182101977
+"GO:1901700 response to
+oxygen-containing compound","GO:0010243 response to
+organonitrogen compound",3.13368055555556
+"GO:0016310 phosphorylation","GO:0010243 response to
+organonitrogen compound",0.555555555555554
+"GO:0010646 reg. of cell
+communication","GO:0010243 response to
+organonitrogen compound",0.98061224489796
+"GO:0042221 response to
+chemical","GO:0010243 response to
+organonitrogen compound",1.43225550486015
+"R-HSA-162582 Signal
+Transduction","GO:0010243 response to
+organonitrogen compound",0.788278546712804
+"GO:1901698 response to
+nitrogen compound","GO:0010243 response to
+organonitrogen compound",4.5125
+"GO:0032879 reg. of
+localization","GO:0010243 response to
+organonitrogen compound",0.965335169880623
+"GO:0023051 reg. of signaling","GO:0010243 response to
+organonitrogen compound",0.918367346938777
+"STITCH
+staurosporine(CID100005279)","ENSP00000302564 interacting
+protein",0.703125
+"GO:0006468 protein
+phosphorylation","ENSP00000302564 interacting
+protein",0.481569560047563
+"GO:0010033 response to
+organic substance","ENSP00000302564 interacting
+protein",0.463137996219283
+"GO:0016310 phosphorylation","ENSP00000302564 interacting
+protein",0.518529158287849
+"GO:0010646 reg. of cell
+communication","ENSP00000302564 interacting
+protein",0.508296576349507
+"GO:0042221 response to
+chemical","ENSP00000302564 interacting
+protein",0.512
+"R-HSA-162582 Signal
+Transduction","ENSP00000302564 interacting
+protein",0.538330078125
+"GO:0023051 reg. of signaling","ENSP00000302564 interacting
+protein",0.523356401384083
