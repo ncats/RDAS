@@ -380,7 +380,8 @@ def _clean(s: Any) -> str:
         return ''
     if not isinstance(s, str):
         s = str(s)
-    return re.sub(r'[^\w\s\-\/@.+]+', '', s)
+    # Keep ":" so URL schemes such as "https://" are not rewritten to "https//".
+    return re.sub(r'[^\w\s\-\/@.+:]+', '', s)
 
 
 def _clean_data_extract(data):
