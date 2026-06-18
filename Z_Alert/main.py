@@ -304,6 +304,12 @@ class AlertPipelineRunner(PipelineRunnerBase):
         self._run_pipeline_task(PublicationPipelineWrapUpTask)
         self._run_pipeline_task(PersonPipelineWrapUpTask)
 
+
+    def run_memgraph_index_initialization(self) -> None:
+        """Run Memgraph index initialization through the standard task lifecycle."""
+
+        self._run_pipeline_task(MemgraphIndexInitializationTask)
+
  
 
 if __name__ == "__main__":
@@ -318,68 +324,78 @@ if __name__ == "__main__":
         # Step 1
         runner._run_step_with_timing(
             "Step 1: run_find_new_clinical_trial_and_publication_updates()",
-            runner.run_find_new_clinical_trial_and_publication_updates,
+            lambda: runner.logger.info("\n\n*** Skip Step 1 ***\n\n"),
+            #lambda: runner.run_find_new_clinical_trial_and_publication_updates(),
         )
         
         # Step 2
         runner._run_step_with_timing(
             "Step 2: run_clinical_trial_mysql_updates()",
-            runner.run_clinical_trial_mysql_updates,
+            lambda: runner.logger.info("\n\n*** Skip Step 2 ***\n\n"),
+            #lambda: runner.run_clinical_trial_mysql_updates(),
         )
        
         # Step 3
         runner._run_step_with_timing(
             "Step 3: run_publication_mysql_updates()",
-            runner.run_publication_mysql_updates,
+            lambda: runner.logger.info("\n\n*** Skip Step 3 ***\n\n"),
+            #lambda: runner.run_publication_mysql_updates(), 
         )
         
         # Step 4
         runner._run_step_with_timing(
-            "Step 4: MemgraphIndexInitializationTask().process_new_data()",
-            # lambda: MemgraphIndexInitializationTask().process_new_data(),
-            lambda: runner.logger.info(f'\n\n{"*" * 30} MemgraphIndexInitializationTask().process_new_data() is disabled {"*" * 30}\n\n')
+            "Step 4: run_memgraph_index_initialization()",
+            #lambda: runner.logger.info(f'\n\n{"*" * 30} MemgraphIndexInitializationTask().process_new_data() is disabled {"*" * 30}\n\n')
+            lambda: runner.run_memgraph_index_initialization(),
         )
         
         # Step 5
         runner._run_step_with_timing(
             "Step 5: run_clinical_trial_graph_updates()",
-            runner.run_clinical_trial_graph_updates,
+            lambda: runner.logger.info("\n\n*** Skip Step 5 ***\n\n"),
+            #lambda: runner.run_clinical_trial_graph_updates(),   
         )
         
         # Step 6
         runner._run_step_with_timing(
             "Step 6: run_publication_graph_updates()",
-            runner.run_publication_graph_updates,
+            lambda: runner.logger.info("\n\n*** Skip Step 6 ***\n\n"),
+            #lambda: runner.run_publication_graph_updates(), 
         )
         
         # Step 7
         runner._run_step_with_timing(
             "Step 7: run_pipeline_followup_updates()",
-            runner.run_pipeline_followup_updates,
+            lambda: runner.logger.info("\n\n*** Skip Step 7 ***\n\n"),
+            #lambda: runner.run_pipeline_followup_updates(),
         )
         
         # Step 8
         runner._run_step_with_timing(
             "Step 8: send_alert_emails()",
-            runner.send_alert_emails,
+            lambda: runner.logger.info("\n\n*** Skip Step 8 ***\n\n"),
+            #lambda: runner.send_alert_emails(),
         )
         
         # Step 9
         runner._run_step_with_timing(
             "Step 9: run_regroup_the_person()",
-            runner.run_regroup_the_person,
+            #lambda: runner.logger.info("\n\n*** Skip Step 9 ***\n\n"),
+            lambda: runner.run_regroup_the_person(),
         )
          
         # Step 10
         runner._run_step_with_timing(
             "Step 10: run_pipeline_maintenance()",
-            runner.run_pipeline_maintenance,
+            lambda: runner.logger.info("\n\n*** Skip Step 10 ***\n\n"),
+            #lambda: runner.run_pipeline_maintenance(),
         )
         
         # Step 11
         runner._run_step_with_timing(
             "Step 10: run_pipeline_wrapup()",
-            runner.run_pipeline_wrapup,
+            lambda: runner.logger.info("\n\n*** Skip Step 11 ***\n\n"),
+            lambda: runner.run_pipeline_wrapup(),
         )
          
     finally:
@@ -393,5 +409,8 @@ if __name__ == "__main__":
         """ Flush and close the runner logger. """
         runner.close()
 
-        ''' Create a date-stamped archive directory under runner.log_dir, like 20260526, then move all *.log and *.log.* files into it. '''
+        ''' 
+        Create a date-stamped archive directory under runner.log_dir, 
+        like 20260526, then move all *.log and *.log.* files into it. 
+        '''
         runner._archive_log_files_by_date()
