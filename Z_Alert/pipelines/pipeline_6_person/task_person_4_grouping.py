@@ -433,8 +433,18 @@ class NewPersonGroupingTask(PipelineBase):
     def get_newly_added_last_names_by_prefix(self, prefix: str) -> List[str]:
         """Return new-row last names under one prefix for regrouping."""
 
-        # is_new only chooses which last names were affected by this alert run.
-        # The full person set for each returned last name is loaded later.
+        '''
+        This query is only the worklist selector for the alert run. 
+        It returns distinct last_name values from newly staged rows 
+        whose rdas_group_id is still missing.
+        The is_new filter should not be interpreted as "group only new people"; 
+        it only answers "which last-name groups were touched by this alert run?" 
+        After a last name is selected here, fetch_person_by_last_name_for_group_id_update()
+        loads the full person set for that last name, including older rows, so
+        PersonDisambiguator can preserve and reuse existing rdas_group_id values.
+        '''
+        # Resume safety: if the process is interrupted, already processed person rows have rdas_group_id populated,
+        # so they will not be processed again even when is_new = 1.
         query = f'''
             SELECT DISTINCT last_name
             FROM {self.PERSON_TABLE}
