@@ -1,0 +1,167 @@
+Omics_type,Sequencing_type
+['Epigenomics'],ATAC-seq
+['Epigenomics'],Bisulfite-Seq
+['Epigenomics'],ChIA-PET
+['Epigenomics'],ChIP-Seq
+['Epigenomics'],DNase-Hypersensitivity
+['Epigenomics'],FAIRE-seq
+['Epigenomics'],Hi-C
+['Epigenomics'],MBD-Seq
+['Epigenomics'],MNase-Seq
+['Epigenomics'],MeDIP-Seq
+['Epigenomics'],OTHER
+['Epigenomics'],RNA-Seq
+['Epigenomics'],"['', 'Bisulfite-Seq', 'ChIP-Seq', 'RNA-Seq']"
+['Epigenomics'],"['ATAC-seq', 'ChIP-Seq']"
+['Epigenomics'],"['ATAC-seq', 'OTHER', 'RNA-Seq']"
+['Epigenomics'],"['Bisulfite-Seq', 'ChIP-Seq', 'MeDIP-Seq']"
+['Epigenomics'],"['Bisulfite-Seq', 'ChIP-Seq', 'OTHER']"
+['Epigenomics'],"['Bisulfite-Seq', 'OTHER']"
+['Epigenomics'],"['ChIP-Seq', 'DNase-Hypersensitivity']"
+['Epigenomics'],"['ChIP-Seq', 'FAIRE-seq']"
+['Epigenomics'],"['ChIP-Seq', 'MNase-Seq']"
+['Epigenomics'],"['ChIP-Seq', 'MeDIP-Seq']"
+['Epigenomics'],"['ChIP-Seq', 'OTHER']"
+['Epigenomics'],"['ChIP-Seq', 'RNA-Seq']"
+['Epigenomics'],
+"['Genome sequencing and assembly, Genome sequencing, Transcriptome or Gene expression']",RNA-Seq
+"['Genome sequencing and assembly, Raw sequence reads']",RNA-Seq
+"['Genome sequencing and assembly, Raw sequence reads, Genome sequencing, Assembly']",RNA-Seq
+['Genome sequencing'],ChIP-Seq
+"['Genome sequencing, Exome, Transcriptome or Gene expression']",ATAC-seq
+"['Genome sequencing, Exome, Transcriptome or Gene expression']",RNA-Seq
+"['Genome sequencing, Exome, Transcriptome or Gene expression']","['ATAC-seq', 'RNA-Seq']"
+['Metagenome'],RNA-Seq
+['Phenotype or Genotype'],RNA-Seq
+['Phenotype or Genotype'],"['ATAC-seq', 'RNA-Seq']"
+['Proteome'],
+['Raw sequence reads'],ATAC-seq
+['Raw sequence reads'],ChIP-Seq
+['Raw sequence reads'],Hi-C
+['Raw sequence reads'],OTHER
+['Raw sequence reads'],RNA-Seq
+['Raw sequence reads'],"['ChIP-Seq', 'RIP-Seq']"
+['Raw sequence reads'],"['ChIP-Seq', 'RNA-Seq']"
+['Raw sequence reads'],"['Hi-C', 'OTHER', 'RNA-Seq']"
+['Raw sequence reads'],"['OTHER', 'RNA-Seq']"
+['Raw sequence reads'],"['RIP-Seq', 'RNA-Seq']"
+['Raw sequence reads'],
+"['Raw sequence reads, Epigenomics']","['ATAC-seq', 'ChIP-Seq', 'RNA-Seq']"
+"['Raw sequence reads, Genome sequencing, Epigenomics, Transcriptome or Gene expression, Other']","['ATAC-seq', 'ChIP-Seq']"
+"['Raw sequence reads, Genome sequencing, Transcriptome or Gene expression']",RNA-Seq
+"['Raw sequence reads, Targeted Locus (Loci), Transcriptome or Gene expression']",RNA-Seq
+"['Raw sequence reads, Transcriptome or Gene expression']",OTHER
+"['Raw sequence reads, Transcriptome or Gene expression']",RNA-Seq
+['Targeted Locus (Loci)'],RNA-Seq
+['Transcriptome or Gene expression'],ATAC-seq
+['Transcriptome or Gene expression'],Bisulfite-Seq
+['Transcriptome or Gene expression'],Hi-C
+['Transcriptome or Gene expression'],OTHER
+['Transcriptome or Gene expression'],RIP-Seq
+['Transcriptome or Gene expression'],RNA-Seq
+['Transcriptome or Gene expression'],"['', 'RNA-Seq']"
+['Transcriptome or Gene expression'],"['Bisulfite-Seq', 'RNA-Seq']"
+['Transcriptome or Gene expression'],"['OTHER', 'RNA-Seq']"
+['Transcriptome or Gene expression'],"['RIP-Seq', 'RNA-Seq', 'ncRNA-Seq']"
+['Transcriptome or Gene expression'],"['RIP-Seq', 'RNA-Seq']"
+['Transcriptome or Gene expression'],"['RNA-Seq', 'miRNA-Seq']"
+['Transcriptome or Gene expression'],"['RNA-Seq', 'ncRNA-Seq']"
+['Transcriptome or Gene expression'],"['RNA-Seq', 'ssRNA-seq']"
+['Transcriptome or Gene expression'],[]
+['Transcriptome or Gene expression'],miRNA-Seq
+['Transcriptome or Gene expression'],ncRNA-Seq
+['Transcriptome or Gene expression'],ssRNA-seq
+['Transcriptome or Gene expression'],
+['Variation'],ChIP-Seq
+['Variation'],OTHER
+['Variation'],RNA-Seq
+['Variation'],
+[],ATAC-seq
+[],Bisulfite-Seq
+[],ChIP-Seq
+[],DNase-Hypersensitivity
+[],Hi-C
+[],OTHER
+[],RIP-Seq
+[],RNA-Seq
+[],SELEX
+[],Tn-Seq
+[],"['', 'ATAC-seq', 'Bisulfite-Seq', 'ChIP-Seq', 'RNA-Seq']"
+[],"['', 'ATAC-seq']"
+[],"['', 'Bisulfite-Seq', 'RNA-Seq']"
+[],"['', 'Bisulfite-Seq']"
+[],"['', 'ChIP-Seq', 'DNase-Hypersensitivity', 'OTHER']"
+[],"['', 'ChIP-Seq', 'DNase-Hypersensitivity', 'RNA-Seq']"
+[],"['', 'ChIP-Seq', 'DNase-Hypersensitivity']"
+[],"['', 'ChIP-Seq', 'FAIRE-seq', 'RNA-Seq']"
+[],"['', 'ChIP-Seq', 'OTHER', 'RNA-Seq']"
+[],"['', 'ChIP-Seq', 'OTHER']"
+[],"['', 'ChIP-Seq', 'RNA-Seq']"
+[],"['', 'ChIP-Seq']"
+[],"['', 'DNase-Hypersensitivity']"
+[],"['', 'MeDIP-Seq']"
+[],"['', 'OTHER', 'RNA-Seq']"
+[],"['', 'OTHER']"
+[],"['', 'RNA-Seq', 'miRNA-Seq']"
+[],"['', 'RNA-Seq']"
+[],"['', 'miRNA-Seq']"
+[],"['', 'ncRNA-Seq']"
+[],"['ATAC-seq', 'Bisulfite-Seq', 'ChIP-Seq', 'OTHER', 'RNA-Seq']"
+[],"['ATAC-seq', 'Bisulfite-Seq', 'ChIP-Seq', 'RNA-Seq']"
+[],"['ATAC-seq', 'Bisulfite-Seq', 'OTHER', 'RNA-Seq']"
+[],"['ATAC-seq', 'Bisulfite-Seq', 'RNA-Seq']"
+[],"['ATAC-seq', 'ChIP-Seq', 'Hi-C', 'OTHER', 'RNA-Seq']"
+[],"['ATAC-seq', 'ChIP-Seq', 'Hi-C', 'RNA-Seq']"
+[],"['ATAC-seq', 'ChIP-Seq', 'Hi-C']"
+[],"['ATAC-seq', 'ChIP-Seq', 'MeDIP-Seq', 'OTHER', 'RNA-Seq']"
+[],"['ATAC-seq', 'ChIP-Seq', 'OTHER', 'RNA-Seq']"
+[],"['ATAC-seq', 'ChIP-Seq', 'RNA-Seq']"
+[],"['ATAC-seq', 'ChIP-Seq']"
+[],"['ATAC-seq', 'Hi-C', 'OTHER']"
+[],"['ATAC-seq', 'OTHER', 'RIP-Seq', 'RNA-Seq', 'miRNA-Seq', 'ssRNA-seq']"
+[],"['ATAC-seq', 'OTHER', 'RNA-Seq']"
+[],"['ATAC-seq', 'OTHER']"
+[],"['ATAC-seq', 'RNA-Seq', 'miRNA-Seq']"
+[],"['ATAC-seq', 'RNA-Seq']"
+[],"['Bisulfite-Seq', 'ChIP-Seq', 'Hi-C', 'OTHER', 'RNA-Seq']"
+[],"['Bisulfite-Seq', 'ChIP-Seq', 'OTHER', 'RNA-Seq']"
+[],"['Bisulfite-Seq', 'ChIP-Seq', 'OTHER']"
+[],"['Bisulfite-Seq', 'ChIP-Seq', 'RNA-Seq']"
+[],"['Bisulfite-Seq', 'ChIP-Seq']"
+[],"['Bisulfite-Seq', 'MNase-Seq', 'RNA-Seq']"
+[],"['Bisulfite-Seq', 'OTHER', 'RNA-Seq']"
+[],"['Bisulfite-Seq', 'OTHER']"
+[],"['Bisulfite-Seq', 'RNA-Seq']"
+[],"['ChIA-PET', 'ChIP-Seq', 'OTHER', 'RNA-Seq']"
+[],"['ChIP-Seq', 'Hi-C', 'OTHER', 'RIP-Seq', 'RNA-Seq']"
+[],"['ChIP-Seq', 'Hi-C', 'OTHER', 'RNA-Seq']"
+[],"['ChIP-Seq', 'Hi-C', 'RNA-Seq']"
+[],"['ChIP-Seq', 'OTHER', 'RNA-Seq', 'WGS']"
+[],"['ChIP-Seq', 'OTHER', 'RNA-Seq']"
+[],"['ChIP-Seq', 'OTHER']"
+[],"['ChIP-Seq', 'RIP-Seq', 'RNA-Seq']"
+[],"['ChIP-Seq', 'RIP-Seq']"
+[],"['ChIP-Seq', 'RNA-Seq']"
+[],"['DNase-Hypersensitivity', 'RNA-Seq']"
+[],"['FAIRE-seq', 'RNA-Seq']"
+[],"['Hi-C', 'OTHER', 'RNA-Seq']"
+[],"['Hi-C', 'OTHER']"
+[],"['Hi-C', 'RNA-Seq']"
+[],"['MNase-Seq', 'OTHER', 'RNA-Seq']"
+[],"['MeDIP-Seq', 'RNA-Seq']"
+[],"['OTHER', 'RIP-Seq', 'RNA-Seq']"
+[],"['OTHER', 'RIP-Seq']"
+[],"['OTHER', 'RNA-Seq', 'miRNA-Seq']"
+[],"['OTHER', 'RNA-Seq', 'ncRNA-Seq']"
+[],"['OTHER', 'RNA-Seq']"
+[],"['OTHER', 'ssRNA-seq']"
+[],"['RIP-Seq', 'RNA-Seq', 'ncRNA-Seq']"
+[],"['RIP-Seq', 'RNA-Seq']"
+[],"['RIP-Seq', 'ncRNA-Seq']"
+[],"['RNA-Seq', 'miRNA-Seq']"
+[],"['RNA-Seq', 'ncRNA-Seq']"
+[],"['RNA-Seq', 'ssRNA-seq']"
+[],[]
+[],ncRNA-Seq
+[],ssRNA-seq
+[],

@@ -1,0 +1,4 @@
+Similarity_Cutoff,Labels_Assigned,Label_Coverage_Among_Remaining_Labels,Occurrences_Assigned,Occurrence_Coverage_Among_Remaining_Occurrences,Reviewed_Labels,Reviewed_Correct,Manual_Accuracy,Selected_For_Final_Pipeline
+0.70,534,38.8%,198809,55.2%,150,67,44.7%,No
+0.75,333,24.2%,146907,40.8%,100,45,45.0%,Yes
+0.80,163,11.8%,42280,11.7%,50,24,48.0%,No

@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Environment and local overrides
+.env
+scripts/config/paths.local.yaml
+
+# Logs
+logs/
+*.log
+scripts/sample_characteristics_harmonization/logs/
+
+# macOS
+.DS_Store
+
+# Generated pipeline outputs
+scripts/data/geo_matrix_files/
+scripts/data/geo_final_tables/
+scripts/data/geo_final_tables_testing/
+scripts/data/node_csv_files/
+scripts/data/node_json_files/
+scripts/sample_characteristics_harmonization/sample_characteristics_harmonization_output/sample_import_resume.json
