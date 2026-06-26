@@ -1,4 +1,4 @@
-# RDAS_RDOMICS
+# RD_OMICS
 
 RDAS_RDOMICS is a rare-disease omics data extraction and graph-construction pipeline centered on GEO studies. The project takes disease-driven queries, gathers matching GEO accessions, extracts experiment and sample metadata, normalizes selected fields, and reshapes the results into graph-ready node and relationship tables that can be imported into Neo4j or Memgraph.
 
