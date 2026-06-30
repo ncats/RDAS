@@ -25,7 +25,7 @@ Sync new organization location rows from MySQL back to Memgraph.
 7. Merge duplicate Location nodes by _idx_key.
 """
 
-# Reference: G_update/update_organization_location_db_step_3_graph_batch.py
+# Reference: G_update/update_organization_location_db_step_3_graph.py
 
 class OrganizationLocationGraphSyncTask(PipelineBase):
     """Apply newly staged organization_location rows to the Memgraph graph."""
