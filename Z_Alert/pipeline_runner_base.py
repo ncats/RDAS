@@ -64,14 +64,14 @@ class PipelineRunnerBase:
         """Run one high-level pipeline step and log the duration."""
 
         step_start_time = time.time()
-        self.logger.info(f"\n\n{'*' * 20} Starting {step_name} {'*' * 20}\n")
+        self.logger.info(f"\n{'*' * 20} Starting {step_name} {'*' * 20}")
 
         try:
             step_func()
 
         finally:
             hours, minutes, seconds = _time_hms(time.time() - step_start_time)
-            self.logger.info(f"\n\n{'*' * 20} Finished {step_name} in {hours} hours, {minutes} minutes, {seconds} seconds {'*' * 20}\n\n")
+            self.logger.info(f"\n{'*' * 20} Finished {step_name} in {hours} hours, {minutes} minutes, {seconds} seconds {'*' * 20}\n")
 
 
     def _close_task_if_needed(self, task) -> None:
