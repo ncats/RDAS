@@ -16,7 +16,7 @@ from utils.tools import _clean, _make_hash_key, _parse_json_list, _time_hms, _to
 """
 Sync new organization location rows from MySQL back to Memgraph.
 
-1. Reference: G_update/update_organization_location_db_step_3_graph_batch.py.
+1. Reference: G_update/update_organization_location_db_step_3_graph.py.
 2. Read organization_location rows where is_new = 1.
 3. Update matching Organization nodes with ROR metadata.
 4. Create Location nodes when location data exists.
