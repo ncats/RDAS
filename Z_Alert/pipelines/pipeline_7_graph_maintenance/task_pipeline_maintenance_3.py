@@ -155,10 +155,12 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
             self.track_clinical_trial_sources()
             self.track_core_project_sources()
             self.track_person_sources()
+            reset_count = self.reset_organization_location_is_new()
 
             hours, minutes, seconds = _time_hms(time.time() - start_time)
             self.logger.info(
                 "Completed NewOrganizationSourceTrackingTask. "
+                f"reset_organization_location_is_new={reset_count}. "
                 f"Time={hours} hours, {minutes} minutes, {seconds} seconds."
             )
 
@@ -200,6 +202,42 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
             batch_size=self.PERSON_BATCH_SIZE,
             row_builder=self._create_person_source_row,
         )
+
+
+    def reset_organization_location_is_new(self) -> int:
+        """
+        Clear organization_location rows only after source tracking succeeds.
+
+        Keeping this out of process_new_data()'s finally block preserves
+        is_new=1 for retry when graph sync or source tracking fails before this
+        point.
+        """
+
+        cursor = None
+
+        try:
+            cursor = self.mysql.cursor(buffered=True)
+            cursor.execute(f"""
+                UPDATE {self.ORGANIZATION_LOCATION_TABLE_NAME}
+                SET is_new = 0
+                WHERE is_new = 1
+            """)
+            self.mysql.commit()
+
+            self.logger.info(
+                f"Updated {cursor.rowcount} rows in {self.ORGANIZATION_LOCATION_TABLE_NAME}; "
+                "set is_new = 0."
+            )
+            return cursor.rowcount
+
+        except Exception as e:
+            self.mysql.rollback()
+            self.logger.error(f"Error resetting {self.ORGANIZATION_LOCATION_TABLE_NAME}.is_new: {e}")
+            raise
+
+        finally:
+            if cursor:
+                cursor.close()
 
 
     def _process_query_batches(self, source_name: str, query: str, batch_size: int, row_builder) -> None:
