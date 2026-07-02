@@ -176,6 +176,58 @@ class OrganizationNameExtractor:
         self.session.close()
 
 
+    def shutdown_model(self) -> bool:
+        """
+        Ask the configured Ollama-compatible server to unload this model.
+
+        Ollama keeps recently used models resident in memory. Passing
+        keep_alive=0 to /api/generate unloads only the configured model while
+        leaving an existing Ollama server process available for other work.
+        """
+        if not self._model_server_is_running:
+            self._log_info(f"Skipping model shutdown because the model server is not running: {self.model_api_base_url}")
+            return False
+
+        try:
+            response = self.session.post(
+                f"{self.model_api_base_url}/api/generate",
+                json={
+                    "model": self.model_name,
+                    "keep_alive": 0,
+                    "stream": False,
+                },
+                timeout=min(self.request_timeout, 30),
+            )
+            response.raise_for_status()
+            self._log_info(f"Shutdown model after task completion: {self.model_name}")
+
+            return True
+
+        except requests.RequestException as exc:
+            self._log_warning(f"Failed to shutdown model {self.model_name}: {exc}")
+            return False
+
+
+    def stop_model_server(self) -> None:
+        """
+        Stop only the model server process started by this extractor instance.
+
+        If Ollama was already running before this task, _model_server_process is
+        None and the shared server is left alone.
+        """
+        if self._model_server_process is None:
+            return
+
+        self._model_server_process.terminate()
+
+        try:
+            self._model_server_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self._model_server_process.kill()
+
+        self._model_server_process = None
+
+
     def _is_local_model_api(self) -> bool:
         """Return True when the configured model API URL points to this machine."""
 

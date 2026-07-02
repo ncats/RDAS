@@ -224,6 +224,19 @@ class OrganizationLocationRorLookupTask(PipelineBase):
         self.org_name_extractor = OrganizationNameExtractor(logger=self.logger)
 
 
+    def close(self) -> None:
+        """Unload the local model before closing task resources."""
+
+        try:
+            if getattr(self, "org_name_extractor", None) is not None:
+                self.org_name_extractor.shutdown_model()
+                self.org_name_extractor.stop_model_server()
+                self.org_name_extractor.close()
+                self.org_name_extractor = None
+        finally:
+            super().close()
+
+
     def find_new_data(self, gard_node) -> None:
         self.logger.info("OrganizationLocationRorLookupTask does not use find_new_data().")
 
