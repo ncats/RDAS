@@ -181,15 +181,30 @@ class OrganizationNameExtractor:
 
 
     def find_ollama_executable(self) -> Optional[str]:
-        """Find Ollama in common macOS install locations when it is not on PATH."""
+        """Find Ollama in common macOS and Linux install locations when it is not on PATH."""
 
-        candidate_paths = [
+        # macOS
+        macos_candidate_paths = [
             "/opt/homebrew/bin/ollama",
             "/usr/local/bin/ollama",
             "/Applications/Ollama.app/Contents/Resources/ollama",
         ]
-        candidate_paths.extend(sorted(glob.glob("/opt/homebrew/Cellar/ollama/*/bin/ollama"), reverse=True))
-        candidate_paths.extend(sorted(glob.glob("/usr/local/Cellar/ollama/*/bin/ollama"), reverse=True))
+        macos_candidate_paths.extend(sorted(glob.glob("/opt/homebrew/Cellar/ollama/*/bin/ollama"), reverse=True))
+        macos_candidate_paths.extend(sorted(glob.glob("/usr/local/Cellar/ollama/*/bin/ollama"), reverse=True))
+
+        # Linux
+        linux_candidate_paths = [
+            "/usr/local/bin/ollama",
+            "/usr/bin/ollama",
+            "/bin/ollama",
+            "/snap/bin/ollama",
+            "/opt/ollama/bin/ollama",
+            "/home/linuxbrew/.linuxbrew/bin/ollama",
+        ]
+        linux_candidate_paths.extend(sorted(glob.glob("/home/linuxbrew/.linuxbrew/Cellar/ollama/*/bin/ollama"), reverse=True))
+
+        # All paths
+        candidate_paths = macos_candidate_paths + linux_candidate_paths
 
         for candidate_path in candidate_paths:
             if os.path.isfile(candidate_path) and os.access(candidate_path, os.X_OK):
