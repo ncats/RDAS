@@ -152,8 +152,14 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                 except Exception as e:
                     self.logger.error(f"Error syncing organization location batch #{batch_num} to Memgraph: {e}")
 
-            merged_organizations = self.merge_duplicate_organizations()
-            merged_locations = self.merge_duplicate_locations()
+            merged_organizations = 0
+            merged_locations = 0
+
+            if total_updated > 0:
+                merged_organizations = self.merge_duplicate_organizations()
+                merged_locations = self.merge_duplicate_locations()
+            else:
+                self.logger.info("No Organization location updates were applied; skipping duplicate merges.")
 
             total_hours, total_minutes, total_seconds = _time_hms(time.time() - start_time)
             self.logger.info(
