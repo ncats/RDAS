@@ -111,6 +111,8 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         total_updated = 0
         batch_num = 0
         start_time = time.time()
+        updated_ror_ids = set()
+        updated_location_idx_keys = set()
 
         try:
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
@@ -141,6 +143,19 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                     without_location_count = len(chunks) - with_location_count
                     total_updated += len(chunks)
 
+                    for chunk in chunks:
+                        if not chunk["hasLocation"]:
+                            continue
+
+                        ror_id = chunk.get("rorId")
+                        location_idx_key = chunk.get("locationIdxKey")
+
+                        if ror_id and ror_id != "N/A":
+                            updated_ror_ids.add(ror_id)
+
+                        if location_idx_key:
+                            updated_location_idx_keys.add(location_idx_key)
+
                     hours, minutes, seconds = _time_hms(time.time() - batch_start)
                     self.logger.info(
                         f"Batch #{batch_num}: updated {len(chunks)} Organization nodes. "
@@ -156,8 +171,8 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             merged_locations = 0
 
             if total_updated > 0:
-                merged_organizations = self.merge_duplicate_organizations()
-                merged_locations = self.merge_duplicate_locations()
+                merged_organizations = self.merge_duplicate_organizations(updated_ror_ids)
+                merged_locations = self.merge_duplicate_locations(updated_location_idx_keys)
             else:
                 self.logger.info("No Organization location updates were applied; skipping duplicate merges.")
 
@@ -242,18 +257,78 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         }
 
 
-    def merge_duplicate_organizations(self) -> int:
+    def merge_duplicate_organizations(self, ror_ids: Optional[Set[str]] = None) -> int:
         """Merge Organization nodes that now share the same real ROR id."""
+
+        if ror_ids is not None:
+            return self.merge_duplicate_nodes_for_keys("Organization", "ror_id", ror_ids)
 
         where_clause = "n.ror_id IS NOT NULL AND n.ror_id <> '' AND n.ror_id <> 'N/A'"
         return self.merge_duplicate_nodes_by_property("Organization", "ror_id", where_clause)
 
 
-    def merge_duplicate_locations(self) -> int:
+    def merge_duplicate_locations(self, location_idx_keys: Optional[Set[str]] = None) -> int:
         """Merge duplicate Location nodes that share the same stable _idx_key."""
+
+        if location_idx_keys is not None:
+            return self.merge_duplicate_nodes_for_keys("Location", "_idx_key", location_idx_keys)
 
         where_clause = "n._idx_key IS NOT NULL AND n._idx_key <> ''"
         return self.merge_duplicate_nodes_by_property("Location", "_idx_key", where_clause)
+
+
+    def merge_duplicate_nodes_for_keys(self, label: str, property_name: str, merge_keys: Set[str]) -> int:
+        """
+        Merge duplicate nodes only for keys touched by current organization_location rows.
+
+        This keeps normal alert maintenance incremental. A full graph-wide scan
+        is still available through merge_duplicate_nodes_by_property for manual
+        cleanup, but the scheduled path only needs keys from is_new rows.
+        """
+
+        filtered_merge_keys = sorted(merge_key for merge_key in merge_keys if merge_key)
+
+        if not filtered_merge_keys:
+            self.logger.info(f"No updated {label}.{property_name} keys to check; skipping duplicate merge.")
+            return 0
+
+        merged_count = 0
+        key_batch_count = 0
+
+        for start in range(0, len(filtered_merge_keys), self.DUPLICATE_KEY_BATCH_SIZE):
+            key_batch_count += 1
+            merge_key_batch = filtered_merge_keys[start:start + self.DUPLICATE_KEY_BATCH_SIZE]
+            duplicate_groups = self.fetch_duplicate_groups_for_keys(label, property_name, merge_key_batch)
+
+            self.logger.info(
+                f"Duplicate {label} touched key batch #{key_batch_count}: "
+                f"merge_keys={len(merge_key_batch)}, duplicate_groups={len(duplicate_groups)}, "
+                f"last_{property_name}={merge_key_batch[-1]}, "
+                f"duplicate_merge_batch_size={self.DUPLICATE_MERGE_BATCH_SIZE}."
+            )
+
+            if not duplicate_groups:
+                continue
+
+            for duplicate_group in duplicate_groups:
+                merge_key = duplicate_group["merge_key"]
+                node_ids = [int(node_id) for node_id in duplicate_group["node_ids"]]
+
+                if len(node_ids) < 2:
+                    continue
+
+                keeper_id = min(node_ids)
+                duplicate_ids = [node_id for node_id in node_ids if node_id != keeper_id]
+
+                self.logger.info(
+                    f"Batch merging {len(duplicate_ids)} duplicate {label} nodes for "
+                    f"{property_name}={merge_key}; keeper_id={keeper_id}."
+                )
+
+                merged_count += self.merge_duplicate_group(label, keeper_id, duplicate_ids)
+
+        self.logger.info(f"Merged {merged_count} duplicate {label} nodes for {len(filtered_merge_keys)} updated keys.")
+        return merged_count
 
 
     def merge_duplicate_nodes_by_property(self, label: str, property_name: str, where_clause: str) -> int:
