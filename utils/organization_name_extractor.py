@@ -1,10 +1,12 @@
+import glob
 import os
 import re
-import time
 import shlex
+import shutil
+import time
 import requests
 import subprocess
-from typing import Any, Optional
+from typing import Any, List, Optional
 from urllib.parse import urlparse
 from utils.tools import _make_hash_key
 
@@ -127,13 +129,14 @@ class OrganizationNameExtractor:
         start_command = self._required_env("MODEL_START_COMMAND")
 
         try:
+            start_command_args = self.build_model_start_command_args(start_command)
             self._model_server_process = subprocess.Popen(
-                shlex.split(start_command),
+                start_command_args,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
             )
-            self._log_info(f"Started model server with: {start_command}")
+            self._log_info(f"Started model server with: {' '.join(start_command_args)}")
 
             return True
 
@@ -141,6 +144,58 @@ class OrganizationNameExtractor:
             self._model_server_process = None
             self._log_error(f"Failed to start model server with MODEL_START_COMMAND={start_command}: {exc}")
             return False
+
+
+    def build_model_start_command_args(self, start_command: str) -> List[str]:
+        """
+        Parse MODEL_START_COMMAND and resolve a bare executable name when the
+        pipeline process does not inherit the user's interactive shell PATH.
+        """
+
+        command_args = shlex.split(start_command)
+
+        if not command_args:
+            raise ValueError("MODEL_START_COMMAND must include an executable.")
+
+        executable = command_args[0]
+
+        if os.path.dirname(executable):
+            return command_args
+
+        resolved_executable = shutil.which(executable)
+
+        if resolved_executable:
+            return [resolved_executable] + command_args[1:]
+
+        if executable == "ollama":
+            resolved_executable = self.find_ollama_executable()
+
+            if resolved_executable:
+                self._log_info(
+                    f"Resolved MODEL_START_COMMAND executable 'ollama' to {resolved_executable}. "
+                    "Consider setting MODEL_START_COMMAND to the absolute path in the pipeline environment."
+                )
+                return [resolved_executable] + command_args[1:]
+
+        return command_args
+
+
+    def find_ollama_executable(self) -> Optional[str]:
+        """Find Ollama in common macOS install locations when it is not on PATH."""
+
+        candidate_paths = [
+            "/opt/homebrew/bin/ollama",
+            "/usr/local/bin/ollama",
+            "/Applications/Ollama.app/Contents/Resources/ollama",
+        ]
+        candidate_paths.extend(sorted(glob.glob("/opt/homebrew/Cellar/ollama/*/bin/ollama"), reverse=True))
+        candidate_paths.extend(sorted(glob.glob("/usr/local/Cellar/ollama/*/bin/ollama"), reverse=True))
+
+        for candidate_path in candidate_paths:
+            if os.path.isfile(candidate_path) and os.access(candidate_path, os.X_OK):
+                return candidate_path
+
+        return None
 
 
     def wait_for_model_server_start(self, attempts: int = 10, delay_seconds: float = 1.0) -> bool:
