@@ -17,6 +17,9 @@
 AGENTS.md
 mtu
 test
+test/*
+F_person/riea/
+!test/test_OrganizationNameExtractor.py
 tools
 movies
 */screenshots

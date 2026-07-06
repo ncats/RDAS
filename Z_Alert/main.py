@@ -15,7 +15,6 @@ load_dotenv(os.path.abspath(os.path.join(_dir, "..", ".env")))
 
 from pipeline_runner_base import PipelineRunnerBase
 from utils.tools import _time_hms
-from init_index import MemgraphIndexInitializationTask
 
 class AlertPipelineRunner(PipelineRunnerBase):
     """
@@ -181,7 +180,7 @@ class AlertPipelineRunner(PipelineRunnerBase):
     def run_publication_mysql_updates(self) -> None:
         """Run publication MySQL enrichment tasks."""
 
-        self.logger.info("\n\nStarting run_publication_mysql_updates().")
+        self.logger.info("Starting run_publication_mysql_updates().")
 
         from pipelines.pipeline_3_publication.task_publication_2 import PublicationEpiNhsClassificationTask
         from pipelines.pipeline_3_publication.task_publication_3 import GardOmimPublicationMappingTask
@@ -190,7 +189,6 @@ class AlertPipelineRunner(PipelineRunnerBase):
         from pipelines.pipeline_3_publication.task_publication_6 import NewPublicationChemicalSubstanceTask
         from pipelines.pipeline_3_publication.task_publication_7 import PublicationFalsePositiveFilterTask
         from pipelines.pipeline_3_publication.task_publication_8 import NewOmimPublicationArticleImportTask
-
 
         self._run_pipeline_task(PublicationEpiNhsClassificationTask)
         self._run_pipeline_task(GardOmimPublicationMappingTask)
@@ -230,7 +228,6 @@ class AlertPipelineRunner(PipelineRunnerBase):
         self._run_pipeline_task(NewPublicationPubtatorGraphTask)
         self._run_pipeline_task(NewPublicationSubstanceGraphTask)
         self._run_pipeline_task(NewPublicationOmimRefGraphTask)
-
 
 
     def run_pipeline_followup_updates(self) -> None:
@@ -279,34 +276,43 @@ class AlertPipelineRunner(PipelineRunnerBase):
         self._run_pipeline_task(NewClinicalTrialPersonTask)
         self._run_pipeline_task(NewGrantPersonTask)
         self._run_pipeline_task(NewPersonGroupingTask)
-
         self._run_pipeline_task(NewPersonAgentGraphTask)
 
 
     def run_pipeline_maintenance(self) -> None:
         """Run final graph statistics updates after pipeline data loads finish.""" 
+
         from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_1 import OrganizationLocationRorLookupTask
         from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_2 import OrganizationLocationGraphSyncTask 
         from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_3 import NewOrganizationSourceTrackingTask
- 
+        
         self._run_pipeline_task(OrganizationLocationRorLookupTask)
         self._run_pipeline_task(OrganizationLocationGraphSyncTask)
         self._run_pipeline_task(NewOrganizationSourceTrackingTask)
-
+       
 
     def run_pipeline_wrapup(self) -> None:
 
+        '''
+        These wrap-up tasks run after the MySQL, graph, person, and maintenance
+        steps have consumed the rows marked is_new=1. Keep them at the end so a
+        failed earlier step leaves its is_new markers available for retry.
+        '''
         from pipelines.pipeline_2_clinical_trial.task_clinical_trial_pipeline_wrapup import ClinicalTrialPipelineWrapUpTask
         from pipelines.pipeline_3_publication.task_publication_pipeline_wrapup import PublicationPipelineWrapUpTask
         from pipelines.pipeline_6_person.task_person_pipeline_wrapup import PersonPipelineWrapUpTask
+        from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_wrapup import OrganizationLocationMaintenanceWrapUpTask
 
         self._run_pipeline_task(ClinicalTrialPipelineWrapUpTask)
         self._run_pipeline_task(PublicationPipelineWrapUpTask)
         self._run_pipeline_task(PersonPipelineWrapUpTask)
+        self._run_pipeline_task(OrganizationLocationMaintenanceWrapUpTask)
 
 
     def run_memgraph_index_initialization(self) -> None:
         """Run Memgraph index initialization through the standard task lifecycle."""
+
+        from init_index import MemgraphIndexInitializationTask
 
         self._run_pipeline_task(MemgraphIndexInitializationTask)
 
@@ -324,71 +330,71 @@ if __name__ == "__main__":
         # Step 1
         runner._run_step_with_timing(
             "Step 1: run_find_new_clinical_trial_and_publication_updates()",
-            lambda: runner.logger.info("\n\n*** Skip Step 1 ***\n\n"),
-            #runner.run_find_new_clinical_trial_and_publication_updates,
+            #lambda: runner.logger.info("*** Skip Step 1 ***\n\n"),
+            runner.run_find_new_clinical_trial_and_publication_updates,
         )
         
         # Step 2
         runner._run_step_with_timing(
             "Step 2: run_clinical_trial_mysql_updates()",
-            lambda: runner.logger.info("\n\n*** Skip Step 2 ***\n\n"),
-            #runner.run_clinical_trial_mysql_updates,
+            #lambda: runner.logger.info("*** Skip Step 2 ***\n\n"),
+            runner.run_clinical_trial_mysql_updates,
         )
        
         # Step 3
         runner._run_step_with_timing(
             "Step 3: run_publication_mysql_updates()",
-            lambda: runner.logger.info("\n\n*** Skip Step 3 ***\n\n"),
-            #runner.run_publication_mysql_updates,
+            #lambda: runner.logger.info("*** Skip Step 3 ***\n\n"),
+            runner.run_publication_mysql_updates,
         )
         
         # Step 4
         runner._run_step_with_timing(
             "Step 4: run_memgraph_index_initialization()",
-            #lambda: runner.logger.info(f'\n\n{"*" * 30} MemgraphIndexInitializationTask().process_new_data() is disabled {"*" * 30}\n\n')
-            runner.run_memgraph_index_initialization,
+            lambda: runner.logger.info(f'{"*" * 30} MemgraphIndexInitializationTask().process_new_data() is disabled {"*" * 30}\n\n')
+            #runner.run_memgraph_index_initialization,
         )
         
         # Step 5
         runner._run_step_with_timing(
             "Step 5: run_clinical_trial_graph_updates()",
-            lambda: runner.logger.info("\n\n*** Skip Step 5 ***\n\n"),
-            #runner.run_clinical_trial_graph_updates,
+            #lambda: runner.logger.info("*** Skip Step 5 ***\n\n"),
+            runner.run_clinical_trial_graph_updates,
         )
         
         # Step 6
         runner._run_step_with_timing(
             "Step 6: run_publication_graph_updates()",
-            lambda: runner.logger.info("\n\n*** Skip Step 6 ***\n\n"),
-            #runner.run_publication_graph_updates,
+            #lambda: runner.logger.info("*** Skip Step 6 ***\n\n"),
+            runner.run_publication_graph_updates,
         )
         
         # Step 7
         runner._run_step_with_timing(
             "Step 7: run_pipeline_followup_updates()",
-            lambda: runner.logger.info("\n\n*** Skip Step 7 ***\n\n"),
-            #runner.run_pipeline_followup_updates,
+            #lambda: runner.logger.info("*** Skip Step 7 ***\n\n"),
+            runner.run_pipeline_followup_updates,
         )
         
         # Step 8
         runner._run_step_with_timing(
             "Step 8: send_alert_emails()",
-            lambda: runner.logger.info("\n\n*** Skip Step 8 ***\n\n"),
-            #runner.send_alert_emails,
+            #lambda: runner.logger.info("*** Skip Step 8 ***\n\n"),
+            runner.send_alert_emails,
         )
         
         # Step 9
         runner._run_step_with_timing(
             "Step 9: run_regroup_the_person()",
-            #lambda: runner.logger.info("\n\n*** Skip Step 9 ***\n\n"),
+            #lambda: runner.logger.info("*** Skip Step 9 ***\n\n"),
             runner.run_regroup_the_person,
         )
          
         # Step 10
         runner._run_step_with_timing(
             "Step 10: run_pipeline_maintenance()",
-            lambda: runner.logger.info("\n\n*** Skip Step 10 ***\n\n"),
-            #runner.run_pipeline_maintenance,
+            #lambda: runner.logger.info("*** Skip Step 10 ***\n\n"),
+            runner.run_pipeline_maintenance,
         )
         
         # Step 11
