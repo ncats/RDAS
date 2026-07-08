@@ -1,0 +1,106 @@
+"Pasted","Symbol","Ensembl Gene ID","Entrez","Type","Species","Chr","Position (Mbp)","Description","percentage_gc_content","transcript_count","genomeSpan","cds_length","transcript_length","FiveUTR","ThreeUTR","nExons"
+"PIK3CD"," PIK3CD","ENSG00000171608",5293,"protein_coding","Human","1",9.629889,"phosphatidylinositol-4,5-bisphosphate 3-kinase catalytic subunit delta [Source:HGNC Symbol;Acc:HGNC:8977]",51.08,23,99226,2473,2778,83,1420,13
+"LCK"," LCK","ENSG00000182866",3932,"protein_coding","Human","1",32.251244,"LCK proto-oncogene, Src family tyrosine kinase [Source:HGNC Symbol;Acc:HGNC:6524]",49.59,14,34922,882,1384,64,341,8
+"HDAC1"," HDAC1","ENSG00000116478",3065,"protein_coding","Human","1",32.292083,"histone deacetylase 1 [Source:HGNC Symbol;Acc:HGNC:4852]",46.79,10,41553,1042,1045,58,582,6
+"GPR88"," GPR88","ENSG00000181656",54112,"protein_coding","Human","1",100.538139,"G protein-coupled receptor 88 [Source:HGNC Symbol;Acc:HGNC:4539]",52.43,1,3883,1155,3492,218,1900,2
+"PTPN22"," PTPN22","ENSG00000134242",26191,"protein_coding","Human","1",113.813811,"protein tyrosine phosphatase non-receptor type 22 [Source:HGNC Symbol;Acc:HGNC:9652]",38.85,11,57943,1582,2143,97,542,13
+"APH1A"," APH1A","ENSG00000117362",51107,"protein_coding","Human","1",150.265399,"aph-1 homolog A, gamma-secretase subunit [Source:HGNC Symbol;Acc:HGNC:29509]",53.83,9,4182,645,1100,328,858,4
+"CTSK"," CTSK","ENSG00000143387",1513,"protein_coding","Human","1",150.79488,"cathepsin K [Source:HGNC Symbol;Acc:HGNC:2536]",42.99,20,14698,891,2307,95,635,7
+"CHRNB2"," CHRNB2","ENSG00000160716",1141,"protein_coding","Human","1",154.567778,"cholinergic receptor nicotinic beta 2 subunit [Source:HGNC Symbol;Acc:HGNC:1962]",54.68,5,12236,1527,2723,242,1822,5
+"NCSTN"," NCSTN","ENSG00000162736",23385,"protein_coding","Human","1",160.343294,"nicastrin [Source:HGNC Symbol;Acc:HGNC:17091]",46.83,45,15659,1088,2728,61,383,13
+"NR1I3"," NR1I3","ENSG00000143257",9970,"protein_coding","Human","1",161.229666,"nuclear receptor subfamily 1 group I member 3 [Source:HGNC Symbol;Acc:HGNC:7969]",48.75,35,8579,753,972,61,101,7
+"AVPR1B"," AVPR1B","ENSG00000198049",553,"protein_coding","Human","1",206.106936,"arginine vasopressin receptor 1B [Source:HGNC Symbol;Acc:HGNC:896]",51.42,2,10764,1275,2786,498,3253,2
+"PSEN2"," PSEN2","ENSG00000143801",5664,"protein_coding","Human","1",226.870184,"presenilin 2 [Source:HGNC Symbol;Acc:HGNC:9509]",48.2,37,57543,972,2495,128,479,11
+"EGLN1"," EGLN1","ENSG00000135766",54583,"protein_coding","Human","1",231.363751,"egl-9 family hypoxia inducible factor 1 [Source:HGNC Symbol;Acc:HGNC:1232]",39.6,7,58537,574,1718,399,1133,4
+"SLC8A1"," SLC8A1","ENSG00000183023",6546,"protein_coding","Human","2",40.09727,"solute carrier family 8 member A1 [Source:HGNC Symbol;Acc:HGNC:11068]",37.43,12,513784,2137,5442,83,5254,7
+"POLR1A"," POLR1A","ENSG00000068654",25885,"protein_coding","Human","2",86.020216,"RNA polymerase I subunit A [Source:HGNC Symbol;Acc:HGNC:17264]",46.69,15,85940,2600,2438,174,2117,10
+"SCN9A"," SCN9A","ENSG00000169432",6335,"protein_coding","Human","2",166.195185,"sodium voltage-gated channel alpha subunit 9 [Source:HGNC Symbol;Acc:HGNC:10597]",34.44,13,180817,3058,4074,128,1426,13
+"ACKR3"," ACKR3","ENSG00000144476",57007,"protein_coding","Human","2",236.567787,"atypical chemokine receptor 3 [Source:HGNC Symbol;Acc:HGNC:23692]",50.01,2,14568,860,1364,52,800,2
+"OXTR"," OXTR","ENSG00000180914",5021,"protein_coding","Human","3",8.750381,"oxytocin receptor [Source:HGNC Symbol;Acc:HGNC:8529]",49.96,4,19248,525,1566,191,2596,3
+"RAF1"," RAF1","ENSG00000132155",5894,"protein_coding","Human","3",12.582101,"Raf-1 proto-oncogene, serine/threonine kinase [Source:HGNC Symbol;Acc:HGNC:9829]",42.68,74,82101,935,2942,154,495,11
+"THRB"," THRB","ENSG00000151090",7068,"protein_coding","Human","3",24.117153,"thyroid hormone receptor beta [Source:HGNC Symbol;Acc:HGNC:11799]",38.87,19,378604,924,3435,103,3400,8
+"SCN5A"," SCN5A","ENSG00000183873",6331,"protein_coding","Human","3",38.548057,"sodium voltage-gated channel alpha subunit 5 [Source:HGNC Symbol;Acc:HGNC:10593]",50.94,11,101631,5259,5117,63,1764,18
+"GRM2"," GRM2","ENSG00000164082",2912,"protein_coding","Human","3",51.707068,"glutamate metabotropic receptor 2 [Source:HGNC Symbol;Acc:HGNC:4594]",55.81,8,11546,1480,2426,139,336,4
+"HTR1F"," HTR1F","ENSG00000179097",3355,"protein_coding","Human","3",87.792706,"5-hydroxytryptamine receptor 1F [Source:HGNC Symbol;Acc:HGNC:5292]",36.31,1,201134,1101,3386,99,1989,3
+"BCHE"," BCHE","ENSG00000114200",590,"protein_coding","Human","3",165.772904,"butyrylcholinesterase [Source:HGNC Symbol;Acc:HGNC:983]",32.29,5,64559,1168,1779,72,352,4
+"PRKCI"," PRKCI","ENSG00000163558",5584,"protein_coding","Human","3",170.222424,"protein kinase C iota [Source:HGNC Symbol;Acc:HGNC:9404]",39.8,7,83554,1791,1537,246,2850,5
+"PDGFRA"," PDGFRA","ENSG00000134853",5156,"protein_coding","Human","4",54.22928,"platelet derived growth factor receptor alpha [Source:HGNC Symbol;Acc:HGNC:8803]",43.66,10,68966,1145,1812,75,1528,8
+"GNRHR"," GNRHR","ENSG00000109163",2798,"protein_coding","Human","4",67.737118,"gonadotropin releasing hormone receptor [Source:HGNC Symbol;Acc:HGNC:4421]",34.17,2,17271,868,2630,53,1736,3
+"ABCG2"," ABCG2","ENSG00000118777",9429,"protein_coding","Human","4",88.09015,"ATP binding cassette subfamily G member 2 (Junior blood group) [Source:HGNC Symbol;Acc:HGNC:74]",41.38,5,141479,1289,2921,175,2047,11
+"TACR3"," TACR3","ENSG00000169836",6870,"protein_coding","Human","4",103.586031,"tachykinin receptor 3 [Source:HGNC Symbol;Acc:HGNC:11528]",35.63,1,133955,1398,5359,310,3651,5
+"CASP3"," CASP3","ENSG00000164305",836,"protein_coding","Human","4",184.627696,"caspase 3 [Source:HGNC Symbol;Acc:HGNC:1504]",41.13,11,22367,607,2457,81,1101,7
+"TERT"," TERT","ENSG00000164362",7015,"protein_coding","Human","5",1.253147,"telomerase reverse transcriptase [Source:HGNC Symbol;Acc:HGNC:11730]",58.47,7,41922,2680,2693,68,294,11
+"HCN1"," HCN1","ENSG00000164588",348980,"protein_coding","Human","5",45.254948,"hyperpolarization activated cyclic nucleotide gated potassium channel 1 [Source:HGNC Symbol;Acc:HGNC:4845]",34.76,6,441551,1795,4874,326,4784,5
+"CCNB1"," CCNB1","ENSG00000134057",891,"protein_coding","Human","5",69.167135,"cyclin B1 [Source:HGNC Symbol;Acc:HGNC:1579]",43.43,7,11111,862,1044,96,277,6
+"PDE8B"," ","ENSG00000284762",8622,"protein_coding","Human","5",77.086732,"phosphodiesterase 8B [Source:NCBI gene (formerly Entrezgene);Acc:8622]",41.54,1,340393,2286,3397,135,570,24
+"ADRB2"," ADRB2","ENSG00000169252",154,"protein_coding","Human","5",148.826611,"adrenoceptor beta 2 [Source:HGNC Symbol;Acc:HGNC:286]",50.57,1,2013,1242,2013,221,550,1
+"PDGFRB"," PDGFRB","ENSG00000113721",5159,"protein_coding","Human","5",150.113839,"platelet derived growth factor receptor beta [Source:HGNC Symbol;Acc:HGNC:8804]",54.34,11,42034,1251,1376,169,1032,7
+"ITK"," ITK","ENSG00000113263",3702,"protein_coding","Human","5",157.142933,"IL2 inducible T cell kinase [Source:HGNC Symbol;Acc:HGNC:6171]",41.46,11,112253,881,2113,114,1025,7
+"PIM1"," PIM1","ENSG00000137193",5292,"protein_coding","Human","6",37.170152,"Pim-1 proto-oncogene, serine/threonine kinase [Source:HGNC Symbol;Acc:HGNC:8986]",53.82,3,5277,942,1399,424,1337,4
+"TTK"," TTK","ENSG00000112742",7272,"protein_coding","Human","6",80.003887,"TTK protein kinase [Source:HGNC Symbol;Acc:HGNC:12401]",34.98,11,38641,1199,1319,132,272,9
+"CNR1"," CNR1","ENSG00000118432",1268,"protein_coding","Human","6",88.139864,"cannabinoid receptor 1 [Source:HGNC Symbol;Acc:HGNC:2159]",39.08,7,26484,1218,5626,147,4155,2
+"NOD1"," NOD1","ENSG00000106100",10392,"protein_coding","Human","7",30.424527,"nucleotide binding oligomerization domain containing 1 [Source:HGNC Symbol;Acc:HGNC:16390]",46.77,8,54258,979,1985,122,667,7
+"EPHB4"," EPHB4","ENSG00000196411",2050,"protein_coding","Human","7",100.802565,"EPH receptor B4 [Source:HGNC Symbol;Acc:HGNC:3395]",54.77,10,24959,2231,2266,356,675,9
+"BLK"," BLK","ENSG00000136573",640,"protein_coding","Human","8",11.486894,"BLK proto-oncogene, Src family tyrosine kinase [Source:HGNC Symbol;Acc:HGNC:1057]",46.62,9,77706,1083,1497,107,377,7
+"FGFR1"," FGFR1","ENSG00000077782",2260,"protein_coding","Human","8",38.400215,"fibroblast growth factor receptor 1 [Source:HGNC Symbol;Acc:HGNC:3688]",49.49,57,68620,1392,2320,217,848,9
+"IKBKB"," IKBKB","ENSG00000104365",3551,"protein_coding","Human","8",42.271302,"inhibitor of nuclear factor kappa B kinase subunit beta [Source:HGNC Symbol;Acc:HGNC:5960]",48.26,33,61159,727,2021,108,253,11
+"LYN"," LYN","ENSG00000254087",4067,"protein_coding","Human","8",55.879835,"LYN proto-oncogene, Src family tyrosine kinase [Source:HGNC Symbol;Acc:HGNC:6735]",43.2,4,134335,1155,3198,108,4058,9
+"TEK"," TEK","ENSG00000120156",7010,"protein_coding","Human","9",27.109141,"TEK receptor tyrosine kinase [Source:HGNC Symbol;Acc:HGNC:11724]",40.55,5,121034,2473,3733,314,532,20
+"CTSL"," CTSL","ENSG00000135047",1514,"protein_coding","Human","9",87.724051,"cathepsin L [Source:HGNC Symbol;Acc:HGNC:2537]",45.11,43,7419,786,2035,192,306,7
+"ABL1"," ABL1","ENSG00000097007",25,"protein_coding","Human","9",130.713016,"ABL proto-oncogene 1, non-receptor tyrosine kinase [Source:HGNC Symbol;Acc:HGNC:76]",44.57,3,174660,2345,4284,612,1990,8
+"DPP7"," DPP7","ENSG00000176978",29952,"protein_coding","Human","9",137.110546,"dipeptidyl peptidase 7 [Source:HGNC Symbol;Acc:HGNC:14892]",68.72,13,4632,674,845,20,96,6
+"CACNA1B"," CACNA1B","ENSG00000148408",774,"protein_coding","Human","9",137.877782,"calcium voltage-gated channel subunit alpha1 B [Source:HGNC Symbol;Acc:HGNC:1389]",49.94,5,246843,5651,7368,139,2042,38
+"RET"," RET","ENSG00000165731",5979,"protein_coding","Human","10",43.077064,"ret proto-oncogene [Source:HGNC Symbol;Acc:HGNC:9967]",55.71,12,53288,1286,2909,187,846,10
+"CDK1"," CDK1","ENSG00000170312",983,"protein_coding","Human","10",60.778331,"cyclin dependent kinase 1 [Source:HGNC Symbol;Acc:HGNC:1722]",35.07,8,16522,761,1312,64,869,6
+"CCKBR"," CCKBR","ENSG00000110148",887,"protein_coding","Human","11",6.259806,"cholecystokinin B receptor [Source:HGNC Symbol;Acc:HGNC:1571]",45.78,6,12322,932,1232,55,422,3
+"WEE1"," WEE1","ENSG00000166483",7465,"protein_coding","Human","11",9.57367,"WEE1 G2 checkpoint kinase [Source:HGNC Symbol;Acc:HGNC:12761]",40.55,10,19788,959,2362,299,827,7
+"SLC6A5"," SLC6A5","ENSG00000165970",9152,"protein_coding","Human","11",20.599594,"solute carrier family 6 member 5 [Source:HGNC Symbol;Acc:HGNC:11051]",45.33,3,59692,1479,3451,72,2274,13
+"BAD"," BAD","ENSG00000002330",572,"protein_coding","Human","11",64.26983,"BCL2 associated agonist of cell death [Source:HGNC Symbol;Acc:HGNC:936]",53.92,7,14875,388,640,91,216,3
+"BIRC3"," BIRC3","ENSG00000023445",330,"protein_coding","Human","11",102.31745,"baculoviral IAP repeat containing 3 [Source:HGNC Symbol;Acc:HGNC:591]",37.6,8,21954,1641,3486,652,1531,8
+"BIRC2"," BIRC2","ENSG00000110330",329,"protein_coding","Human","11",102.347211,"baculoviral IAP repeat containing 2 [Source:HGNC Symbol;Acc:HGNC:590]",38.86,13,31460,1073,1662,267,309,6
+"IRAK4"," IRAK4","ENSG00000198001",51135,"protein_coding","Human","12",43.758944,"interleukin 1 receptor associated kinase 4 [Source:HGNC Symbol;Acc:HGNC:17967]",37.41,18,39364,422,1812,60,457,9
+"CDK4"," CDK4","ENSG00000135446",1019,"protein_coding","Human","12",57.747727,"cyclin dependent kinase 4 [Source:HGNC Symbol;Acc:HGNC:1773]",53.24,15,8287,438,851,100,315,5
+"AVPR1A"," AVPR1A","ENSG00000166148",552,"protein_coding","Human","12",63.142759,"arginine vasopressin receptor 1A [Source:HGNC Symbol;Acc:HGNC:895]",38.49,2,8443,909,3456,365,2365,2
+"LTA4H"," LTA4H","ENSG00000111144",4048,"protein_coding","Human","12",96.000753,"leukotriene A4 hydrolase [Source:HGNC Symbol;Acc:HGNC:6710]",39.07,10,42768,1382,1864,109,150,12
+"PSEN1"," PSEN1","ENSG00000080815",5663,"protein_coding","Human","14",73.136418,"presenilin 1 [Source:HGNC Symbol;Acc:HGNC:9508]",42.73,88,87274,915,4295,84,2494,10
+"BDKRB2"," BDKRB2","ENSG00000168398",624,"protein_coding","Human","14",96.204679,"bradykinin receptor B2 [Source:HGNC Symbol;Acc:HGNC:1030]",50.22,3,39488,1122,4147,403,1808,3
+"AKT1"," AKT1","ENSG00000142208",207,"protein_coding","Human","14",104.769349,"AKT serine/threonine kinase 1 [Source:HGNC Symbol;Acc:HGNC:391]",64.08,22,26403,1214,2630,403,777,10
+"APH1B"," APH1B","ENSG00000138613",83464,"protein_coding","Human","15",63.276018,"aph-1 homolog B, gamma-secretase subunit [Source:HGNC Symbol;Acc:HGNC:24080]",40.76,10,33109,494,1066,30,930,4
+"DPP8"," DPP8","ENSG00000074603",54878,"protein_coding","Human","15",65.442463,"dipeptidyl peptidase 8 [Source:HGNC Symbol;Acc:HGNC:16490]",40.97,16,75242,1575,2201,279,1416,10
+"HCN4"," HCN4","ENSG00000138622",10021,"protein_coding","Human","15",73.319859,"hyperpolarization activated cyclic nucleotide gated potassium channel 4 [Source:HGNC Symbol;Acc:HGNC:16882]",55.03,1,49100,3612,6922,688,2622,8
+"CSK"," CSK","ENSG00000103653",1445,"protein_coding","Human","15",74.78208,"C-terminal Src kinase [Source:HGNC Symbol;Acc:HGNC:2444]",56.61,14,21118,798,1104,187,570,7
+"CHRNA3"," CHRNA3","ENSG00000080644",1136,"protein_coding","Human","15",78.593052,"cholinergic receptor nicotinic alpha 3 subunit [Source:HGNC Symbol;Acc:HGNC:1957]",47.02,8,28244,1140,1183,314,485,4
+"IGF1R"," IGF1R","ENSG00000140443",3480,"protein_coding","Human","15",98.648539,"insulin like growth factor 1 receptor [Source:HGNC Symbol;Acc:HGNC:5465]",44.56,17,315992,1937,2031,762,4768,6
+"PRKCB"," PRKCB","ENSG00000166501",5579,"protein_coding","Human","16",23.835983,"protein kinase C beta [Source:HGNC Symbol;Acc:HGNC:9395]",43.77,12,384629,1031,1391,164,2154,6
+"NOD2"," NOD2","ENSG00000167207",64127,"protein_coding","Human","16",50.693588,"nucleotide binding oligomerization domain containing 2 [Source:HGNC Symbol;Acc:HGNC:5331]",48.11,17,39490,1019,1711,121,394,6
+"CSNK2A2"," CSNK2A2","ENSG00000070770",1459,"protein_coding","Human","16",58.157907,"casein kinase 2 alpha 2 [Source:HGNC Symbol;Acc:HGNC:2459]",41.51,8,40200,882,2426,370,197,9
+"MBTPS1"," MBTPS1","ENSG00000140943",8720,"protein_coding","Human","16",84.053761,"membrane bound transcription factor peptidase, site 1 [Source:HGNC Symbol;Acc:HGNC:15456]",45.15,17,63182,720,1223,164,271,5
+"TRPV1"," TRPV1","ENSG00000196689",7442,"protein_coding","Human","17",3.565444,"transient receptor potential cation channel subfamily V member 1 [Source:HGNC Symbol;Acc:HGNC:12716]",52.6,10,43968,2379,3177,241,795,14
+"AURKB"," AURKB","ENSG00000178999",9212,"protein_coding","Human","17",8.204733,"aurora kinase B [Source:HGNC Symbol;Acc:HGNC:11390]",52.69,14,5868,713,815,57,106,6
+"THRA"," THRA","ENSG00000126351",7067,"protein_coding","Human","17",40.05829,"thyroid hormone receptor alpha [Source:HGNC Symbol;Acc:HGNC:11796]",54.9,10,35578,834,1763,246,1004,7
+"PHOSPHO1"," PHOSPHO1","ENSG00000173868",162466,"protein_coding","Human","17",49.223366,"phosphoethanolamine/phosphocholine phosphatase 1 [Source:HGNC Symbol;Acc:HGNC:16815]",56.75,7,7422,609,1237,127,781,3
+"RPS6KB1"," RPS6KB1","ENSG00000108443",6198,"protein_coding","Human","17",59.893046,"ribosomal protein S6 kinase B1 [Source:HGNC Symbol;Acc:HGNC:10436]",41.68,12,57529,947,1846,95,1442,8
+"UTS2R"," UTS2R","ENSG00000181408",2837,"protein_coding","Human","17",82.371765,"urotensin 2 receptor [Source:HGNC Symbol;Acc:HGNC:4468]",62.56,1,5694,1170,3685,184,1964,3
+"YES1"," YES1","ENSG00000176105",7525,"protein_coding","Human","18",0.721588,"YES proto-oncogene 1, Src family tyrosine kinase [Source:HGNC Symbol;Acc:HGNC:12841]",40.01,5,90959,1637,2971,75,2836,9
+"BCL2"," BCL2","ENSG00000171791",596,"protein_coding","Human","18",63.123346,"BCL2 apoptosis regulator [Source:HGNC Symbol;Acc:HGNC:990]",42.74,9,196783,548,5080,442,3351,2
+"DPP9"," DPP9","ENSG00000142002",91039,"protein_coding","Human","19",4.674341,"dipeptidyl peptidase 9 [Source:HGNC Symbol;Acc:HGNC:18648]",56.68,29,50333,2201,1764,81,829,10
+"JAK3"," JAK3","ENSG00000105639",3718,"protein_coding","Human","19",17.82478,"Janus kinase 3 [Source:HGNC Symbol;Acc:HGNC:6193]",54.93,11,23292,2898,3025,37,742,14
+"PSENEN"," PSENEN","ENSG00000205155",55851,"protein_coding","Human","19",35.7456,"presenilin enhancer, gamma-secretase subunit [Source:HGNC Symbol;Acc:HGNC:30100]",49.79,3,1920,302,853,80,390,4
+"PAK4"," PAK4","ENSG00000130669",10298,"protein_coding","Human","19",39.12577,"p21 (RAC1) activated kinase 4 [Source:HGNC Symbol;Acc:HGNC:16059]",56.17,12,57047,1102,1831,78,1136,6
+"CSNK2A1"," CSNK2A1","ENSG00000101266",1457,"protein_coding","Human","20",0.472498,"casein kinase 2 alpha 1 [Source:HGNC Symbol;Acc:HGNC:2457]",41.35,48,71338,740,2747,111,1726,9
+"AHCY"," AHCY","ENSG00000101444",191,"protein_coding","Human","20",34.280268,"adenosylhomocysteinase [Source:HGNC Symbol;Acc:HGNC:343]",50.38,6,31535,1257,1510,139,765,6
+"SRC"," SRC","ENSG00000197122",6714,"protein_coding","Human","20",37.344685,"SRC proto-oncogene, non-receptor tyrosine kinase [Source:HGNC Symbol;Acc:HGNC:11283]",54.1,14,61366,1441,2475,58,2342,8
+"CACNA1I"," CACNA1I","ENSG00000100346",8911,"protein_coding","Human","22",39.570753,"calcium voltage-gated channel subunit alpha1 I [Source:HGNC Symbol;Acc:HGNC:1396]",56.05,5,118983,6309,6551,NA,1838,29
+"PIM3"," PIM3","ENSG00000198355",415116,"protein_coding","Human","22",49.960768,"Pim-3 proto-oncogene, serine/threonine kinase [Source:HGNC Symbol;Acc:HGNC:19310]",68.65,2,3305,981,1412,176,945,4
+"TLR7"," TLR7","ENSG00000196664",51284,"protein_coding","Human","X",12.867072,"toll like receptor 7 [Source:HGNC Symbol;Acc:HGNC:15631]",40.25,2,23290,3150,2651,75,1703,2
+"TLR8"," TLR8","ENSG00000101916",51311,"protein_coding","Human","X",12.90662,"toll like receptor 8 [Source:HGNC Symbol;Acc:HGNC:15632]",41.32,2,16550,3153,3792,81,520,2
+"MAOA"," MAOA","ENSG00000189221",4128,"protein_coding","Human","X",43.654907,"monoamine oxidase A [Source:HGNC Symbol;Acc:HGNC:6833]",40.27,10,91911,1252,3935,137,2301,12
+"MAOB"," MAOB","ENSG00000069535",4129,"protein_coding","Human","X",43.76661,"monoamine oxidase B [Source:HGNC Symbol;Acc:HGNC:6834]",39.31,3,115841,1563,1251,151,856,8
+"EBP"," EBP","ENSG00000147155",10682,"protein_coding","Human","X",48.521799,"EBP cholestenol delta-isomerase [Source:HGNC Symbol;Acc:HGNC:3133]",49.44,6,6918,537,807,74,259,5
+"PIM2"," PIM2","ENSG00000102096",11040,"protein_coding","Human","X",48.913182,"Pim-2 proto-oncogene, serine/threonine kinase [Source:HGNC Symbol;Acc:HGNC:8987]",53.5,3,5843,686,1226,324,949,3
+"CXCR3"," CXCR3","ENSG00000186810",2833,"protein_coding","Human","X",71.615916,"C-X-C motif chemokine receptor 3 [Source:HGNC Symbol;Acc:HGNC:4540]",61.25,2,2596,1178,1738,72,448,2
+"XIAP"," XIAP","ENSG00000101966",331,"protein_coding","Human","X",123.859712,"X-linked inhibitor of apoptosis [Source:HGNC Symbol;Acc:HGNC:592]",41.99,11,54261,1238,2381,96,5188,5
+"AVPR2"," AVPR2","ENSG00000126895",554,"protein_coding","Human","X",153.902531,"arginine vasopressin receptor 2 [Source:HGNC Symbol;Acc:HGNC:897]",62.86,5,4636,885,1523,130,420,3
+"ADRB1",NA,"Not mapped",NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+"CRHR1",NA,"Not mapped",NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
+"FDFT1",NA,"Not mapped",NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA

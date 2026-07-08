@@ -1,0 +1,36 @@
+Enrichment FDR,nGenes,Pathway Genes,Fold Enrichment,Pathway,URL,Genes
+0.008972337,2,68,61.17914439,Path:hsa04664 Fc epsilon RI signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04664 , FYN  LYN
+0.008972337,2,70,59.43116883,Path:hsa05120 Epithelial cell signaling in Helicobacter pylori infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05120 , CSK  LYN
+0.009488662,2,97,42.88847235,Path:hsa04666 Fc gamma R-mediated phagocytosis,http://www.genome.jp/kegg-bin/show_pathway?hsa04666 , HCK  LYN
+0.009488662,2,102,40.78609626,Path:hsa04914 Progesterone-mediated oocyte maturation,http://www.genome.jp/kegg-bin/show_pathway?hsa04914 , CDC25B  CDC25C
+0.009610346,2,126,33.01731602,Path:hsa04110 Cell cycle,http://www.genome.jp/kegg-bin/show_pathway?hsa04110 , CDC25B  CDC25C
+0.009610346,2,124,33.54985337,Path:hsa04611 Platelet activation,http://www.genome.jp/kegg-bin/show_pathway?hsa04611 , FYN  LYN
+0.016831912,2,191,21.78105664,Path:hsa04062 Chemokine signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04062 , HCK  LYN
+0.016831912,2,194,21.44423618,Path:hsa05167 Kaposi sarcoma-associated herpesvirus infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05167 , HCK  LYN
+0.044016782,1,23,90.43873518,Path:hsa00515 Mannose type O-glycan biosynthesis,http://www.genome.jp/kegg-bin/show_pathway?hsa00515 , LARGE1
+0.055008482,1,32,65.00284091,Path:hsa04136 Autophagy-other,http://www.genome.jp/kegg-bin/show_pathway?hsa04136 , ATG4B
+0.0854274,1,60,34.66818182,Path:hsa04730 Long-term depression,http://www.genome.jp/kegg-bin/show_pathway?hsa04730 , LYN
+0.0854274,1,60,34.66818182,Path:hsa05416 Viral myocarditis,http://www.genome.jp/kegg-bin/show_pathway?hsa05416 , FYN
+0.093089571,1,71,29.29705506,Path:hsa04520 Adherens junction,http://www.genome.jp/kegg-bin/show_pathway?hsa04520 , FYN
+0.09840042,1,81,25.68013468,Path:hsa04662 B cell receptor signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04662 , LYN
+0.103362433,1,104,20.00087413,Path:hsa04064 NF-kappa B signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04064 , LYN
+0.103362433,1,119,17.47975554,Path:hsa04071 Sphingolipid signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04071 , FYN
+0.103362433,1,148,14.0546683,Path:hsa04072 Phospholipase D signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04072 , FYN
+0.103362433,1,131,15.87855656,Path:hsa04114 Oocyte meiosis,http://www.genome.jp/kegg-bin/show_pathway?hsa04114 , CDC25C
+0.103362433,1,141,14.75241779,Path:hsa04140 Autophagy-animal,http://www.genome.jp/kegg-bin/show_pathway?hsa04140 , ATG4B
+0.103362433,1,126,16.50865801,Path:hsa04380 Osteoclast differentiation,http://www.genome.jp/kegg-bin/show_pathway?hsa04380 , FYN
+0.103362433,1,143,14.54609027,Path:hsa04550 Signaling pathways regulating pluripotency of stem cells,http://www.genome.jp/kegg-bin/show_pathway?hsa04550 , KAT6A
+0.103362433,1,130,16.0006993,Path:hsa04650 Natural killer cell mediated cytotoxicity,http://www.genome.jp/kegg-bin/show_pathway?hsa04650 , FYN
+0.103362433,1,103,20.19505737,Path:hsa04660 T cell receptor signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04660 , FYN
+0.103362433,1,113,18.40788415,Path:hsa04725 Cholinergic synapse,http://www.genome.jp/kegg-bin/show_pathway?hsa04725 , FYN
+0.107639719,1,161,12.91981931,Path:hsa05206 MicroRNAs in cancer,http://www.genome.jp/kegg-bin/show_pathway?hsa05206 , CDC25B
+0.110499788,1,181,11.49221497,Path:hsa04360 Axon guidance,http://www.genome.jp/kegg-bin/show_pathway?hsa04360 , FYN
+0.110499788,1,200,10.40045455,Path:hsa04510 Focal adhesion,http://www.genome.jp/kegg-bin/show_pathway?hsa04510 , FYN
+0.110499788,1,197,10.5588371,Path:hsa05130 Pathogenic Escherichia coli infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05130 , FYN
+0.110499788,1,202,10.29747975,Path:hsa05169 Epstein-Barr virus infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05169 , LYN
+0.110499788,1,210,9.905194805,Path:hsa05170 Human immunodeficiency virus 1 infection,http://www.genome.jp/kegg-bin/show_pathway?hsa05170 , CDC25C
+0.110499788,1,202,10.29747975,Path:hsa05203 Viral carcinogenesis,http://www.genome.jp/kegg-bin/show_pathway?hsa05203 , LYN
+0.110499788,1,214,9.720050977,Path:hsa05417 Lipid and atherosclerosis,http://www.genome.jp/kegg-bin/show_pathway?hsa05417 , LYN
+0.13496052,1,273,7.619380619,Path:hsa05020 Prion disease,http://www.genome.jp/kegg-bin/show_pathway?hsa05020 , FYN
+0.140429504,1,294,7.075139147,Path:hsa04010 MAPK signaling pathway,http://www.genome.jp/kegg-bin/show_pathway?hsa04010 , CDC25B
+0.174759316,1,384,5.416903409,Path:hsa05010 Alzheimer disease,http://www.genome.jp/kegg-bin/show_pathway?hsa05010 , ADAM10
