@@ -400,6 +400,7 @@ if __name__ == "__main__":
         # Step 11
         runner._run_step_with_timing(
             "Step 11: run_pipeline_wrapup()",
+            #lambda: runner.logger.info("*** Skip Step 11 ***\n\n"),
             runner.run_pipeline_wrapup,
         )
          
