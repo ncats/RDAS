@@ -28,13 +28,37 @@ Generate the Annotation data for NEW Clinical Trail
 
 class NewClinicalTrialAnnotationTask(PipelineBase):
 
+    DEFAULT_NLP_PIPE_BATCH_SIZE = 1
+    DEFAULT_NLP_TEXT_CHUNK_SIZE = 12000
+
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=False)
+        self.nlp_pipe_batch_size = self.parse_positive_int_setting(os.getenv("CLINICAL_TRIAL_NLP_PIPE_BATCH_SIZE"), self.DEFAULT_NLP_PIPE_BATCH_SIZE, "CLINICAL_TRIAL_NLP_PIPE_BATCH_SIZE")
+        self.nlp_text_chunk_size = self.parse_positive_int_setting(os.getenv("CLINICAL_TRIAL_NLP_TEXT_CHUNK_SIZE"), self.DEFAULT_NLP_TEXT_CHUNK_SIZE, "CLINICAL_TRIAL_NLP_TEXT_CHUNK_SIZE")
 
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
         raise NotImplementedError("NewClinicalTrialAnnotationTask does not implement find_new_data().")
+
+
+    def parse_positive_int_setting(self, value, default_value, setting_name):
+        """Parse a positive integer environment setting, falling back to a safe default."""
+
+        if value is None or str(value).strip() == "":
+            return default_value
+
+        try:
+            parsed_value = int(value)
+
+            if parsed_value > 0:
+                return parsed_value
+
+        except (TypeError, ValueError):
+            pass
+
+        self.logger.warning(f"Invalid {setting_name}={value}; using default {default_value}.")
+        return default_value
 
 
     def load_models(self):
@@ -296,54 +320,116 @@ class NewClinicalTrialAnnotationTask(PipelineBase):
     def process_description_text(self, nlp, linker, semantic_type_tree, nctid_list, description_list):
 
         processed_annotations = []
-        try:
-            for i, doc in enumerate(nlp.pipe(description_list, disable=["parser", "attribute_ruler", "lemmatizer"])):
 
-                current_app_id = nctid_list[i]
-                self.logger.info(f"Processing nctid: {current_app_id}")
+        for i, description in enumerate(description_list):
+            current_app_id = nctid_list[i]
+            description_chunks = self.split_description_text(description)
 
-                for ent in doc.ents:
+            if not description_chunks:
+                continue
 
-                    if hasattr(ent._, 'kb_ents') and ent._.kb_ents:
-                        # Taking the first linked entity as the primary
-                        concept_id, score = ent._.kb_ents[0]
-                        try:
-                            kb_entity = linker.kb.cui_to_entity[concept_id]
+            if len(description_chunks) > 1:
+                self.logger.info(
+                    f"Split nctid={current_app_id} description into {len(description_chunks)} NLP chunks "
+                    f"using chunk_size={self.nlp_text_chunk_size}."
+                )
 
-                            semantic_type_names = []
+            for chunk_index, description_chunk in enumerate(description_chunks, 1):
+                self.logger.info(f"Processing nctid: {current_app_id}, chunk {chunk_index}/{len(description_chunks)}")
 
-                            for abbr in kb_entity.types:
+                try:
+                    docs = nlp.pipe(
+                        [description_chunk],
+                        batch_size=self.nlp_pipe_batch_size,
+                        disable=["parser", "attribute_ruler", "lemmatizer"],
+                    )
+
+                    for doc in docs:
+                        for ent in doc.ents:
+
+                            if hasattr(ent._, 'kb_ents') and ent._.kb_ents:
+                                # Taking the first linked entity as the primary
+                                concept_id, score = ent._.kb_ents[0]
                                 try:
-                                    node = semantic_type_tree.get_node_from_id(abbr)
-                                    semantic_type_names.append(node.full_name)
-                                except KeyError:
-                                    semantic_type_names.append(f"{abbr} (Name not found)")
+                                    kb_entity = linker.kb.cui_to_entity[concept_id]
+
+                                    semantic_type_names = []
+
+                                    for abbr in kb_entity.types:
+                                        try:
+                                            node = semantic_type_tree.get_node_from_id(abbr)
+                                            semantic_type_names.append(node.full_name)
+                                        except KeyError:
+                                            semantic_type_names.append(f"{abbr} (Name not found)")
+                                            continue
+
+                                    processed_annotations.append( {
+                                        'nctid': current_app_id,
+                                        #'entity_label': _val(ent.label_),
+                                        'concept_id': concept_id,
+                                        'score': f'{score:.4f}',
+                                        'umls_concept': _val(kb_entity.canonical_name),
+                                        'umls_cui': kb_entity.concept_id,
+                                        'semantic_types': ','.join(kb_entity.types),
+                                        'semantic_type_names': ','.join(_normalize_txt(name) for name in semantic_type_names),
+                                        'aliases': ','.join(_normalize_txt(alias) for alias in kb_entity.aliases),
+                                        'definition': _normalize_txt(kb_entity.definition) if kb_entity.definition else ''
+                                    })
+
+                                except KeyError as e:
+                                    self.logger.error(e)
+                                    self.logger.info(f"Warning: Concept ID '{concept_id}' not found for '{ent.text}'.")
                                     continue
 
-                            processed_annotations.append( {
-                                'nctid': current_app_id,
-                                #'entity_label': _val(ent.label_),
-                                'concept_id': concept_id,
-                                'score': f'{score:.4f}',
-                                'umls_concept': _val(kb_entity.canonical_name),
-                                'umls_cui': kb_entity.concept_id,
-                                'semantic_types': ','.join(kb_entity.types),
-                                'semantic_type_names': ','.join(_normalize_txt(name) for name in semantic_type_names),
-                                'aliases': ','.join(_normalize_txt(alias) for alias in kb_entity.aliases),
-                                'definition': _normalize_txt(kb_entity.definition) if kb_entity.definition else ''
-                            })
+                except Exception as e:
+                    model_name = nlp.meta.get("name", "unknown") if hasattr(nlp, "meta") else "unknown"
+                    self.logger.error(
+                        f"Error during NLP processing: model={model_name}, nctid={current_app_id}, "
+                        f"chunk={chunk_index}/{len(description_chunks)}, text_length={len(description or '')}, "
+                        f"chunk_length={len(description_chunk)}, batch_size={self.nlp_pipe_batch_size}, "
+                        f"chunk_size={self.nlp_text_chunk_size}: {e}",
+                        exc_info=True,
+                    )
+                    continue
 
-                        except KeyError as e:
-                            self.logger.error(e)
-                            self.logger.info(f"Warning: Concept ID '{concept_id}' not found for '{ent.text}'.")
-                            continue
-
-                if not processed_annotations:
-                    self.logger.info(f'No new annotations generated')
-                    return []
-
-        except Exception as e:
-            self.logger.error(f'Error during NLP processing: {e}')
+        if not processed_annotations:
+            self.logger.info(f'No new annotations generated')
             return []
 
         return processed_annotations
+
+
+    def split_description_text(self, description):
+        """Split long clinical trial descriptions so sciSpaCy does not process one huge document."""
+
+        description_text = str(description or "").strip()
+
+        if not description_text:
+            return []
+
+        if len(description_text) <= self.nlp_text_chunk_size:
+            return [description_text]
+
+        chunks = []
+        start_index = 0
+
+        while start_index < len(description_text):
+            end_index = min(start_index + self.nlp_text_chunk_size, len(description_text))
+
+            if end_index < len(description_text):
+                split_index = description_text.rfind(" ", start_index, end_index)
+
+                if split_index > start_index:
+                    end_index = split_index
+
+            chunk = description_text[start_index:end_index].strip()
+
+            if chunk:
+                chunks.append(chunk)
+
+            start_index = end_index
+
+            while start_index < len(description_text) and description_text[start_index].isspace():
+                start_index += 1
+
+        return chunks
