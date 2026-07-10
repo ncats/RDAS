@@ -93,8 +93,13 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
 
             try:
                 pageToken = None
+                current_nctid = None
+                current_stage = "fetch_nct_ids"
+                response_txt = None
 
                 while True:
+                    current_stage = "fetch_nct_ids"
+                    current_nctid = None
                     response_txt = self.call_get_nctids(initial_query, pageToken=pageToken)
                     #response_txt example:
                     '''
@@ -113,9 +118,12 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
 
                         for trial in trials_list:
 
+                            current_stage = "read_nct_id"
                             nctid = trial['protocolSection']['identificationModule']['nctId']
+                            current_nctid = nctid
 
                             # Fetch the full ClinicalTrials.gov study JSON for the NCT ID.
+                            current_stage = "fetch_study_details"
                             retries = 0
                             response_txt = None
                             max_retries=10
@@ -144,6 +152,7 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
                             if response_txt is not None:
 
                                 try:
+                                    current_stage = "insert_study"
                                     val = (
                                         gardId,
                                         name,
@@ -164,6 +173,7 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
                                 except mysql.connector.Error as error:
                                     print(f"Failed to insert record into table: {error}")
 
+                        current_stage = "paginate_nct_ids"
                         if not 'nextPageToken' in response_txt:
                             break
                         else:
@@ -174,7 +184,16 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
                         break
 
             except Exception as e:
-                self.logger.error(e)
+                response_type = type(response_txt).__name__
+                response_keys = list(response_txt.keys())[:10] if isinstance(response_txt, dict) else None
+                self.logger.error(
+                    f"Error discovering clinical trials for gardId={gardId}, "
+                    f"disease={name[:200]}, last_update_date={last_update_date}, "
+                    f"stage={current_stage}, nctid={current_nctid}, pageToken={pageToken}, "
+                    f"response_type={response_type}, response_keys={response_keys}, "
+                    f"query={initial_query}: {e}",
+                    exc_info=True,
+                )
 
         self.mysql.commit()
 
