@@ -34,7 +34,6 @@ ENV DEFAULT_MODEL="Llama-3.1-70B-Instruct" \
     API_PORT=8000 \
     API_WORKERS=1 \
     CORS_ALLOW_ORIGINS="" \
-    CORS_ALLOW_CREDENTIALS=false \
     CORS_ALLOW_METHODS="GET,POST" \
     CORS_ALLOW_HEADERS="*" \
     ENABLE_TERMINOLOGY_API=true \
@@ -51,6 +50,8 @@ ENV DEFAULT_MODEL="Llama-3.1-70B-Instruct" \
 # CORS is locked down by default (no origins allowed). Set CORS_ALLOW_ORIGINS to
 # a comma-separated list of trusted front-end origins, e.g.:
 #   CORS_ALLOW_ORIGINS="https://app.example.org,https://admin.example.org"
+# Credentials are disabled by default; enable only with an explicit origin list:
+#   CORS_ALLOW_CREDENTIALS=true
 
 # Run as an unprivileged user instead of root.
 RUN groupadd --system --gid 10001 appuser \
