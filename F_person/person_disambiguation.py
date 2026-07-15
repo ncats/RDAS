@@ -299,7 +299,7 @@ class PersonDisambiguator:
         valid_affil = self.df[(self.df['affil_group'].notna()) & (self.df['affil_group'] != '')]
         affil_with_orcid = valid_affil[valid_affil['orcid_group'].notna() & (valid_affil['orcid_group'] != '')]
         
-        affil_to_orcid = affil_with_orcid.groupby('affil_group')['orcid_group'].apply(list).to_dict()
+        affil_to_orcid = affil_with_orcid.groupby('affil_group', group_keys=False)['orcid_group'].apply(list).to_dict()
         affil_groups_with_no_orcid = self.df[(self.df['orcid_group'].isna()) | 
                                           (self.df['orcid_group'] == '')]['affil_group'].dropna().unique()
         
@@ -340,7 +340,7 @@ class PersonDisambiguator:
         coauth_with_merge = valid_coauth[valid_coauth['merge_group'].notna() & 
                                          (valid_coauth['merge_group'] != '')]
         
-        coauth_to_orcid = coauth_with_merge.groupby('coauthor_group')['merge_group'].apply(list).to_dict()
+        coauth_to_orcid = coauth_with_merge.groupby('coauthor_group', group_keys=False)['merge_group'].apply(list).to_dict()
         coauth_groups_with_no_orcid = self.df[(self.df['orcid_group'].isna()) | 
                                            (self.df['orcid_group'] == '')]['coauthor_group'].dropna().unique()
         
