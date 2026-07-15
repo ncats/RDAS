@@ -49,6 +49,13 @@ def _get_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in ("1", "true", "yes", "on")
 
 
+def _get_list(name: str, default: list) -> list:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return list(default)
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 def _env_key(model_name: str, suffix: str) -> str:
     """Build an env var name from a model name, e.g. Llama-3.1-70B -> LLAMA_3_1_70B."""
     normalized = (
@@ -135,6 +142,13 @@ BATCH_SIZE: int = _get_int("BATCH_SIZE", 10)
 API_HOST: str = _get_str("API_HOST", "0.0.0.0")
 API_PORT: int = _get_int("API_PORT", 8000)
 API_WORKERS: int = _get_int("API_WORKERS", 1)
+
+# CORS settings (comma-separated values; defaults are restrictive).
+# Set CORS_ALLOW_ORIGINS explicitly to the trusted front-end origins.
+CORS_ALLOW_ORIGINS: list = _get_list("CORS_ALLOW_ORIGINS", [])
+CORS_ALLOW_CREDENTIALS: bool = _get_bool("CORS_ALLOW_CREDENTIALS", False)
+CORS_ALLOW_METHODS: list = _get_list("CORS_ALLOW_METHODS", ["GET", "POST"])
+CORS_ALLOW_HEADERS: list = _get_list("CORS_ALLOW_HEADERS", ["*"])
 
 # Terminology enhancer settings
 ENABLE_TERMINOLOGY_API: bool = _get_bool("ENABLE_TERMINOLOGY_API", True)

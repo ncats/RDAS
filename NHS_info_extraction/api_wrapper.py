@@ -21,6 +21,10 @@ from config import (
     API_HOST,
     API_PORT,
     API_WORKERS,
+    CORS_ALLOW_ORIGINS,
+    CORS_ALLOW_CREDENTIALS,
+    CORS_ALLOW_METHODS,
+    CORS_ALLOW_HEADERS,
     ENABLE_TERMINOLOGY_API,
     TERMINOLOGY_TIMEOUT,
     TERMINOLOGY_VERBOSE,
@@ -195,13 +199,23 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
+# Add CORS middleware (origins are restricted via configuration).
+# Guard against the invalid/unsafe combination of wildcard origins with
+# credentials, which browsers reject and which would expose the API broadly.
+_cors_allow_credentials = CORS_ALLOW_CREDENTIALS
+if "*" in CORS_ALLOW_ORIGINS and CORS_ALLOW_CREDENTIALS:
+    print(
+        "WARNING: CORS_ALLOW_CREDENTIALS cannot be used with wildcard origins; "
+        "disabling credentials."
+    )
+    _cors_allow_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ALLOW_ORIGINS,
+    allow_credentials=_cors_allow_credentials,
+    allow_methods=CORS_ALLOW_METHODS,
+    allow_headers=CORS_ALLOW_HEADERS,
 )
 
 

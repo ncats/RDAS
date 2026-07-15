@@ -33,6 +33,10 @@ ENV DEFAULT_MODEL="Llama-3.1-70B-Instruct" \
     API_HOST="0.0.0.0" \
     API_PORT=8000 \
     API_WORKERS=1 \
+    CORS_ALLOW_ORIGINS="" \
+    CORS_ALLOW_CREDENTIALS=false \
+    CORS_ALLOW_METHODS="GET,POST" \
+    CORS_ALLOW_HEADERS="*" \
     ENABLE_TERMINOLOGY_API=true \
     TERMINOLOGY_TIMEOUT=10 \
     TERMINOLOGY_VERBOSE=false
@@ -44,6 +48,15 @@ ENV DEFAULT_MODEL="Llama-3.1-70B-Instruct" \
 #   GPU_MEMORY_UTILIZATION=0.90
 #   MAX_MODEL_LEN=3072
 #   TERMINOLOGY_PROXY_URL=http://proxy:8080
+# CORS is locked down by default (no origins allowed). Set CORS_ALLOW_ORIGINS to
+# a comma-separated list of trusted front-end origins, e.g.:
+#   CORS_ALLOW_ORIGINS="https://app.example.org,https://admin.example.org"
+
+# Run as an unprivileged user instead of root.
+RUN groupadd --system --gid 10001 appuser \
+    && useradd --system --uid 10001 --gid 10001 --no-create-home appuser \
+    && chown -R appuser:appuser /app
+USER appuser
 
 EXPOSE 8000
 
