@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Dict, Any, Literal
+from typing import List, Optional, Dict, Any
 from contextlib import asynccontextmanager
 import uvicorn
 import json
@@ -14,34 +14,18 @@ from extraction_core import (
     extract_json_from_text,
     process_abstracts
 )
-
-# Model configurations
-MODEL_CONFIGS = {
-    "gemma3-27b": {
-        "path": "/vast/projects/ncats-llms/gemma3-27b/",
-        "tensor_parallel_size": 4,
-        "gpu_memory_utilization": 0.90,
-        "max_model_len": 3072,
-        "temperature": 0.1,
-        "max_tokens": 2048,
-        "top_p": 0.95,
-        "stop": ["<END_JSON>", "</s>"]
-    },
-    "Llama-3.1-70B-Instruct": {
-        "path": "/vast/projects/ncats-llms/Llama-3.1-70B-Instruct/",
-        "tensor_parallel_size": 4,
-        "gpu_memory_utilization": 0.90,
-        "max_model_len": 3072,
-        "temperature": 0.1,
-        "max_tokens": 2048,
-        "top_p": 0.95,
-        "stop": ["<|eot_id|>", "</s>", "<END_JSON>"]
-    }
-}
-
-# Default settings
-DEFAULT_MODEL = "Llama-3.1-70B-Instruct"
-BATCH_SIZE = 10
+from config import (
+    MODEL_CONFIGS,
+    DEFAULT_MODEL,
+    BATCH_SIZE,
+    API_HOST,
+    API_PORT,
+    API_WORKERS,
+    ENABLE_TERMINOLOGY_API,
+    TERMINOLOGY_TIMEOUT,
+    TERMINOLOGY_VERBOSE,
+    TERMINOLOGY_PROXY_URL,
+)
 
 # Global variables for models
 loaded_models = {}
@@ -63,9 +47,9 @@ class AbstractRequest(BaseModel):
     
     abstract: str = Field(..., description="The clinical trial or natural history study abstract to process")
     enhance_terminology: bool = Field(default=True, description="Whether to enhance with HPO and RxNorm IDs")
-    model_name: Literal["Llama-3.1-70B-Instruct", "gemma3-27b"] = Field(
+    model_name: str = Field(
         default=DEFAULT_MODEL,
-        description="Model to use for extraction"
+        description="Model to use for extraction (must be one of the configured models)"
     )
 
 
@@ -73,9 +57,9 @@ class BatchAbstractRequest(BaseModel):
     abstracts: List[str] = Field(..., description="List of abstracts to process")
     enhance_terminology: bool = Field(default=True, description="Whether to enhance with HPO and RxNorm IDs")
     batch_size: int = Field(default=BATCH_SIZE, ge=1, le=50, description="Batch size for processing")
-    model_name: Literal["Llama-3.1-70B-Instruct", "gemma3-27b"] = Field(
+    model_name: str = Field(
         default=DEFAULT_MODEL,
-        description="Model to use for extraction"
+        description="Model to use for extraction (must be one of the configured models)"
     )
 
 
@@ -181,11 +165,12 @@ async def lifespan(app: FastAPI):
         print(f"\nLoading default model: {DEFAULT_MODEL}")
         get_or_load_model(DEFAULT_MODEL)
         
-        # Initialize terminology enhancer with verbose=False for API
+        # Initialize terminology enhancer from configuration
         terminology_enhancer = TerminologyEnhancer(
-            enable_api_calls=True,
-            timeout=10,
-            verbose=False
+            enable_api_calls=ENABLE_TERMINOLOGY_API,
+            timeout=TERMINOLOGY_TIMEOUT,
+            verbose=TERMINOLOGY_VERBOSE,
+            proxy_url=TERMINOLOGY_PROXY_URL
         )
         
         print("Model initialization complete!")
@@ -427,8 +412,8 @@ if __name__ == "__main__":
     # Run the API server
     uvicorn.run(
         "api_wrapper:app",
-        host="0.0.0.0",
-        port=8000,
+        host=API_HOST,
+        port=API_PORT,
         reload=False,
-        workers=1
+        workers=API_WORKERS
     )
