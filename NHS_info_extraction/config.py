@@ -57,7 +57,7 @@ def _get_list(name: str, default: list) -> list:
 
 
 def _env_key(model_name: str, suffix: str) -> str:
-    """Build an env var name from a model name, e.g. Llama-3.1-70B -> LLAMA_3_1_70B."""
+    """Build an env var name from a model name, e.g. gemma3-27b -> GEMMA3_27B."""
     normalized = (
         model_name.upper()
         .replace("-", "_")
@@ -78,16 +78,6 @@ DEFAULT_MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
         "max_tokens": 2048,
         "top_p": 0.95,
         "stop": ["<END_JSON>", "</s>"],
-    },
-    "Llama-3.1-70B-Instruct": {
-        "path": "/vast/projects/ncats-llms/Llama-3.1-70B-Instruct/",
-        "tensor_parallel_size": 4,
-        "gpu_memory_utilization": 0.90,
-        "max_model_len": 3072,
-        "temperature": 0.1,
-        "max_tokens": 2048,
-        "top_p": 0.95,
-        "stop": ["<|eot_id|>", "</s>", "<END_JSON>"],
     },
 }
 
@@ -135,7 +125,7 @@ def load_model_configs() -> Dict[str, Dict[str, Any]]:
 
 # Model settings
 MODEL_CONFIGS: Dict[str, Dict[str, Any]] = load_model_configs()
-DEFAULT_MODEL: str = _get_str("DEFAULT_MODEL", "Llama-3.1-70B-Instruct")
+DEFAULT_MODEL: str = _get_str("DEFAULT_MODEL", "gemma3-27b")
 BATCH_SIZE: int = _get_int("BATCH_SIZE", 10)
 
 # Server settings

@@ -31,9 +31,10 @@ from config import (
     TERMINOLOGY_PROXY_URL,
 )
 
-# Global variables for models
-loaded_models = {}
-sampling_params_cache = {}
+# Global variables for the currently loaded model
+loaded_model_name: Optional[str] = None
+loaded_llm: Optional[LLM] = None
+loaded_sampling_params: Optional[SamplingParams] = None
 terminology_enhancer = None
 
 
@@ -44,7 +45,7 @@ class AbstractRequest(BaseModel):
             "example": {
                 "abstract": "A retrospective cohort study...",
                 "enhance_terminology": True,
-                "model_name": "Llama-3.1-70B-Instruct"
+                "model_name": "gemma3-27b"
             }
         }
     )
@@ -105,28 +106,28 @@ class BatchExtractionResponse(BaseModel):
 
 class HealthCheckResponse(BaseModel):
     status: str
-    loaded_models: List[str]
+    loaded_model: Optional[str]
     available_models: List[str]
     default_model: str
     timestamp: float
 
 
 def get_or_load_model(model_name: str) -> tuple[LLM, SamplingParams]:
-    """Get model from cache or load it"""
-    global loaded_models, sampling_params_cache
-    
+    """Get the loaded model or load it"""
+    global loaded_model_name, loaded_llm, loaded_sampling_params
+
     if model_name not in MODEL_CONFIGS:
         raise ValueError(f"Unknown model: {model_name}. Available: {list(MODEL_CONFIGS.keys())}")
-    
-    # Return cached model if available
-    if model_name in loaded_models:
-        print(f"Using cached model: {model_name}")
-        return loaded_models[model_name], sampling_params_cache[model_name]
-    
+
+    # Return the already-loaded model if it matches
+    if model_name == loaded_model_name:
+        print(f"Using loaded model: {model_name}")
+        return loaded_llm, loaded_sampling_params
+
     # Load new model
     print(f"Loading model: {model_name}...")
     config = MODEL_CONFIGS[model_name]
-    
+
     try:
         llm = LLM(
             model=config["path"],
@@ -134,21 +135,21 @@ def get_or_load_model(model_name: str) -> tuple[LLM, SamplingParams]:
             gpu_memory_utilization=config["gpu_memory_utilization"],
             max_model_len=config["max_model_len"]
         )
-        
+
         sampling_params = SamplingParams(
             temperature=config["temperature"],
             max_tokens=config["max_tokens"],
             top_p=config["top_p"],
             stop=config["stop"],
         )
-        
-        # Cache the model
-        loaded_models[model_name] = llm
-        sampling_params_cache[model_name] = sampling_params
-        
+
+        loaded_model_name = model_name
+        loaded_llm = llm
+        loaded_sampling_params = sampling_params
+
         print(f"Model {model_name} loaded successfully!")
         return llm, sampling_params
-        
+
     except Exception as e:
         print(f"Error loading model {model_name}: {e}")
         raise
@@ -158,8 +159,8 @@ def get_or_load_model(model_name: str) -> tuple[LLM, SamplingParams]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    global terminology_enhancer
-    
+    global terminology_enhancer, loaded_model_name, loaded_llm, loaded_sampling_params
+
     print("Initializing API...")
     print(f"Available models: {list(MODEL_CONFIGS.keys())}")
     print(f"Default model: {DEFAULT_MODEL}")
@@ -183,18 +184,19 @@ async def lifespan(app: FastAPI):
         raise
     
     yield
-    
+
     # Shutdown
     print("Shutting down...")
-    loaded_models.clear()
-    sampling_params_cache.clear()
+    loaded_model_name = None
+    loaded_llm = None
+    loaded_sampling_params = None
     terminology_enhancer = None
 
 
 # Initialize FastAPI app
 app = FastAPI(
     title="Clinical Abstract Extraction API",
-    description="Extract structured characteristics from clinical trial and natural history study abstracts using LLM (supports Llama-3.1-70B-Instruct and Gemma3-27b)",
+    description="Extract structured characteristics from clinical trial and natural history study abstracts using LLM (supports gemma3-27b)",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -227,7 +229,7 @@ async def root():
         "version": "1.0.0",
         "available_models": list(MODEL_CONFIGS.keys()),
         "default_model": DEFAULT_MODEL,
-        "loaded_models": list(loaded_models.keys()),
+        "loaded_model": loaded_model_name,
         "endpoints": {
             "health": "/health",
             "models": "/models",
@@ -242,8 +244,8 @@ async def root():
 async def health_check():
     """Check if the API and model are ready"""
     return HealthCheckResponse(
-        status="healthy" if loaded_models else "not_ready",
-        loaded_models=list(loaded_models.keys()),
+        status="healthy" if loaded_model_name else "not_ready",
+        loaded_model=loaded_model_name,
         available_models=list(MODEL_CONFIGS.keys()),
         default_model=DEFAULT_MODEL,
         timestamp=time.time()
@@ -255,12 +257,12 @@ async def list_models():
     """List all available models and their loaded status"""
     return {
         "available_models": list(MODEL_CONFIGS.keys()),
-        "loaded_models": list(loaded_models.keys()),
+        "loaded_model": loaded_model_name,
         "default_model": DEFAULT_MODEL,
         "model_configs": {
             name: {
                 "path": config["path"],
-                "loaded": name in loaded_models
+                "loaded": name == loaded_model_name
             }
             for name, config in MODEL_CONFIGS.items()
         }
@@ -275,7 +277,7 @@ async def extract_characteristics(request: AbstractRequest):
     Returns disease name, study details, clinical outcomes, treatments, and more.
     Optionally enhances outcomes with HPO IDs and treatments with RxNorm IDs.
     
-    Supports models: Llama-3.1-70B-Instruct (default), gemma3-27b 
+    Supports models: gemma3-27b (default)
     """
     if not request.abstract.strip():
         raise HTTPException(status_code=400, detail="Abstract cannot be empty")
@@ -327,7 +329,7 @@ async def extract_batch_characteristics(request: BatchAbstractRequest):
     
     More efficient for processing multiple abstracts at once.
     
-    Supports models: Llama-3.1-70B-Instruct (default), gemma3-27b 
+    Supports models: gemma3-27b (default)
     """
     if not request.abstracts:
         raise HTTPException(status_code=400, detail="Abstracts list cannot be empty")
@@ -418,7 +420,7 @@ async def get_terminology_stats():
             "hpo_cache": len(terminology_enhancer.hpo_cache),
             "rxnorm_cache": len(terminology_enhancer.rxnorm_cache)
         },
-        "loaded_models": list(loaded_models.keys())
+        "loaded_model": loaded_model_name
     }
 
 

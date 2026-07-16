@@ -28,7 +28,7 @@ COPY api_wrapper.py extraction_core.py config.py /app/
 # LLM / runtime configuration (override at `docker run` with -e or --env-file).
 # Model configs default to the built-in values in config.py. To fully customise
 # them, mount a JSON file and point MODEL_CONFIG_PATH at it.
-ENV DEFAULT_MODEL="Llama-3.1-70B-Instruct" \
+ENV DEFAULT_MODEL="gemma3-27b" \
     BATCH_SIZE=10 \
     API_HOST="0.0.0.0" \
     API_PORT=8000 \
@@ -41,7 +41,6 @@ ENV DEFAULT_MODEL="Llama-3.1-70B-Instruct" \
     TERMINOLOGY_VERBOSE=false
 # Optional, unset by default:
 #   MODEL_CONFIG_PATH=/config/model_configs.json
-#   MODEL_PATH_LLAMA_3_1_70B_INSTRUCT=/models/Llama-3.1-70B-Instruct
 #   MODEL_PATH_GEMMA3_27B=/models/gemma3-27b
 #   TENSOR_PARALLEL_SIZE=4
 #   GPU_MEMORY_UTILIZATION=0.90
