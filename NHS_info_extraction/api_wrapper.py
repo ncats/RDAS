@@ -21,6 +21,7 @@ from config import (
     API_HOST,
     API_PORT,
     API_WORKERS,
+    API_ROOT_PATH,
     CORS_ALLOW_ORIGINS,
     CORS_ALLOW_CREDENTIALS,
     CORS_ALLOW_METHODS,
@@ -198,7 +199,8 @@ app = FastAPI(
     title="Clinical Abstract Extraction API",
     description="Extract structured characteristics from clinical trial and natural history study abstracts using LLM (supports gemma3-27b)",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    root_path=API_ROOT_PATH,
 )
 
 # Add CORS middleware (origins are restricted via configuration).

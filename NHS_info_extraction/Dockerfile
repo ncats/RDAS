@@ -14,7 +14,14 @@ RUN apt-get update \
     python3.11-venv \
     python3-pip \
     ca-certificates \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
+
+# Triton / torch-inductor JIT-compile kernels at model load time and need a
+# C/C++ compiler on PATH; make the toolchain explicit for those tools.
+ENV CC=gcc \
+    CXX=g++
 
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
 

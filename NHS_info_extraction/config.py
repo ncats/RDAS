@@ -132,6 +132,10 @@ BATCH_SIZE: int = _get_int("BATCH_SIZE", 10)
 API_HOST: str = _get_str("API_HOST", "0.0.0.0")
 API_PORT: int = _get_int("API_PORT", 8000)
 API_WORKERS: int = _get_int("API_WORKERS", 1)
+# Sub-path the API is mounted under when served behind a reverse proxy
+# (e.g. nginx location /extraction/). Leave empty when served at the root.
+# Must start with "/" and have no trailing slash, e.g. "/extraction".
+API_ROOT_PATH: str = _get_str("API_ROOT_PATH", "").rstrip("/")
 
 # CORS settings (comma-separated values; defaults are restrictive).
 # Set CORS_ALLOW_ORIGINS explicitly to the trusted front-end origins.
