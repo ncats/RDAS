@@ -1,4 +1,8 @@
-FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
+# Use the CUDA "-base" image instead of "-runtime": the torch and vllm wheels
+# already bundle their own CUDA math libraries (cuBLAS, cuDNN, NCCL, ...), so the
+# runtime image's copies are pure duplication (~2-3 GB). "-base" keeps only the
+# minimal CUDA runtime environment and the GPU entrypoint.
+FROM nvidia/cuda:12.8.0-base-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -8,18 +12,24 @@ ENV DEBIAN_FRONTEND=noninteractive \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get -y upgrade \
     && apt-get install -y --no-install-recommends \
     python3.11 \
     python3.11-venv \
+    python3.11-dev \
     python3-pip \
     ca-certificates \
     gcc \
     g++ \
+    unattended-upgrades \
+    && unattended-upgrade -v \
+    && apt-get purge -y unattended-upgrades \
+    && apt-get autoremove -y \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Triton / torch-inductor JIT-compile kernels at model load time and need a
-# C/C++ compiler on PATH; make the toolchain explicit for those tools.
+# C/C++ compiler on PATH plus the Python development headers (python3.11-dev
+# provides Python.h, which the generated cuda_utils.c includes).
 ENV CC=gcc \
     CXX=g++
 
@@ -28,7 +38,10 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
 COPY requirements.txt /app/requirements.txt
 
 RUN python -m pip install --upgrade pip && \
-    python -m pip install --prefer-binary -r /app/requirements.txt
+    python -m pip install --prefer-binary -r /app/requirements.txt && \
+    pip cache purge || true && \
+    find /usr/local/lib/python3.11 /usr/lib/python3.11 -depth -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true && \
+    find /usr/local/lib/python3.11 /usr/lib/python3.11 -type f -name '*.pyc' -delete 2>/dev/null || true
 
 COPY api_wrapper.py extraction_core.py config.py /app/
 
