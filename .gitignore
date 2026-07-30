@@ -10,6 +10,7 @@
 /*.txt
 !/requirements.txt
 *.cypher
+memgraph_dumps/
 **/data
 **/G_update/*.md
 **/G_update/*.html
