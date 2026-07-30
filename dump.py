@@ -437,30 +437,77 @@ def _main() -> int:
     directly from the repo root without importing MemgraphDumper in a shell.
     Output paths still live on the constructor via --output-dir.
     '''
-    
-    parser = argparse.ArgumentParser(description="Dump the RDAS Memgraph database.")
+
+    '''
+    Show common command examples in `python dump.py --help` so the user can copy
+    a complete command without reading the source file.
+    '''
+    #python dump.py --help
+    #python dump.py label --help
+
+    command_examples = """
+        Examples:
+        python dump.py cypherl
+        python dump.py json
+        python dump.py labels
+        python dump.py label GARD
+        python dump.py --output-dir /tmp/memgraph_dumps json
+        python dump.py --batch-size 10000 --no-overwrite labels
+    """
+
+    '''
+    The parser owns the top-level CLI description and keeps the examples text
+    formatted with its line breaks instead of collapsing it into one paragraph.
+    '''
+    parser = argparse.ArgumentParser(
+        description="Dump the RDAS Memgraph database.",
+        epilog=command_examples,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    '''
+    These global options apply to every dump command:
+        --output-dir changes the constructor-level output directory.
+        --batch-size controls JSON fetch batches and progress intervals.
+        --no-overwrite protects existing dump files from accidental replacement.
+    '''
     parser.add_argument("--output-dir", default=str(_DEFAULT_OUTPUT_DIR), help="Default output directory for generated dump files.")
     parser.add_argument("--batch-size", type=int, default=5000, help="Number of nodes or relationships to fetch per JSON batch.")
     parser.add_argument("--no-overwrite", action="store_true", help="Fail if the target output file already exists.")
 
+    '''
+    Subcommands map directly to the public dump methods on MemgraphDumper. The
+    required=True setting makes argparse fail fast when no dump type is chosen.
+    '''
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("cypherl", help="Dump the whole database to a CYPHERL file.")
     subparsers.add_parser("json", help="Dump the whole database to a JSON file.")
     subparsers.add_parser("labels", help="Dump every node label to a separate JSON file.")
 
+    '''
+    The label subcommand is the only command that needs an extra positional
+    value, because the output file name is generated from this Memgraph label.
+    '''
     label_parser = subparsers.add_parser("label", help="Dump one node label to a JSON file.")
     label_parser.add_argument("label_name", help="Memgraph node label to export.")
 
+    '''
+    Parse the command line once, then construct the dumper with the shared output
+    and overwrite settings before dispatching to the selected dump method.
+    '''
     args = parser.parse_args()
     dumper = MemgraphDumper(output_dir=args.output_dir, batch_size=args.batch_size, overwrite=not args.no_overwrite)
 
     if args.command == "cypherl":
         dumper.dump_whole_database_cypherl()
+
     elif args.command == "json":
         dumper.dump_whole_database_json()
+
     elif args.command == "labels":
         dumper.dump_each_label_json()
+
     elif args.command == "label":
         dumper.dump_label_json(args.label_name)
 
