@@ -16,7 +16,6 @@ from extraction_core import (
     extract_json_from_text,
     process_abstracts
 )
-
 load_dotenv()
 
 MODEL_NAME = "gemma3-27b"
@@ -175,7 +174,7 @@ app = FastAPI(
     title="Clinical Abstract Extraction API",
     description="Extract structured characteristics from clinical trial and natural history study abstracts using Gemma3-27b",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
