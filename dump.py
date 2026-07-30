@@ -22,14 +22,24 @@ class MemgraphDumper:
 
     def __init__(self, output_dir: os.PathLike = _DEFAULT_OUTPUT_DIR, batch_size: int = 5000, overwrite: bool = True):
 
+        # Keep the dump configuration on the dumper instance instead of passing
+        # paths into each export method. This makes the four public dump methods
+        # simple commands: connect once, then write to the standard dump paths.
         from baseclass.conn import DBConnection
 
         self.output_dir = Path(output_dir)
         self.batch_size = batch_size
         self.overwrite = overwrite
+
+        # The whole-database exports have fixed names under output_dir. Per-label
+        # exports go under labels/ so a full label split cannot mix with the
+        # single-file JSON or CYPHERL dump.
         self.cypherl_output_path = self.output_dir / "memgraph_dump.cypherl"
         self.json_output_path = self.output_dir / "memgraph_dump.json"
         self.labels_output_dir = self.output_dir / "labels"
+
+        # Match the rest of the repo by using DBConnection().memgraph_conn().
+        # That helper reads MEMGRAPH_* values from the already-loaded .env file.
         self.memgraph = DBConnection().memgraph_conn()
 
         if self.memgraph is None:
@@ -38,7 +48,11 @@ class MemgraphDumper:
 
     def dump_whole_database_cypherl(self) -> Path:
 
-        """Dump the whole database to a local CYPHERL file using Memgraph's DUMP DATABASE query."""
+        # Use Memgraph's native DUMP DATABASE command for the restore-friendly
+        # export. This file should contain Cypher/CYPHERL statements that can
+        # recreate graph data and supported metadata such as indexes/constraints.
+        # The row shape can vary by Memgraph/gqlalchemy version, so each returned
+        # row is normalized by _cypher_statements_from_dump_row() before writing.
 
         path = self._prepare_output_path(self.cypherl_output_path)
         row_count = 0
@@ -65,7 +79,12 @@ class MemgraphDumper:
 
     def dump_whole_database_json(self) -> Path:
 
-        """Dump the whole database to a local JSON file with separate node and relationship arrays."""
+        # Write one local JSON document with two top-level arrays:
+        #   nodes: all graph nodes with id, labels, and properties
+        #   relationships: all relationships with id, type, endpoints, properties
+        # The output is easier to inspect than CYPHERL, but it is not intended to
+        # be a drop-in restore format because internal ids are included only as
+        # references for this exported snapshot.
 
         path = self._prepare_output_path(self.json_output_path)
         node_count = 0
@@ -84,7 +103,10 @@ class MemgraphDumper:
 
     def dump_each_label_json(self) -> List[Path]:
 
-        """Dump nodes for every Memgraph node label into separate local JSON files."""
+        # Discover every node label currently present in Memgraph, then reuse the
+        # one-label export for each label. A node with multiple labels will appear
+        # in each matching label file, which is usually what label-scoped review
+        # needs and matches how Cypher label filters behave.
 
         self.labels_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -99,7 +121,11 @@ class MemgraphDumper:
 
     def dump_label_json(self, label_name: str) -> Path:
 
-        """Dump nodes for one Memgraph node label into a local JSON file."""
+        # Export only nodes that have the requested label. Relationships are not
+        # included here because the user's label-split requirement is for node
+        # label files, and relationships can connect nodes across multiple labels.
+        # Use dump_whole_database_json() when relationship endpoint context is
+        # needed alongside node data.
 
         if not label_name:
             raise ValueError("label_name is required.")
@@ -118,6 +144,8 @@ class MemgraphDumper:
 
     def _execute_and_fetch(self, query: str, params: Optional[Dict[str, Any]] = None) -> Iterable[Dict[str, Any]]:
 
+        # Keep all gqlalchemy calls behind one small method so the public dump
+        # code does not repeat the parameter/no-parameter branching.
         if params is None:
             return self.memgraph.execute_and_fetch(query)
 
@@ -126,6 +154,8 @@ class MemgraphDumper:
 
     def _prepare_output_path(self, output_path: os.PathLike) -> Path:
 
+        # Create parent directories on demand and enforce the constructor-level
+        # overwrite setting before any export method starts writing a large file.
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -137,6 +167,9 @@ class MemgraphDumper:
 
     def _cypher_statements_from_dump_row(self, row: Any) -> Iterable[str]:
 
+        # DUMP DATABASE normally streams textual Cypher statements, but different
+        # client/server versions may wrap those statements in a single-column dict
+        # or use a named field. Normalize those shapes into plain statement text.
         if isinstance(row, str):
             yield row
             return
@@ -156,6 +189,9 @@ class MemgraphDumper:
 
     def _coerce_dump_value_to_statements(self, value: Any) -> Iterable[str]:
 
+        # Convert nested dump values into individual statement strings. Splitting
+        # string values by line keeps large dump payloads readable and lets the
+        # writer add a missing semicolon consistently.
         if value is None:
             return
 
@@ -174,6 +210,10 @@ class MemgraphDumper:
 
     def _iter_node_rows(self, quoted_label: Optional[str] = None) -> Iterable[Dict[str, Any]]:
 
+        # Stream nodes by internal id so a full database export does not need to
+        # hold every node in memory. The optional label clause is already quoted
+        # before it reaches this method because Cypher labels cannot be passed as
+        # normal query parameters.
         label_clause = f":{quoted_label}" if quoted_label else ""
         last_id = -1
 
@@ -197,6 +237,9 @@ class MemgraphDumper:
 
     def _iter_relationship_rows(self) -> Iterable[Dict[str, Any]]:
 
+        # Stream relationships by internal id for the same reason as node export:
+        # large Memgraph databases should be written incrementally instead of
+        # collected into one Python list.
         last_id = -1
 
         while True:
@@ -224,6 +267,8 @@ class MemgraphDumper:
 
     def _get_node_labels(self) -> List[str]:
 
+        # Use the graph itself as the source of truth for label names so new RDAS
+        # labels are automatically picked up by dump_each_label_json().
         query = """
             MATCH (n)
             UNWIND labels(n) AS label
@@ -236,6 +281,9 @@ class MemgraphDumper:
 
     def _write_json_rows(self, file_handle: Any, rows: Iterable[Dict[str, Any]], record_builder: Any, indent: str) -> int:
 
+        # Stream JSON array items manually so callers can write very large arrays
+        # without building a full list first. The count also becomes the progress
+        # number printed by each public export method.
         count = 0
 
         for row in rows:
@@ -251,6 +299,9 @@ class MemgraphDumper:
 
     def _node_json_record(self, row: Dict[str, Any]) -> Dict[str, Any]:
 
+        # Keep node JSON records explicit and stable: a small type marker, the
+        # Memgraph internal id for snapshot-local reference, all labels, and the
+        # property dictionary exactly as returned by Cypher.
         return {
             "type": "node",
             "id": row["id"],
@@ -261,6 +312,9 @@ class MemgraphDumper:
 
     def _relationship_json_record(self, row: Dict[str, Any]) -> Dict[str, Any]:
 
+        # Keep relationship JSON records parallel to node records. start/end are
+        # internal node ids from this same dump, so they are useful for inspecting
+        # topology inside the exported snapshot.
         return {
             "type": "relationship",
             "id": row["id"],
@@ -273,20 +327,26 @@ class MemgraphDumper:
 
     def _quote_label(self, label_name: str) -> str:
 
+        # Labels are part of Cypher syntax, not parameter values. Backtick quoting
+        # lets labels with unusual characters export safely and doubles embedded
+        # backticks so the generated query remains valid.
         return f"`{label_name.replace('`', '``')}`"
 
 
     def _safe_filename(self, label_name: str) -> str:
 
+        # Convert label names into portable filenames. Most RDAS labels are simple
+        # already, but this avoids path separators or whitespace creating awkward
+        # file paths when labels are added later.
         filename = _SAFE_FILENAME_RE.sub("_", label_name.strip()).strip("._")
         return filename or "label"
 
 
     def _json_default(self, value: Any) -> Any:
 
-        # JSON cannot preserve every Memgraph/Python value type directly. Keep
-        # native JSON types as-is and convert temporal/decimal/unknown values to
-        # stable readable values instead of failing halfway through a large dump.
+        # json.dump() cannot preserve every Memgraph/Python value type directly.
+        # Keep native JSON types as-is and convert temporal/decimal/unknown values
+        # to stable readable values instead of failing halfway through a dump.
         if isinstance(value, (datetime, date, time)):
             return value.isoformat()
 
@@ -301,6 +361,10 @@ class MemgraphDumper:
 
 def _main() -> int:
 
+    # Provide a small CLI around the four dump methods so the script can be used
+    # directly from the repo root without importing MemgraphDumper in a shell.
+    # Output paths still live on the constructor via --output-dir.
+    
     parser = argparse.ArgumentParser(description="Dump the RDAS Memgraph database.")
     parser.add_argument("--output-dir", default=str(_DEFAULT_OUTPUT_DIR), help="Default output directory for generated dump files.")
     parser.add_argument("--batch-size", type=int, default=5000, help="Number of nodes or relationships to fetch per JSON batch.")
@@ -338,5 +402,5 @@ if __name__ == "__main__":
     python dump.py labels
     python dump.py label GARD
     '''
-    
+
     sys.exit(_main())
