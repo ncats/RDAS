@@ -12,22 +12,25 @@ class TerminologyEnhancer:
     def __init__(self, enable_api_calls=True, timeout=10, verbose=True, proxy_url=None):
         self.hpo_api = "https://clinicaltables.nlm.nih.gov/api/hpo/v3/search"
         self.rxnorm_api = "https://rxnav.nlm.nih.gov/REST"
+        self.gard_api = "https://api.monarchinitiative.org/v3/api/search"
         self.hpo_cache = {}
         self.rxnorm_cache = {}
+        self.gard_cache = {}
         self.timeout = timeout
         self.verbose = verbose
         self.enabled = enable_api_calls
-        
+
         # Proxy configuration
         self.proxies = None
         if proxy_url:
             self.proxies = {'http': proxy_url, 'https': proxy_url}
             if verbose:
                 print(f"Using proxy: {proxy_url}")
-        
+
         # Simple statistics
-        self.stats = {'hpo_matched': 0, 'hpo_not_found': 0, 
+        self.stats = {'hpo_matched': 0, 'hpo_not_found': 0,
                      'rxnorm_matched': 0, 'rxnorm_not_found': 0,
+                     'gard_matched': 0, 'gard_not_found': 0,
                      'api_calls': 0, 'cache_hits': 0}
     
     def _api_call(self, url, params, cache_key=None, cache_dict=None):
@@ -99,9 +102,39 @@ class TerminologyEnhancer:
             rxnorm_id = data.get('idGroup', {}).get('rxnormId')
             if rxnorm_id:
                 return rxnorm_id[0] if isinstance(rxnorm_id, list) else rxnorm_id
-        
+
         return None
-    
+
+    def search_gard(self, term: str) -> Optional[str]:
+        """Search GARD (via Monarch Initiative disease xrefs) and return best match GARD ID"""
+        # Monarch's search requires a fairly close phrase match, so a leading
+        # demographic/severity modifier (e.g. "pediatric X") is retried without it
+        modifiers = ['pediatric', 'adult', 'adult-onset', 'childhood', 'infantile',
+                     'neonatal', 'juvenile', 'congenital', 'hereditary', 'familial',
+                     'acquired', 'chronic', 'acute', 'early-onset', 'late-onset',
+                     'sporadic', 'idiopathic']
+        candidates = [term]
+        words = term.split()
+        if words and words[0].lower().strip('-') in modifiers:
+            candidates.append(' '.join(words[1:]))
+
+        for candidate in candidates:
+            candidate = candidate.strip()
+            if not candidate:
+                continue
+            data = self._api_call(
+                self.gard_api,
+                {'q': candidate, 'category': 'biolink:Disease', 'limit': 5},
+                cache_key=candidate.lower(),
+                cache_dict=self.gard_cache
+            )
+            if data:
+                for item in data.get('items', []):
+                    for xref in (item.get('xref') or []):
+                        if xref.startswith('GARD:'):
+                            return xref.split(':', 1)[1]
+        return None
+
     def enhance_outcomes(self, outcomes_str: str) -> str:
         """Add HPO IDs to clinical outcomes"""
         if not outcomes_str or outcomes_str == "N/A":
@@ -176,14 +209,45 @@ class TerminologyEnhancer:
             time.sleep(0.2)
         
         return ', '.join(enhanced)
-    
+
+    def enhance_disease_name(self, disease_str: str) -> str:
+        """Add a GARD ID to the extracted disease name"""
+        if not disease_str or disease_str == "N/A":
+            return disease_str
+
+        # Remove existing GARD ID
+        clean = re.sub(r'\s*\[GARD:[^\]]+\]', '', disease_str).strip()
+        if not clean:
+            return disease_str
+
+        # Search using the name with any parenthetical abbreviation stripped
+        search_term = re.sub(r'\s*\([^)]*\)', '', clean).strip()
+        gard_id = self.search_gard(search_term or clean)
+
+        if gard_id:
+            enhanced = f"{clean} [GARD:{gard_id}]"
+            self.stats['gard_matched'] += 1
+            if self.verbose:
+                print(f"GARD: '{clean}' -> {gard_id}")
+        else:
+            enhanced = clean
+            self.stats['gard_not_found'] += 1
+
+        time.sleep(0.2)
+        return enhanced
+
     def enhance_result(self, result: Dict) -> Dict:
         """Enhance a single extraction result with IDs"""
         if result.get("parse_error", False):
             return result
-        
+
         enhanced = result.copy()
-        
+
+        if enhanced.get("disease_name"):
+            enhanced["disease_name"] = self.enhance_disease_name(
+                enhanced["disease_name"]
+            )
+
         if enhanced.get("clinical_outcomes"):
             enhanced["clinical_outcomes"] = self.enhance_outcomes(
                 enhanced["clinical_outcomes"]
@@ -208,8 +272,11 @@ class TerminologyEnhancer:
         
         hpo_total = self.stats['hpo_matched'] + self.stats['hpo_not_found']
         rx_total = self.stats['rxnorm_matched'] + self.stats['rxnorm_not_found']
-        
-        print(f"\nHPO: {self.stats['hpo_matched']}/{hpo_total} matched "
+        gard_total = self.stats['gard_matched'] + self.stats['gard_not_found']
+
+        print(f"\nGARD: {self.stats['gard_matched']}/{gard_total} matched "
+              f"({100*self.stats['gard_matched']/gard_total if gard_total else 0:.1f}%)")
+        print(f"HPO: {self.stats['hpo_matched']}/{hpo_total} matched "
               f"({100*self.stats['hpo_matched']/hpo_total if hpo_total else 0:.1f}%)")
         print(f"RxNorm: {self.stats['rxnorm_matched']}/{rx_total} matched "
               f"({100*self.stats['rxnorm_matched']/rx_total if rx_total else 0:.1f}%)")

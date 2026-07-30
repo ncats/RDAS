@@ -3,9 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 from contextlib import asynccontextmanager
+import os
 import uvicorn
 import json
 import time
+from dotenv import load_dotenv
 from vllm import LLM, SamplingParams
 
 from extraction_core import (
@@ -14,27 +16,29 @@ from extraction_core import (
     extract_json_from_text,
     process_abstracts
 )
-from config import (
-    MODEL_CONFIGS,
-    DEFAULT_MODEL,
-    BATCH_SIZE,
-    API_HOST,
-    API_PORT,
-    API_WORKERS,
-    CORS_ALLOW_ORIGINS,
-    CORS_ALLOW_CREDENTIALS,
-    CORS_ALLOW_METHODS,
-    CORS_ALLOW_HEADERS,
-    ENABLE_TERMINOLOGY_API,
-    TERMINOLOGY_TIMEOUT,
-    TERMINOLOGY_VERBOSE,
-    TERMINOLOGY_PROXY_URL,
-)
 
-# Global variables for the currently loaded model
-loaded_model_name: Optional[str] = None
-loaded_llm: Optional[LLM] = None
-loaded_sampling_params: Optional[SamplingParams] = None
+load_dotenv()
+
+MODEL_NAME = "gemma3-27b"
+
+# Model configuration, populated from environment variables (see .env.example)
+MODEL_CONFIG = {
+    "path": os.environ["MODEL_PATH"],
+    "tensor_parallel_size": int(os.getenv("TENSOR_PARALLEL_SIZE", 4)),
+    "gpu_memory_utilization": float(os.getenv("GPU_MEMORY_UTILIZATION", 0.90)),
+    "max_model_len": int(os.getenv("MAX_MODEL_LEN", 3072)),
+    "temperature": float(os.getenv("TEMPERATURE", 0.1)),
+    "max_tokens": int(os.getenv("MAX_TOKENS", 2048)),
+    "top_p": float(os.getenv("TOP_P", 0.95)),
+    "stop": ["<END_JSON>", "</s>"]
+}
+
+# Default settings
+BATCH_SIZE = 10
+
+# Global variables for the model
+loaded_llm = None
+sampling_params = None
 terminology_enhancer = None
 
 
@@ -44,28 +48,19 @@ class AbstractRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "abstract": "A retrospective cohort study...",
-                "enhance_terminology": True,
-                "model_name": "gemma3-27b"
+                "enhance_terminology": True
             }
         }
     )
-    
+
     abstract: str = Field(..., description="The clinical trial or natural history study abstract to process")
-    enhance_terminology: bool = Field(default=True, description="Whether to enhance with HPO and RxNorm IDs")
-    model_name: str = Field(
-        default=DEFAULT_MODEL,
-        description="Model to use for extraction (must be one of the configured models)"
-    )
+    enhance_terminology: bool = Field(default=True, description="Whether to enhance with GARD, HPO, and RxNorm IDs")
 
 
 class BatchAbstractRequest(BaseModel):
     abstracts: List[str] = Field(..., description="List of abstracts to process")
-    enhance_terminology: bool = Field(default=True, description="Whether to enhance with HPO and RxNorm IDs")
+    enhance_terminology: bool = Field(default=True, description="Whether to enhance with GARD, HPO, and RxNorm IDs")
     batch_size: int = Field(default=BATCH_SIZE, ge=1, le=50, description="Batch size for processing")
-    model_name: str = Field(
-        default=DEFAULT_MODEL,
-        description="Model to use for extraction (must be one of the configured models)"
-    )
 
 
 class ExtractedCharacteristics(BaseModel):
@@ -90,7 +85,6 @@ class ExtractionResponse(BaseModel):
     extracted_characteristics: ExtractedCharacteristics
     processing_time_seconds: float
     enhanced_with_terminology: bool
-    model_used: str
 
 
 class BatchExtractionResponse(BaseModel):
@@ -101,57 +95,44 @@ class BatchExtractionResponse(BaseModel):
     results: List[ExtractionResponse]
     total_processing_time_seconds: float
     terminology_stats: Optional[Dict[str, Any]] = None
-    model_used: str
 
 
 class HealthCheckResponse(BaseModel):
     status: str
-    loaded_model: Optional[str]
-    available_models: List[str]
-    default_model: str
+    model_loaded: bool
+    model_name: str
     timestamp: float
 
 
-def get_or_load_model(model_name: str) -> tuple[LLM, SamplingParams]:
-    """Get the loaded model or load it"""
-    global loaded_model_name, loaded_llm, loaded_sampling_params
+def get_or_load_model() -> tuple[LLM, SamplingParams]:
+    """Get the model from cache, or load it"""
+    global loaded_llm, sampling_params
 
-    if model_name not in MODEL_CONFIGS:
-        raise ValueError(f"Unknown model: {model_name}. Available: {list(MODEL_CONFIGS.keys())}")
+    if loaded_llm is not None:
+        return loaded_llm, sampling_params
 
-    # Return the already-loaded model if it matches
-    if model_name == loaded_model_name:
-        print(f"Using loaded model: {model_name}")
-        return loaded_llm, loaded_sampling_params
-
-    # Load new model
-    print(f"Loading model: {model_name}...")
-    config = MODEL_CONFIGS[model_name]
+    print(f"Loading model: {MODEL_NAME} from {MODEL_CONFIG['path']}...")
 
     try:
-        llm = LLM(
-            model=config["path"],
-            tensor_parallel_size=config["tensor_parallel_size"],
-            gpu_memory_utilization=config["gpu_memory_utilization"],
-            max_model_len=config["max_model_len"]
+        loaded_llm = LLM(
+            model=MODEL_CONFIG["path"],
+            tensor_parallel_size=MODEL_CONFIG["tensor_parallel_size"],
+            gpu_memory_utilization=MODEL_CONFIG["gpu_memory_utilization"],
+            max_model_len=MODEL_CONFIG["max_model_len"]
         )
 
         sampling_params = SamplingParams(
-            temperature=config["temperature"],
-            max_tokens=config["max_tokens"],
-            top_p=config["top_p"],
-            stop=config["stop"],
+            temperature=MODEL_CONFIG["temperature"],
+            max_tokens=MODEL_CONFIG["max_tokens"],
+            top_p=MODEL_CONFIG["top_p"],
+            stop=MODEL_CONFIG["stop"],
         )
 
-        loaded_model_name = model_name
-        loaded_llm = llm
-        loaded_sampling_params = sampling_params
-
-        print(f"Model {model_name} loaded successfully!")
-        return llm, sampling_params
+        print(f"Model {MODEL_NAME} loaded successfully!")
+        return loaded_llm, sampling_params
 
     except Exception as e:
-        print(f"Error loading model {model_name}: {e}")
+        print(f"Error loading model {MODEL_NAME}: {e}")
         raise
 
 
@@ -159,23 +140,20 @@ def get_or_load_model(model_name: str) -> tuple[LLM, SamplingParams]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    global terminology_enhancer, loaded_model_name, loaded_llm, loaded_sampling_params
+    global terminology_enhancer, loaded_llm, sampling_params
 
     print("Initializing API...")
-    print(f"Available models: {list(MODEL_CONFIGS.keys())}")
-    print(f"Default model: {DEFAULT_MODEL}")
-    
+    print(f"Model: {MODEL_NAME}")
+
     try:
-        # Load default model
-        print(f"\nLoading default model: {DEFAULT_MODEL}")
-        get_or_load_model(DEFAULT_MODEL)
-        
-        # Initialize terminology enhancer from configuration
+        # Load the model
+        get_or_load_model()
+
+        # Initialize terminology enhancer with verbose=False for API
         terminology_enhancer = TerminologyEnhancer(
-            enable_api_calls=ENABLE_TERMINOLOGY_API,
-            timeout=TERMINOLOGY_TIMEOUT,
-            verbose=TERMINOLOGY_VERBOSE,
-            proxy_url=TERMINOLOGY_PROXY_URL
+            enable_api_calls=True,
+            timeout=10,
+            verbose=False
         )
         
         print("Model initialization complete!")
@@ -184,40 +162,29 @@ async def lifespan(app: FastAPI):
         raise
     
     yield
-
+    
     # Shutdown
     print("Shutting down...")
-    loaded_model_name = None
     loaded_llm = None
-    loaded_sampling_params = None
+    sampling_params = None
     terminology_enhancer = None
 
 
 # Initialize FastAPI app
 app = FastAPI(
     title="Clinical Abstract Extraction API",
-    description="Extract structured characteristics from clinical trial and natural history study abstracts using LLM (supports gemma3-27b)",
+    description="Extract structured characteristics from clinical trial and natural history study abstracts using Gemma3-27b",
     version="1.0.0",
     lifespan=lifespan
 )
 
-# Add CORS middleware (origins are restricted via configuration).
-# Guard against the invalid/unsafe combination of wildcard origins with
-# credentials, which browsers reject and which would expose the API broadly.
-_cors_allow_credentials = CORS_ALLOW_CREDENTIALS
-if "*" in CORS_ALLOW_ORIGINS and CORS_ALLOW_CREDENTIALS:
-    print(
-        "WARNING: CORS_ALLOW_CREDENTIALS cannot be used with wildcard origins; "
-        "disabling credentials."
-    )
-    _cors_allow_credentials = False
-
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ALLOW_ORIGINS,
-    allow_credentials=_cors_allow_credentials,
-    allow_methods=CORS_ALLOW_METHODS,
-    allow_headers=CORS_ALLOW_HEADERS,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -227,9 +194,8 @@ async def root():
     return {
         "message": "Clinical Abstract Extraction API",
         "version": "1.0.0",
-        "available_models": list(MODEL_CONFIGS.keys()),
-        "default_model": DEFAULT_MODEL,
-        "loaded_model": loaded_model_name,
+        "model": MODEL_NAME,
+        "model_loaded": loaded_llm is not None,
         "endpoints": {
             "health": "/health",
             "models": "/models",
@@ -244,28 +210,20 @@ async def root():
 async def health_check():
     """Check if the API and model are ready"""
     return HealthCheckResponse(
-        status="healthy" if loaded_model_name else "not_ready",
-        loaded_model=loaded_model_name,
-        available_models=list(MODEL_CONFIGS.keys()),
-        default_model=DEFAULT_MODEL,
+        status="healthy" if loaded_llm is not None else "not_ready",
+        model_loaded=loaded_llm is not None,
+        model_name=MODEL_NAME,
         timestamp=time.time()
     )
 
 
 @app.get("/models")
 async def list_models():
-    """List all available models and their loaded status"""
+    """Show the configured model and its loaded status"""
     return {
-        "available_models": list(MODEL_CONFIGS.keys()),
-        "loaded_model": loaded_model_name,
-        "default_model": DEFAULT_MODEL,
-        "model_configs": {
-            name: {
-                "path": config["path"],
-                "loaded": name == loaded_model_name
-            }
-            for name, config in MODEL_CONFIGS.items()
-        }
+        "model_name": MODEL_NAME,
+        "model_path": MODEL_CONFIG["path"],
+        "loaded": loaded_llm is not None
     }
 
 
@@ -275,45 +233,44 @@ async def extract_characteristics(request: AbstractRequest):
     Extract structured characteristics from a single clinical abstract.
     
     Returns disease name, study details, clinical outcomes, treatments, and more.
-    Optionally enhances outcomes with HPO IDs and treatments with RxNorm IDs.
-    
-    Supports models: gemma3-27b (default)
+    Optionally enhances disease names with GARD IDs, outcomes with HPO IDs,
+    and treatments with RxNorm IDs.
+
+    Uses the gemma3-27b model.
     """
     if not request.abstract.strip():
         raise HTTPException(status_code=400, detail="Abstract cannot be empty")
-    
+
     start_time = time.time()
-    
+
     try:
-        # Get or load the requested model
-        llm, sampling_params = get_or_load_model(request.model_name)
-        
+        llm, params = get_or_load_model()
+
         # Process single abstract
         results = process_abstracts(
-            llm, 
-            [request.abstract], 
-            sampling_params, 
+            llm,
+            [request.abstract],
+            params,
             batch_size=1
         )
-        
+
         result = results[0]
-        
+
         # Enhance with terminology if requested
         if request.enhance_terminology and not result.get("parse_error", False):
             result = terminology_enhancer.enhance_result(result)
-        
+
         processing_time = time.time() - start_time
-        
+
         # Build response
         characteristics = ExtractedCharacteristics(**result)
-        
+
         return ExtractionResponse(
             success=not result.get("parse_error", False),
             abstract=request.abstract,
             extracted_characteristics=characteristics,
             processing_time_seconds=round(processing_time, 2),
-            enhanced_with_terminology=request.enhance_terminology,
-            model_used=request.model_name
+            enhanced_with_terminology=request.enhance_terminology
         )
         
     except ValueError as e:
@@ -328,26 +285,25 @@ async def extract_batch_characteristics(request: BatchAbstractRequest):
     Extract structured characteristics from multiple clinical abstracts in batch.
     
     More efficient for processing multiple abstracts at once.
-    
-    Supports models: gemma3-27b (default)
+
+    Uses the gemma3-27b model.
     """
     if not request.abstracts:
         raise HTTPException(status_code=400, detail="Abstracts list cannot be empty")
-    
+
     if len(request.abstracts) > 100:
         raise HTTPException(status_code=400, detail="Maximum 100 abstracts per batch request")
-    
+
     start_time = time.time()
-    
+
     try:
-        # Get or load the requested model
-        llm, sampling_params = get_or_load_model(request.model_name)
-        
+        llm, params = get_or_load_model()
+
         # Process all abstracts
         results = process_abstracts(
-            llm, 
-            request.abstracts, 
-            sampling_params, 
+            llm,
+            request.abstracts,
+            params,
             batch_size=request.batch_size
         )
         
@@ -382,8 +338,7 @@ async def extract_batch_characteristics(request: BatchAbstractRequest):
                 abstract=abstract,
                 extracted_characteristics=characteristics,
                 processing_time_seconds=round(total_processing_time / len(request.abstracts), 2),
-                enhanced_with_terminology=request.enhance_terminology,
-                model_used=request.model_name
+                enhanced_with_terminology=request.enhance_terminology
             ))
         
         # Get terminology stats if enhancement was used
@@ -398,8 +353,7 @@ async def extract_batch_characteristics(request: BatchAbstractRequest):
             failed_extractions=failed,
             results=extraction_responses,
             total_processing_time_seconds=round(total_processing_time, 2),
-            terminology_stats=terminology_stats,
-            model_used=request.model_name
+            terminology_stats=terminology_stats
         )
         
     except ValueError as e:
@@ -417,10 +371,11 @@ async def get_terminology_stats():
     return {
         "statistics": terminology_enhancer.stats,
         "cache_sizes": {
+            "gard_cache": len(terminology_enhancer.gard_cache),
             "hpo_cache": len(terminology_enhancer.hpo_cache),
             "rxnorm_cache": len(terminology_enhancer.rxnorm_cache)
         },
-        "loaded_model": loaded_model_name
+        "model_loaded": loaded_llm is not None
     }
 
 
@@ -428,8 +383,8 @@ if __name__ == "__main__":
     # Run the API server
     uvicorn.run(
         "api_wrapper:app",
-        host=API_HOST,
-        port=API_PORT,
+        host="0.0.0.0",
+        port=8000,
         reload=False,
-        workers=API_WORKERS
+        workers=1
     )
