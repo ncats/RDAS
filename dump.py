@@ -20,16 +20,25 @@ _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 class MemgraphDumper:
     """Export Memgraph data through the repo's existing DBConnection helper."""
 
-    def __init__(self, output_dir: os.PathLike = _DEFAULT_OUTPUT_DIR, batch_size: int = 5000, memgraph: Any = None):
+    def __init__(self, output_dir: os.PathLike = _DEFAULT_OUTPUT_DIR, batch_size: int = 5000, overwrite: bool = True):
+        from baseclass.conn import DBConnection
+
         self.output_dir = Path(output_dir)
         self.batch_size = batch_size
-        self.memgraph = memgraph
+        self.overwrite = overwrite
+        self.cypherl_output_path = self.output_dir / "memgraph_dump.cypherl"
+        self.json_output_path = self.output_dir / "memgraph_dump.json"
+        self.labels_output_dir = self.output_dir / "labels"
+        self.memgraph = DBConnection().memgraph_conn()
+
+        if self.memgraph is None:
+            raise RuntimeError("Unable to create a Memgraph connection. Check MEMGRAPH_* values in .env.")
 
 
-    def dump_whole_database_cypherl(self, output_path: Optional[os.PathLike] = None, overwrite: bool = True) -> Path:
+    def dump_whole_database_cypherl(self) -> Path:
         """Dump the whole database to a local CYPHERL file using Memgraph's DUMP DATABASE query."""
 
-        path = self._prepare_output_path(output_path, "memgraph_dump.cypherl", overwrite)
+        path = self._prepare_output_path(self.cypherl_output_path)
         row_count = 0
 
         with path.open("w", encoding="utf-8") as file_handle:
@@ -52,10 +61,10 @@ class MemgraphDumper:
         return path
 
 
-    def dump_whole_database_json(self, output_path: Optional[os.PathLike] = None, overwrite: bool = True) -> Path:
+    def dump_whole_database_json(self) -> Path:
         """Dump the whole database to a local JSON file with separate node and relationship arrays."""
 
-        path = self._prepare_output_path(output_path, "memgraph_dump.json", overwrite)
+        path = self._prepare_output_path(self.json_output_path)
         node_count = 0
         relationship_count = 0
 
@@ -70,30 +79,27 @@ class MemgraphDumper:
         return path
 
 
-    def dump_each_label_json(self, output_dir: Optional[os.PathLike] = None, overwrite: bool = True) -> List[Path]:
+    def dump_each_label_json(self) -> List[Path]:
         """Dump nodes for every Memgraph node label into separate local JSON files."""
 
-        label_output_dir = Path(output_dir) if output_dir is not None else self.output_dir / "labels"
-        label_output_dir.mkdir(parents=True, exist_ok=True)
+        self.labels_output_dir.mkdir(parents=True, exist_ok=True)
 
         paths = []
 
         for label_name in self._get_node_labels():
-            output_path = label_output_dir / f"{self._safe_filename(label_name)}.json"
-            paths.append(self.dump_label_json(label_name, output_path=output_path, overwrite=overwrite))
+            paths.append(self.dump_label_json(label_name))
 
-        print(f"Wrote {len(paths)} label JSON files to {label_output_dir}")
+        print(f"Wrote {len(paths)} label JSON files to {self.labels_output_dir}")
         return paths
 
 
-    def dump_label_json(self, label_name: str, output_path: Optional[os.PathLike] = None, overwrite: bool = True) -> Path:
+    def dump_label_json(self, label_name: str) -> Path:
         """Dump nodes for one Memgraph node label into a local JSON file."""
 
         if not label_name:
             raise ValueError("label_name is required.")
 
-        default_name = f"{self._safe_filename(label_name)}.json"
-        path = self._prepare_output_path(output_path, default_name, overwrite)
+        path = self._prepare_output_path(self.labels_output_dir / f"{self._safe_filename(label_name)}.json")
         quoted_label = self._quote_label(label_name)
 
         with path.open("w", encoding="utf-8") as file_handle:
@@ -105,35 +111,19 @@ class MemgraphDumper:
         return path
 
 
-    def _connect_memgraph(self) -> Any:
-        if self.memgraph is not None:
-            return self.memgraph
-
-        from baseclass.conn import DBConnection
-
-        self.memgraph = DBConnection().memgraph_conn()
-
-        if self.memgraph is None:
-            raise RuntimeError("Unable to create a Memgraph connection. Check MEMGRAPH_* values in .env.")
-
-        return self.memgraph
-
-
     def _execute_and_fetch(self, query: str, params: Optional[Dict[str, Any]] = None) -> Iterable[Dict[str, Any]]:
-        memgraph = self._connect_memgraph()
-
         if params is None:
-            return memgraph.execute_and_fetch(query)
+            return self.memgraph.execute_and_fetch(query)
 
-        return memgraph.execute_and_fetch(query, params)
+        return self.memgraph.execute_and_fetch(query, params)
 
 
-    def _prepare_output_path(self, output_path: Optional[os.PathLike], default_filename: str, overwrite: bool) -> Path:
-        path = Path(output_path) if output_path is not None else self.output_dir / default_filename
+    def _prepare_output_path(self, output_path: os.PathLike) -> Path:
+        path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        if path.exists() and not overwrite:
-            raise FileExistsError(f"{path} already exists. Pass overwrite=True to replace it.")
+        if path.exists() and not self.overwrite:
+            raise FileExistsError(f"{path} already exists. Set overwrite=True on MemgraphDumper to replace it.")
 
         return path
 
@@ -299,31 +289,24 @@ def _main() -> int:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    cypherl_parser = subparsers.add_parser("cypherl", help="Dump the whole database to a CYPHERL file.")
-    cypherl_parser.add_argument("--output", help="Output .cypherl path.")
-
-    json_parser = subparsers.add_parser("json", help="Dump the whole database to a JSON file.")
-    json_parser.add_argument("--output", help="Output .json path.")
-
-    labels_parser = subparsers.add_parser("labels", help="Dump every node label to a separate JSON file.")
-    labels_parser.add_argument("--labels-output-dir", help="Output directory for label JSON files.")
+    subparsers.add_parser("cypherl", help="Dump the whole database to a CYPHERL file.")
+    subparsers.add_parser("json", help="Dump the whole database to a JSON file.")
+    subparsers.add_parser("labels", help="Dump every node label to a separate JSON file.")
 
     label_parser = subparsers.add_parser("label", help="Dump one node label to a JSON file.")
     label_parser.add_argument("label_name", help="Memgraph node label to export.")
-    label_parser.add_argument("--output", help="Output .json path.")
 
     args = parser.parse_args()
-    dumper = MemgraphDumper(output_dir=args.output_dir, batch_size=args.batch_size)
-    overwrite = not args.no_overwrite
+    dumper = MemgraphDumper(output_dir=args.output_dir, batch_size=args.batch_size, overwrite=not args.no_overwrite)
 
     if args.command == "cypherl":
-        dumper.dump_whole_database_cypherl(output_path=args.output, overwrite=overwrite)
+        dumper.dump_whole_database_cypherl()
     elif args.command == "json":
-        dumper.dump_whole_database_json(output_path=args.output, overwrite=overwrite)
+        dumper.dump_whole_database_json()
     elif args.command == "labels":
-        dumper.dump_each_label_json(output_dir=args.labels_output_dir, overwrite=overwrite)
+        dumper.dump_each_label_json()
     elif args.command == "label":
-        dumper.dump_label_json(args.label_name, output_path=args.output, overwrite=overwrite)
+        dumper.dump_label_json(args.label_name)
 
     return 0
 
