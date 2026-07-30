@@ -33,14 +33,15 @@ class MemgraphDumper:
         self.batch_size = batch_size
         self.overwrite = overwrite
         self.progress_interval = max(1, batch_size)
+        self.dump_date = date.today().strftime("%Y%m%d")
 
         '''
-        The whole-database exports have fixed names under output_dir. Per-label
-        exports go under labels/ so a full label split cannot mix with the
-        single-file JSON or CYPHERL dump.
+        The whole-database exports have date-stamped names under output_dir.
+        Per-label exports go under labels/ so a full label split cannot mix with
+        the single-file JSON or CYPHERL dump.
         '''
-        self.cypherl_output_path = self.output_dir / "memgraph_dump.cypherl"
-        self.json_output_path = self.output_dir / "memgraph_dump.json"
+        self.cypherl_output_path = self.output_dir / f"memgraph_dump-{self.dump_date}.cypherl"
+        self.json_output_path = self.output_dir / f"memgraph_dump-{self.dump_date}.json"
         self.labels_output_dir = self.output_dir / "labels"
 
         '''
@@ -160,7 +161,7 @@ class MemgraphDumper:
         if not label_name:
             raise ValueError("label_name is required.")
 
-        path = self._prepare_output_path(self.labels_output_dir / f"{self._safe_filename(label_name)}.json")
+        path = self._prepare_output_path(self.labels_output_dir / f"{self._safe_filename(label_name)}-{self.dump_date}.json")
         quoted_label = self._quote_label(label_name)
 
         self._print_progress(f"Starting JSON dump for label {label_name} to {path}")
