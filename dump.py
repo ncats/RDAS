@@ -7,9 +7,12 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
+from dotenv import load_dotenv
 
 
 _REPO_DIR = Path(__file__).resolve().parent
+load_dotenv(_REPO_DIR / ".env")
+
 _DEFAULT_OUTPUT_DIR = _REPO_DIR / "memgraph_dumps"
 _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -105,14 +108,6 @@ class MemgraphDumper:
     def _connect_memgraph(self) -> Any:
         if self.memgraph is not None:
             return self.memgraph
-
-        # Load the repo .env before using DBConnection so this script behaves the
-        # same way no matter which directory the command is launched from.
-        try:
-            from dotenv import load_dotenv
-            load_dotenv(_REPO_DIR / ".env")
-        except ImportError:
-            pass
 
         from baseclass.conn import DBConnection
 
