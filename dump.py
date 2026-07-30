@@ -21,6 +21,7 @@ class MemgraphDumper:
     """Export Memgraph data through the repo's existing DBConnection helper."""
 
     def __init__(self, output_dir: os.PathLike = _DEFAULT_OUTPUT_DIR, batch_size: int = 5000, overwrite: bool = True):
+
         from baseclass.conn import DBConnection
 
         self.output_dir = Path(output_dir)
@@ -36,6 +37,7 @@ class MemgraphDumper:
 
 
     def dump_whole_database_cypherl(self) -> Path:
+
         """Dump the whole database to a local CYPHERL file using Memgraph's DUMP DATABASE query."""
 
         path = self._prepare_output_path(self.cypherl_output_path)
@@ -62,6 +64,7 @@ class MemgraphDumper:
 
 
     def dump_whole_database_json(self) -> Path:
+
         """Dump the whole database to a local JSON file with separate node and relationship arrays."""
 
         path = self._prepare_output_path(self.json_output_path)
@@ -80,6 +83,7 @@ class MemgraphDumper:
 
 
     def dump_each_label_json(self) -> List[Path]:
+
         """Dump nodes for every Memgraph node label into separate local JSON files."""
 
         self.labels_output_dir.mkdir(parents=True, exist_ok=True)
@@ -94,6 +98,7 @@ class MemgraphDumper:
 
 
     def dump_label_json(self, label_name: str) -> Path:
+
         """Dump nodes for one Memgraph node label into a local JSON file."""
 
         if not label_name:
@@ -112,6 +117,7 @@ class MemgraphDumper:
 
 
     def _execute_and_fetch(self, query: str, params: Optional[Dict[str, Any]] = None) -> Iterable[Dict[str, Any]]:
+
         if params is None:
             return self.memgraph.execute_and_fetch(query)
 
@@ -119,6 +125,7 @@ class MemgraphDumper:
 
 
     def _prepare_output_path(self, output_path: os.PathLike) -> Path:
+
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -129,6 +136,7 @@ class MemgraphDumper:
 
 
     def _cypher_statements_from_dump_row(self, row: Any) -> Iterable[str]:
+
         if isinstance(row, str):
             yield row
             return
@@ -147,6 +155,7 @@ class MemgraphDumper:
 
 
     def _coerce_dump_value_to_statements(self, value: Any) -> Iterable[str]:
+
         if value is None:
             return
 
@@ -164,6 +173,7 @@ class MemgraphDumper:
 
 
     def _iter_node_rows(self, quoted_label: Optional[str] = None) -> Iterable[Dict[str, Any]]:
+
         label_clause = f":{quoted_label}" if quoted_label else ""
         last_id = -1
 
@@ -186,6 +196,7 @@ class MemgraphDumper:
 
 
     def _iter_relationship_rows(self) -> Iterable[Dict[str, Any]]:
+
         last_id = -1
 
         while True:
@@ -212,6 +223,7 @@ class MemgraphDumper:
 
 
     def _get_node_labels(self) -> List[str]:
+
         query = """
             MATCH (n)
             UNWIND labels(n) AS label
@@ -223,6 +235,7 @@ class MemgraphDumper:
 
 
     def _write_json_rows(self, file_handle: Any, rows: Iterable[Dict[str, Any]], record_builder: Any, indent: str) -> int:
+
         count = 0
 
         for row in rows:
@@ -237,6 +250,7 @@ class MemgraphDumper:
 
 
     def _node_json_record(self, row: Dict[str, Any]) -> Dict[str, Any]:
+
         return {
             "type": "node",
             "id": row["id"],
@@ -246,6 +260,7 @@ class MemgraphDumper:
 
 
     def _relationship_json_record(self, row: Dict[str, Any]) -> Dict[str, Any]:
+
         return {
             "type": "relationship",
             "id": row["id"],
@@ -257,15 +272,18 @@ class MemgraphDumper:
 
 
     def _quote_label(self, label_name: str) -> str:
+
         return f"`{label_name.replace('`', '``')}`"
 
 
     def _safe_filename(self, label_name: str) -> str:
+
         filename = _SAFE_FILENAME_RE.sub("_", label_name.strip()).strip("._")
         return filename or "label"
 
 
     def _json_default(self, value: Any) -> Any:
+
         # JSON cannot preserve every Memgraph/Python value type directly. Keep
         # native JSON types as-is and convert temporal/decimal/unknown values to
         # stable readable values instead of failing halfway through a large dump.
@@ -282,6 +300,7 @@ class MemgraphDumper:
 
 
 def _main() -> int:
+
     parser = argparse.ArgumentParser(description="Dump the RDAS Memgraph database.")
     parser.add_argument("--output-dir", default=str(_DEFAULT_OUTPUT_DIR), help="Default output directory for generated dump files.")
     parser.add_argument("--batch-size", type=int, default=5000, help="Number of nodes or relationships to fetch per JSON batch.")
@@ -312,4 +331,12 @@ def _main() -> int:
 
 
 if __name__ == "__main__":
+
+    '''
+    python dump.py cypherl
+    python dump.py json
+    python dump.py labels
+    python dump.py label GARD
+    '''
+    
     sys.exit(_main())
