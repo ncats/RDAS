@@ -6,13 +6,13 @@ from typing import Optional, Tuple, Type
 
 
 PIPELINE_ERROR_LOG_FILES: Tuple[Tuple[str, str, str], ...] = (
-    ("pipelines.pipeline_1_gard", "pipeline_1_gard", "alert-pipeline-1-gard-errors.log"),
-    ("pipelines.pipeline_2_clinical_trial", "pipeline_2_clinical_trial", "alert-pipeline-2-clinical-trial-errors.log"),
-    ("pipelines.pipeline_3_publication", "pipeline_3_publication", "alert-pipeline-3-publication-errors.log"),
-    ("pipelines.pipeline_4_grant", "pipeline_4_grant", "alert-pipeline-4-grant-errors.log"),
-    ("pipelines.pipeline_5_followup", "pipeline_5_followup", "alert-pipeline-5-followup-errors.log"),
-    ("pipelines.pipeline_6_person", "pipeline_6_person", "alert-pipeline-6-person-errors.log"),
-    ("pipelines.pipeline_7_graph_maintenance", "pipeline_7_graph_maintenance", "alert-pipeline-7-graph-maintenance-errors.log"),
+    ("pipelines.pipeline_1_gard", "pipeline_1_gard", "error-alert-pipeline-1-gard.log"),
+    ("pipelines.pipeline_2_clinical_trial", "pipeline_2_clinical_trial", "error-alert-pipeline-2-clinical-trial.log"),
+    ("pipelines.pipeline_3_publication", "pipeline_3_publication", "error-alert-pipeline-3-publication.log"),
+    ("pipelines.pipeline_4_grant", "pipeline_4_grant", "error-alert-pipeline-4-grant.log"),
+    ("pipelines.pipeline_5_followup", "pipeline_5_followup", "error-alert-pipeline-5-followup.log"),
+    ("pipelines.pipeline_6_person", "pipeline_6_person", "error-alert-pipeline-6-person.log"),
+    ("pipelines.pipeline_7_graph_maintenance", "pipeline_7_graph_maintenance", "error-alert-pipeline-7-graph-maintenance.log"),
 )
 PIPELINE_ERROR_LOG_MAX_BYTES = 1024 * 1024 * 10
 PIPELINE_ERROR_LOG_BACKUP_COUNT = 10
