@@ -32,6 +32,7 @@ class MemgraphDumper:
         self.output_dir = Path(output_dir)
         self.batch_size = batch_size
         self.overwrite = overwrite
+        self.progress_interval = max(1, batch_size)
 
         '''
         The whole-database exports have fixed names under output_dir. Per-label
@@ -65,6 +66,8 @@ class MemgraphDumper:
         path = self._prepare_output_path(self.cypherl_output_path)
         row_count = 0
 
+        self._print_progress(f"Starting whole database CYPHERL dump to {path}")
+
         with path.open("w", encoding="utf-8") as file_handle:
             for row in self._execute_and_fetch("DUMP DATABASE;"):
                 for statement in self._cypher_statements_from_dump_row(row):
@@ -81,7 +84,10 @@ class MemgraphDumper:
                     file_handle.write("\n")
                     row_count += 1
 
-        print(f"Wrote {row_count} Cypher statements to {path}")
+                    if row_count % self.progress_interval == 0:
+                        self._print_progress(f"CYPHERL dump progress: wrote {row_count:,} statements")
+
+        self._print_progress(f"Finished whole database CYPHERL dump: wrote {row_count:,} statements to {path}")
         return path
 
 
@@ -100,14 +106,20 @@ class MemgraphDumper:
         node_count = 0
         relationship_count = 0
 
+        self._print_progress(f"Starting whole database JSON dump to {path}")
+
         with path.open("w", encoding="utf-8") as file_handle:
+            self._print_progress("Whole database JSON dump: writing nodes")
             file_handle.write("{\n  \"nodes\": [\n")
-            node_count = self._write_json_rows(file_handle, self._iter_node_rows(), self._node_json_record, "    ")
+            node_count = self._write_json_rows(file_handle, self._iter_node_rows(), self._node_json_record, "    ", "Whole database JSON node progress")
+            self._print_progress(f"Whole database JSON dump: finished nodes ({node_count:,})")
+
+            self._print_progress("Whole database JSON dump: writing relationships")
             file_handle.write("\n  ],\n  \"relationships\": [\n")
-            relationship_count = self._write_json_rows(file_handle, self._iter_relationship_rows(), self._relationship_json_record, "    ")
+            relationship_count = self._write_json_rows(file_handle, self._iter_relationship_rows(), self._relationship_json_record, "    ", "Whole database JSON relationship progress")
             file_handle.write("\n  ]\n}\n")
 
-        print(f"Wrote {node_count} nodes and {relationship_count} relationships to {path}")
+        self._print_progress(f"Finished whole database JSON dump: wrote {node_count:,} nodes and {relationship_count:,} relationships to {path}")
         return path
 
 
@@ -123,11 +135,15 @@ class MemgraphDumper:
         self.labels_output_dir.mkdir(parents=True, exist_ok=True)
 
         paths = []
+        labels = self._get_node_labels()
 
-        for label_name in self._get_node_labels():
+        self._print_progress(f"Starting per-label JSON dump for {len(labels):,} labels into {self.labels_output_dir}")
+
+        for index, label_name in enumerate(labels, start=1):
+            self._print_progress(f"Per-label JSON dump progress: label {index:,}/{len(labels):,} ({label_name})")
             paths.append(self.dump_label_json(label_name))
 
-        print(f"Wrote {len(paths)} label JSON files to {self.labels_output_dir}")
+        self._print_progress(f"Finished per-label JSON dump: wrote {len(paths):,} label JSON files to {self.labels_output_dir}")
         return paths
 
 
@@ -147,12 +163,14 @@ class MemgraphDumper:
         path = self._prepare_output_path(self.labels_output_dir / f"{self._safe_filename(label_name)}.json")
         quoted_label = self._quote_label(label_name)
 
+        self._print_progress(f"Starting JSON dump for label {label_name} to {path}")
+
         with path.open("w", encoding="utf-8") as file_handle:
             file_handle.write("[\n")
-            count = self._write_json_rows(file_handle, self._iter_node_rows(quoted_label=quoted_label), self._node_json_record, "  ")
+            count = self._write_json_rows(file_handle, self._iter_node_rows(quoted_label=quoted_label), self._node_json_record, "  ", f"Label {label_name} JSON progress")
             file_handle.write("\n]\n")
 
-        print(f"Wrote {count} {label_name} nodes to {path}")
+        self._print_progress(f"Finished JSON dump for label {label_name}: wrote {count:,} nodes to {path}")
         return path
 
 
@@ -181,6 +199,15 @@ class MemgraphDumper:
             raise FileExistsError(f"{path} already exists. Set overwrite=True on MemgraphDumper to replace it.")
 
         return path
+
+
+    def _print_progress(self, message: str) -> None:
+
+        '''
+        Print progress immediately so long-running dump commands keep the shell
+        visibly moving even when stdout is buffered by the surrounding process.
+        '''
+        print(message, flush=True)
 
 
     def _cypher_statements_from_dump_row(self, row: Any) -> Iterable[str]:
@@ -307,7 +334,7 @@ class MemgraphDumper:
         return [row["label"] for row in self._execute_and_fetch(query)]
 
 
-    def _write_json_rows(self, file_handle: Any, rows: Iterable[Dict[str, Any]], record_builder: Any, indent: str) -> int:
+    def _write_json_rows(self, file_handle: Any, rows: Iterable[Dict[str, Any]], record_builder: Any, indent: str, progress_label: Optional[str] = None) -> int:
 
         '''
         Stream JSON array items manually so callers can write very large arrays
@@ -323,6 +350,9 @@ class MemgraphDumper:
             file_handle.write(indent)
             json.dump(record_builder(row), file_handle, ensure_ascii=False, default=self._json_default)
             count += 1
+
+            if progress_label is not None and count % self.progress_interval == 0:
+                self._print_progress(f"{progress_label}: wrote {count:,} records")
 
         return count
 
