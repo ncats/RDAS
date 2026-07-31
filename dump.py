@@ -20,18 +20,19 @@ _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 class MemgraphDumper:
     """Export Memgraph data through the repo's existing DBConnection helper."""
 
-    def __init__(self, output_dir: os.PathLike = _DEFAULT_OUTPUT_DIR, batch_size: int = 5000, overwrite: bool = True):
+    def __init__(self, output_dir: os.PathLike = _DEFAULT_OUTPUT_DIR, batch_size: int = 5000):
 
         '''
         Keep the dump configuration on the dumper instance instead of passing
         paths into each export method. This makes the four public dump methods
         simple commands: connect once, then write to the standard dump paths.
+        The dump files overwrite by default because each writer opens its file
+        in write mode.
         '''
         from baseclass.conn import DBConnection
 
         self.output_dir = Path(output_dir)
         self.batch_size = batch_size
-        self.overwrite = overwrite
         self.progress_interval = max(1, batch_size)
         self.dump_date = date.today().strftime("%Y%m%d")
 
@@ -43,6 +44,13 @@ class MemgraphDumper:
         self.cypherl_output_path = self.output_dir / f"memgraph_dump-{self.dump_date}.cypherl"
         self.json_output_path = self.output_dir / f"memgraph_dump-{self.dump_date}.json"
         self.labels_output_dir = self.output_dir / "labels"
+
+        '''
+        Create the dump directories once during initialization. The export
+        methods can then focus only on writing their configured files.
+        '''
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.labels_output_dir.mkdir(parents=True, exist_ok=True)
 
         '''
         Match the rest of the repo by using DBConnection().memgraph_conn().
@@ -64,7 +72,7 @@ class MemgraphDumper:
         row is normalized by _cypher_statements_from_dump_row() before writing.
         '''
 
-        path = self._prepare_output_path(self.cypherl_output_path)
+        path = self.cypherl_output_path
         row_count = 0
 
         self._print_progress(f"Starting whole database CYPHERL dump to {path}")
@@ -103,7 +111,7 @@ class MemgraphDumper:
         references for this exported snapshot.
         '''
 
-        path = self._prepare_output_path(self.json_output_path)
+        path = self.json_output_path
         node_count = 0
         relationship_count = 0
 
@@ -133,8 +141,6 @@ class MemgraphDumper:
         needs and matches how Cypher label filters behave.
         '''
 
-        self.labels_output_dir.mkdir(parents=True, exist_ok=True)
-
         paths = []
         labels = self._get_node_labels()
 
@@ -161,7 +167,7 @@ class MemgraphDumper:
         if not label_name:
             raise ValueError("label_name is required.")
 
-        path = self._prepare_output_path(self.labels_output_dir / f"{self._safe_filename(label_name)}-{self.dump_date}.json")
+        path = self.labels_output_dir / f"{self._safe_filename(label_name)}-{self.dump_date}.json"
         quoted_label = self._quote_label(label_name)
 
         self._print_progress(f"Starting JSON dump for label {label_name} to {path}")
@@ -185,21 +191,6 @@ class MemgraphDumper:
             return self.memgraph.execute_and_fetch(query)
 
         return self.memgraph.execute_and_fetch(query, params)
-
-
-    def _prepare_output_path(self, output_path: os.PathLike) -> Path:
-
-        '''
-        Create parent directories on demand and enforce the constructor-level
-        overwrite setting before any export method starts writing a large file.
-        '''
-        path = Path(output_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-
-        if path.exists() and not self.overwrite:
-            raise FileExistsError(f"{path} already exists. Set overwrite=True on MemgraphDumper to replace it.")
-
-        return path
 
 
     def _print_progress(self, message: str) -> None:
@@ -446,14 +437,14 @@ def _main() -> int:
     #python dump.py label --help
 
     command_examples = """
-        Examples:
-        python dump.py cypherl
-        python dump.py json
-        python dump.py labels
-        python dump.py label GARD
-        python dump.py --output-dir /tmp/memgraph_dumps json
-        python dump.py --batch-size 10000 --no-overwrite labels
-    """
+Examples:
+  python dump.py cypherl
+  python dump.py json
+  python dump.py labels
+  python dump.py label GARD
+  python dump.py --output-dir /tmp/memgraph_dumps json
+  python dump.py --batch-size 10000 labels
+"""
 
     '''
     The parser owns the top-level CLI description and keeps the examples text
@@ -469,11 +460,10 @@ def _main() -> int:
     These global options apply to every dump command:
         --output-dir changes the constructor-level output directory.
         --batch-size controls JSON fetch batches and progress intervals.
-        --no-overwrite protects existing dump files from accidental replacement.
+        Existing dump files are overwritten by default.
     '''
     parser.add_argument("--output-dir", default=str(_DEFAULT_OUTPUT_DIR), help="Default output directory for generated dump files.")
     parser.add_argument("--batch-size", type=int, default=5000, help="Number of nodes or relationships to fetch per JSON batch.")
-    parser.add_argument("--no-overwrite", action="store_true", help="Fail if the target output file already exists.")
 
     '''
     Subcommands map directly to the public dump methods on MemgraphDumper. The
@@ -494,10 +484,10 @@ def _main() -> int:
 
     '''
     Parse the command line once, then construct the dumper with the shared output
-    and overwrite settings before dispatching to the selected dump method.
+    setting before dispatching to the selected dump method.
     '''
     args = parser.parse_args()
-    dumper = MemgraphDumper(output_dir=args.output_dir, batch_size=args.batch_size, overwrite=not args.no_overwrite)
+    dumper = MemgraphDumper(output_dir=args.output_dir, batch_size=args.batch_size)
 
     if args.command == "cypherl":
         dumper.dump_whole_database_cypherl()
