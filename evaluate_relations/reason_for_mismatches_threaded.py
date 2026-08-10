@@ -49,7 +49,7 @@ Text/title: {text}
 
 You are deciding why this abstract text/project title is NOT a match for the disease, even though it was flagged as a possible match.
 
-IMPORTANT: A short text or title is NOT automatically vague. Titles are naturally brief but clearly describe a specific, identifiable topic. Only treat something as vague if its content gives no identifiable topic at all â€” never because of its length alone.
+IMPORTANT: A short text or title is NOT automatically vague. Titles are naturally brief but clearly describe a specific, identifiable topic. Only treat something as vague if its content gives no identifiable topic at all, never because of its length alone.
 
 Example: The title "CHILD CARE AND DEVELOPMENT FUND (CCDF) POLICIES DATABASE PROJECT" is short, but it clearly describes a specific topic (childcare policy/funding database) unrelated to any disease. This is NOT "Text too vague" -- it is "Synonym/abbreviation without context", because the word "child" matched a synonym without any disease-relevant meaning.
 
