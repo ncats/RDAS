@@ -1,6 +1,6 @@
 """
     Looks through each row of the grant_gard_processed_names_sip table from rdas database, using NLTK to pick up any common terms in the Synonyms lists. 
-    Stores each matched term in a row with the GardID, Name, and synonym Term that was matched with. 
+    Stores each matched term in a row with the GardID, Name, Synonym, and Term that was matched. 
     Output is nltk_matched_terms.tsv file.
 """
 
