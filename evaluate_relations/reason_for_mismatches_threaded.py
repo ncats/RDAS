@@ -49,7 +49,7 @@ Text/title: {text}
 
 You are deciding why this abstract text/project title is NOT a match for the disease, even though it was flagged as a possible match.
 
-IMPORTANT: A short text or title is NOT automatically vague. Titles are naturally brief but clearly describe a specific, identifiable topic. Only treat something as vague if its content gives no identifiable topic at all, never because of its length alone.
+IMPORTANT: A short text or title is NOT automatically vague. Titles are naturally brief but clearly describe a specific, identifiable topic. Only treat something as vague if its content gives no identifiable topic at all never because of its length alone.
 
 Example: The title "CHILD CARE AND DEVELOPMENT FUND (CCDF) POLICIES DATABASE PROJECT" is short, but it clearly describes a specific topic (childcare policy/funding database) unrelated to any disease. This is NOT "Text too vague" -- it is "Synonym/abbreviation without context", because the word "child" matched a synonym without any disease-relevant meaning.
 
@@ -80,6 +80,27 @@ Allowed reason labels:
 
 Do not include any explanation, evidence, quoted text, or extra keys. Return only the "reason" key.
 """
+
+# Helper method to check if column exists in the table, and create it if it doesn't.
+def ensure_column_exists(conn, column_name: str, column_def: str = "VARCHAR(255) NULL"):
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+            AND table_name = %s
+            AND column_name = %s
+    """, (TABLE_NAME, column_name))
+    exists = cursor.fetchone()[0] > 0
+
+    if not exists:
+        print(f"Column `{column_name}` not found on `{TABLE_NAME}`, creating it...", flush=True)
+        cursor.execute(f"""
+            ALTER TABLE `{TABLE_NAME}`
+            ADD COLUMN `{column_name}` {column_def}
+        """)
+        conn.commit()
+    cursor.close()
 
 # Helper method to normalize the synonyms.
 def normalize_synonyms(raw_synonyms) -> str:
@@ -243,6 +264,9 @@ def process_rows():
 
     if conn is None:
         raise ConnectionError("Unable to connect to MySQL.")
+
+    # Helper to ensure the column exists before we try to write to it. If it doesn't exist, create it.
+    ensure_column_exists(conn, RELATED_COLUMN)
 
     read_cursor = conn.cursor(buffered=True, dictionary=True)
     write_cursor = conn.cursor()
