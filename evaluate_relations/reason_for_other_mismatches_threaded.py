@@ -56,6 +56,27 @@ Do not include punctuation beyond the label itself, no quotes within the
 label, no trailing period, no explanation.
 """
 
+# Helper method to check if column exists in the table, and create it if it doesn't.
+def ensure_column_exists(conn, column_name: str, column_def: str = "VARCHAR(255) NULL"):
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+            AND table_name = %s
+            AND column_name = %s
+    """, (TABLE_NAME, column_name))
+    exists = cursor.fetchone()[0] > 0
+
+    if not exists:
+        print(f"Column `{column_name}` not found on `{TABLE_NAME}`, creating it...", flush=True)
+        cursor.execute(f"""
+            ALTER TABLE `{TABLE_NAME}`
+            ADD COLUMN `{column_name}` {column_def}
+        """)
+        conn.commit()
+    cursor.close()
+
 # Helper method to normalize the synonyms.
 def normalize_synonyms(raw_synonyms) -> str:
     if not raw_synonyms:
@@ -233,6 +254,9 @@ def process_rows():
 
     if conn is None:
         raise ConnectionError("Unable to connect to MySQL.")
+
+    # Helper to ensure the column exists before we try to write to it. If it doesn't exist, create it.
+    ensure_column_exists(conn, DETAIL_COLUMN)
 
     read_cursor = conn.cursor(buffered=True, dictionary=True)
     write_cursor = conn.cursor()
