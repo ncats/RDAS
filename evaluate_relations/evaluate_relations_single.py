@@ -74,6 +74,7 @@ def _call_ollama(name: str, text: str) -> str:
                 1 = yes, the text is about this disease
                 0 = no, the text is not about this disease
 
+                Your entire response must be a single character: 1 or 0. 
                 No words, no punctuation, no explanation.""".strip()
             }
         ],
