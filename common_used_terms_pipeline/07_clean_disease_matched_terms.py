@@ -6,8 +6,8 @@
 import csv
 import re
 
-INPUT_FILE = "07_1_clean_medical_suffix_matched_terms.tsv"
-OUTPUT_FILE = "07_2_clean_disease_matched_terms.tsv"
+INPUT_FILE = "06_1_clean_medical_suffix_matched_terms.tsv"
+OUTPUT_FILE = "07_1_clean_disease_matched_terms.tsv"
 
 REMOVE_WORDS = {
     "disease",
