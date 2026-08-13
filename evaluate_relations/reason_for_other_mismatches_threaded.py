@@ -1,4 +1,5 @@
 """
+    BEFORE RUNNING CODE: Create a mistral_other_detail column with TEXT data type.
     Evaluates the mismatch reason between the GARD name, PubMed Abstract 
     or Title, and Synonyms, and generates a reason for the mismatch. 
     The number of max-workers can be edited according to the system's capacity. 
