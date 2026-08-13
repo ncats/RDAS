@@ -1,4 +1,5 @@
 """
+    BEFORE RUNNING CODE: Create a mistral_related_bool column with TINYINT(1) data type.
     Evaluates the relations between the GARD name and PubMed Abstract or Title. 
     Will provide 1 or 0 for match or mismatch
     This version does 2 rows at a time for a faster process. Any that timed out can be run again using the single version. 
