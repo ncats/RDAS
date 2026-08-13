@@ -5,8 +5,8 @@
 
 import csv
 
-INPUT_FILE = "06_1_clean_scispacy_matched_terms.tsv"
-OUTPUT_FILE = "06_2_clean_medical_suffix_matched_terms.tsv"
+INPUT_FILE = "05_1_clean_scispacy_matched_terms.tsv"
+OUTPUT_FILE = "06_1_clean_medical_suffix_matched_terms.tsv"
 
 # List of typical medical suffixes. Avoids any that could be common term.
 SUFFIXES = (
