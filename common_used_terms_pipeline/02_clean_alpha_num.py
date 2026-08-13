@@ -6,9 +6,9 @@
 import csv
 import re
 
-INPUT_FILE = "nltk_matched_terms.tsv"
-OUTPUT_FILE = "clean_alpha_num_matched_terms.tsv"
-DELETED_FILE = "deleted_alpha_num_matched_terms.tsv"
+INPUT_FILE = "02_1_nltk_matched_terms.tsv"
+OUTPUT_FILE = "02_2_clean_alpha_num_matched_terms.tsv"
+DELETED_FILE = "02_3_deleted_alpha_num_matched_terms.tsv"
 
 # Matches words that have numbers in them
 LETTER_NUMBER = re.compile(r"\b(?=\w*[A-Za-z])(?=\w*\d)\w+(?:-\w+)?\b")
