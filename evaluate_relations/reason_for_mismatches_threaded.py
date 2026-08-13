@@ -1,4 +1,5 @@
 """
+    BEFORE RUNNING CODE: Create a mistral_reason column with TEXT datatype.
     Evaluates the mismatch reason between the GARD name, PubMed Abstract 
     or Title, and Synonyms, and provides a reason for the mismatch. 
     A list of reasons have already been made to select from. 
