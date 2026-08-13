@@ -11,8 +11,8 @@
 import csv
 
 # File config
-INPUT_FILE = "clean_repeating_matched_terms.tsv"
-OUTPUT_FILE = "clean_duplicate_matched_terms.tsv"
+INPUT_FILE = "04_1_clean_repeating_matched_terms.tsv"
+OUTPUT_FILE = "04_2_clean_duplicate_matched_terms.tsv"
 
 GARD_ID_COL = "GardID"
 TERM_COL = "Matched Term"
