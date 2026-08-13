@@ -23,27 +23,6 @@ TIMEOUT_SECONDS = 300  # 5 minutes
 # One executor reused across calls.
 _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
-# Helper to ensure column exists/creates one if not.
-def ensure_column_exists(conn):
-    cursor = conn.cursor()
-    cursor.execute(f"""
-        SELECT COUNT(*)
-        FROM information_schema.columns
-        WHERE table_schema = DATABASE()
-            AND table_name = %s
-            AND column_name = %s
-    """, (TABLE_NAME, RELATED))
-    exists = cursor.fetchone()[0] > 0
-
-    if not exists:
-        print(f"Column `{RELATED}` not found on `{TABLE_NAME}`, creating it...", flush=True)
-        cursor.execute(f"""
-            ALTER TABLE `{TABLE_NAME}`
-            ADD COLUMN `{RELATED}` TINYINT(1) NULL
-        """)
-        conn.commit()
-    cursor.close()
-
 # Helper method to validate the generated response.
 def validate_response(result: str):
 
@@ -122,9 +101,6 @@ def insert_response():
     # If connection can't form, raise an error
     if conn is None: 
         raise ConnectionError("Unable to connect to MySQL.")
-
-    # Check that column exists using helper method
-    ensure_column_exists(conn)
 
     # Initialize cursors
     read_cursor = conn.cursor(buffered=True, dictionary=True)
