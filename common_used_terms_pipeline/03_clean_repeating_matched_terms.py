@@ -7,9 +7,9 @@ import csv
 import re
 from collections import Counter
 
-INPUT_FILE = "clean_alpha_num_matched_terms.tsv"
-OUTPUT_FILE = "clean_repeating_matched_terms.tsv"
-DELETED_FILE = "deleted_repeating_matched_terms.tsv"
+INPUT_FILE = "03_1_clean_alpha_num_matched_terms.tsv"
+OUTPUT_FILE = "03_2_clean_repeating_matched_terms.tsv"
+DELETED_FILE = "03_3_deleted_repeating_matched_terms.tsv"
 
 # Helper method to normalize the text (lowercase and remove extra spacing)
 def normalize(text):
