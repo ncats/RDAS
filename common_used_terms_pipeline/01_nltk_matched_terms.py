@@ -19,7 +19,7 @@ from baseclass.conn import DBConnection as db
 nltk.download("words", quiet=True)
 
 TABLE_NAME = "grant_gard_processed_names_sip"
-
+OUTPUT_FILE = "01_nltk_matched_terms.tsv"
 
 def nltk_matching():
     # Try to establish MySQL connection
@@ -49,7 +49,7 @@ def nltk_matching():
         rows = read_cursor.fetchall()
 
         # Open the output tsv file to write into
-        with open("nltk_matched_terms.tsv", "w", newline="", encoding="utf-8") as f:
+        with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter = "\t")
             writer.writerow(headers)
 
@@ -78,7 +78,7 @@ def nltk_matching():
                         for matched_term in matched_terms:
                             writer.writerow([gard_id, name, synonym, matched_term])
 
-        print("Done. Output written to nltk_matched_terms.tsv")
+        print(f"Done. Output written to {OUTPUT_FILE}")
 
     except Exception as exc:
         print(f"Could not finish executing the process: {exc}")
