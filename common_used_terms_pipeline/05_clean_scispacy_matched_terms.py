@@ -8,8 +8,8 @@ import spacy
 
 nlp = spacy.load("en_core_sci_sm")
 
-INPUT_FILE = "05_1_clean_duplicate_matched_terms.tsv"
-OUTPUT_FILE = "05_2_clean_scispacy_matched_terms.tsv"
+INPUT_FILE = "04_1_clean_duplicate_matched_terms.tsv"
+OUTPUT_FILE = "05_1_clean_scispacy_matched_terms.tsv"
 
 def is_scispacy_term(term):
     doc = nlp(term)
