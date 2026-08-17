@@ -36,6 +36,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
     """
 
     def __init__(self):
+
         """Initialize MySQL access and RxNav endpoint configuration."""
 
         super().__init__(init_mysql=True, init_memgraph=False)
@@ -45,14 +46,18 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
+
         raise NotImplementedError("ClinicalTrialDrugInterventionMappingTask does not implement find_new_data().")
 
 
     def process_new_data(self) -> None:
+
         """Process new clinical trials and map each drug intervention to RxNorm."""
 
-        # Only newly discovered clinical trials need drug-intervention
-        # extraction in this incremental alert pipeline.
+        '''
+        Only newly discovered or changed clinical trials need drug-intervention
+        extraction in this incremental alert pipeline.
+        '''
         select_new_clinic_trial_sql = '''
             SELECT gardId AS gardid, disease, nctid, studies, id
             FROM clinical_trial
@@ -60,11 +65,31 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
             AND is_new = 1
         '''
 
+        '''
+        Clear the current-run marker from old derived RxNorm rows before
+        remapping changed studies. The rows remain available as history, but the
+        graph task will only consume mappings inserted by this run with is_new=1.
+        '''
+        reset_current_drug_mapping_sql = '''
+            UPDATE clinical_trial_intervention_drug AS cid
+            INNER JOIN clinical_trial AS ct
+                ON ct.gardId = cid.gardId
+                AND ct.disease <=> cid.disease
+                AND ct.nctid = cid.nctid
+            SET cid.is_new = 0
+            WHERE ct.is_new = 1
+            AND cid.is_new = 1
+        '''
+
         batch_num = 0
         batch_size = 100
 
         try:
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
+            fetch_cursor.execute(reset_current_drug_mapping_sql)
+            self.mysql.commit()
+            self.logger.info(f"Reset {fetch_cursor.rowcount} existing clinical_trial_intervention_drug rows before current RxNorm remapping.")
+
             fetch_cursor.execute(select_new_clinic_trial_sql)
 
             while True:
@@ -88,7 +113,9 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
                     self.logger.info(f"# Id: {id}, Gard_ID: {gardid}, NCTID: {nctid}, Disease: {disease}")
 
                     '''
-                    # ClinicalTrials.gov stores interventions inside the protocolSection; this task only keeps intervention records explicitly marked as DRUG.
+                    ClinicalTrials.gov stores interventions inside the
+                    protocolSection. This task only keeps intervention records
+                    explicitly marked as DRUG.
                     '''
                     intervention_module = study.get('protocolSection', dict()).get('armsInterventionsModule', dict())
                     interventions = intervention_module.get('interventions', list())
@@ -109,6 +136,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
         except Exception as err:
             self.logger.error(f"Error: {err}")
+            self.mysql.rollback()
 
         finally:
             # close all connections
@@ -117,6 +145,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
 
     def rxnorm_map(self, gardid, disease, nctid, intervention_name):
+
         """
         Resolve one intervention name to RxNorm data and insert property rows.
 
@@ -133,6 +162,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
         '''
 
         def add_to_db(rxdata, intervention, drug_name, wspacy):
+
             """Insert one row per RxNorm property for a mapped drug."""
 
             rxnormid = rxdata['RxNormID']
@@ -153,6 +183,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
 
         def nlp_to_drug(intervention, matches):
+
             """Use SpaCy chemical entities as fallback drug names."""
 
             for match_id, start, end in matches:
@@ -176,7 +207,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
             ''' Decode the bytes to string '''
             updated_str = new_val.decode()
             ''' Replace non-word characters with spaces '''
-            updated_str = re.sub('\W+',' ', updated_str)
+            updated_str = re.sub(r'\W+',' ', updated_str)
             return updated_str
 
         # -----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -184,8 +215,10 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
         drug = drug_normalize(intervention_name)
         the_drug = drug.replace(' ','+')
 
-        # Try the full intervention name first because it preserves the trial's
-        # original drug context.
+        '''
+        Try the full intervention name first because it preserves the trial's
+        original drug context.
+        '''
         '''  Retrieve RxNorm data for the drug name '''
         rxdata = self.get_rxnorm_data(the_drug)
 
@@ -208,6 +241,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
 
     def get_rxnorm_data(self, drug_name):
+
             """
             Fetch the RxNorm ID and expanded RxNorm properties for a drug name.
 
