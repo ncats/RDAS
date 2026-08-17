@@ -34,21 +34,25 @@ A later rerun can fill that link once the organization_location row has been cre
 
 # Reference: G_update/track_organization_source.py
 
-# SourceRow is the normalized source mapping before organization_location_id is
-# resolved. Tuple order:
-#   1. org_original_name: original Organization text from the source table/JSON
-#   2. original_name_in_graph_db_idx_key: graph Organization._idx_key hash
-#   3. node_type_name: source type, such as ClinicalTrial/CoreProject/Person
-#   4. node_type_id: source id, such as nctid/coreProjectNumber/person row id
+'''
+SourceRow is the normalized source mapping before organization_location_id is
+resolved. Tuple order:
+  1. org_original_name: original Organization text from the source table/JSON
+  2. original_name_in_graph_db_idx_key: graph Organization._idx_key hash
+  3. node_type_name: source type, such as ClinicalTrial/CoreProject/Person
+  4. node_type_id: source id, such as nctid/coreProjectNumber/person row id
+'''
 SourceRow = Tuple[str, str, str, str]
 
-# InsertRow is the final organization_location_source insert payload after the
-# optional organization_location.id lookup. Tuple order:
-#   1. org_original_name
-#   2. organization_location_id, or None when no organization_location row exists
-#   3. original_name_in_graph_db_idx_key
-#   4. node_type_name
-#   5. node_type_id
+'''
+InsertRow is the final organization_location_source insert payload after the
+optional organization_location.id lookup. Tuple order:
+  1. org_original_name
+  2. organization_location_id, or None when no organization_location row exists
+  3. original_name_in_graph_db_idx_key
+  4. node_type_name
+  5. node_type_id
+'''
 InsertRow = Tuple[str, Optional[int], str, str, str]
 
 
@@ -139,14 +143,17 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
     """
 
     def __init__(self):
+
         super().__init__(init_mysql=True, init_memgraph=False)
 
 
     def find_new_data(self, gard_node) -> None:
+
         self.logger.info("NewOrganizationSourceTrackingTask does not use find_new_data().")
 
 
     def process_new_data(self) -> None:
+
         """Track Organization sources from only new alert-pipeline rows."""
 
         start_time = time.time()
@@ -170,17 +177,102 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
 
 
     def track_clinical_trial_sources(self) -> None:
-        """Track organizations from clinical_trial_unique rows where is_new = 1."""
 
-        self._process_query_batches(
-            source_name=self.SOURCE_NODE_TYPE_CLINICAL_TRIAL,
-            query=self.FETCH_NEW_CLINICAL_TRIALS_QUERY,
-            batch_size=self.CLINICAL_TRIAL_BATCH_SIZE,
-            row_builder=self._create_clinical_trial_source_row,
-        )
+        """
+        Track organizations from changed clinical_trial_unique rows.
+
+        Clinical trial studies can change their responsible organization. The
+        generic source tracker only inserts or updates current rows; this
+        clinical-trial-specific path also removes source rows for the same NCTID
+        when their Organization key is no longer present in the latest JSON.
+        """
+
+        fetch_cursor = None
+        update_cursor = None
+        total_source_rows = 0
+        total_db_changes = 0
+        total_without_location = 0
+        total_stale_deleted = 0
+        batch_num = 0
+
+        try:
+            fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
+            update_cursor = self.mysql.cursor()
+            fetch_cursor.execute(self.FETCH_NEW_CLINICAL_TRIALS_QUERY)
+
+            while True:
+                rows = fetch_cursor.fetchmany(self.CLINICAL_TRIAL_BATCH_SIZE)
+
+                if not rows:
+                    self.logger.info(
+                        f"Finished {self.SOURCE_NODE_TYPE_CLINICAL_TRIAL} source tracking. "
+                        f"Total inserted_or_updated={total_source_rows}, "
+                        f"db changes={total_db_changes}, "
+                        f"without_organization_location={total_without_location}, "
+                        f"stale_deleted={total_stale_deleted}."
+                    )
+                    break
+
+                batch_num += 1
+                source_rows = []
+                current_org_keys_by_nctid = {}
+
+                for row in rows:
+                    nctid, source_row, should_cleanup = self._create_clinical_trial_source_tracking_row(row)
+
+                    if not nctid:
+                        continue
+
+                    if should_cleanup:
+                        current_org_keys_by_nctid[nctid] = []
+
+                    if source_row:
+                        source_rows.append(source_row)
+                        current_org_keys_by_nctid[nctid] = [source_row[1]]
+
+                inserted_or_updated = 0
+                db_changes = 0
+                without_location = 0
+
+                if source_rows:
+                    inserted_or_updated, db_changes, without_location = self._insert_source_rows(
+                        update_cursor,
+                        source_rows,
+                    )
+
+                stale_deleted = self._delete_stale_clinical_trial_source_rows(
+                    update_cursor,
+                    current_org_keys_by_nctid,
+                )
+                self.mysql.commit()
+
+                total_source_rows += inserted_or_updated
+                total_db_changes += db_changes
+                total_without_location += without_location
+                total_stale_deleted += stale_deleted
+
+                self.logger.info(
+                    f"{self.SOURCE_NODE_TYPE_CLINICAL_TRIAL} batch #{batch_num}: "
+                    f"source rows={len(source_rows)}, inserted_or_updated={inserted_or_updated}, "
+                    f"db changes={db_changes}, without_organization_location={without_location}, "
+                    f"stale_deleted={stale_deleted}, total inserted_or_updated={total_source_rows}."
+                )
+
+        except Exception as e:
+            self.mysql.rollback()
+            self.logger.error(f"{self.SOURCE_NODE_TYPE_CLINICAL_TRIAL} source tracking failed: {e}")
+            raise
+
+        finally:
+            if update_cursor:
+                update_cursor.close()
+
+            if fetch_cursor:
+                fetch_cursor.close()
 
 
     def track_core_project_sources(self) -> None:
+
         """Track funding IC organizations from grant_project rows where is_new = 1."""
 
         self._process_query_batches(
@@ -192,6 +284,7 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
 
 
     def track_person_sources(self) -> None:
+
         """Track affiliation organizations from person rows where is_new = 1."""
 
         self._process_query_batches(
@@ -203,6 +296,7 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
 
 
     def _process_query_batches(self, source_name: str, query: str, batch_size: int, row_builder) -> None:
+
         """
         Fetch new source rows, transform them to organization source tuples, and
         insert them into organization_location_source.
@@ -279,61 +373,112 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
                 fetch_cursor.close()
 
 
-    def _create_clinical_trial_source_row(self, row: Dict[str, Any]) -> Optional[SourceRow]:
-        """Create one source tuple from one clinical_trial_unique JSON row."""
+    def _create_clinical_trial_source_tracking_row(self, row: Dict[str, Any]) -> Tuple[Optional[str], Optional[SourceRow], bool]:
+
+        """
+        Create one clinical-trial source tuple and cleanup signal.
+
+        The boolean return value controls stale-source cleanup. It is False only
+        when the row cannot be trusted, such as invalid JSON or a missing NCTID.
+        Valid current JSON with no responsible organization returns True with no
+        source row, which tells the caller to delete older org-source rows for
+        that NCTID.
+        """
 
         nctid = self._clean_value(row.get("nctid"))
 
         if not nctid:
-            return None
+            return None, None, False
 
         try:
             study = json.loads(row.get("studies") or "{}")
 
         except (json.JSONDecodeError, TypeError) as e:
             self.logger.error(f"Invalid clinical_trial_unique.studies JSON for nctid={nctid}: {e}")
-            return None
+            return nctid, None, False
 
         if not isinstance(study, dict):
-            return None
+            return nctid, None, False
 
         protocol = study.get("protocolSection", {})
         if not isinstance(protocol, dict):
-            return None
+            return nctid, None, True
 
         identification_module = protocol.get("identificationModule", {})
         if not isinstance(identification_module, dict):
-            return None
+            return nctid, None, True
 
         organization_data = identification_module.get("organization", {})
         if not isinstance(organization_data, dict):
-            return None
+            return nctid, None, True
 
-        # Match B_clinical_trial/initializer/organization_location.py:
-        # remove the parenthetical acronym before hashing.
+        '''
+        Match B_clinical_trial/initializer/organization_location.py:
+        remove the parenthetical acronym before hashing.
+        '''
         organization = self._normalize_org_name(
             organization_data.get("fullName"),
             remove_parentheses=True,
         )
 
         if not organization:
-            return None
+            return nctid, None, True
 
-        return (
+        return nctid, (
             organization[:300],
             _make_hash_key(organization),
             self.SOURCE_NODE_TYPE_CLINICAL_TRIAL,
             nctid,
-        )
+        ), True
+
+
+    def _delete_stale_clinical_trial_source_rows(self, update_cursor, current_org_keys_by_nctid: Dict[str, List[str]]) -> int:
+
+        """
+        Remove Organization source rows that disappeared from changed NCTIDs.
+
+        organization_location_source has a unique key that includes the
+        Organization key, so a changed responsible organization creates a new
+        row instead of replacing the old one. This cleanup keeps the source table
+        aligned with the latest clinical-trial JSON.
+        """
+        deleted_count = 0
+
+        for nctid, current_org_keys in current_org_keys_by_nctid.items():
+            if current_org_keys:
+                placeholders = ", ".join(["%s"] * len(current_org_keys))
+                delete_sql = f"""
+                    DELETE FROM {self.SOURCE_TABLE_NAME}
+                    WHERE node_type_name = %s
+                    AND node_type_id = %s
+                    AND original_name_in_graph_db_idx_key NOT IN ({placeholders})
+                """
+                params = (self.SOURCE_NODE_TYPE_CLINICAL_TRIAL, nctid, *current_org_keys)
+
+            else:
+                delete_sql = f"""
+                    DELETE FROM {self.SOURCE_TABLE_NAME}
+                    WHERE node_type_name = %s
+                    AND node_type_id = %s
+                """
+                params = (self.SOURCE_NODE_TYPE_CLINICAL_TRIAL, nctid)
+
+            update_cursor.execute(delete_sql, params)
+            deleted_count += max(update_cursor.rowcount, 0)
+
+        return deleted_count
 
 
     def _create_core_project_source_row(self, row: Dict[str, Any]) -> Optional[SourceRow]:
+
         """Create one source tuple from one new grant_project row."""
 
         core_project_num = self._clean_value(row.get("core_project_num") or row.get("full_project_num"))
 
-        # Match D_grant/initializer/funding_IC.py:
-        # IC_NAME is hashed directly, without removing parenthetical text.
+        '''
+        Match D_grant/initializer/funding_IC.py:
+        IC_NAME is hashed directly, without removing parenthetical text.
+        '''
         ic_name = self._normalize_org_name(row.get("ic_name"), remove_parentheses=False)
 
         if not core_project_num or not ic_name:
@@ -348,6 +493,7 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
 
 
     def _create_person_source_row(self, row: Dict[str, Any]) -> Optional[SourceRow]:
+
         """Create one source tuple from one new person_of_all_sources row."""
 
         person_id = row.get("id")
@@ -356,9 +502,11 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
         if not person_id or not affiliation:
             return None
 
-        # Match F_person/initializer/agent.py:
-        # person affiliations become Organization nodes using
-        # _make_hash_key(_remove_parentheses(affiliation)).
+        '''
+        Match F_person/initializer/agent.py:
+        person affiliations become Organization nodes using
+        _make_hash_key(_remove_parentheses(affiliation)).
+        '''
         org_name = self._normalize_org_name(affiliation, remove_parentheses=True)
 
         if not org_name:
@@ -373,6 +521,7 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
 
 
     def _insert_source_rows(self, update_cursor, source_rows: Sequence[SourceRow]) -> Tuple[int, int, int]:
+
         """
         Insert source rows after resolving organization_location_id where possible.
 
@@ -412,6 +561,7 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
 
 
     def _fetch_latest_organization_location_ids(self, org_idx_keys: Iterable[str]) -> Dict[str, int]:
+
         """
         Return the newest organization_location.id for each Organization _idx_key.
 
@@ -454,6 +604,7 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
 
 
     def _dedupe_source_rows(self, source_rows: Sequence[SourceRow]) -> List[SourceRow]:
+
         """
         Remove duplicate source mappings inside one batch.
 
@@ -478,6 +629,7 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
 
 
     def _normalize_org_name(self, value: Any, remove_parentheses: bool) -> str:
+
         """
         Normalize an organization name before deriving the graph _idx_key.
 
@@ -497,6 +649,7 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
 
 
     def _clean_value(self, value: Any) -> str:
+
         """Convert None to an empty string and trim real values."""
 
         return str(value).strip() if value is not None else ""
