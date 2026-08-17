@@ -6,12 +6,12 @@ from baseclass.init_base import InitBase
 from utils.file_appender import FileAppender
 from utils.tools import _date_string
 
-''' Create CoreProject-[has_researched_disease]->Disease relationship '''
+''' Create GARD-[has_coreproject]->CoreProject relationship '''
 class CoreProjectToGARDRelationInitializer(InitBase):
 
     def __init__(self): 
         
-        super().__init__('grant_gard_project_relation', 'CoreProject -> GARD relationshp')
+        super().__init__('grant_gard_project_relation', 'GARD -> CoreProject relationship')
 
         class_name = type(self).__name__
         self.log_file = f'{self.log_dir}/4-{class_name}-{_date_string()}.log'
@@ -29,9 +29,9 @@ class CoreProjectToGARDRelationInitializer(InitBase):
          # Create GARD to CoreProject relation
         batch_create = '''
             UNWIND $chunks AS chunk 
-            MATCH(disease:GARD {gardId: chunk.gardId}) 
+            MATCH(gard:GARD {gardId: chunk.gardId})
             MATCH(cp:CoreProject {coreProjectNumber: chunk.coreProjectNumber})
-            MERGE (cp)-[:has_researched_disease]->(disease)
+            MERGE (gard)-[:has_coreproject]->(cp)
         '''  
 
         fetch_query = f''' SELECT DISTINCT gard_id, core_project_num 
@@ -83,5 +83,3 @@ class CoreProjectToGARDRelationInitializer(InitBase):
                 fetch_cursor.close()
 
             
-
-

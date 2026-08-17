@@ -8,17 +8,19 @@ reads all rows from `grant_gard_project_relation` with a non-null
 reading `grant_gard_project_relation` directly where `is_new = 1`.
 
 Relationship direction:
-    The initializer creates the relationship from CoreProject to GARD:
+    The initializer creates the relationship from GARD to CoreProject:
 
-        (CoreProject)-[:has_researched_disease]->(GARD)
+        (GARD)-[:has_coreproject]->(CoreProject)
 
-    This task keeps the same direction and relationship type.
+    This task keeps grant CoreProject relationships under one relationship type
+    and direction, independent of older `has_researched_disease` or
+    `has_mention_under` graph data.
 
 Processing flow:
     1. Read distinct current new `(gard_id, core_project_num)` pairs.
     2. Match the existing GARD node by `gardId`.
     3. Match the existing CoreProject node by `coreProjectNumber`.
-    4. MERGE the CoreProject -> GARD `has_researched_disease` relationship.
+    4. MERGE the GARD -> CoreProject `has_coreproject` relationship.
 
 Notes:
     This task expects CoreProject and GARD nodes to already exist in Memgraph.
@@ -42,19 +44,19 @@ from pipelines.pipeline_base import PipelineBase
 
 
 class NewCoreProjectGardRelationshipGraphTask(PipelineBase):
-    """Upsert current alert-run CoreProject-to-GARD relationships into Memgraph."""
+    """Upsert current alert-run GARD-to-CoreProject relationships into Memgraph."""
 
     BATCH_SIZE = 200
 
     '''
     The historical initializer does not set relationship properties here; it
-    only guarantees the CoreProject -> GARD disease edge exists.
+    only guarantees the GARD -> CoreProject grant edge exists.
     '''
     UPSERT_RELATIONSHIPS_CYPHER = '''
         UNWIND $chunks AS chunk
-        MATCH (disease:GARD {gardId: chunk.gardId})
+        MATCH (gard:GARD {gardId: chunk.gardId})
         MATCH (cp:CoreProject {coreProjectNumber: chunk.coreProjectNumber})
-        MERGE (cp)-[:has_researched_disease]->(disease)
+        MERGE (gard)-[:has_coreproject]->(cp)
     '''
 
     '''
