@@ -59,7 +59,9 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
     '''
     '''
     GROUP_CONCAT folds many RxNorm property rows into one JSON-like property
-    string per RxNorm/intervention/spaCy combination.
+    string per RxNorm/intervention/spaCy combination. clinical_trial_intervention_drug.is_new
+    keeps stale historical mappings for a changed NCTID out of the current graph
+    refresh.
     '''
     FETCH_NEW_DRUG_QUERY = '''
         SELECT
@@ -77,6 +79,7 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
             AND ct.nctid = cid.nctid
         WHERE ct.is_new = 1
         AND cid.RxNormID IS NOT NULL
+        AND cid.is_new = 1
         GROUP BY
             cid.RxNormID,
             cid.intervention,
