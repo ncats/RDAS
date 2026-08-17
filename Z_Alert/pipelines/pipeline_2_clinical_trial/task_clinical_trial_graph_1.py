@@ -20,8 +20,7 @@ Insert or update Clinical Trial nodes
 
 class NewClinicalTrialGraphTask(PipelineBase):
     """
-    Create or update ClinicalTrial nodes in Memgraph for newly imported or
-    newly changed trials.
+    Create or update ClinicalTrial nodes in Memgraph for newly imported or newly changed trials.
 
     The task reads staged clinical_trial_unique rows, converts each stored
     ClinicalTrials.gov study JSON into graph-ready properties, creates the node
