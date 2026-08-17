@@ -14,11 +14,13 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean, _make_hash_key, _remove_parentheses, _to_int
 
 """
-Create Agent nodes and relationships for newly staged people.
+Create Agent nodes and refresh relationships for newly staged people.
 
 It only reads person_of_all_sources rows where is_new = 1, groups them by
 rdas_group_id, creates/updates Agent nodes, and creates relationships from
-ClinicalTrial, Project, and Article nodes to those Agent nodes.
+ClinicalTrial, Project, and Article nodes to those Agent nodes. For changed
+clinical trials, it also removes stale ClinicalTrial -> Agent links that are no
+longer present in the latest NCTID JSON.
 """
 
 #F_person/initializer/agent.py
@@ -33,8 +35,10 @@ class NewPersonAgentGraphTask(PipelineBase):
     GRANT_PROJECT = "GrantProject"
     CLINICAL_TRIAL = "ClinicalTrial"
 
-    # Each chunk represents one RDAS person group. The Cypher creates/updates
-    # the Agent, then expands the grouped source relationships and affiliations.
+    '''
+    Each chunk represents one RDAS person group. The Cypher creates/updates the
+    Agent, then expands the grouped source relationships and affiliations.
+    '''
     BATCH_CREATE = f'''
         UNWIND $chunks AS chunk
 
@@ -140,8 +144,39 @@ class NewPersonAgentGraphTask(PipelineBase):
         }}
     '''
 
-    # Only new person rows are read, and only after grouping has assigned an
-    # rdas_group_id that can be used as the Agent identity.
+    '''
+    Remove ClinicalTrial -> Agent relationships that belonged to a changed NCTID
+    in an earlier run but are no longer present in the current person rows. Agent
+    nodes are shared across sources, so only source relationships are deleted.
+    '''
+    BATCH_DELETE_STALE_CLINICAL_TRIAL_INVESTIGATORS = '''
+        UNWIND $chunks AS chunk
+        MATCH (ct: ClinicalTrial {nctId: chunk.nctId})
+        OPTIONAL MATCH (ct)-[old_rel:has_investigator]->(old:Agent)
+        WHERE old_rel IS NOT NULL
+        AND (
+            old._idx_key IS NULL
+            OR NOT old._idx_key IN chunk.agentKeys
+        )
+        DELETE old_rel
+    '''
+
+    BATCH_DELETE_STALE_CLINICAL_TRIAL_CONTACTS = '''
+        UNWIND $chunks AS chunk
+        MATCH (ct: ClinicalTrial {nctId: chunk.nctId})
+        OPTIONAL MATCH (ct)-[old_rel:has_contact]->(old:Agent)
+        WHERE old_rel IS NOT NULL
+        AND (
+            old._idx_key IS NULL
+            OR NOT old._idx_key IN chunk.agentKeys
+        )
+        DELETE old_rel
+    '''
+
+    '''
+    Only new person rows are read, and only after grouping has assigned an
+    rdas_group_id that can be used as the Agent identity.
+    '''
     FETCH_NEW_PERSON_QUERY = f'''
         SELECT
             id,
@@ -160,24 +195,52 @@ class NewPersonAgentGraphTask(PipelineBase):
         WHERE is_new = 1
     '''
 
+    '''
+    clinical_trial_unique.is_new remains set until the final wrap-up task. That
+    makes it the stable list of changed trials whose contact/investigator edges
+    should be compared against the current person rows.
+    '''
+    FETCH_CHANGED_CLINICAL_TRIAL_NCTIDS_QUERY = '''
+        SELECT nctid
+        FROM clinical_trial_unique
+        WHERE is_new = 1
+        AND nctid IS NOT NULL
+    '''
+
     def __init__(self):
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
     def find_new_data(self, gard_node) -> None:
+
         self.logger.info("NewPersonAgentGraphTask does not use find_new_data().")
 
 
     def process_new_data(self) -> None:
+
         """Read new grouped people and submit Agent graph chunks."""
 
         fetch_cursor = None
         total_agents = 0
         total_people = 0
         batch_num = 0
+        agent_graph_update_failed = False
+        clinical_trial_agent_keys = {
+            "has_investigator": defaultdict(set),
+            "has_contact": defaultdict(set),
+        }
 
         try:
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
+
+            fetch_cursor.execute(self.FETCH_CHANGED_CLINICAL_TRIAL_NCTIDS_QUERY)
+            changed_clinical_trial_nctids = {
+                row.get("nctid")
+                for row in fetch_cursor.fetchall()
+                if row.get("nctid")
+            }
+
             fetch_cursor.execute(self.FETCH_NEW_PERSON_QUERY)
 
             while True:
@@ -188,8 +251,10 @@ class NewPersonAgentGraphTask(PipelineBase):
                     break
 
                 batch_num += 1
-                # Many person rows can collapse into fewer Agent chunks because
-                # rows with the same rdas_group_id represent the same person.
+                '''
+                Many person rows can collapse into fewer Agent chunks because
+                rows with the same rdas_group_id represent the same person.
+                '''
                 chunks = self.create_agent_chunks(rows)
 
                 if not chunks:
@@ -198,6 +263,7 @@ class NewPersonAgentGraphTask(PipelineBase):
 
                 try:
                     self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                    self.collect_current_clinical_trial_agent_keys(chunks, clinical_trial_agent_keys)
 
                     total_agents += len(chunks)
                     total_people += len(rows)
@@ -209,7 +275,25 @@ class NewPersonAgentGraphTask(PipelineBase):
                     )
 
                 except Exception as e:
+                    agent_graph_update_failed = True
                     self.logger.error(f"Error executing Agent graph batch #{batch_num}: {e}")
+
+            if changed_clinical_trial_nctids and not agent_graph_update_failed:
+                investigator_cleanup_chunks = self.create_clinical_trial_agent_cleanup_chunks(
+                    changed_clinical_trial_nctids,
+                    clinical_trial_agent_keys["has_investigator"]
+                )
+                contact_cleanup_chunks = self.create_clinical_trial_agent_cleanup_chunks(
+                    changed_clinical_trial_nctids,
+                    clinical_trial_agent_keys["has_contact"]
+                )
+
+                self.memgraph.execute(self.BATCH_DELETE_STALE_CLINICAL_TRIAL_INVESTIGATORS, {"chunks": investigator_cleanup_chunks})
+                self.memgraph.execute(self.BATCH_DELETE_STALE_CLINICAL_TRIAL_CONTACTS, {"chunks": contact_cleanup_chunks})
+                self.logger.info(f"Removed stale clinical-trial Agent relationships for {len(changed_clinical_trial_nctids)} changed trials.")
+
+            elif agent_graph_update_failed:
+                self.logger.info("Skipped stale clinical-trial Agent relationship cleanup because at least one Agent graph batch failed.")
 
             self.logger.info(
                 f"Completed NewPersonAgentGraphTask. Total Agents={total_agents}; "
@@ -228,6 +312,7 @@ class NewPersonAgentGraphTask(PipelineBase):
 
 
     def create_agent_chunks(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
         """Group person rows by RDAS group ID and build Agent chunks."""
 
         grouped_by_rdas_group_id = defaultdict(list)
@@ -252,6 +337,7 @@ class NewPersonAgentGraphTask(PipelineBase):
 
 
     def create_agent_chunk(self, rdas_group_id: Any, person_list: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+
         """Build one Agent payload from all rows in an RDAS person group."""
 
         relations = []
@@ -277,7 +363,7 @@ class NewPersonAgentGraphTask(PipelineBase):
                 self.logger.info(f"Skipping invalid last_name={original_last_name}")
                 continue
 
-            # Use the first valid name in the group as the Agent display name.
+            ''' Use the first valid name in the group as the Agent display name. '''
             first_name = str(original_first_name).strip().title()
             last_name = normalized_last_name.strip().title()
             full_name = f"{first_name} {last_name}"
@@ -287,8 +373,10 @@ class NewPersonAgentGraphTask(PipelineBase):
             relation = self.create_relation(person)
 
             if relation:
-                # The same Agent/source relation can appear from duplicate rows;
-                # keep one relationship payload per unique target.
+                '''
+                The same Agent/source relation can appear from duplicate rows;
+                keep one relationship payload per unique target.
+                '''
                 relation_key = tuple(sorted(relation.items()))
 
                 if relation_key not in relation_keys:
@@ -308,8 +396,10 @@ class NewPersonAgentGraphTask(PipelineBase):
         if not full_name:
             return None
 
-        # Affiliations become Organization nodes linked from the Agent. Reuse
-        # the same normalized hash rule as the initializer.
+        '''
+        Affiliations become Organization nodes linked from the Agent. Reuse the
+        same normalized hash rule as the initializer.
+        '''
         organizations = [
             {
                 "name": org,
@@ -334,6 +424,7 @@ class NewPersonAgentGraphTask(PipelineBase):
 
 
     def create_relation(self, person: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+
         """Create the source-specific relationship payload for one person row."""
 
         associate_id = _clean(person.get("associate_id"))
@@ -345,8 +436,10 @@ class NewPersonAgentGraphTask(PipelineBase):
             return None
 
         if source == self.CLINICAL_TRIAL:
-            # Clinical trial PIs become investigators; all other clinical-trial
-            # person rows become contacts.
+            '''
+            Clinical trial PIs become investigators; all other clinical-trial
+            person rows become contacts.
+            '''
             relation_type = "has_investigator" if associate_type == "PI" else "has_contact"
 
             return {
@@ -356,7 +449,7 @@ class NewPersonAgentGraphTask(PipelineBase):
             }
 
         if source == self.GRANT_PROJECT:
-            # Grant rows use role to distinguish contacts from investigators.
+            ''' Grant rows use role to distinguish contacts from investigators. '''
             relation_type = "has_contact" if role == "contact" else "has_investigator"
 
             return {
@@ -366,8 +459,10 @@ class NewPersonAgentGraphTask(PipelineBase):
             }
 
         if source == self.PUBLICATION:
-            # Article relationships use integer PubMed IDs to match Article
-            # node identity in Memgraph.
+            '''
+            Article relationships use integer PubMed IDs to match Article node
+            identity in Memgraph.
+            '''
             pubmed_id = _to_int(associate_id)
 
             if pubmed_id is None:
@@ -381,6 +476,41 @@ class NewPersonAgentGraphTask(PipelineBase):
             }
 
         return None
+
+
+    def collect_current_clinical_trial_agent_keys(self, chunks, clinical_trial_agent_keys) -> None:
+
+        """Collect current Agent keys by changed NCTID and clinical-trial relation type."""
+
+        for chunk in chunks:
+            agent_key = chunk.get("_idx_key")
+            if not agent_key:
+                continue
+
+            for relation in chunk.get("relations", []):
+                if relation.get("source") != self.CLINICAL_TRIAL:
+                    continue
+
+                relation_type = relation.get("relationType")
+                nctid = relation.get("nctId")
+
+                if relation_type not in clinical_trial_agent_keys or not nctid:
+                    continue
+
+                clinical_trial_agent_keys[relation_type][nctid].add(agent_key)
+
+
+    def create_clinical_trial_agent_cleanup_chunks(self, nctids, agent_keys_by_nctid) -> List[Dict[str, Any]]:
+
+        """Build cleanup chunks for every changed NCTID, including trials with no current people."""
+
+        return [
+            {
+                "nctId": nctid,
+                "agentKeys": sorted(agent_keys_by_nctid.get(nctid, set()))
+            }
+            for nctid in sorted(nctids)
+        ]
 
 
     def normalize_last_name(self, last_name: Any) -> Optional[str]:
