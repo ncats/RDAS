@@ -1,8 +1,9 @@
+import json
 import os
 import re
 import sys
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -11,16 +12,17 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _clean, _make_hash_key, _remove_parentheses, _to_int
+from pipelines.pipeline_6_person.task_person_2_clinical_trial import extract_name_title
+from utils.tools import _clean, _make_hash_key, _normalize_tuple, _normalize_txt, _remove_parentheses, _to_int
 
 """
 Create Agent nodes and refresh relationships for newly staged people.
 
-It only reads person_of_all_sources rows where is_new = 1, groups them by
+It reads person_of_all_sources rows where is_new = 1, groups them by
 rdas_group_id, creates/updates Agent nodes, and creates relationships from
 ClinicalTrial, Project, and Article nodes to those Agent nodes. For changed
-clinical trials, it also removes stale ClinicalTrial -> Agent links that are no
-longer present in the latest NCTID JSON.
+clinical trials, it also compares the latest NCTID JSON against existing
+person_of_all_sources rows before removing stale ClinicalTrial -> Agent links.
 """
 
 #F_person/initializer/agent.py
@@ -207,6 +209,45 @@ class NewPersonAgentGraphTask(PipelineBase):
         AND nctid IS NOT NULL
     '''
 
+    '''
+    Read the latest changed study JSON so cleanup can preserve Agent links for
+    existing people that task_person_2 intentionally skipped instead of
+    re-staging as is_new=1.
+    '''
+    FETCH_CHANGED_CLINICAL_TRIAL_STUDIES_QUERY = '''
+        SELECT nctid, studies
+        FROM clinical_trial_unique
+        WHERE is_new = 1
+        AND nctid IS NOT NULL
+        AND studies IS NOT NULL
+    '''
+
+    '''
+    Find person rows by the same identity used by task_person_2 when it decides
+    whether a changed NCTID person is new: associate_id, source, first_name, and
+    last_name.
+    '''
+    FETCH_PERSON_BY_CLINICAL_TRIAL_IDENTITY_QUERY = f'''
+        SELECT
+            id,
+            associate_id,
+            associate_type,
+            source,
+            first_name,
+            last_name,
+            affiliation,
+            orcid,
+            email,
+            rdas_group_id,
+            PI_id,
+            role
+        FROM {PERSON_TABLE}
+        WHERE associate_id <=> %s
+        AND source <=> %s
+        AND first_name <=> %s
+        AND last_name <=> %s
+    '''
+
     def __init__(self):
 
         super().__init__(init_mysql=True, init_memgraph=True)
@@ -279,6 +320,41 @@ class NewPersonAgentGraphTask(PipelineBase):
                     self.logger.error(f"Error executing Agent graph batch #{batch_num}: {e}")
 
             if changed_clinical_trial_nctids and not agent_graph_update_failed:
+                '''
+                Existing clinical-trial people are no longer marked is_new by
+                task_person_2. Build Agent chunks from the latest changed study
+                JSON so cleanup keeps relationships for people who are current
+                but not newly inserted in this run.
+                '''
+                current_clinical_trial_person_rows, current_identity_count, matched_identity_count = self.fetch_current_clinical_trial_person_rows(fetch_cursor)
+                current_clinical_trial_chunks = self.create_agent_chunks(current_clinical_trial_person_rows)
+
+                if matched_identity_count < current_identity_count:
+                    agent_graph_update_failed = True
+                    self.logger.error(
+                        f"Skipped stale clinical-trial Agent cleanup because only "
+                        f"{matched_identity_count}/{current_identity_count} current person identities "
+                        f"matched person_of_all_sources rows."
+                    )
+
+                elif current_identity_count > 0 and not current_clinical_trial_chunks:
+                    agent_graph_update_failed = True
+                    self.logger.error("Skipped stale clinical-trial Agent cleanup because current person rows have no grouped Agent keys.")
+
+                elif current_clinical_trial_chunks:
+                    try:
+                        self.memgraph.execute(self.BATCH_CREATE, {"chunks": current_clinical_trial_chunks})
+                        self.collect_current_clinical_trial_agent_keys(current_clinical_trial_chunks, clinical_trial_agent_keys)
+                        self.logger.info(
+                            f"Refreshed {len(current_clinical_trial_chunks)} current clinical-trial Agent chunks "
+                            f"before stale relationship cleanup."
+                        )
+
+                    except Exception as e:
+                        agent_graph_update_failed = True
+                        self.logger.error(f"Error refreshing current clinical-trial Agent chunks before cleanup: {e}")
+
+            if changed_clinical_trial_nctids and not agent_graph_update_failed:
                 investigator_cleanup_chunks = self.create_clinical_trial_agent_cleanup_chunks(
                     changed_clinical_trial_nctids,
                     clinical_trial_agent_keys["has_investigator"]
@@ -309,6 +385,183 @@ class NewPersonAgentGraphTask(PipelineBase):
 
             ''' Explicitly close all db connections. '''
             self.close()
+
+
+    def fetch_current_clinical_trial_person_rows(self, cursor) -> Tuple[List[Dict[str, Any]], int, int]:
+
+        '''
+        Fetch person rows that represent the latest people in changed NCTID JSON.
+
+        task_person_2 only inserts people whose associate_id/source/first_name/
+        last_name identity is missing from person_of_all_sources. This method
+        rebuilds those current identities from clinical_trial_unique.studies,
+        then looks up matching person rows regardless of is_new so graph cleanup
+        can preserve existing Agent relationships.
+        '''
+        identities = self.fetch_current_clinical_trial_person_identities(cursor)
+        person_rows = []
+        matched_identity_count = 0
+
+        for identity in identities:
+            cursor.execute(self.FETCH_PERSON_BY_CLINICAL_TRIAL_IDENTITY_QUERY, identity)
+            matched_rows = cursor.fetchall()
+
+            if matched_rows:
+                matched_identity_count += 1
+
+            person_rows.extend(matched_rows)
+
+        self.logger.info(
+            f"Matched {len(person_rows)} person rows for {matched_identity_count}/{len(identities)} "
+            f"current clinical-trial person identities."
+        )
+
+        return person_rows, len(identities), matched_identity_count
+
+
+    def fetch_current_clinical_trial_person_identities(self, cursor) -> List[Tuple[Any, ...]]:
+
+        '''
+        Build deduplicated person identities from the latest changed study JSON.
+
+        The returned tuple order matches FETCH_PERSON_BY_CLINICAL_TRIAL_IDENTITY_QUERY:
+        associate_id, source, first_name, last_name.
+        '''
+        cursor.execute(self.FETCH_CHANGED_CLINICAL_TRIAL_STUDIES_QUERY)
+
+        identities = []
+        seen_identities = set()
+
+        for row in cursor.fetchall():
+            nctid = row.get("nctid")
+            studies = row.get("studies")
+
+            for identity in self.create_current_clinical_trial_person_identities(nctid, studies):
+                if identity in seen_identities:
+                    continue
+
+                seen_identities.add(identity)
+                identities.append(identity)
+
+        return identities
+
+
+    def create_current_clinical_trial_person_identities(self, nctid: Any, studies: Any) -> List[Tuple[Any, ...]]:
+
+        '''
+        Extract the current clinical-trial person identities from one study JSON.
+
+        This mirrors the person locations used by task_person_2: responsible
+        party, central contacts, and overall officials. It intentionally returns
+        only identity fields because existing rows must be left unchanged.
+        '''
+        if not nctid or not studies:
+            return []
+
+        try:
+            study = json.loads(studies) if isinstance(studies, str) else studies
+        except (json.JSONDecodeError, TypeError) as e:
+            self.logger.error(f"Error parsing studies JSON for current person cleanup nctid={nctid}: {e}")
+            return []
+
+        if not isinstance(study, dict):
+            return []
+
+        protocol = study.get("protocolSection") or {}
+
+        if not isinstance(protocol, dict):
+            return []
+
+        identities = []
+        sponsor_module = protocol.get("sponsorCollaboratorsModule") or {}
+
+        if isinstance(sponsor_module, dict):
+            responsible_party = sponsor_module.get("responsibleParty") or {}
+
+            if isinstance(responsible_party, dict) and responsible_party.get("investigatorFullName"):
+                first_name, last_name, _title = extract_name_title(responsible_party.get("investigatorFullName"))
+                identity = self.create_clinical_trial_person_identity(nctid, first_name, last_name)
+
+                if identity:
+                    identities.append(identity)
+
+        contacts_module = protocol.get("contactsLocationsModule") or {}
+
+        if not isinstance(contacts_module, dict):
+            return identities
+
+        for contact in self._as_list(contacts_module.get("centralContacts")):
+            if not isinstance(contact, dict):
+                continue
+
+            first_name, last_name, _title = extract_name_title(contact.get("name"))
+            identity = self.create_clinical_trial_person_identity(nctid, first_name, last_name)
+
+            if identity:
+                identities.append(identity)
+
+        for official in self._as_list(contacts_module.get("overallOfficials")):
+            if not isinstance(official, dict):
+                continue
+
+            first_name, last_name, _title = extract_name_title(official.get("name"))
+            identity = self.create_clinical_trial_person_identity(nctid, first_name, last_name)
+
+            if identity:
+                identities.append(identity)
+
+        return identities
+
+
+    def create_clinical_trial_person_identity(self, nctid: Any, first_name: Any, last_name: Any) -> Optional[Tuple[Any, ...]]:
+
+        '''
+        Normalize one clinical-trial person identity to match task_person_2.
+
+        person_of_all_sources stores task_person_2 output after _normalize_tuple,
+        so this method normalizes/truncates first and last name in the same shape
+        before querying existing rows.
+        '''
+        first_name = self.normalize_person_identity_value(first_name, 250)
+        last_name = self.normalize_person_identity_value(last_name, 250)
+
+        if first_name is None and last_name is None:
+            return None
+
+        return _normalize_tuple((nctid, self.CLINICAL_TRIAL, first_name, last_name))
+
+
+    def normalize_person_identity_value(self, value: Any, max_length: int) -> Optional[str]:
+
+        """Normalize one name field using the same rules as task_person_2."""
+
+        if value is None:
+            return None
+
+        value = _normalize_txt(value)
+
+        if value is None:
+            return None
+
+        value = str(value).strip()
+
+        if not value:
+            return None
+
+        return value[:max_length]
+
+
+    def _as_list(self, value: Any) -> List[Any]:
+
+        """Normalize optional singleton/list JSON fields to a list."""
+
+        if value is None:
+            return []
+
+        if isinstance(value, list):
+            return value
+
+        return [value]
 
 
     def create_agent_chunks(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
