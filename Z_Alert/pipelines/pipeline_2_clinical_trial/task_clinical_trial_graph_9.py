@@ -13,14 +13,15 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean
 
 """
-Create IndividualPatientData nodes and ClinicalTrial/IndividualPatientData mappings for new clinical trials.
+Create or update IndividualPatientData nodes and ClinicalTrial/IndividualPatientData mappings for new or changed clinical trials.
 """
 # Reference: B_clinical_trial/initializer/patient_data.py
 
 
 class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
     """
-    Create IndividualPatientData nodes for newly imported clinical trials.
+    Create or update IndividualPatientData nodes for newly imported or changed
+    clinical trials.
 
     ClinicalTrials.gov stores individual patient data sharing statements in
     ipdSharingStatementModule. This task extracts that statement and links it
@@ -29,12 +30,16 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
-    # IPD sharing nodes are keyed per trial so rerunning the task reuses the
-    # existing IndividualPatientData node for that NCT ID.
+    '''
+    MERGE the IPD sharing node by nctId so changed existing studies refresh the
+    same keyed node. Older IPD nodes from the previous CREATE-only behavior did
+    not have an nctId property, so remove stale IPD nodes still linked to this
+    ClinicalTrial after the keyed node is upserted.
+    '''
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
-        CREATE (y:IndividualPatientData)
+        MERGE (y:IndividualPatientData {nctId: chunk.nctId})
         SET
             y.ipdSharing = chunk.IPDSharing,
             y.ipdSharingInfoType = chunk.IPDSharingInfoType,
@@ -43,6 +48,11 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
             y.ipdSharingAccessCriteria = chunk.IPDSharingAccessCriteria
 
         MERGE (x)-[:has_individual_patient_data]->(y)
+
+        WITH x, y
+        OPTIONAL MATCH (x)-[:has_individual_patient_data]->(old:IndividualPatientData)
+        WHERE old <> y
+        DETACH DELETE old
     '''
 
     FETCH_NEW_CLINICAL_QUERY = '''
@@ -53,6 +63,7 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+
         """Initialize MySQL and Memgraph connections for IPD graph loading."""
 
         super().__init__(init_mysql=True, init_memgraph=True)
@@ -60,11 +71,13 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
+
         raise NotImplementedError("NewClinicalTrialIndividualPatientDataGraphTask does not implement find_new_data().")
 
 
     # implement
     def process_new_data(self) -> None:
+
         """Fetch new trial JSON and write individual-patient-data graph chunks."""
 
         count = 0
@@ -107,9 +120,9 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
                     self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
-                    self.logger.info(f'Created {len(chunks)} individual patient data mappings in memgraph. Total = {count}')
+                    self.logger.info(f'Upserted {len(chunks)} individual patient data mappings in memgraph. Total = {count}')
                 else:
-                    self.logger.info('No valid individual patient data to insert into memgraph.')
+                    self.logger.info('No valid individual patient data to upsert into memgraph.')
 
         except Exception as e:
             self.logger.error(f"Error executing individual patient data graph task: {e}")
@@ -123,6 +136,7 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
 
 
     def _create_patient_data_chunk(self, nctid: str, study: Dict[str, Any]) -> Dict[str, Any]:
+
         """Extract IPD sharing fields from one study payload."""
 
         if not isinstance(study, dict):
