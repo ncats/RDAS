@@ -14,16 +14,18 @@ from utils.tools import _clean
 
 """
 Find clinical-trial PMIDs that exist in clinical_trial_nctid_pmids_mapping but
-are not present in PUBLICATION_ARTICLE table.
+are not present in publication_article.
 
-For each missing PMID, download the publication metadata from Europe PMC and
-store the article row in publication_article for the alert workflow.
+Existing publication_article rows are left unchanged. For each missing PMID, the
+task downloads publication metadata from Europe PMC and stores the article row
+in publication_article with is_new = 1.
 """
 # Reference: B_clinical_trial/init_6_clinical_trial_pmids_not_in_Article_umlti.py
 
 class ClinicalTrialPmidArticleImportTask(PipelineBase):
 
     def __init__(self):
+
         super().__init__(init_mysql=True, init_memgraph=False)
 
         self.publication_worker = PublicationWorker()
@@ -31,13 +33,18 @@ class ClinicalTrialPmidArticleImportTask(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
+
         raise NotImplementedError("ClinicalTrialPmidArticleImportTask does not implement find_new_data().")
 
 
     # implement
     def process_new_data(self) -> None:
 
-        ''' 1 '''
+        '''
+        Step 1. Fetch only current clinical-trial PMIDs that do not already have
+        a publication_article row. PMIDs already present in publication_article
+        are not marked new again.
+        '''
         query = '''
             SELECT DISTINCT ctnp.pmid
             FROM  clinical_trial_nctid_pmids_mapping ctnp
@@ -49,7 +56,11 @@ class ClinicalTrialPmidArticleImportTask(PipelineBase):
             AND pa.pubmed_id IS NULL
         '''
 
-        ''' 2 '''
+        '''
+        Step 2. Insert downloaded article metadata as current publication rows.
+        The NOT EXISTS guard keeps this idempotent if another run inserted the
+        article after the initial missing-PMID query.
+        '''
         insert_new_article_sql = '''
             INSERT INTO publication_article (
                 pubmed_id, doi, title, abstract_text, affiliation,
