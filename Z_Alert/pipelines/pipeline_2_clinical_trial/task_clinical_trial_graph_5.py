@@ -13,14 +13,15 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _make_hash_key
 
 """
-Create Drug nodes and Intervention/Drug mappings for new clinical trials.
+Create or refresh Drug nodes and Intervention/Drug mappings for new or changed clinical trials.
 """
 # Reference: B_clinical_trial/initializer/drug.py
 
 
 class NewClinicalTrialDrugGraphTask(PipelineBase):
     """
-    Create Drug nodes and link them to Intervention nodes for new trials.
+    Create or refresh Drug nodes and link them to Intervention nodes for new or
+    changed trials.
 
     Upstream MySQL work maps clinical-trial interventions to RxNorm IDs and
     stores RxNorm properties one row at a time. This task groups those property
@@ -30,14 +31,18 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
-    # Drug nodes are keyed by RxNorm ID. The optional Intervention match uses
-    # the same hashed intervention-name key created by the intervention graph task.
+    '''
+    Drug nodes are keyed by RxNorm ID. A plain SET after MERGE refreshes RxNorm
+    properties when a changed trial causes a drug mapping to be reprocessed. The
+    Intervention -> Drug mapping is shared by intervention name and RxNorm ID, so
+    this task does not delete old mappings that may still be used by other
+    trials.
+    '''
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
 
         MERGE (x: Drug {rxnormID: chunk.rxnormID})
-        ON CREATE SET
-            x = chunk.props
+        SET x += chunk.props
 
         WITH x, chunk
         OPTIONAL MATCH (y: Intervention {_intervention_name_key: chunk._intervention_name_key})
@@ -48,11 +53,14 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
     '''
 
 
-    '''<=> is MySQL’s null-safe equality operator.
-    So: ct.disease <=> cid.disease matches when both diseases are equal, and also matches when both are NULL.
     '''
-    # GROUP_CONCAT folds many RxNorm property rows into one JSON-like property
-    # string per RxNorm/intervention/spaCy combination.
+    <=> is MySQL's null-safe equality operator. So ct.disease <=> cid.disease
+    matches when both diseases are equal, and also matches when both are NULL.
+    '''
+    '''
+    GROUP_CONCAT folds many RxNorm property rows into one JSON-like property
+    string per RxNorm/intervention/spaCy combination.
+    '''
     FETCH_NEW_DRUG_QUERY = '''
         SELECT
             cid.RxNormID,
@@ -98,6 +106,7 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
     }
 
     def __init__(self):
+
         """Initialize MySQL and Memgraph connections for drug graph loading."""
 
         super().__init__(init_mysql=True, init_memgraph=True)
@@ -105,11 +114,13 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
+
         raise NotImplementedError("NewClinicalTrialDrugGraphTask does not implement find_new_data().")
 
 
     # implement
     def process_new_data(self) -> None:
+
         """Fetch grouped RxNorm data and submit Drug graph chunks in batches."""
 
         count = 0
@@ -118,8 +129,10 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
 
         try:
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
-            # RxNorm properties can be large; increase GROUP_CONCAT so MySQL
-            # does not truncate the generated property payload.
+            '''
+            RxNorm properties can be large; increase GROUP_CONCAT so MySQL does
+            not truncate the generated property payload.
+            '''
             fetch_cursor.execute("SET SESSION group_concat_max_len = 10000000")
             fetch_cursor.execute(self.FETCH_NEW_DRUG_QUERY)
 
@@ -144,9 +157,9 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
                     self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
-                    self.logger.info(f'Created {len(chunks)} drug mappings in memgraph. Total = {count}')
+                    self.logger.info(f'Upserted {len(chunks)} drug mappings in memgraph. Total = {count}')
                 else:
-                    self.logger.info('No valid drug mappings to insert into memgraph.')
+                    self.logger.info('No valid drug mappings to upsert into memgraph.')
 
         except Exception as e:
             self.logger.error(f"Error executing drug graph task: {e}")
@@ -160,6 +173,7 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
 
 
     def _create_drug_chunk(self, row: Dict[str, Any]) -> Dict[str, Any]:
+
         """Convert one grouped MySQL row into the Cypher chunk shape."""
 
         rxnorm_id = row.get('RxNormID')
@@ -171,8 +185,10 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
             return {}
 
         try:
-            # FETCH_NEW_DRUG_QUERY returns comma-separated JSON properties; wrap
-            # them in braces before parsing into a Python dict.
+            '''
+            FETCH_NEW_DRUG_QUERY returns comma-separated JSON properties. Wrap
+            them in braces before parsing into a Python dict.
+            '''
             props_obj = json.loads('{' + props + '}')
         except (json.JSONDecodeError, TypeError) as e:
             self.logger.error(f"Error parsing drug props for RxNormID {rxnorm_id}: {e}")
@@ -188,6 +204,7 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
 
 
     def transform_json_object(self, json_obj: Dict[str, Any]) -> Dict[str, Any]:
+
         """Rename RxNorm property keys to the Drug node property schema."""
 
         transformed = {}
@@ -196,8 +213,10 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
             if old_key in self.KEY_MAP:
                 transformed[self.KEY_MAP[old_key]] = value
 
-        # Ensure every expected Drug property exists, even when RxNav did not
-        # provide that property for this RxNorm ID.
+        '''
+        Ensure every expected Drug property exists, even when RxNav did not
+        provide that property for this RxNorm ID.
+        '''
         for old_key, new_key in self.KEY_MAP.items():
             if new_key not in transformed:
                 transformed[new_key] = []
