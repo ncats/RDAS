@@ -13,13 +13,13 @@ from utils.tools import _clean, _safe_get
 from pipelines.pipeline_base import PipelineBase
 
 """
-Create the clinical trial nodes to GARD nodes mapping
+Create the GARD nodes to clinical trial nodes mapping.
 """
 # Reference: B_clinical_trial/initializer/clinicaltrial_gard_mapping.py
 
 class NewClinicalTrialGardRelationshipTask(PipelineBase):
     """
-    Create relationships from new ClinicalTrial nodes to GARD nodes.
+    Create relationships from GARD nodes to new ClinicalTrial nodes.
 
     clinical_trial records preserve the disease search term that matched each
     trial. This task uses that term as matchedTermRDAS on the Memgraph
@@ -27,6 +27,7 @@ class NewClinicalTrialGardRelationshipTask(PipelineBase):
     """
 
     def __init__(self):
+
         """Initialize MySQL and Memgraph connections for relationship loading."""
 
         super().__init__(init_mysql=True, init_memgraph=True)
@@ -34,11 +35,13 @@ class NewClinicalTrialGardRelationshipTask(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
+
         raise NotImplementedError("NewClinicalTrialGardRelationshipTask does not implement find_new_data().")
 
 
     # implement
     def process_new_data(self) -> None:
+
         """Fetch new trial/GARD mappings and merge them into Memgraph."""
 
         ''' 
@@ -49,11 +52,13 @@ class NewClinicalTrialGardRelationshipTask(PipelineBase):
             UNWIND $chunks AS chunk
             MATCH (x: GARD {gardId: chunk.gardId})
             MATCH (y: ClinicalTrial {nctId: chunk.nctId})
-            MERGE (x)<-[:has_clinical_trial {matchedTermRDAS: chunk.disease}]-(y)
+            MERGE (x)-[:has_clinical_trial {matchedTermRDAS: chunk.disease}]->(y)
         '''
 
-        # clinical_trial can contain multiple GARD matches per NCT ID; is_new
-        # keeps this incremental task scoped to the current alert run.
+        '''
+        clinical_trial can contain multiple GARD matches per NCT ID; is_new
+        keeps this incremental task scoped to the current alert run.
+        '''
         fetch_new_clinical_query = '''
                 SELECT id, gardId AS gardid, disease, nctid
                 FROM clinical_trial
@@ -85,8 +90,10 @@ class NewClinicalTrialGardRelationshipTask(PipelineBase):
                     disease = row['disease']
                     nctid = row['nctid']  
 
-                    # These keys match the Cypher query above: source trial,
-                    # target GARD node, and the matched disease term.
+                    '''
+                    These keys match the Cypher query above: source GARD node,
+                    target clinical-trial node, and the matched disease term.
+                    '''
                     chunks.append({"nctId": nctid, "gardId": gard_id, "disease": disease})
 
                 if len(chunks) > 0:

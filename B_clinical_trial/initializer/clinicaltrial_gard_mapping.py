@@ -38,7 +38,7 @@ class ClinicalTrialToGARDMappingInitializer(InitBase):
             UNWIND $chunks AS chunk
             MATCH (x: GARD {gardId: chunk.gardId})
             MATCH (y: ClinicalTrial {nctId: chunk.nctId})
-            MERGE (x)<-[:has_clinical_trial {matchedTermRDAS: chunk.disease}]-(y)
+            MERGE (x)-[:has_clinical_trial {matchedTermRDAS: chunk.disease}]->(y)
         '''
         start = time.time()
 
