@@ -42,9 +42,9 @@ class ClinicalTrialPublicationMappingTask(PipelineBase):
 
         '''
         Reset previous current-run markers for changed NCTIDs before reading the
-        latest referencesModule JSON. Historical rows stay in the table, but only
-        PMIDs still present in the current study payload are marked is_new=1 for
-        downstream article import.
+        latest referencesModule JSON. Historical rows stay in the table, and only
+        NCT ID/PMID pairs inserted for the first time in this run are marked
+        is_new=1 for downstream article import.
         '''
         reset_current_mapping_sql = '''
             UPDATE clinical_trial_nctid_pmids_mapping AS ctnp
@@ -56,18 +56,10 @@ class ClinicalTrialPublicationMappingTask(PipelineBase):
         '''
 
         '''
-        Existing current PMID pairs should become is_new=1 again so a changed
-        trial can retry publication import if a referenced PMID was seen before
-        but publication_article still does not contain it.
+        The NOT EXISTS guard keeps the mapping table idempotent across reruns.
+        Existing pairs are left unchanged; only brand-new PMIDs are inserted with
+        is_new=1.
         '''
-        update_existing_sql = '''
-            UPDATE clinical_trial_nctid_pmids_mapping
-            SET is_new = 1
-            WHERE nctid = %s
-            AND pmid = %s
-        '''
-
-        ''' The NOT EXISTS guard keeps the mapping table idempotent across reruns. '''
         insert_sql = '''
             INSERT INTO clinical_trial_nctid_pmids_mapping (nctid, pmid, is_new)
             SELECT %s, %s, 1
@@ -92,9 +84,6 @@ class ClinicalTrialPublicationMappingTask(PipelineBase):
                 if not current_pairs:
                     continue
 
-                mapping_cursor.executemany(update_existing_sql, current_pairs)
-                updated_count = max(mapping_cursor.rowcount, 0)
-
                 insert_pairs = [
                     (nctid, pmid, nctid, pmid)
                     for nctid, pmid in current_pairs
@@ -104,8 +93,8 @@ class ClinicalTrialPublicationMappingTask(PipelineBase):
                 self.mysql.commit()
 
                 self.logger.info(
-                    f"Marked {updated_count} existing and inserted {inserted_count} "
-                    f"[nctid - pubmed_id] pairs in clinical_trial_nctid_pmids_mapping.\n"
+                    f"Inserted {inserted_count} new [nctid - pubmed_id] pairs "
+                    f"in clinical_trial_nctid_pmids_mapping.\n"
                 )
 
         except Exception as e:
