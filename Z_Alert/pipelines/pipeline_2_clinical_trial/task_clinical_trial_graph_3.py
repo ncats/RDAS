@@ -13,14 +13,15 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _gard_text_normalize, _is_english, _is_under_char_threshold
 
 """
-Create Condition nodes and ClinicalTrial/Condition/GARD mappings for new clinical trials.
+Create or refresh Condition nodes and ClinicalTrial/Condition/GARD mappings for new or changed clinical trials.
 """
 # Reference: B_clinical_trial/initializer/condition.py
 
 
 class NewClinicalTrialConditionGraphTask(PipelineBase):
     """
-    Create Condition nodes and link them to ClinicalTrial and GARD nodes.
+    Create or refresh Condition nodes and link them to ClinicalTrial and GARD
+    nodes.
 
     New clinical-trial JSON provides condition strings. This task normalizes
     those strings, matches them against known GARD names/synonyms, and writes
@@ -29,8 +30,12 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
-    # For each trial, create or reuse normalized Condition nodes, connect the
-    # trial to each condition, then connect matched conditions to existing GARDs.
+    '''
+    For each trial, create or reuse normalized Condition nodes, connect the trial
+    to each current condition, then connect matched conditions to existing GARDs.
+    Condition nodes are shared by condition text, so stale cleanup removes only
+    ClinicalTrial -> Condition relationships for the reprocessed NCT ID.
+    '''
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (ct: ClinicalTrial {nctId: chunk.nctId})
@@ -49,6 +54,36 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
         MERGE (con)-[:has_mapped_condition]->(g)
     '''
 
+    '''
+    Remove Condition relationships that belonged to this ClinicalTrial in an
+    earlier run but are no longer present in the latest ClinicalTrials.gov JSON.
+    The Condition nodes themselves are left in place because another trial may
+    still use the same normalized condition.
+    '''
+    BATCH_DELETE_STALE_CONDITION_RELATIONSHIPS = '''
+        UNWIND $chunks AS chunk
+        MATCH (ct: ClinicalTrial {nctId: chunk.nctId})
+        WITH ct, [mapping IN chunk.condition_gard_mappings | mapping.condition] AS current_conditions
+        OPTIONAL MATCH (ct)-[old_rel:has_investigated_condition]->(old:Condition)
+        WHERE old_rel IS NOT NULL
+        AND (
+            old.condition IS NULL
+            OR NOT old.condition IN current_conditions
+        )
+        DELETE old_rel
+    '''
+
+    '''
+    If the latest study JSON has no current valid conditions, no create chunk is
+    produced. This query still clears all old condition relationships for those
+    reprocessed NCT IDs.
+    '''
+    BATCH_DELETE_ALL_CONDITION_RELATIONSHIPS = '''
+        UNWIND $nctids AS nctid
+        MATCH (ct: ClinicalTrial {nctId: nctid})-[old_rel:has_investigated_condition]->(:Condition)
+        DELETE old_rel
+    '''
+
     FETCH_NEW_CLINICAL_QUERY = '''
         SELECT id, nctid, studies
         FROM clinical_trial_unique
@@ -57,6 +92,7 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+
         """Initialize MySQL and Memgraph connections for condition graph loading."""
 
         super().__init__(init_mysql=True, init_memgraph=True)
@@ -64,20 +100,25 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
+
         raise NotImplementedError("NewClinicalTrialConditionGraphTask does not implement find_new_data().")
 
 
     # implement
     def process_new_data(self) -> None:
+
         """Build condition graph mappings for new clinical trials."""
 
         count = 0
         batch_num = 0 
+        empty_condition_nctids = []
         fetch_cursor = None
 
         try:
-            # Preload normalized GARD names/synonyms once so each condition can
-            # be mapped without repeatedly querying Memgraph.
+            '''
+            Preload normalized GARD names/synonyms once so each condition can be
+            mapped without repeatedly querying Memgraph.
+            '''
             term_to_gard_ids = self._get_term_to_gard_ids()
 
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
@@ -108,12 +149,16 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
                     conditions = self._extract_conditions(study)
                     if not conditions:
+                        empty_condition_nctids.append(nctid)
                         continue
 
-                    # Each mapping keeps the normalized condition text and any
-                    # matching GARD IDs found from the preloaded term index.
+                    '''
+                    Each mapping keeps the normalized condition text and any
+                    matching GARD IDs found from the preloaded term index.
+                    '''
                     condition_gard_mappings = self._map_conditions_to_gard_ids(conditions, term_to_gard_ids)
                     if not condition_gard_mappings:
+                        empty_condition_nctids.append(nctid)
                         continue
 
                     chunks.append({
@@ -123,11 +168,16 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
                 if chunks:
                     self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                    self.memgraph.execute(self.BATCH_DELETE_STALE_CONDITION_RELATIONSHIPS, {"chunks": chunks})
 
                     count += len(chunks)
-                    self.logger.info(f'Created {len(chunks)} condition mappings in memgraph. Total = {count}')
+                    self.logger.info(f'Upserted {len(chunks)} condition mappings in memgraph. Total = {count}')
                 else:
-                    self.logger.info('No valid condition mappings to insert into memgraph.')
+                    self.logger.info('No valid condition mappings to upsert into memgraph.')
+
+            if empty_condition_nctids:
+                self.memgraph.execute(self.BATCH_DELETE_ALL_CONDITION_RELATIONSHIPS, {"nctids": empty_condition_nctids})
+                self.logger.info(f'Removed stale condition mappings for {len(empty_condition_nctids)} trials with no current valid conditions.')
 
         except Exception as e:
             self.logger.error(f"Error executing condition graph task: {e}")
@@ -141,6 +191,7 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
 
     def _extract_conditions(self, study: Dict[str, Any]) -> List[str]:
+
         """Read the ClinicalTrials.gov conditions list from a study payload."""
 
         if not isinstance(study, dict):
@@ -159,6 +210,7 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
 
     def _map_conditions_to_gard_ids(self, conditions: List[str], term_to_gard_ids: Dict[str, List[str]] ) -> List[Dict[str, Any]]:
+
         """Normalize trial conditions and attach matching GARD IDs when available."""
 
         mappings = []
@@ -182,6 +234,7 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
 
     def _get_term_to_gard_ids(self) -> Dict[str, List[str]]:
+
         """Invert the GARD term dictionary into normalized term -> GARD IDs."""
 
         term_to_gard_ids = {}
@@ -195,6 +248,7 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
 
 
     def _get_GARD_names_syns(self) -> Dict[str, List[str]]:
+
         """Load GARD names/synonyms from Memgraph and normalize search terms."""
 
         gard_terms = {}
@@ -216,8 +270,11 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
             gardsyns_eng = [syn for syn in gardsyns if _is_english(syn)]
             gardsyns_char_threshold = [syn for syn in gardsyns if _is_under_char_threshold(syn)]
 
-            # Keep the same synonym filtering style used by GARD discovery:
-            # avoid short abbreviations and terms that are less useful for exact matching.
+            '''
+            Keep the same synonym filtering style used by GARD discovery: avoid
+            short abbreviations and terms that are less useful for exact
+            matching.
+            '''
             filtered_syns = [syn for syn in gardsyns if syn not in gardsyns_eng]
             filtered_syns = [syn for syn in filtered_syns if syn not in gardsyns_char_threshold]
 
