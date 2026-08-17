@@ -13,14 +13,15 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean
 
 """
-Create StudyDesign nodes and ClinicalTrial/StudyDesign mappings for new clinical trials.
+Create or update StudyDesign nodes and ClinicalTrial/StudyDesign mappings for new or changed clinical trials.
 """
 # Reference: B_clinical_trial/initializer/study_design.py
 
 
 class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
     """
-    Create StudyDesign nodes for newly imported clinical trials.
+    Create or update StudyDesign nodes for newly imported or changed clinical
+    trials.
 
     Study design data is split across ClinicalTrials.gov design, description,
     and status modules. This task gathers those fields into one StudyDesign
@@ -29,13 +30,15 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
-    # The bulk initializer creates one StudyDesign node per trial. Since this
-    # node does not have a persisted key property, CREATE must be followed by
-    # SET, not ON CREATE SET.
+    '''
+    MERGE the StudyDesign node by nctId so a changed existing study refreshes
+    the same node instead of creating a duplicate. The plain SET block runs for
+    both created and matched nodes.
+    '''
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
-        CREATE (y:StudyDesign)
+        MERGE (y:StudyDesign {nctId: chunk.nctId})
         SET
             y.designAllocation = chunk.allocation,
             y.designInterventionModel = chunk.interventionModel,
@@ -59,6 +62,7 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+
         """Initialize MySQL and Memgraph connections for study-design graph loading."""
 
         super().__init__(init_mysql=True, init_memgraph=True)
@@ -66,11 +70,13 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
+
         raise NotImplementedError("NewClinicalTrialStudyDesignGraphTask does not implement find_new_data().")
 
 
     # implement
     def process_new_data(self) -> None:
+
         """Fetch new trial JSON and write study-design graph chunks."""
 
         count = 0
@@ -113,9 +119,9 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
                     self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
-                    self.logger.info(f'Created {len(chunks)} study design mappings in memgraph. Total = {count}')
+                    self.logger.info(f'Upserted {len(chunks)} study design mappings in memgraph. Total = {count}')
                 else:
-                    self.logger.info('No valid study designs to insert into memgraph.')
+                    self.logger.info('No valid study designs to upsert into memgraph.')
 
         except Exception as e:
             self.logger.error(f"Error executing study design graph task: {e}")
@@ -129,6 +135,7 @@ class NewClinicalTrialStudyDesignGraphTask(PipelineBase):
 
 
     def _create_study_design_chunk(self, nctid: str, study: Dict[str, Any]) -> Dict[str, Any]:
+
         """Extract design, description, and expanded-access fields from a study."""
 
         if not isinstance(study, dict):
