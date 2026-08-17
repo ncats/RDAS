@@ -13,14 +13,15 @@ from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean
 
 """
-Create Participant nodes and ClinicalTrial/Participant mappings for new clinical trials.
+Create or update Participant nodes and ClinicalTrial/Participant mappings for new or changed clinical trials.
 """
 # Reference: B_clinical_trial/initializer/participant.py
 
 
 class NewClinicalTrialParticipantGraphTask(PipelineBase):
     """
-    Create Participant nodes for newly imported clinical trials.
+    Create or update Participant nodes for newly imported or changed clinical
+    trials.
 
     Participant data comes from the ClinicalTrials.gov eligibility and design
     modules. This task extracts those fields and links each Participant node to
@@ -29,13 +30,16 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
-    # Participant nodes are keyed per trial so rerunning the alert task reuses
-    # the existing participant-info node instead of creating a duplicate.
+    '''
+    Participant nodes are keyed by nctId. A plain SET after MERGE refreshes
+    existing participant properties when a changed study JSON is reprocessed,
+    while still creating the node when it does not exist yet.
+    '''
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
         MATCH (x: ClinicalTrial {nctId: chunk.nctId})
         MERGE (y: Participant {nctId: chunk.nctId})
-        ON CREATE SET
+        SET
             y.eligibilityCriteria = chunk.eligibilityCriteria,
             y.healthyVolunteers = chunk.healthyVolunteers,
             y.stdAges = chunk.stdAges,
@@ -55,6 +59,7 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+
         """Initialize MySQL and Memgraph connections for participant graph loading."""
 
         super().__init__(init_mysql=True, init_memgraph=True)
@@ -62,11 +67,13 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
+
         raise NotImplementedError("NewClinicalTrialParticipantGraphTask does not implement find_new_data().")
 
 
     # implement
     def process_new_data(self) -> None:
+
         """Fetch new clinical trials and write participant-info graph chunks."""
 
         count = 0
@@ -109,9 +116,9 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
                     self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
 
                     count += len(chunks)
-                    self.logger.info(f'Created {len(chunks)} participant mappings in memgraph. Total = {count}')
+                    self.logger.info(f'Upserted {len(chunks)} participant mappings in memgraph. Total = {count}')
                 else:
-                    self.logger.info('No valid participants to insert into memgraph.')
+                    self.logger.info('No valid participants to upsert into memgraph.')
 
         except Exception as e:
             self.logger.error(f"Error executing participant graph task: {e}")
@@ -125,6 +132,7 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
 
 
     def _create_participant_chunk(self, nctid: str, study: Dict[str, Any]) -> Dict[str, Any]:
+
         """Extract eligibility and enrollment fields from one study payload."""
 
         if not isinstance(study, dict):
@@ -145,8 +153,10 @@ class NewClinicalTrialParticipantGraphTask(PipelineBase):
         if not (eligibility_module or design_module):
             return {}
 
-        # Enrollment lives in designModule, while age/volunteer/criteria fields
-        # live in eligibilityModule.
+        '''
+        Enrollment lives in designModule, while age, volunteer, and criteria
+        fields live in eligibilityModule.
+        '''
         enrollment_info = design_module.get('enrollmentInfo', {})
         if not isinstance(enrollment_info, dict):
             enrollment_info = {}
