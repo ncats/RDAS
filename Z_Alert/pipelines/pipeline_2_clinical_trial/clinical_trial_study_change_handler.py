@@ -181,6 +181,8 @@ class ClinicalTrialStudyChangeHandler:
         tasks through WHERE is_new = 1. Resetting brief_title and brief_summary
         lets task_clinical_trial_2.py recalculate those fields from the updated
         study JSON instead of leaving stale title/summary text in place.
+        Resetting alert_sent keeps a real content change visible to AlertSender
+        even when the same clinical_trial row already produced an older alert.
         '''
         clinical_trial_row_count = self._clinical_trial_row_count(nctid)
 
@@ -194,7 +196,8 @@ class ClinicalTrialStudyChangeHandler:
                     url = %s,
                     brief_title = NULL,
                     brief_summary = NULL,
-                    is_new = 1
+                    is_new = 1,
+                    alert_sent = '0'
                 WHERE nctid = %s
             '''
 
