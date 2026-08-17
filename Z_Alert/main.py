@@ -372,8 +372,8 @@ if __name__ == "__main__":
         # Step 7
         runner._run_step_with_timing(
             "Step 7: run_pipeline_followup_updates()",
-            #lambda: runner.logger.info("*** Skip Step 7 ***\n\n"),
-            runner.run_pipeline_followup_updates,
+            lambda: runner.logger.info("*** Step 7 will be executed in another process. See crontab ***\n\n"),
+            #runner.run_pipeline_followup_updates,
         )
         
         # Step 8

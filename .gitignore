@@ -18,9 +18,11 @@ memgraph_dumps/
 AGENTS.md
 mtu
 test
+!test/
 test/*
 F_person/riea/
 !test/test_OrganizationNameExtractor.py
+!test/clinical_trial_study_change_handler_test.py
 tools
 movies
 */screenshots

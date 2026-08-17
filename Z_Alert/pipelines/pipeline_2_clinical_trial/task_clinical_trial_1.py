@@ -1,9 +1,7 @@
 import os
 import sys
-import json
 import time
 import requests
-import mysql.connector
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -12,14 +10,15 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
+from pipelines.pipeline_2_clinical_trial.clinical_trial_study_change_handler import ClinicalTrialStudyChangeHandler
 
 """
 Find newly updated clinical trials for GARD diseases.
 
 For each updated GARD node, this pipeline searches ClinicalTrials.gov with the
-node's filtered disease names and last update date. It fetches each matching
-study by NCT ID, then stores only trials that are not already present in
-clinical_trial. New rows are marked with is_new = 1 for later pipeline steps.
+node's filtered disease names and last update date. It fetches each matching NCT
+ID, inserts brand-new studies, and marks changed existing studies as is_new = 1
+so the later clinical-trial pipeline steps can process them.
 """
 # Reference: B_clinical_trial/init_1_clinical_trial_step_1.py
 
@@ -34,10 +33,12 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
             os.getenv("CLINICAL_TRIAL_STUDIES_API")
             or os.getenv("CLINICAL_TRAIL_STUDY_URL")
         )
+        self.study_change_handler = ClinicalTrialStudyChangeHandler(self.mysql, self.logger)
 
 
     # Not implemented
     def process_new_data(self) -> None:
+
         raise NotImplementedError("NewClinicalTrialDiscoveryTask does not implement process_new_data().")
 
 
@@ -60,48 +61,36 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
 
         studies_api = self.clinical_trials_studies_api.rstrip("/")
 
-        mycursor = self.mysql.cursor()
-
         for name in names:
-            #
-            # Check the name like:
-            # GARD:0000536	Acute myeloid leukemia with abnormal bone marrow eosinophils inv(16)(p13q22) or t(16;16)(p13;q22)
-            # GARD:0000538	AML with t(15;17)(q22;q12);(PML/RARalpha) and variants
-            #
+            '''
+            Check the name like:
+            GARD:0000536 Acute myeloid leukemia with abnormal bone marrow eosinophils inv(16)(p13q22) or t(16;16)(p13;q22)
+            GARD:0000538 AML with t(15;17)(q22;q12);(PML/RARalpha) and variants
+            '''
 
-            nctid_list = list()
             name = name.replace('"','\"')
 
             #print(f'Get nctid for: {name}')
 
-            # Search for studies whose condition, detailed description, or brief summary
-            # match this disease name and whose last update is newer than the GARD update.
+            '''
+            Search for studies whose condition, detailed description, or brief
+            summary match this disease name and whose last update is newer than
+            the GARD update.
+            '''
             initial_query = f'{studies_api}?query.cond=(EXPANSION[Term]{name} OR AREA[DetailedDescription]EXPANSION[Term]{name} OR AREA[BriefSummary]EXPANSION[Term]{name}) AND AREA[LastUpdatePostDate]RANGE[{last_update_date},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
-
-            # Insert each new NCT ID only if it is absent from clinical_trial.
-            # clinical_trial.is_new defaults to 0, so new discovery rows set it
-            # explicitly to 1 for the downstream alert workflow.
-            insert_sql = """
-                INSERT INTO clinical_trial (gardId, disease, nctid, studies, url, is_new)
-                SELECT %s, %s, %s, %s, %s, 1
-                WHERE NOT EXISTS (
-                    SELECT 1
-                    FROM clinical_trial ct
-                    WHERE ct.nctid = %s
-                )
-            """
 
             try:
                 pageToken = None
                 current_nctid = None
                 current_stage = "fetch_nct_ids"
-                response_txt = None
+                search_response = None
+                study_response = None
 
                 while True:
                     current_stage = "fetch_nct_ids"
                     current_nctid = None
-                    response_txt = self.call_get_nctids(initial_query, pageToken=pageToken)
-                    #response_txt example:
+                    search_response = self.call_get_nctids(initial_query, pageToken=pageToken)
+                    # search_response example:
                     '''
                     {
                         "totalCount":3,
@@ -112,7 +101,11 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
                         ]
                     }
                     '''
-                    trials_list = response_txt['studies']
+                    if not search_response:
+                        self.logger.error(f"No ClinicalTrials.gov search response for gardId={gardId}, disease={name[:200]}")
+                        break
+
+                    trials_list = search_response.get('studies') or []
 
                     if trials_list:
 
@@ -124,68 +117,36 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
 
                             # Fetch the full ClinicalTrials.gov study JSON for the NCT ID.
                             current_stage = "fetch_study_details"
-                            retries = 0
-                            response_txt = None
-                            max_retries=10
+                            study_response = self._fetch_study_by_nctid(studies_api, nctid)
 
-                            while retries < max_retries:
-                                try:
-                                    response = requests.get(f'{studies_api}/{nctid}', timeout=10)
-
-                                    if response.status_code >= 400:
-                                        print(f"Request failed for {nctid}: status={response.status_code}")
-                                        break
-
-                                    # Parse JSON response
-                                    response_txt = response.json()
-                                    break  # Exit the loop if successful
-
-                                except requests.exceptions.Timeout:
-                                    print(f"Timeout occurred for {nctid}, retrying...")
-                                    retries += 1
-                                    time.sleep(1)
-                                except requests.exceptions.RequestException as e:
-                                    print(f"Request failed for {nctid}: {e}")
-                                    break  # Exit the loop for non-retryable errors
-
-
-                            if response_txt is not None:
+                            if study_response is not None:
 
                                 try:
-                                    current_stage = "insert_study"
-                                    val = (
-                                        gardId,
-                                        name,
-                                        nctid,
-                                        json.dumps(response_txt),
-                                        initial_query,
-                                        nctid,
-                                    )
+                                    current_stage = "save_or_update_study"
+                                    result = self.study_change_handler.save_or_update_study(gardId, name, nctid, study_response, initial_query)
 
-                                    mycursor.execute(insert_sql, val)
+                                    if result.get("action") == "updated":
+                                        self.logger.info(f"Clinical trial study JSON changed for NCTID={nctid}; differences={result.get('differences')}")
 
-                                    if mycursor.rowcount == 1:
-                                        #print(initial_query)
+                                except Exception as error:
+                                    self.logger.error(f"Failed to save or update clinical trial study for nctid={nctid}: {error}", exc_info=True)
 
-                                        self.logger.info(f"New nctid added: {nctid} for: {gardId}")
-                                        self.mysql.commit()
-
-                                except mysql.connector.Error as error:
-                                    print(f"Failed to insert record into table: {error}")
+                            else:
+                                self.logger.error(f"No ClinicalTrials.gov study detail response for nctid={nctid}")
 
                         current_stage = "paginate_nct_ids"
-                        if not 'nextPageToken' in response_txt:
+                        if not 'nextPageToken' in search_response:
                             break
                         else:
-                            pageToken = response_txt['nextPageToken']
+                            pageToken = search_response['nextPageToken']
 
                     else:
                         #self.logger.info(f'No new NCTIDs found for: {gardId}')
                         break
 
             except Exception as e:
-                response_type = type(response_txt).__name__
-                response_keys = list(response_txt.keys())[:10] if isinstance(response_txt, dict) else None
+                response_type = type(search_response).__name__
+                response_keys = list(search_response.keys())[:10] if isinstance(search_response, dict) else None
                 self.logger.error(
                     f"Error discovering clinical trials for gardId={gardId}, "
                     f"disease={name[:200]}, last_update_date={last_update_date}, "
@@ -198,7 +159,42 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
         self.mysql.commit()
 
 
+    def _fetch_study_by_nctid(self, studies_api, nctid):
+
+        '''
+        Fetch the full ClinicalTrials.gov study JSON for one NCT ID.
+
+        The search endpoint returns only the matching NCT IDs. The pipeline needs
+        the full study response so ClinicalTrialStudyChangeHandler can compare
+        the fetched study against clinical_trial_unique.studies.
+        '''
+        retries = 0
+        max_retries = 10
+
+        while retries < max_retries:
+            try:
+                response = requests.get(f'{studies_api}/{nctid}', timeout=10)
+
+                if response.status_code >= 400:
+                    print(f"Request failed for {nctid}: status={response.status_code}")
+                    break
+
+                return response.json()
+
+            except requests.exceptions.Timeout:
+                print(f"Timeout occurred for {nctid}, retrying...")
+                retries += 1
+                time.sleep(1)
+
+            except requests.exceptions.RequestException as e:
+                print(f"Request failed for {nctid}: {e}")
+                break
+
+        return None
+
+
     def call_get_nctids (self, query, pageToken=None):
+
         try:
             if pageToken:
                 query += f'&pageToken={pageToken}'
