@@ -13,21 +13,24 @@ from utils.tools import _clean, _safe_get
 from pipelines.pipeline_base import PipelineBase
 
 """
-Insert NEW Clinical Trial nodes
+Insert or update Clinical Trial nodes
 """
 # Reference: Z_Alert/pipelines/pipeline_2_clinical_trial/task_clinical_trial_2.py
 # Reference: B_clinical_trial/initializer/clinicaltrial.py
 
 class NewClinicalTrialGraphTask(PipelineBase):
     """
-    Create ClinicalTrial nodes in Memgraph for newly imported trials.
+    Create or update ClinicalTrial nodes in Memgraph for newly imported or
+    newly changed trials.
 
     The task reads staged clinical_trial_unique rows, converts each stored
-    ClinicalTrials.gov study JSON into graph-ready properties, and creates the
-    node only when its nctId does not already exist.
+    ClinicalTrials.gov study JSON into graph-ready properties, creates the node
+    when its nctId does not already exist, and refreshes existing node
+    properties when the NCT ID was marked is_new because the source JSON changed.
     """
 
     def __init__(self):
+
         """Initialize both MySQL and Memgraph connections for graph loading."""
 
         super().__init__(init_mysql=True, init_memgraph=True)
@@ -35,20 +38,48 @@ class NewClinicalTrialGraphTask(PipelineBase):
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
+
         raise NotImplementedError("NewClinicalTrialGraphTask does not implement find_new_data().")
 
 
     # implement
     def process_new_data(self) -> None:
+
         """Fetch new clinical trials from MySQL and submit ClinicalTrial nodes in batches."""
 
-        ''' create the node only when nctId does not exist; if it already exists, do nothing. '''
-        # MERGE is keyed by nctId. ON CREATE SET intentionally avoids updating
-        # existing ClinicalTrial nodes during this incremental graph step.
+        '''
+        MERGE is keyed by nctId so an existing ClinicalTrial node is not
+        duplicated. ON CREATE initializes a brand-new node with every generated
+        property. ON MATCH refreshes source-derived properties for existing
+        nodes when ClinicalTrialStudyChangeHandler marked the NCT ID is_new
+        because clinical_trial_unique.studies changed.
+        '''
         batch_create = '''
             UNWIND $chunks AS props
             MERGE (n: ClinicalTrial {nctId: props.nctId})
             ON CREATE SET n = props
+            ON MATCH SET
+                n.studyType = props.studyType,
+                n.briefTitle = props.briefTitle,
+                n.briefSummary = props.briefSummary,
+                n.officialTitle = props.officialTitle,
+                n.completionDate = props.completionDate,
+                n.completionDateType = props.completionDateType,
+                n.lastKnownStatus = props.lastKnownStatus,
+                n.lastUpdatePostDate = props.lastUpdatePostDate,
+                n.lastUpdatePostDateType = props.lastUpdatePostDateType,
+                n.lastUpdateSubmitDate = props.lastUpdateSubmitDate,
+                n.overallStatus = props.overallStatus,
+                n.startDate = props.startDate,
+                n.startDateType = props.startDateType,
+                n.phase = props.phase,
+                n.patientRegistry = props.patientRegistry,
+                n.primaryCompletionDate = props.primaryCompletionDate,
+                n.primaryCompletionDateType = props.primaryCompletionDateType,
+                n.resultsFirstPostDate = props.resultsFirstPostDate,
+                n.resultsFirstPostDateType = props.resultsFirstPostDateType,
+                n.resultsFirstPostedQCCommentsDate = props.resultsFirstPostedQCCommentsDate,
+                n.lastUpdatedRDAS = props.lastUpdatedRDAS
         ''' 
         
         # clinical_trial_unique has one row per NCT ID; is_new limits the graph
@@ -98,12 +129,12 @@ class NewClinicalTrialGraphTask(PipelineBase):
                     self.memgraph.execute(batch_create, {"chunks": chunks})
 
                     count += len(chunks)
-                    self.logger.info(f'Inserted {len(chunks)} nodes into memgraph. Total = {count}')
+                    self.logger.info(f'Upserted {len(chunks)} ClinicalTrial nodes into memgraph. Total = {count}')
 
                 except Exception as e:
                     self.logger.error(f"Error executing batch create: {e}") 
             else:
-                self.logger.info('No new nodes to insert into memgraph.')
+                self.logger.info('No ClinicalTrial nodes to upsert into memgraph.')
  
         ''' Explicitly close all db connections. '''
         self.close()
@@ -111,6 +142,7 @@ class NewClinicalTrialGraphTask(PipelineBase):
 
 
     def _create_ClinicalTrial_node(self, nctid: str, study: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+
         """
         Create ClinicalTrial node properties from one study JSON payload.
 
@@ -135,10 +167,12 @@ class NewClinicalTrialGraphTask(PipelineBase):
         # ClinicalTrials.gov modules are optional. These helpers keep nested
         # access consistent and prevent non-dict values from leaking into the node.
         def _module(key: str) -> Dict[str, Any]:
+
             value = protocol.get(key, {})
             return value if isinstance(value, dict) else {}
 
         def _clean_get(data: Dict[str, Any], *keys: str) -> str:
+
             return _clean(_safe_get(data, *keys))
 
         identification = _module('identificationModule')
