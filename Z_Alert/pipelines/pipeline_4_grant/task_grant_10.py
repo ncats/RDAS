@@ -7,8 +7,8 @@ This alert-pipeline task is based on
 It processes only new grant projects (`grant_project.is_new = 1`). A project is
 eligible when it has a matching abstract row and does not already have rows in
 `grant_gard_project_relation`.
-For each eligible project, the task searches the project title, PHR,
-and abstract for processed GARD disease terms, scores any matches,
+For each eligible project, the task searches the project title, project terms,
+PHR, and abstract for processed GARD disease terms, scores any matches,
 and inserts the resulting GARD-project relationship rows with `is_new = 1`.
 
 To speed up processing, the task splits eligible `grant_project.id` ranges
@@ -18,7 +18,8 @@ writes relationship rows in batches.
 
 Required inputs:
     `grant_project`
-        Project title, PHR, fiscal year, application ID, and core project number.
+        Project title, project terms, PHR, fiscal year, application ID, and
+        core project number.
     `grant_abstract`
         Abstract text joined by `APPLICATION_ID` and fiscal year.
     `grant_gard_processed_names`
@@ -28,8 +29,9 @@ Required inputs:
 
 Matching priority:
     1. `grant_project.PROJECT_TITLE`
-    2. `grant_project.PHR`
-    3. `grant_abstract.ABSTRACT_TEXT`
+    2. `grant_project.PROJECT_TERMS`
+    3. `grant_project.PHR`
+    4. `grant_abstract.ABSTRACT_TEXT`
 
 The task preserves the initializer's matching strategy:
     - exact and stemmed GARD term matching
@@ -96,6 +98,7 @@ PROJECT_SELECT_SQL = """
         p.APPLICATION_ID,
         p.FY,
         p.PROJECT_TITLE,
+        p.PROJECT_TERMS,
         p.PHR,
         p.core_project_num,
         a.ABSTRACT_TEXT
@@ -529,14 +532,15 @@ def process_text_and_normalize(text: str, source_type: str) -> Optional[Dict[str
     return result_dict or None
 
 
-def project_gard_relationship(project_title: Any, public_health_relevance_statement: Any, abstract_text: Any) -> Tuple[Optional[Dict[str, List[float]]], str]:
+def project_gard_relationship(project_title: Any, project_terms: Any, public_health_relevance_statement: Any, abstract_text: Any) -> Tuple[Optional[Dict[str, List[float]]], str]:
     """Find the highest-priority GARD relationship source for one grant project."""
 
     title = normalize_text_value(project_title)
+    terms = normalize_text_value(project_terms)
     phr = normalize_text_value(public_health_relevance_statement)
     abstract = normalize_text_value(abstract_text)
 
-    if not any((title, phr, abstract)):
+    if not any((title, terms, phr, abstract)):
         return None, ""
 
     if title:
@@ -545,6 +549,18 @@ def project_gard_relationship(project_title: Any, public_health_relevance_statem
         if name_dict:
             similarity_text = abstract or title
             return normalize_combined_dictionary(similarity_text, name_dict, {}, {}, {}, "title"), "title"
+
+    if terms:
+        '''
+        PROJECT_TERMS is already a compact keyword-style project description,
+        so reuse the title exact/stemmed matcher before falling back to the
+        longer sentence-priority matching used for PHR and abstract text.
+        '''
+        name_dict = get_gard_title_stem_exact(terms)
+
+        if name_dict:
+            similarity_text = abstract or terms
+            return normalize_combined_dictionary(similarity_text, name_dict, {}, {}, {}, "terms"), "terms"
 
     if phr:
         result = process_text_and_normalize(phr, "statement")
@@ -690,6 +706,7 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
                 try:
                     result_dict, source_type = project_gard_relationship(
                         row.get("PROJECT_TITLE"),
+                        row.get("PROJECT_TERMS"),
                         row.get("PHR"),
                         row.get("ABSTRACT_TEXT"),
                     )
