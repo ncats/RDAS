@@ -27,9 +27,6 @@ Update is_EPI and is_NHS for new rows in publication_article.
 These are module-level functions, not class methods, and keeping them outside PublicationEpiNhsClassificationTask is correct for multiprocessing.
 '''
 
-DEFAULT_EPI_PREDICTION = {'isEpi': False, 'probability': None}
-
-
 def get_nhs_extract(texts: Sequence[str]) -> bool:
     """
     Predict whether the supplied publication text is NIH/NHS-related.
@@ -72,7 +69,7 @@ def get_nhs_extract(texts: Sequence[str]) -> bool:
     return bool(HttpsUtil.with_api_retry(api_url, payload, parse_api_response))
 
 
-def get_is_epi(text: str) -> Dict[str, Any]:
+def get_is_epi(text: str) -> Optional[Dict[str, Any]]:
     """
     Predict whether publication text describes epidemiology.
 
@@ -80,33 +77,38 @@ def get_is_epi(text: str) -> Dict[str, Any]:
         text: Combined publication title and abstract text.
 
     Returns:
-        A dictionary with isEpi and probability keys.
+        A dictionary with isEpi and probability keys when the API returns a usable
+        prediction. None means the API call failed or returned an invalid payload,
+        so the caller should leave the database row unchanged and retry later.
     """
-    def parse_api_response(response: requests.Response) -> Dict[str, Any]:
+    def parse_api_response(response: requests.Response) -> Optional[Dict[str, Any]]:
         try:
             prediction = response.json()
         except ValueError as e:
             print(f'Invalid EPI classification JSON response: {e}')
-            return dict(DEFAULT_EPI_PREDICTION)
+            return None
 
         if not isinstance(prediction, dict):
             print(f'Unexpected EPI classification response type: {type(prediction).__name__}')
-            return dict(DEFAULT_EPI_PREDICTION)
+            return None
+
+        if 'IsEpi' not in prediction:
+            print('EPI classification response is missing IsEpi.')
+            return None
 
         return {
-            'isEpi': prediction.get('IsEpi', False),
+            'isEpi': prediction.get('IsEpi'),
             'probability': prediction.get('EPI_PROB')
         }
 
     api_url = os.getenv('EPI_CLASSIFY_API')
     if not api_url:
         print('EPI_CLASSIFY_API is not configured.')
-        return dict(DEFAULT_EPI_PREDICTION)
+        return None
 
     payload = {'text': text}
 
-    result = HttpsUtil.with_api_retry(api_url, payload, parse_api_response)
-    return result or dict(DEFAULT_EPI_PREDICTION)
+    return HttpsUtil.with_api_retry(api_url, payload, parse_api_response)
 
 
 def get_epi_extract(text: str) -> Optional[Dict[str, Any]]:
@@ -142,7 +144,7 @@ def get_epi_extract(text: str) -> Optional[Dict[str, Any]]:
     return HttpsUtil.with_api_retry(api_url, payload, parse_api_response)
 
 
-def process_publication_article(obj: Dict[str, Any]) -> Tuple[bool, bool, Any, Optional[str], Any]:
+def process_publication_article(obj: Dict[str, Any]) -> Optional[Tuple[bool, bool, Any, Optional[str], Any]]:
     """
     Run all publication classifiers/extractors for one article row.
 
@@ -150,8 +152,10 @@ def process_publication_article(obj: Dict[str, Any]) -> Tuple[bool, bool, Any, O
         obj: Article data containing id, pubmed_id, title, and abstract_text.
 
     Returns:
-        Tuple matching the publication_article update statement:
-        is_epi, is_nhs, epi_probability, epi_extract, pubmed_id.
+        Tuple matching the publication_article update statement when the EPI
+        prediction succeeds: is_epi, is_nhs, epi_probability, epi_extract,
+        pubmed_id. None means the EPI prediction failed, and the caller should
+        skip the update so is_EPI stays NULL for a later retry.
     """
 
     article_id = obj['id']
@@ -162,6 +166,9 @@ def process_publication_article(obj: Dict[str, Any]) -> Tuple[bool, bool, Any, O
     text_to_predict = (title + ' ' + abstract_text).strip()
 
     epi_prediction = get_is_epi(text_to_predict)
+    if epi_prediction is None:
+        print(f'OS.process_id:{os.getpid()}\tId:{article_id} - pubmed_id:{pubmed_id}\tEPI classification failed; database row will not be updated.')
+        return None
 
     is_epi = epi_prediction['isEpi']
     epi_probability = epi_prediction['probability']
@@ -231,13 +238,21 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
                     } for row in rows]
 
                     try:
-                        val_list = active_pool.map(process_publication_article, obj_list)
+                        processed_values = active_pool.map(process_publication_article, obj_list)
+                        val_list = [value for value in processed_values if value is not None]
+                        skipped_count = len(processed_values) - len(val_list)
+                        if skipped_count:
+                            self.logger.warning(f"Skipped {skipped_count} publication_article rows in batch#{batch_num} because EPI classification failed; is_EPI remains NULL so they can be retried.")
                         print(val_list)
                     except Exception as e:
                         self.logger.error(f"Error processing batch#{batch_num}: {e}")
                         continue
  
                     try:
+                        if not val_list:
+                            self.logger.warning(f"No publication_article rows updated for batch#{batch_num}; all rows remain retryable.")
+                            continue
+
                         update_cursor.executemany(update_sql, val_list)
                         self.mysql.commit()
 
