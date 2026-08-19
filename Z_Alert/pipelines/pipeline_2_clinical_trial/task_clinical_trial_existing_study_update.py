@@ -39,14 +39,6 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
     DEFAULT_BATCH_SIZE = 100
     REQUEST_TIMEOUT_SECONDS = 10
     REQUEST_SLEEP_SECONDS = 0.0
-    SKIPPED_OVERALL_STATUSES = (
-        "COMPLETED",
-        "TERMINATED",
-        "WITHDRAWN",
-        "NO_LONGER_AVAILABLE",
-        "APPROVED_FOR_MARKETING",
-    )
-
     def __init__(self, batch_size: int = DEFAULT_BATCH_SIZE, nctid_limit: Optional[int] = None):
 
         '''
@@ -54,7 +46,8 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
 
         batch_size controls how many clinical_trial_unique rows are read per
         database batch. nctid_limit is only for manual test runs; the production
-        runner leaves it as None so every eligible is_new = 0 NCT ID is checked.
+        runner leaves it as None so every eligible non-new, non-terminal NCT ID
+        is checked.
         '''
         super().__init__(init_mysql=True, init_memgraph=False)
 
@@ -86,17 +79,13 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
             self.logger.error("CLINICAL_TRIAL_STUDIES_API is not configured.")
             return
 
-        total_nctids = self._count_refresh_candidate_nctids()
-        if self.nctid_limit is not None:
-            total_nctids = min(total_nctids, self.nctid_limit)
-
         checked_count = 0
         unchanged_count = 0
         updated_count = 0
         failed_count = 0
         missing_context_count = 0
 
-        self.logger.info(f"Starting existing ClinicalTrials.gov study update check for {total_nctids} non-new non-terminal NCTIDs.")
+        self.logger.info("Starting existing ClinicalTrials.gov study update check for non-new non-terminal NCTIDs.")
 
         for batch_num, rows in enumerate(self._iter_existing_nctid_batches(), 1):
             nctids = [row["nctid"] for row in rows]
@@ -104,7 +93,7 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
 
             self.logger.info(
                 f"Existing NCTID update check batch #{batch_num}: "
-                f"batch_size={len(rows)}, checked={checked_count}/{total_nctids}."
+                f"batch_size={len(rows)}, checked_so_far={checked_count}."
             )
 
             for row in rows:
@@ -156,9 +145,9 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
                     failed_count += 1
                     self.logger.warning(f"Unexpected existing NCTID update action for NCTID={nctid}: action={action}.")
 
-                if checked_count % self.batch_size == 0 or checked_count == total_nctids:
+                if checked_count % self.batch_size == 0:
                     self.logger.info(
-                        f"Existing NCTID update progress: checked={checked_count}/{total_nctids}, "
+                        f"Existing NCTID update progress: checked={checked_count}, "
                         f"updated={updated_count}, unchanged={unchanged_count}, "
                         f"failed={failed_count}, missing_context={missing_context_count}."
                     )
@@ -173,48 +162,6 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
         )
 
 
-    def _count_refresh_candidate_nctids(self) -> int:
-
-        '''
-        Count eligible existing NCT IDs for progress logging.
-
-        Only is_new = 0 rows are candidates because is_new = 1 rows have already
-        been staged by discovery or a previous update decision and will be
-        consumed by later clinical-trial tasks in the same pipeline run.
-
-        Terminal/closed overall_status values are skipped here to avoid frequent
-        API calls for records that are least likely to need daily refresh. Active
-        or uncertain values are not skipped:
-        RECRUITING, NOT_YET_RECRUITING, ENROLLING_BY_INVITATION,
-        ACTIVE_NOT_RECRUITING, SUSPENDED, AVAILABLE,
-        TEMPORARILY_NOT_AVAILABLE, UNKNOWN, NULL, and empty string.
-        '''
-        skipped_status_placeholders = ", ".join(["%s"] * len(self.SKIPPED_OVERALL_STATUSES))
-        cursor = self.mysql.cursor(dictionary=True, buffered=True)
-
-        try:
-            cursor.execute(
-                f'''
-                SELECT COUNT(*) AS row_count
-                FROM clinical_trial_unique
-                WHERE nctid IS NOT NULL
-                AND nctid <> ''
-                AND is_new = 0
-                AND (
-                    overall_status IS NULL
-                    OR overall_status = ''
-                    OR overall_status NOT IN ({skipped_status_placeholders})
-                )
-                ''',
-                self.SKIPPED_OVERALL_STATUSES,
-            )
-            row = cursor.fetchone()
-            return int(row.get("row_count") or 0) if row else 0
-
-        finally:
-            cursor.close()
-
-
     def _iter_existing_nctid_batches(self):
 
         '''
@@ -227,13 +174,18 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
 
         The overall_status predicate skips terminal/closed records and keeps
         active or uncertain records in the refresh queue:
-        RECRUITING, NOT_YET_RECRUITING, ENROLLING_BY_INVITATION,
-        ACTIVE_NOT_RECRUITING, SUSPENDED, AVAILABLE,
-        TEMPORARILY_NOT_AVAILABLE, UNKNOWN, NULL, and empty string.
+        RECRUITING, 
+        NOT_YET_RECRUITING, 
+        ENROLLING_BY_INVITATION,
+        ACTIVE_NOT_RECRUITING, 
+        SUSPENDED, 
+        AVAILABLE,
+        TEMPORARILY_NOT_AVAILABLE, 
+        UNKNOWN, 
+        NULL, and empty string.
         '''
         last_id = 0
         fetched_count = 0
-        skipped_status_placeholders = ", ".join(["%s"] * len(self.SKIPPED_OVERALL_STATUSES))
 
         while True:
             limit = self.batch_size
@@ -248,7 +200,7 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
 
             try:
                 cursor.execute(
-                    f'''
+                    '''
                     SELECT id, nctid
                     FROM clinical_trial_unique
                     WHERE id > %s
@@ -258,12 +210,18 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
                     AND (
                         overall_status IS NULL
                         OR overall_status = ''
-                        OR overall_status NOT IN ({skipped_status_placeholders})
+                        OR overall_status NOT IN (
+                            'COMPLETED',
+                            'TERMINATED',
+                            'WITHDRAWN',
+                            'NO_LONGER_AVAILABLE',
+                            'APPROVED_FOR_MARKETING'
+                        )
                     )
                     ORDER BY id
                     LIMIT %s
                     ''',
-                    (last_id, *self.SKIPPED_OVERALL_STATUSES, limit),
+                    (last_id, limit),
                 )
                 rows = cursor.fetchall()
 
