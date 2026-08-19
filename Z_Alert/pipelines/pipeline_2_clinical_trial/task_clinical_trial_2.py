@@ -40,7 +40,8 @@ class NewClinicalTrialImportTask(PipelineBase):
 
         self.step_1_add_new_nctid_to_clinical_trial()
         self.step_2_add_new_nctid_to_clinical_trial_unique()
-        self.step_3_update_brief_title_and_brief_summary()
+        self.step_3_update_overall_status()
+        self.step_4_update_brief_title_and_brief_summary()
 
         ''' Explicitly close the all the db connections '''
         self.close()
@@ -88,8 +89,78 @@ class NewClinicalTrialImportTask(PipelineBase):
 
 
 
+    def step_3_update_overall_status(self)-> None:
+
+        '''
+        Read protocolSection.statusModule.overallStatus from stored study JSON.
+
+        clinical_trial_unique now has an overall_status column so later tasks can
+        filter or reason about completed trials without repeatedly parsing the
+        large studies MEDIUMTEXT JSON. This step backfills any missing
+        overall_status value and also handles changed NCTIDs whose status was
+        reset to NULL by ClinicalTrialStudyChangeHandler.
+        '''
+        select_missing_status_query = '''
+            SELECT id, nctid, studies
+            FROM clinical_trial_unique
+            WHERE studies IS NOT NULL
+            AND studies <> ''
+            AND (overall_status IS NULL OR overall_status = '')
+            ORDER BY id
+            LIMIT %s
+        '''
+
+        batch_size = 100
+        batch_num = 0
+        fetch_cursor = None
+
+        try:
+            fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
+
+            while True:
+                chunks = []
+
+                fetch_cursor.execute(select_missing_status_query, (batch_size,))
+                rows = fetch_cursor.fetchall()
+
+                if not rows:
+                    self.logger.info("No more clinical_trial_unique rows need overall_status updates.")
+                    break
+
+                batch_num += 1
+                self.logger.info(f'\n--- overall_status batch# = {batch_num} ---')
+
+                for row in rows:
+                    nctid = row['nctid']
+                    study_json = row['studies']
+
+                    try:
+                        study = json.loads(study_json)
+                        protocol_section = study.get('protocolSection', {})
+                        status_module = protocol_section.get('statusModule', {})
+                        overall_status = status_module.get('overallStatus') or 'N/A'
+
+                    except json.JSONDecodeError as e:
+                        self.logger.error(f"Error parsing JSON while reading overall_status for NCTID {nctid}:\n {e}")
+                        overall_status = 'N/A'
+
+                    chunks.append((overall_status, nctid))
+                    self.logger.info(f'Updated overall_status={overall_status} for NCTID = {nctid}')
+
+                if chunks:
+                    self._save_overall_status(chunks)
+
+        except Exception as err:
+            self.logger.error(f"Error updating overall_status: {err}")
+            self.mysql.rollback()
+
+        finally:
+            if fetch_cursor:
+                fetch_cursor.close()
+
+
     ''' Update the 2 columns: brief_title and brief_summary in the clinical_trial & clinical_trial_unique table '''
-    def step_3_update_brief_title_and_brief_summary(self)-> None:
+    def step_4_update_brief_title_and_brief_summary(self)-> None:
 
         select_new_query = f'''
             SELECT id, nctid, studies
@@ -182,3 +253,29 @@ class NewClinicalTrialImportTask(PipelineBase):
         except Exception as e:
             self.logger.error(e)
             self.mysql.rollback()
+
+
+    def _save_overall_status(self, chunks):
+
+        '''
+        Save extracted ClinicalTrials.gov overall_status values.
+
+        The chunks list contains (overall_status, nctid) tuples. Updating by
+        NCTID is safe here because clinical_trial_unique has one canonical row
+        per NCTID.
+        '''
+        update_sql = 'UPDATE clinical_trial_unique set overall_status=%s WHERE nctid=%s'
+        cursor = None
+
+        try:
+            cursor = self.mysql.cursor()
+            cursor.executemany(update_sql, chunks)
+            self.mysql.commit()
+
+        except Exception as e:
+            self.logger.error(e)
+            self.mysql.rollback()
+
+        finally:
+            if cursor:
+                cursor.close()

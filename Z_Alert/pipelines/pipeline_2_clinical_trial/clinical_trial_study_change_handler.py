@@ -218,6 +218,7 @@ class ClinicalTrialStudyChangeHandler:
             SET studies = %s,
                 brief_title = NULL,
                 brief_summary = NULL,
+                overall_status = NULL,
                 is_new = 1
             WHERE nctid = %s
         '''
