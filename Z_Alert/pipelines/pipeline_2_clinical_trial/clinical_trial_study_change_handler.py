@@ -1,3 +1,4 @@
+import copy
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -14,6 +15,9 @@ class ClinicalTrialStudyChangeHandler:
     '''
 
     MAX_DIFF_VALUE_LENGTH = 500
+    IGNORED_COMPARE_PATHS = (
+        ("derivedSection", "miscInfoModule", "versionHolder"),
+    )
 
     def __init__(self, mysql: Any, logger: Any):
 
@@ -128,8 +132,8 @@ class ClinicalTrialStudyChangeHandler:
         before comparison. When the normalized documents differ, a capped list of
         path-level differences is returned for logs or manual review.
         '''
-        stored_obj = self._coerce_json_value(stored_study)
-        fetched_obj = self._coerce_json_value(fetched_study)
+        stored_obj = self._study_value_for_comparison(stored_study)
+        fetched_obj = self._study_value_for_comparison(fetched_study)
 
         if self._normalized_json(stored_obj) == self._normalized_json(fetched_obj):
             return True, []
@@ -275,6 +279,45 @@ class ClinicalTrialStudyChangeHandler:
                 return text
 
         return value
+
+
+    def _study_value_for_comparison(self, value: Any) -> Any:
+
+        '''
+        Normalize one study JSON object before equality/difference checks.
+
+        ClinicalTrials.gov includes generated metadata fields that can change
+        without a clinical study-content change. Removing those known volatile
+        paths prevents the existing-NCTID refresh from marking a study as new
+        only because generated API metadata changed.
+        '''
+        comparison_value = copy.deepcopy(self._coerce_json_value(value))
+
+        for path in self.IGNORED_COMPARE_PATHS:
+            self._remove_nested_path(comparison_value, path)
+
+        return comparison_value
+
+
+    def _remove_nested_path(self, value: Any, path: Tuple[str, ...]) -> None:
+
+        '''
+        Remove one ignored comparison path from a copied JSON object.
+
+        Missing keys are expected because ClinicalTrials.gov response sections
+        vary by study. In those cases, this method simply leaves the object
+        unchanged.
+        '''
+        current_value = value
+
+        for key in path[:-1]:
+            if not isinstance(current_value, dict):
+                return
+
+            current_value = current_value.get(key)
+
+        if isinstance(current_value, dict):
+            current_value.pop(path[-1], None)
 
 
     def _serialize_for_storage(self, value: Any) -> str:
