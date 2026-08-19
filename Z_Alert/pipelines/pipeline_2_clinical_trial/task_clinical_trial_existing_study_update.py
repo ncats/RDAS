@@ -18,12 +18,16 @@ from pipelines.pipeline_2_clinical_trial.clinical_trial_study_change_handler imp
 class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
 
     '''
-    Re-check existing clinical_trial_unique NCT IDs against ClinicalTrials.gov.
+    Re-check non-new clinical_trial_unique NCT IDs against ClinicalTrials.gov.
 
     The normal discovery task only compares studies that appear in the disease
     name search window for updated GARD rows. This helper closes the gap for
-    studies that are already known to RDAS by directly fetching every existing
-    NCT ID and reusing ClinicalTrialStudyChangeHandler to update changed rows.
+    studies that are already known to RDAS by directly fetching existing NCT IDs
+    that are not already staged for downstream processing.
+
+    Rows with is_new = 1 are intentionally skipped because they are already in
+    the current update queue. Checking them again would add duplicate API calls
+    and duplicate log messages without changing the downstream result.
     '''
 
     DEFAULT_BATCH_SIZE = 100
@@ -37,7 +41,7 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
 
         batch_size controls how many clinical_trial_unique rows are read per
         database batch. nctid_limit is only for manual test runs; the production
-        runner leaves it as None so every existing NCT ID is checked.
+        runner leaves it as None so every eligible is_new = 0 NCT ID is checked.
         '''
         super().__init__(init_mysql=True, init_memgraph=False)
 
@@ -58,28 +62,28 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
     def process_new_data(self) -> None:
 
         '''
-        Fetch and compare all existing NCT IDs stored in clinical_trial_unique.
+        Fetch and compare existing NCT IDs that are not already marked new.
 
-        Progress is logged for each batch and each changed NCT ID is logged with
-        its GARD/disease context and JSON differences. Unchanged rows are counted
-        in the final summary without writing anything back to MySQL.
+        The clinical-trial pipeline uses clinical_trial_unique.is_new = 1 as the
+        handoff flag for later MySQL and Memgraph steps. This task therefore
+        checks only is_new = 0 rows, and when a fetched study differs, the shared
+        change handler updates the stored JSON and flips is_new back to 1.
         '''
         if not self.clinical_trials_studies_api:
             self.logger.error("CLINICAL_TRIAL_STUDIES_API is not configured.")
             return
 
-        total_nctids = self._count_existing_nctids()
+        total_nctids = self._count_refresh_candidate_nctids()
         if self.nctid_limit is not None:
             total_nctids = min(total_nctids, self.nctid_limit)
 
         checked_count = 0
         unchanged_count = 0
         updated_count = 0
-        inserted_count = 0
         failed_count = 0
         missing_context_count = 0
 
-        self.logger.info(f"Starting existing ClinicalTrials.gov study update check for {total_nctids} NCTIDs.")
+        self.logger.info(f"Starting existing ClinicalTrials.gov study update check for {total_nctids} non-new NCTIDs.")
 
         for batch_num, rows in enumerate(self._iter_existing_nctid_batches(), 1):
             nctids = [row["nctid"] for row in rows]
@@ -132,15 +136,12 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
                         f"differences={result.get('differences')}"
                     )
 
-                elif action == "inserted":
-                    inserted_count += 1
-                    self.logger.info(
-                        f"Existing NCTID was missing from clinical_trial_unique and was inserted by handler: "
-                        f"NCTID={nctid}, gardId={context['gard_id']}, disease={context['disease_name']}."
-                    )
+                elif action == "unchanged":
+                    unchanged_count += 1
 
                 else:
-                    unchanged_count += 1
+                    failed_count += 1
+                    self.logger.warning(f"Unexpected existing NCTID update action for NCTID={nctid}: action={action}.")
 
                 if checked_count % self.batch_size == 0 or checked_count == total_nctids:
                     self.logger.info(
@@ -154,14 +155,20 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
 
         self.logger.info(
             f"Completed existing ClinicalTrials.gov study update check: checked={checked_count}, "
-            f"updated={updated_count}, inserted={inserted_count}, unchanged={unchanged_count}, "
+            f"updated={updated_count}, unchanged={unchanged_count}, "
             f"failed={failed_count}, missing_context={missing_context_count}."
         )
 
 
-    def _count_existing_nctids(self) -> int:
+    def _count_refresh_candidate_nctids(self) -> int:
 
-        ''' Count non-empty NCT IDs in clinical_trial_unique for progress logging. '''
+        '''
+        Count eligible existing NCT IDs for progress logging.
+
+        Only is_new = 0 rows are candidates because is_new = 1 rows have already
+        been staged by discovery or a previous update decision and will be
+        consumed by later clinical-trial tasks in the same pipeline run.
+        '''
         cursor = self.mysql.cursor(dictionary=True, buffered=True)
 
         try:
@@ -171,6 +178,7 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
                 FROM clinical_trial_unique
                 WHERE nctid IS NOT NULL
                 AND nctid <> ''
+                AND is_new = 0
                 '''
             )
             row = cursor.fetchone()
@@ -183,10 +191,12 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
     def _iter_existing_nctid_batches(self):
 
         '''
-        Yield clinical_trial_unique NCT IDs in stable id order.
+        Yield refresh candidate NCT IDs from clinical_trial_unique.
 
         Using id > last_id avoids OFFSET scans on the large unique table and
         keeps the refresh memory footprint bounded to one small batch at a time.
+        The is_new = 0 predicate keeps the task focused on old/existing rows
+        that still need an external change check.
         '''
         last_id = 0
         fetched_count = 0
@@ -210,6 +220,7 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
                     WHERE id > %s
                     AND nctid IS NOT NULL
                     AND nctid <> ''
+                    AND is_new = 0
                     ORDER BY id
                     LIMIT %s
                     ''',
