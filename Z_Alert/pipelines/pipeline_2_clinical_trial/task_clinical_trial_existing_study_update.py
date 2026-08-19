@@ -15,7 +15,7 @@ from pipelines.pipeline_base import PipelineBase
 from pipelines.pipeline_2_clinical_trial.clinical_trial_study_change_handler import ClinicalTrialStudyChangeHandler
 
 
-class ClinicalTrialExistingStudyUpdateChecker(PipelineBase):
+class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
 
     '''
     Re-check existing clinical_trial_unique NCT IDs against ClinicalTrials.gov.
@@ -52,7 +52,7 @@ class ClinicalTrialExistingStudyUpdateChecker(PipelineBase):
 
     def find_new_data(self, gard_node) -> None:
 
-        raise NotImplementedError("ClinicalTrialExistingStudyUpdateChecker does not implement find_new_data().")
+        raise NotImplementedError("ExistingClinicalTrialStudyUpdateTask does not implement find_new_data().")
 
 
     def process_new_data(self) -> None:

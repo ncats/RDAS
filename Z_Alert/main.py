@@ -41,7 +41,7 @@ class AlertPipelineRunner(PipelineRunnerBase):
 
         try:
             from pipelines.pipeline_1_gard.task_gard_1 import GardNodeNamesTask
-            from pipelines.pipeline_2_clinical_trial.clinical_trial_existing_study_update_checker import ClinicalTrialExistingStudyUpdateChecker
+            from pipelines.pipeline_2_clinical_trial.task_clinical_trial_existing_study_update import ExistingClinicalTrialStudyUpdateTask
             from pipelines.pipeline_2_clinical_trial.task_clinical_trial_1 import NewClinicalTrialDiscoveryTask
             from pipelines.pipeline_3_publication.task_publication_1 import NewPublicationDiscoveryTask
 
@@ -129,7 +129,7 @@ class AlertPipelineRunner(PipelineRunnerBase):
             studies that were not returned by the disease-name discovery query
             for the current GARD update window.
             '''
-            self._run_pipeline_task(ClinicalTrialExistingStudyUpdateChecker)
+            self._run_pipeline_task(ExistingClinicalTrialStudyUpdateTask)
 
         except Exception as e:
             self.logger.error(f"run_find_new_clinical_trial_and_publication_updates() failed: {e}") 
