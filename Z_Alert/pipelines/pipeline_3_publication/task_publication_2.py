@@ -219,7 +219,7 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
         self.logger.info(f"Fetching new publication_article rows in id {self.fetch_order} order.")
 
         batch_num = 0
-        batch_size = 15
+        batch_size = 20
 
         try: 
             with Pool(processes=batch_size) as active_pool:
