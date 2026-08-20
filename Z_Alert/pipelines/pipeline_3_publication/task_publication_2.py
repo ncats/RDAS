@@ -192,8 +192,12 @@ def process_publication_article(obj: Dict[str, Any]) -> Optional[Tuple[bool, boo
 class PublicationEpiNhsClassificationTask(PipelineBase):
 
 
-    def __init__(self):
+    def __init__(self, fetch_order: str = "ASC"):
         super().__init__(init_mysql=True, init_memgraph=False)
+        self.fetch_order = fetch_order.upper()
+
+        if self.fetch_order not in {"ASC", "DESC"}:
+            raise ValueError("fetch_order must be ASC or DESC.")
 
 
     # Not implemented
@@ -204,15 +208,15 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
     # implement
     def process_new_data(self) -> None:
         
-        fetch_is_new_query = f'SELECT id, pubmed_id, title, abstract_text FROM publication_article WHERE is_EPI is null AND is_new = 1'
+        fetch_is_new_query = f'SELECT id, pubmed_id, title, abstract_text FROM publication_article WHERE is_EPI is null AND is_new = 1 ORDER BY id {self.fetch_order} LIMIT %s'
 
         update_sql = " UPDATE publication_article SET is_EPI = %s, is_NHS = %s, epi_probability =%s, epi_extract = %s WHERE pubmed_id = %s "
 
         
         update_cursor = self.mysql.cursor()    
 
-        fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
-        fetch_cursor.execute(fetch_is_new_query)
+        fetch_cursor = self.mysql.cursor(dictionary=True)
+        self.logger.info(f"Fetching new publication_article rows in id {self.fetch_order} order.")
 
         batch_num = 0
         batch_size = 15
@@ -221,7 +225,15 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
             with Pool(processes=batch_size) as active_pool:
                 while True:
 
-                    rows = fetch_cursor.fetchmany(batch_size)
+                    '''
+                    Fetch one small batch at a time instead of opening one large
+                    cursor over all remaining rows. This lets the ascending and
+                    descending standalone scripts run at the same time: after
+                    each commit, the next SELECT only sees rows where is_EPI is
+                    still NULL.
+                    '''
+                    fetch_cursor.execute(fetch_is_new_query, (batch_size,))
+                    rows = fetch_cursor.fetchall()
 
                     batch_num += 1
                     self.logger.info(f'\n--- batch# = {batch_num} ---')
