@@ -240,28 +240,46 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
                 pubmed_id_list = [row['pubmed_id'] for row in rows]
 
                 val_list = []
+                skipped_pubmed_ids = []
 
                 for pubmed_id in pubmed_id_list:
                     
-                    # PubtatorWorker owns the API call and retry behavior; this task stores whatever JSON comes back for the PMID.
+                    # PubtatorWorker owns the API call and retry behavior; this task stores only successful responses.
                     pubmed_id, source_json  = self.worker.download_by_pmid(pubmed_id) 
- 
-                    if source_json:
-                        source_json = json.dumps(source_json)
- 
+
+                    if source_json is None:
+                        skipped_pubmed_ids.append(pubmed_id)
+                        self.logger.warning(f'PubTator download failed for pubmed_id={pubmed_id}; no row inserted, so it remains retryable.')
+                        time.sleep(0.5)
+                        continue
+
+                    '''
+                    Only insert rows when PubTator returned a response. A NULL
+                    source_json row would make future runs think the PMID was
+                    already retrieved, so failed downloads must be skipped.
+                    '''
+                    source_json = json.dumps(source_json)
                     val_list.append((pubmed_id, source_json, pubmed_id))
-                     
-                    count += 1
                      
                     ''' PubTator3 API usage guidance: do not exceed three requests per second. '''
                     ''' In order not to overload the PubTator3 server, we ask that users post no more than three requests per second. '''
                     time.sleep(0.5)
 
-                try:              
+                try:
+                    if not val_list:
+                        self.logger.warning(f'No PubTator rows inserted for batch#{batch_num}; all failed PMIDs remain retryable.')
+                        continue
+
                     insert_cursor.executemany(insert_sql, val_list)
-                    self.mysql.commit()  
-                    self.logger.info(f'Inserted {len(val_list)} rows into publication_pubtator table. Current total count = {count}')
-                    self.logger.info(', '.join(str(pubmed_id) for pubmed_id in pubmed_id_list))
+                    self.mysql.commit()
+
+                    inserted_count = insert_cursor.rowcount
+                    count += inserted_count
+
+                    self.logger.info(f'Inserted {inserted_count} rows into publication_pubtator table. Current total count = {count}')
+                    self.logger.info(', '.join(str(pubmed_id) for pubmed_id, _, _ in val_list))
+                    if skipped_pubmed_ids:
+                        self.logger.warning(f'Skipped retryable PubTator PMIDs: {", ".join(str(pubmed_id) for pubmed_id in skipped_pubmed_ids)}')
      
                 except Exception as e:
                     self.logger.error(f'{e}') 
