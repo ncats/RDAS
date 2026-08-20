@@ -215,7 +215,12 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
 
         count = 0
         batch_num = 0
+        '''
+        PubTator3 accepts a comma-separated PMID list. Keep the batch size
+        conservative so URLs stay small and failed batches are easy to retry.
+        '''
         batch_size = 20
+        request_delay_seconds = 0.5
 
         insert_cursor = None
         fetch_cursor = None
@@ -237,20 +242,25 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
                 batch_num += 1
                 self.logger.info(f'--- batch# = {batch_num} ---')
 
-                pubmed_id_list = [row['pubmed_id'] for row in rows]
+                pubmed_id_list = list(dict.fromkeys(row['pubmed_id'] for row in rows))
 
                 val_list = []
                 skipped_pubmed_ids = []
 
+                '''
+                Download the whole PMID batch in one PubTator request, then
+                store one split source_json payload per PMID. This stays below
+                the request-rate guidance while avoiding one HTTP request per
+                article.
+                '''
+                source_json_by_pubmed_id = self.worker.download_by_pmids(pubmed_id_list)
+
                 for pubmed_id in pubmed_id_list:
-                    
-                    # PubtatorWorker owns the API call and retry behavior; this task stores only successful responses.
-                    pubmed_id, source_json  = self.worker.download_by_pmid(pubmed_id) 
+                    source_json = source_json_by_pubmed_id.get(str(pubmed_id))
 
                     if source_json is None:
                         skipped_pubmed_ids.append(pubmed_id)
                         self.logger.warning(f'PubTator download failed for pubmed_id={pubmed_id}; no row inserted, so it remains retryable.')
-                        time.sleep(0.5)
                         continue
 
                     '''
@@ -260,10 +270,10 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
                     '''
                     source_json = json.dumps(source_json)
                     val_list.append((pubmed_id, source_json, pubmed_id))
-                     
-                    ''' PubTator3 API usage guidance: do not exceed three requests per second. '''
-                    ''' In order not to overload the PubTator3 server, we ask that users post no more than three requests per second. '''
-                    time.sleep(0.5)
+
+                ''' PubTator3 API usage guidance: do not exceed three requests per second. '''
+                ''' In order not to overload the PubTator3 server, pause after each batch request. '''
+                time.sleep(request_delay_seconds)
 
                 try:
                     if not val_list:
