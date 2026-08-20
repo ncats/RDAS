@@ -90,6 +90,7 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
 
         insert_cursor = None
         fetch_cursor = None
+        total_pubmed_ids_processed = 0
 
         try:
             insert_cursor = self.mysql.cursor()
@@ -107,6 +108,8 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
 
                 batch_num += 1
                 self.logger.info(f'--- batch# = {batch_num} ---')
+                total_pubmed_ids_processed += len(rows)
+                self.logger.info(f'Parsing PubTator batch#{batch_num}: PMIDs processed={len(rows)}, total PMIDs processed={total_pubmed_ids_processed}.')
 
                 # val_list collects raw parsed annotations for the whole batch; duplicates are merged before insert.
                 val_list = []
@@ -187,6 +190,7 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
             if insert_cursor:
                 insert_cursor.close()
         
+        self.logger.info(f'Total PMIDs processed for PubTator parsing = {total_pubmed_ids_processed}')
         self.logger.info(f'Total inserted = {count} rows into publication_pubtator_parsed table')
         
 
@@ -215,6 +219,9 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
 
         count = 0
         batch_num = 0
+        total_pubmed_ids_processed = 0
+        total_pubmed_ids_downloaded = 0
+        total_pubmed_ids_retryable = 0
         '''
         PubTator3 accepts a comma-separated PMID list. Keep the batch size
         conservative so URLs stay small and failed batches are easy to retry.
@@ -243,6 +250,7 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
                 self.logger.info(f'--- batch# = {batch_num} ---')
 
                 pubmed_id_list = list(dict.fromkeys(row['pubmed_id'] for row in rows))
+                total_pubmed_ids_processed += len(pubmed_id_list)
 
                 val_list = []
                 skipped_pubmed_ids = []
@@ -271,6 +279,17 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
                     source_json = json.dumps(source_json)
                     val_list.append((pubmed_id, source_json, pubmed_id))
 
+                total_pubmed_ids_downloaded += len(val_list)
+                total_pubmed_ids_retryable += len(skipped_pubmed_ids)
+
+                self.logger.info(
+                    f'PubTator retrieval batch#{batch_num}: PMIDs processed={len(pubmed_id_list)}, '
+                    f'downloaded={len(val_list)}, retryable_failed={len(skipped_pubmed_ids)}. '
+                    f'Totals: PMIDs processed={total_pubmed_ids_processed}, '
+                    f'downloaded={total_pubmed_ids_downloaded}, '
+                    f'retryable_failed={total_pubmed_ids_retryable}.'
+                )
+
                 ''' PubTator3 API usage guidance: do not exceed three requests per second. '''
                 ''' In order not to overload the PubTator3 server, pause after each batch request. '''
                 time.sleep(request_delay_seconds)
@@ -294,6 +313,9 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
                 except Exception as e:
                     self.logger.error(f'{e}') 
 
+            self.logger.info(f'\n*** Processed total = {total_pubmed_ids_processed} PMIDs for PubTator retrieval ***')
+            self.logger.info(f'\n*** Downloaded total = {total_pubmed_ids_downloaded} PMIDs from PubTator ***')
+            self.logger.info(f'\n*** Retryable failed total = {total_pubmed_ids_retryable} PMIDs for PubTator retrieval ***')
             self.logger.info(f'\n*** Inserted total = {count} rows into publication_pubtator table ***')
 
         except Exception as e:
@@ -306,6 +328,7 @@ class NewPublicationPubtatorRetrievalTask(PipelineBase):
             if insert_cursor:
                 insert_cursor.close()
 
+        self.logger.info(f'Total PMIDs processed for PubTator retrieval = {total_pubmed_ids_processed}')
         self.logger.info(f'Total inserted = {count} rows into publication_pubtator table')
  
 
