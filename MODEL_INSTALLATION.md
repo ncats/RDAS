@@ -120,7 +120,7 @@ export HUGGINGFACE_TOKEN="your-token"
 
 ## Hugging Face NHS Article Prediction Model
 
-`epi4gard_local.nhs` loads the Natural History Study article classifier from:
+`X_epi_nhs_predict_local.nhs` loads the Natural History Study article classifier from:
 
 ```text
 NIHNCATS/NHS-BiomedNLP-BiomedBERT-hypop

@@ -14,7 +14,7 @@ sys.path.extend([
 
 load_dotenv()
 
-from epi4gard_local import (
+from X_epi_nhs_predict_local import (
     NhsPredictionUnavailable,
     get_pipeline,
     postEpiExtractText,
@@ -27,11 +27,11 @@ from utils.tools import _to_txt
 Local replacement for task_publication_2.py.
 
 Updates is_EPI, is_NHS, epi_probability, and epi_extract for new
-publication_article rows, but replaces these HTTP calls with epi4gard_local:
+publication_article rows, but replaces these HTTP calls with X_epi_nhs_predict_local:
 
-    EPI_CLASSIFY_API -> epi4gard_local classifier
-    EPI_EXTRACT_API -> epi4gard_local extractor
-    NHS_PREDICT_API -> epi4gard_local Natural History Study predictor
+    EPI_CLASSIFY_API -> X_epi_nhs_predict_local classifier
+    EPI_EXTRACT_API -> X_epi_nhs_predict_local extractor
+    NHS_PREDICT_API -> X_epi_nhs_predict_local Natural History Study predictor
 """
 
 

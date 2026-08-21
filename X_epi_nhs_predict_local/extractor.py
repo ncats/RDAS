@@ -380,7 +380,7 @@ class GARDSearch:
         deps = _load_extraction_dependencies()
         from nltk.corpus import stopwords
 
-        with resources.files("epi4gard_local.data").joinpath("gard-id-name-synonyms.json").open("r", encoding="utf-8-sig") as handle:
+        with resources.files("X_epi_nhs_predict_local.data").joinpath("gard-id-name-synonyms.json").open("r", encoding="utf-8-sig") as handle:
             diseases = json.load(handle)
 
         stop_words = set(stopwords.words("english"))

@@ -1,4 +1,4 @@
-"""Command-line smoke test for epi4gard_local."""
+"""Command-line smoke test for X_epi_nhs_predict_local."""
 
 from __future__ import annotations
 

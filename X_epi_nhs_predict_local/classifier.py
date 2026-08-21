@@ -19,7 +19,7 @@ def _load_dependencies():
         from transformers import AutoModelForSequenceClassification, BertConfig, BertTokenizer
     except ImportError as exc:
         raise DependencyError(
-            "epi4gard-local requires torch and transformers. Install this package with "
+            "X_epi_nhs_predict_local requires torch and transformers. Install this package with "
             "`pip install -e .` from the repository root, or install those dependencies "
             "in your existing epi4GARD environment."
         ) from exc

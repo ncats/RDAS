@@ -1,4 +1,4 @@
-# epi4gard_local
+# X_epi_nhs_predict_local
 
 Local replacement layer for RDAS calls that used to go through HTTP:
 
@@ -11,7 +11,7 @@ NHS_PREDICT_API=https://rdas.ncats.nih.gov/api/article_prediction/v1/predict
 ## EPI Classification
 
 ```python
-from epi4gard_local import postEpiClassifyText
+from X_epi_nhs_predict_local import postEpiClassifyText
 
 result = postEpiClassifyText("Your abstract text here.")
 ```
@@ -25,7 +25,7 @@ Returns the same shape as `postEpiClassifyText`:
 For large jobs, load the model once and use batching:
 
 ```python
-from epi4gard_local import EpiClassifyTextPipeline
+from X_epi_nhs_predict_local import EpiClassifyTextPipeline
 
 classifier = EpiClassifyTextPipeline(local_files_only=True)
 
@@ -36,7 +36,7 @@ for result in classifier.iter_classify_texts(texts, batch_size=64):
 ## EPI Extraction
 
 ```python
-from epi4gard_local import postEpiExtractText
+from X_epi_nhs_predict_local import postEpiExtractText
 
 result = postEpiExtractText("Your abstract text here.", extract_diseases=False)
 ```
@@ -48,7 +48,7 @@ local path/cache.
 ## NHS Prediction
 
 ```python
-from epi4gard_local import predict_article
+from X_epi_nhs_predict_local import predict_article
 
 result = predict_article(["Your abstract text here."])
 ```
@@ -78,7 +78,7 @@ For a one-off interactive download through the command line, omit
 `--local-files-only`:
 
 ```bash
-conda run -n rdas python -m epi4gard_local --endpoint nhs --text "Natural history study abstract."
+conda run -n rdas python -m X_epi_nhs_predict_local --endpoint nhs --text "Natural history study abstract."
 ```
 
 Tests can still inject a process-local predictor with
@@ -87,23 +87,15 @@ Tests can still inject a process-local predictor with
 ## Endpoint Dispatcher
 
 ```python
-from epi4gard_local import EPI_CLASSIFY_API, local_post
+from X_epi_nhs_predict_local import EPI_CLASSIFY_API, local_post
 
 result = local_post(EPI_CLASSIFY_API, {"text": "Your abstract text here."})
 ```
 
-## Smoke Tests
+## Command-Line Checks
 
 ```bash
-conda run -n rdas python epi4gard_local_smoke_test.py
-conda run -n rdas python epi4gard_local_smoke_test.py --run-classify --local-files-only
-conda run -n rdas python epi4gard_local_smoke_test.py --run-extract --local-files-only
-```
-
-Command-line module:
-
-```bash
-conda run -n rdas python -m epi4gard_local --endpoint classify --text "A population-based study estimated disease prevalence." --local-files-only
-conda run -n rdas python -m epi4gard_local --endpoint extract --text "A study reported prevalence of 1 in 100000 people." --local-files-only
-conda run -n rdas python -m epi4gard_local --endpoint nhs --text "A natural history study followed patients over time." --local-files-only
+conda run -n rdas python -m X_epi_nhs_predict_local --endpoint classify --text "A population-based study estimated disease prevalence." --local-files-only
+conda run -n rdas python -m X_epi_nhs_predict_local --endpoint extract --text "A study reported prevalence of 1 in 100000 people." --local-files-only
+conda run -n rdas python -m X_epi_nhs_predict_local --endpoint nhs --text "A natural history study followed patients over time." --local-files-only
 ```
