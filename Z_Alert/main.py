@@ -192,7 +192,7 @@ class AlertPipelineRunner(PipelineRunnerBase):
 
         self.logger.info("Starting run_publication_mysql_updates().")
 
-        from pipelines.pipeline_3_publication.task_publication_2 import PublicationEpiNhsClassificationTask
+        from pipelines.pipeline_3_publication.task_publication_2_local import PublicationEpiNhsClassificationTask
         from pipelines.pipeline_3_publication.task_publication_3 import GardOmimPublicationMappingTask
         from pipelines.pipeline_3_publication.task_publication_4 import PublicationOminDataRetrievalTask
         from pipelines.pipeline_3_publication.task_publication_5 import NewPublicationPubtatorRetrievalTask

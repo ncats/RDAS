@@ -118,6 +118,34 @@ If the machine needs authenticated Hugging Face access, set:
 export HUGGINGFACE_TOKEN="your-token"
 ```
 
+## Hugging Face NHS Article Prediction Model
+
+`epi4gard_local.nhs` loads the Natural History Study article classifier from:
+
+```text
+NIHNCATS/NHS-BiomedNLP-BiomedBERT-hypop
+```
+
+This matches the model used by the RDAS
+`NaturalHistory_Transformer_API_v1.0` service. Pre-download/check:
+
+```bash
+python - <<'PY'
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+model_name = "NIHNCATS/NHS-BiomedNLP-BiomedBERT-hypop"
+AutoTokenizer.from_pretrained(model_name)
+AutoModelForSequenceClassification.from_pretrained(model_name)
+print(f"Downloaded {model_name}")
+PY
+```
+
+If the model is installed from a local clone or deployment copy instead, set:
+
+```bash
+export NHS_MODEL_PATH="/path/to/NaturalHistory_Transformer_API_v1.0/app/saved_model/my_BiomedNLP-BiomedBERT_model"
+```
+
 ## NLTK Data
 
 `utils/tools.py` imports and uses NLTK tokenizers/corpora:
@@ -189,4 +217,3 @@ AutoModel.from_pretrained(model_name)
 print(f"Hugging Face model OK: {model_name}")
 PY
 ```
-

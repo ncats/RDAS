@@ -34,6 +34,10 @@ rdas-graph.png
 workflow.html
 requirements-full.txt
 __init__.py
+!epi4gard_local/__init__.py
+!epi4gard_local/data/
+!epi4gard_local/data/__init__.py
+!epi4gard_local/data/gard-id-name-synonyms.json
 
 # Jupyter
 .ipynb_checkpoints/
