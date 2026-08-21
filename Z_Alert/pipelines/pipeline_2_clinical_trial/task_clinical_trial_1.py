@@ -176,18 +176,22 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
                 response = requests.get(f'{studies_api}/{nctid}', timeout=10)
 
                 if response.status_code >= 400:
-                    print(f"Request failed for {nctid}: status={response.status_code}")
+                    self.logger.error(f"ClinicalTrials.gov study request failed for nctid={nctid}: status={response.status_code}")
                     break
 
-                return response.json()
+                try:
+                    return response.json()
+                except ValueError as error:
+                    self.logger.error(f"Invalid ClinicalTrials.gov study JSON for nctid={nctid}: {error}")
+                    break
 
             except requests.exceptions.Timeout:
-                print(f"Timeout occurred for {nctid}, retrying...")
                 retries += 1
+                self.logger.error(f"Timeout fetching ClinicalTrials.gov study for nctid={nctid}. attempt={retries}/{max_retries}")
                 time.sleep(1)
 
             except requests.exceptions.RequestException as e:
-                print(f"Request failed for {nctid}: {e}")
+                self.logger.error(f"ClinicalTrials.gov study request failed for nctid={nctid}: {e}")
                 break
 
         return None
@@ -201,11 +205,16 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
 
             # Return a page of matching NCT IDs from the ClinicalTrials.gov search API.
             #url_logger.info(query)
-            response = requests.get(query)
+            response = requests.get(query, timeout=30)
+
+            if response.status_code >= 400:
+                self.logger.error(f"ClinicalTrials.gov search request failed: status={response.status_code}, query={query}")
+                return None
+
             response_txt = response.json()
 
-        except Exception as e:
-            print(f'Unable to Process Query: {query}\n{e}')
+        except (requests.RequestException, ValueError) as e:
+            self.logger.error(f'Unable to process ClinicalTrials.gov search query: {query}\n{e}')
             response_txt = None
 
         return response_txt

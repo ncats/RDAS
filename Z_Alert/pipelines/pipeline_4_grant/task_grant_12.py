@@ -308,13 +308,16 @@ class GrantPublicationArticleImportTask(GrantPipelineBase):
             if row is not None
         ]
         inserted_count = self._insert_publication_articles(batch_values)
-        marked_count = self._mark_range_processed(start_id, end_id)
+        failed_download_count = len(pmids) - len(batch_values)
+        marked_count = 0
 
-        if len(batch_values) < len(pmids):
+        if failed_download_count:
             self.logger.warning(
                 f"Downloaded {len(batch_values)} of {len(pmids)} missing grant publication PMIDs "
-                f"for work-table range [{start_id}-{end_id}]."
+                f"for work-table range [{start_id}-{end_id}]. The range remains retryable."
             )
+        else:
+            marked_count = self._mark_range_processed(start_id, end_id)
 
         return {
             "pmid_count": len(pmids),

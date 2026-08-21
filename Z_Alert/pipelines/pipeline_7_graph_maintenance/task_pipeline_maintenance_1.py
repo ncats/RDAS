@@ -18,6 +18,8 @@ from pipelines.pipeline_base import PipelineBase
 from utils.organization_name_extractor import OrganizationNameExtractor
 from utils.tools import _time_hms, _to_float, _to_int
 
+ROR_LOOKUP_API_FAILED = "ROR_LOOKUP_API_FAILED"
+
 """
 Fetch ROR organization location data for Organization nodes.
 
@@ -53,8 +55,9 @@ def lookup_ror_static(org_name: str, idx_key: str, timeout: int = 20):
     """
     Query the ROR API for one organization.
 
-    Returns a tuple matching the organization_location insert statement, or
-    None when ROR has no chosen organization result.
+    Returns a tuple matching the organization_location insert statement when a
+    chosen organization is found, None when ROR completed successfully but has
+    no chosen result, or ROR_LOOKUP_API_FAILED when the API call/response failed.
     """
     cleaned_org_name = _clean_org_name(org_name)
 
@@ -64,7 +67,7 @@ def lookup_ror_static(org_name: str, idx_key: str, timeout: int = 20):
     ror_organizations_api = os.getenv("ROR_ORGANIZATIONS_API")
 
     if not ror_organizations_api:
-        return None
+        return ROR_LOOKUP_API_FAILED
 
     try:
         response = requests.get(
@@ -145,9 +148,9 @@ def lookup_ror_static(org_name: str, idx_key: str, timeout: int = 20):
         )
 
     except requests.RequestException:
-        return None
+        return ROR_LOOKUP_API_FAILED
     except (KeyError, ValueError, TypeError, json.JSONDecodeError):
-        return None
+        return ROR_LOOKUP_API_FAILED
 
 
 class OrganizationLocationRorLookupTask(PipelineBase):
@@ -682,17 +685,28 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                 try:
                     '''
                     Step 4.1:
-                    Read the ROR result. lookup_ror_static returns a tuple for a chosen ROR match and None for no match.
+                    Read the ROR result. lookup_ror_static returns a tuple for
+                    a chosen ROR match, None for a completed no-match lookup,
+                    and ROR_LOOKUP_API_FAILED for an API failure that should
+                    remain retryable.
                     '''
                     result = future.result()
                 except Exception as e:
                     '''
                     Step 4.2:
-                    Treat unexpected worker exceptions as no-match for this run and log the context needed to diagnose it.
+                    Treat unexpected worker exceptions as retryable API
+                    failures. Do not save a not-found row or mark the graph as
+                    N/A because that would hide a temporary outage.
                     '''
                     self.logger.error(f"ROR lookup failed for extracted_name={extracted_name}, original_name={original_name}, idx_key={idx_key}: {e}")
+                    continue
 
-                    result = None
+                if result == ROR_LOOKUP_API_FAILED:
+                    self.logger.error(
+                        f"ROR lookup API failed for extracted_name={extracted_name}, "
+                        f"original_name={original_name}, idx_key={idx_key}; leaving it retryable."
+                    )
+                    continue
 
                 if result is not None:
                     '''
@@ -752,7 +766,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
 
 
     def save_not_found_organizations(self, not_found_list: List[Tuple[str, str]]) -> int:
-        """Save failed ROR lookups so they are not repeatedly queried."""
+        """Save completed ROR no-match lookups so they are not repeatedly queried."""
 
         return self.save_organization_rows(self.INSERT_NOT_FOUND_ORGANIZATION_SQL, not_found_list, "not-found", )
 

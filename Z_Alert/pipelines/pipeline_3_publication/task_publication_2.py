@@ -27,7 +27,7 @@ Update is_EPI and is_NHS for new rows in publication_article.
 These are module-level functions, not class methods, and keeping them outside PublicationEpiNhsClassificationTask is correct for multiprocessing.
 '''
 
-def get_nhs_extract(texts: Sequence[str]) -> bool:
+def get_nhs_extract(texts: Sequence[str]) -> Optional[bool]:
     """
     Predict whether the supplied publication text is NIH/NHS-related.
 
@@ -35,38 +35,41 @@ def get_nhs_extract(texts: Sequence[str]) -> bool:
         texts: Text payload expected by the NHS prediction API.
 
     Returns:
-        True when the first prediction is positive; otherwise False.
+        True or False when the API returns a usable prediction. None means the
+        API call failed or returned an invalid payload, so the caller should
+        leave the database row unchanged and retry later.
     """
 
-    def parse_api_response(response: requests.Response) -> bool:
+    def parse_api_response(response: requests.Response) -> Optional[bool]:
         try:
             nhs_info = response.json()
         except ValueError as e:
             print(f'Invalid NHS prediction JSON response: {e}')
-            return False
+            return None
 
         if not isinstance(nhs_info, dict):
             print(f'Unexpected NHS prediction response type: {type(nhs_info).__name__}')
-            return False
+            return None
 
         predictions = nhs_info.get('predictions')
-        if not predictions:
-            return False
+        if predictions is None:
+            print('NHS prediction response is missing predictions.')
+            return None
 
         try:
             return predictions[0] == 1
         except (IndexError, TypeError) as e:
             print(f'Unable to read NHS prediction value: {e}')
-            return False
+            return None
 
     api_url = os.getenv('NHS_PREDICT_API')
     if not api_url:
         print('NHS_PREDICT_API is not configured.')
-        return False
+        return None
 
     payload = {'texts': texts}
 
-    return bool(HttpsUtil.with_api_retry(api_url, payload, parse_api_response))
+    return HttpsUtil.with_api_retry(api_url, payload, parse_api_response)
 
 
 def get_is_epi(text: str) -> Optional[Dict[str, Any]]:
@@ -174,6 +177,9 @@ def process_publication_article(obj: Dict[str, Any]) -> Optional[Tuple[bool, boo
     epi_probability = epi_prediction['probability']
 
     is_nhs = get_nhs_extract([text_to_predict])
+    if is_nhs is None:
+        print(f'OS.process_id:{os.getpid()}\tId:{article_id} - pubmed_id:{pubmed_id}\tNHS prediction failed; database row will not be updated.')
+        return None
 
     print(f'OS.process_id:{os.getpid()}\tId:{article_id} - pubmed_id:{pubmed_id}\tis_EPI={is_epi}\tepiProbability={epi_probability}\tis_NHS={is_nhs}')
 
@@ -181,9 +187,12 @@ def process_publication_article(obj: Dict[str, Any]) -> Optional[Tuple[bool, boo
 
     if is_epi:
         epi_extract_json = get_epi_extract(text_to_predict)
-        if epi_extract_json:
-            epi_extract = json.dumps(epi_extract_json)
-            print(f'\t\t{epi_extract}')
+        if epi_extract_json is None:
+            print(f'OS.process_id:{os.getpid()}\tId:{article_id} - pubmed_id:{pubmed_id}\tEPI extraction failed; database row will not be updated.')
+            return None
+
+        epi_extract = json.dumps(epi_extract_json)
+        print(f'\t\t{epi_extract}')
 
     return (is_epi, is_nhs, epi_probability, epi_extract, pubmed_id)
 

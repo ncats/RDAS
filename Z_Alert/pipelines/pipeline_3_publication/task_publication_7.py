@@ -40,6 +40,8 @@ SEMANTIC_TYPE_LIST = {
     "Physiologic Function",
 }
 
+UMLS_API_FAILED = "UMLS_API_FAILED"
+
 
 class PublicationFalsePositiveFilterTask(PipelineBase):
     """
@@ -146,9 +148,18 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
                     except Exception as e:
                         self.logger.error(
                             f"Error validating abbreviation row id={row_id}, "
-                            f"search_term={search_term}, pubmed_id={row.get('pubmed_id')}: {e}"
+                            f"search_term={search_term}, pubmed_id={row.get('pubmed_id')}: {e}. "
+                            "Leaving is_valid NULL so it can be retried."
                         )
-                        is_valid = False
+                        continue
+
+                    if is_valid is None:
+                        self.logger.error(
+                            f"Skipping abbreviation row id={row_id}, search_term={search_term}, "
+                            f"pubmed_id={row.get('pubmed_id')}: UMLS API failed; "
+                            "leaving is_valid NULL so it can be retried."
+                        )
+                        continue
 
                     update_values.append((1 if is_valid else 0, row_id))
                     total += 1
@@ -263,7 +274,7 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
 
         if not self.api_key or not self.umls_search_api:
             self.logger.error("UMLS_API_KEY or UMLS_SEARCH_API is not configured.")
-            return None
+            return UMLS_API_FAILED
 
         search_url = f"{self.umls_search_api}?string={term}&searchType=exact&apiKey={self.api_key}"
 
@@ -271,13 +282,18 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
             response = requests.get(search_url, timeout=30)
         except requests.RequestException as e:
             self.logger.error(f"Error searching UMLS term '{term}': {e}")
-            return None
+            return UMLS_API_FAILED
 
         if response.status_code != 200:
             self.logger.error(f"Error searching UMLS term '{term}': {response.status_code}, {response.text}")
-            return None
+            return UMLS_API_FAILED
 
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError as e:
+            self.logger.error(f"Invalid UMLS search JSON for term '{term}': {e}")
+            return UMLS_API_FAILED
+
         results = data.get("result", {}).get("results", [])
 
         if not results:
@@ -286,7 +302,7 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
         return results[0].get("ui")
 
 
-    def get_semantic_types(self, cui: str) -> List[str]:
+    def get_semantic_types(self, cui: str) -> Optional[List[str]]:
         """Fetch UMLS semantic type names for a CUI."""
 
         if not cui:
@@ -294,7 +310,7 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
 
         if not self.api_key or not self.umls_cui_api_template:
             self.logger.error("UMLS_API_KEY or UMLS_CUI_API_TEMPLATE is not configured.")
-            return []
+            return None
 
         semantic_type_url = f"{self.umls_cui_api_template.format(cui=cui)}?apiKey={self.api_key}"
 
@@ -302,13 +318,18 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
             response = requests.get(semantic_type_url, timeout=30)
         except requests.RequestException as e:
             self.logger.error(f"Error retrieving semantic types for CUI {cui}: {e}")
-            return []
+            return None
 
         if response.status_code != 200:
             self.logger.error(f"Error retrieving semantic types for CUI {cui}: {response.status_code}, {response.text}")
-            return []
+            return None
 
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError as e:
+            self.logger.error(f"Invalid UMLS semantic type JSON for CUI {cui}: {e}")
+            return None
+
         semantic_types = data.get("result", {}).get("semanticTypes", [])
 
         return [
@@ -333,13 +354,14 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
         return False
 
 
-    def verify(self, search_term: str, abstract: str) -> bool:
+    def verify(self, search_term: str, abstract: str) -> Optional[bool]:
         """
         Return True when an abbreviation appears to expand to a disease term.
 
         The method checks the first sentence containing the abbreviation, pulls
         the expanded phrase before the abbreviation, then prefers UMLS semantic
-        types and falls back to SpaCy entity labels.
+        types and falls back to SpaCy entity labels. None means the UMLS API
+        failed and the database row should remain unchanged for retry.
         """
 
         if not search_term or not abstract:
@@ -363,10 +385,17 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
         last_noun_phrase = noun_phrases[-1]
         cui = self.get_cui(last_noun_phrase)
 
+        if cui == UMLS_API_FAILED:
+            return None
+
         # Prefer UMLS semantic types when available because they are more
         # explicit than local NLP entity labels.
         if cui:
             semantic_types = self.get_semantic_types(cui)
+
+            if semantic_types is None:
+                return None
+
             return any(semantic_type in SEMANTIC_TYPE_LIST for semantic_type in semantic_types)
 
         # If UMLS has no exact match, use SpaCy as a softer local signal.

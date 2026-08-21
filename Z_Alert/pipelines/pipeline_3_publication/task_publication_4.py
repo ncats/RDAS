@@ -1,6 +1,7 @@
 import os
 import sys 
 import json
+from typing import Optional
 _dir = os.path.dirname(__file__)
 sys.path.extend([
     os.path.abspath(os.path.join(_dir, "..")),
@@ -42,15 +43,15 @@ class PublicationOminDataRetrievalTask(PipelineBase):
         raise NotImplementedError("PublicationOminDataRetrievalTask does not implement find_new_data().")
    
 
-    def get_omim(self, url):
+    def get_omim(self, url) -> Optional[dict]:
         """Call the OMIM API and return the parsed JSON response."""
 
         def parse_api_response(response): 
             try: 
                 response_json = response.json() 
                 return response_json
-            except TypeError as e:
-                print(f'TypeError: {e}') 
+            except (TypeError, ValueError, AttributeError) as e:
+                self.logger.error(f'Unable to parse OMIM API response: {e}. url={url}')
             return None
     
         return HttpsUtil.with_api_retry_GET(url, parse_api_response)
@@ -117,6 +118,14 @@ class PublicationOminDataRetrievalTask(PipelineBase):
 
                     entry_json = self.get_omim(url)
 
+                    if entry_json is None:
+                        self.logger.error(f"OMIM API failed for omim_id={omim_id}; no publication_omim row inserted, so it remains retryable.")
+                        continue
+
+                    if not isinstance(entry_json, dict) or not entry_json.get("omim"):
+                        self.logger.error(f"OMIM API returned an unexpected payload for omim_id={omim_id}; no publication_omim row inserted, so it remains retryable.")
+                        continue
+
                     # Error: Failed executing the operation; Python type dict cannot be converted
                     ''' Solution: json.dumps(entry_json) '''
                     # Store the raw OMIM JSON string so later tasks can parse
@@ -132,6 +141,8 @@ class PublicationOminDataRetrievalTask(PipelineBase):
                     
                     except Exception as e:
                         self.logger.error(f'insert_sql error: \n{e}')
+                else:
+                    self.logger.warning(f"Batch#: {batch_num} - no valid OMIM API responses to insert; skipped OMIM IDs remain retryable.")
                 
         except Exception as e:
             self.logger.error(f"An unexpected error occurred: {e}")

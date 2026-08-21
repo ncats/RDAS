@@ -293,7 +293,11 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
                 self.logger.error(f"ClinicalTrials.gov request failed for NCTID={nctid}: status={response.status_code}.")
                 return None
 
-            return response.json()
+            try:
+                return response.json()
+            except ValueError as error:
+                self.logger.error(f"Invalid ClinicalTrials.gov study JSON for NCTID={nctid}: {error}.")
+                return None
 
         except requests.exceptions.RequestException as error:
             self.logger.error(f"ClinicalTrials.gov request failed for NCTID={nctid}: {error}.")

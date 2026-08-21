@@ -263,7 +263,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
                 try:
                     ''' Form RxNav API request to get RxNormID based on drug name '''
                     rq = f'{self.rxnav_rxcui_api}?name={drug_name}&search=2'
-                    response = requests.get(rq)
+                    response = requests.get(rq, timeout=30)
 
                     if response.status_code >= 400:
                         self.logger.error(f"RxNav request failed: status={response.status_code}, url={rq}")
@@ -283,18 +283,21 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
                         self.logger.error("IndexError: The 'rxnormId' list is empty or does not have an element at index 0.")
                         self.logger.error(f'\n{obj}\n')
                         rxnormid = None  # or handle this case appropriately
-                    except (TypeError, AttributeError):
+                    except (TypeError, AttributeError, ValueError):
                         self.logger.error("The JSON structure is not as expected or 'response' might not be JSON.")
                         rxnormid = None  # or handle this case appropriately
 
                     break  # Exit the loop if successful
                 except requests.exceptions.Timeout:
                     retries += 1
+                    self.logger.error(f"RxNav RxCUI request timed out for drug_name={drug_name}. attempt={retries}/{max_retries}, url={rq}")
                     time.sleep(1)
                 except requests.exceptions.RequestException as e:
+                    self.logger.error(f"RxNav RxCUI request failed for drug_name={drug_name}: {e}, url={rq}")
                     break  # Exit the loop for non-retryable errors
 
             if not rxnormid:
+                self.logger.error(f"RxNav returned no RxNormID for drug_name={drug_name}; no clinical_trial_intervention_drug rows inserted for this lookup.")
                 return None
 
             # re-init
@@ -305,8 +308,17 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
                     ''' Form RxNav API request to get all properties of the drug using RxNormID '''
                     rq2 = f'{self.rxnav_all_properties_api_template.format(rxnormid=rxnormid)}?prop=codes+attributes+names+sources'
-                    response = requests.get(rq2)
-                    results = response.json()['propConceptGroup']['propConcept']
+                    response = requests.get(rq2, timeout=30)
+
+                    if response.status_code >= 400:
+                        self.logger.error(f"RxNav property request failed: status={response.status_code}, url={rq2}")
+                        break
+
+                    try:
+                        results = response.json()['propConceptGroup']['propConcept']
+                    except (KeyError, TypeError, ValueError) as e:
+                        self.logger.error(f"Unable to parse RxNav properties for rxnormid={rxnormid}, drug_name={drug_name}: {e}, url={rq2}")
+                        break
 
                     ''' Extract and organize properties of the drug '''
                     for r in results:
@@ -319,6 +331,11 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
                 except requests.exceptions.Timeout:
                     retries += 1
+                    self.logger.error(f"RxNav property request timed out for rxnormid={rxnormid}, drug_name={drug_name}. attempt={retries}/{max_retries}, url={rq2}")
                     time.sleep(1)
                 except requests.exceptions.RequestException as e:
+                    self.logger.error(f"RxNav property request failed for rxnormid={rxnormid}, drug_name={drug_name}: {e}, url={rq2}")
                     break  # Exit the loop for non-retryable errors
+
+            self.logger.error(f"RxNav returned no property data for rxnormid={rxnormid}, drug_name={drug_name}; no clinical_trial_intervention_drug rows inserted for this lookup.")
+            return None
