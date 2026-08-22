@@ -61,12 +61,15 @@ from multiprocessing import Pool
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from pipelines.pipeline_4_grant.grant_base import GrantPipelineBase
+from pipelines.pipeline_error_logging import attach_pipeline_error_file_handler
+from utils.applogger import AppLogger
 from utils.tools import _time_hms
 
 
 WORD_PATTERN = re.compile(r"\b\w+\b")
 GARD_TERM_SEPARATOR = "$$$"
-LOG_FILE_PATH = GrantPipelineBase.PROJECT_ROOT / "logs" / "grant_GARD_Project_relation_process.log"
+TASK_LOGGER_NAME = "GrantGardProjectRelationshipTask"
+WORKER_LOGGER = None
 
 # PyTorch emits this warning while transformers loads/runs ClinicalBERT. This
 # task does not use storage APIs directly, so keep the filter narrow and avoid
@@ -90,7 +93,32 @@ GARD_ID_BY_NAME: Dict[str, Any] = {}
 SPACY_MODEL = None
 CLINICAL_BERT_TOKENIZER = None
 CLINICAL_BERT_MODEL = None
- 
+
+
+def get_grant_relationship_logger():
+
+    """
+    Return the standard task logger for parent and worker processes.
+
+    PipelineBase creates this logger for normal task classes. The multiprocessing
+    workers in this file run outside the task object, so they initialize the
+    same AppLogger target themselves. This keeps worker messages in the same
+    console/file/error-log strategy used by the other Z_Alert tasks.
+    """
+
+    global WORKER_LOGGER
+
+    if WORKER_LOGGER is not None:
+        return WORKER_LOGGER
+
+    log_dir = os.path.expanduser(os.getenv("ALERT_LOG_DIR", "logs"))
+    os.makedirs(log_dir, exist_ok=True)
+
+    log_file = os.path.join(log_dir, f"alert-{TASK_LOGGER_NAME}.log")
+    WORKER_LOGGER = AppLogger(TASK_LOGGER_NAME, log_file).get_logger()
+    attach_pipeline_error_file_handler(WORKER_LOGGER, log_dir, module_name=__name__)
+
+    return WORKER_LOGGER
 
 
 PROJECT_SELECT_SQL = """
@@ -360,7 +388,7 @@ def semantic_similarity_with_fallback(input_text: str, target_term: str) -> floa
         except Exception as exc:
             last_error = exc
 
-    append_worker_log(f"ClinicalBERT similarity failed after fallbacks: {last_error}")
+    get_grant_relationship_logger().error(f"ClinicalBERT similarity failed after fallbacks: {last_error}")
     return 0.0
 
 
@@ -593,33 +621,10 @@ def project_gard_relationship(project_title: Any, project_terms: Any, public_hea
     return None, ""
 
 
-def append_worker_log(message: str) -> None:
-    """Append worker progress to the historical process log."""
-
-    from utils.tools import _append_to_file
-
-    LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _append_to_file(LOG_FILE_PATH, message)
-
-
-def prepare_worker_log() -> None:
-    """Start this task run with a fresh worker log while preserving the previous one."""
-
-    LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-    if LOG_FILE_PATH.exists() and LOG_FILE_PATH.stat().st_size > 0:
-        archived_log_path = LOG_FILE_PATH.with_name(
-            f"{LOG_FILE_PATH.stem}-{time.strftime('%Y%m%d-%H%M%S')}{LOG_FILE_PATH.suffix}"
-        )
-        LOG_FILE_PATH.replace(archived_log_path)
-
-    LOG_FILE_PATH.write_text(
-        f"Grant GARD project relationship worker log started at {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-    )
-
-
 def flush_relationships(write_mysql, insert_cursor, insert_values: List[Tuple[Any, ...]]) -> Tuple[int, int, int]:
     """Insert one relationship batch and retry individual rows after a batch failure."""
+
+    logger = get_grant_relationship_logger()
 
     if not insert_values:
         return 0, 0, 0
@@ -635,7 +640,7 @@ def flush_relationships(write_mysql, insert_cursor, insert_values: List[Tuple[An
 
     except Exception as exc:
         write_mysql.rollback()
-        append_worker_log(f"Relationship insert batch failed; retrying {len(rows_to_insert)} rows individually: {exc}")
+        logger.exception(f"Relationship insert batch failed; retrying {len(rows_to_insert)} rows individually: {exc}")
 
     inserted_count = 0
     failed_rows = 0
@@ -649,17 +654,17 @@ def flush_relationships(write_mysql, insert_cursor, insert_values: List[Tuple[An
         except Exception as row_exc:
             write_mysql.rollback()
             failed_rows += 1
-            append_worker_log(
+            logger.exception(
                 "Relationship insert row failed: "
                 f"gard_id={row[0]}, application_id={row[1]}, gard_name={row[2]}, "
                 f"source_type={row[3]}, error={row_exc}"
             )
 
     if failed_rows:
-        append_worker_log(f"Relationship insert retry completed with failed_rows={failed_rows}.")
+        logger.error(f"Relationship insert retry completed with failed_rows={failed_rows}.")
 
     else:
-        append_worker_log("Relationship insert retry completed successfully after batch failure.")
+        logger.info("Relationship insert retry completed successfully after batch failure.")
 
     insert_values.clear()
     return inserted_count, 1, failed_rows
@@ -718,11 +723,12 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
         "relationship_insert_failed_rows": 0,
         "failed_ranges": 0,
     }
+    logger = get_grant_relationship_logger()
 
     try:
         if not ensure_gard_terms_loaded():
             summary["failed_ranges"] += 1
-            append_worker_log(f"[{start_id}-{end_id}]: no processed GARD terms found.")
+            logger.error(f"[{start_id}-{end_id}]: no processed GARD terms found.")
             return summary
 
         read_mysql = db().mysql_conn()
@@ -730,13 +736,13 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
 
         if read_mysql is None or write_mysql is None:
             summary["failed_ranges"] += 1
-            append_worker_log(f"[{start_id}-{end_id}]: unable to create MySQL read/write connections.")
+            logger.error(f"[{start_id}-{end_id}]: unable to create MySQL read/write connections.")
             return summary
 
         dict_cursor = read_mysql.cursor(dictionary=True)
         insert_cursor = write_mysql.cursor()
         dict_cursor.execute(PROJECT_SELECT_SQL, (start_id, end_id))
-        append_worker_log(f"[{start_id}-{end_id}]: started")
+        logger.info(f"[{start_id}-{end_id}]: started")
 
         while True:
             rows = dict_cursor.fetchmany(fetch_size)
@@ -751,7 +757,7 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
                 message = f"[{start_id}-{end_id}]: id={project_id}, application_id={application_id}"
 
                 if summary["projects_scanned"] % DEFAULT_WORKER_PROGRESS_LOG_INTERVAL == 0:
-                    append_worker_log(
+                    logger.info(
                         f"[{start_id}-{end_id}]: progress "
                         f"projects_scanned={summary['projects_scanned']}, "
                         f"projects_with_results={summary['projects_with_results']}, "
@@ -769,7 +775,7 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
 
                 except Exception as exc:
                     summary["projects_failed"] += 1
-                    append_worker_log(f"{message}; relationship matching failed: {exc}")
+                    logger.exception(f"{message}; relationship matching failed: {exc}")
                     continue
 
                 if not result_dict:
@@ -788,12 +794,12 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
         summary["relationships_inserted"] += inserted_count
         summary["relationship_insert_failed_batches"] += failed_batches
         summary["relationship_insert_failed_rows"] += failed_rows
-        append_worker_log(f"[{start_id}-{end_id}]: completed summary={summary}")
+        logger.info(f"[{start_id}-{end_id}]: completed summary={summary}")
         return summary
 
     except Exception as exc:
         summary["failed_ranges"] += 1
-        append_worker_log(f"[{start_id}-{end_id}]: range processing failed: {exc}")
+        logger.exception(f"[{start_id}-{end_id}]: range processing failed: {exc}")
         return summary
 
     finally:
@@ -852,8 +858,6 @@ class GrantGardProjectRelationshipTask(GrantPipelineBase):
         }
 
         try: 
-            prepare_worker_log()
-
             if self.mysql is None:
                 self.logger.error("Unable to create MySQL connection.")
                 return
