@@ -2,7 +2,7 @@ import inspect
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional, Tuple, Type
+from typing import Iterable, List, Optional, Tuple, Type
 
 
 PIPELINE_ERROR_LOG_FILES: Tuple[Tuple[str, str, str], ...] = (
@@ -14,6 +14,10 @@ PIPELINE_ERROR_LOG_FILES: Tuple[Tuple[str, str, str], ...] = (
     ("pipelines.pipeline_6_person", "pipeline_6_person", "error-alert-pipeline-6-person.log"),
     ("pipelines.pipeline_7_graph_maintenance", "pipeline_7_graph_maintenance", "error-alert-pipeline-7-graph-maintenance.log"),
 )
+Z_ALERT_ERROR_LOG_FILES: Tuple[Tuple[str, str], ...] = (
+    ("alert_sender.py", "error-alert-email.log"),
+    ("init_index.py", "error-alert-index.log"),
+)
 PIPELINE_ERROR_LOG_MAX_BYTES = 1024 * 1024 * 10
 PIPELINE_ERROR_LOG_BACKUP_COUNT = 10
 
@@ -22,9 +26,14 @@ def resolve_pipeline_error_log_file(module_name: Optional[str], task_class: Opti
     """Return the pipeline-specific error log filename for a task module."""
 
     normalized_module_name = module_name or ""
+    normalized_module_tail = normalized_module_name.rsplit(".", 1)[-1]
 
     for module_prefix, _directory_name, log_file in PIPELINE_ERROR_LOG_FILES:
         if normalized_module_name.startswith(module_prefix) or f".{module_prefix}" in normalized_module_name:
+            return log_file
+
+    for file_name, log_file in Z_ALERT_ERROR_LOG_FILES:
+        if normalized_module_tail == Path(file_name).stem:
             return log_file
 
     if task_class is None:
@@ -36,6 +45,10 @@ def resolve_pipeline_error_log_file(module_name: Optional[str], task_class: Opti
     except (OSError, TypeError):
         return None
 
+    for file_name, log_file in Z_ALERT_ERROR_LOG_FILES:
+        if task_file_path.name == file_name:
+            return log_file
+
     path_parts = set(task_file_path.parts)
 
     for _module_prefix, directory_name, log_file in PIPELINE_ERROR_LOG_FILES:
@@ -45,13 +58,13 @@ def resolve_pipeline_error_log_file(module_name: Optional[str], task_class: Opti
     return None
 
 
-def attach_pipeline_error_file_handler(logger, log_dir, module_name: Optional[str] = None, task_class: Optional[Type] = None):
+def attach_pipeline_error_file_handler(logger, log_dir, module_name: Optional[str] = None, task_class: Optional[Type] = None, error_log_file: Optional[str] = None):
     """Attach one ERROR-only rotating file handler for the task's pipeline."""
 
     if logger is None:
         return None, False
 
-    error_log_file = resolve_pipeline_error_log_file(module_name, task_class)
+    error_log_file = error_log_file or resolve_pipeline_error_log_file(module_name, task_class)
 
     if not error_log_file:
         return None, False
@@ -77,6 +90,29 @@ def attach_pipeline_error_file_handler(logger, log_dir, module_name: Optional[st
     return error_handler, True
 
 
+def attach_pipeline_error_file_handlers(logger, log_dir, error_log_files: Iterable[str]) -> List[Tuple[logging.Handler, bool]]:
+    """Attach several ERROR-only file handlers to one logger for a mixed pipeline step."""
+
+    handler_records = []
+    seen_log_files = set()
+
+    for error_log_file in error_log_files:
+        if not error_log_file or error_log_file in seen_log_files:
+            continue
+
+        handler, added = attach_pipeline_error_file_handler(
+            logger,
+            log_dir,
+            error_log_file=error_log_file,
+        )
+
+        if handler is not None:
+            handler_records.append((handler, added))
+            seen_log_files.add(error_log_file)
+
+    return handler_records
+
+
 def remove_pipeline_error_file_handler(logger, handler) -> None:
     """Flush, close, and remove a temporary pipeline error handler."""
 
@@ -86,3 +122,11 @@ def remove_pipeline_error_file_handler(logger, handler) -> None:
     handler.flush()
     handler.close()
     logger.removeHandler(handler)
+
+
+def remove_pipeline_error_file_handlers(logger, handler_records: Iterable[Tuple[logging.Handler, bool]]) -> None:
+    """Remove only the temporary error handlers that were added for one step."""
+
+    for handler, added in handler_records:
+        if added:
+            remove_pipeline_error_file_handler(logger, handler)

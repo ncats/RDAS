@@ -14,6 +14,12 @@ sys.path.extend([
 load_dotenv(os.path.abspath(os.path.join(_dir, "..", ".env")))
 
 from pipeline_runner_base import PipelineRunnerBase
+from pipelines.pipeline_error_logging import (
+    attach_pipeline_error_file_handler,
+    attach_pipeline_error_file_handlers,
+    remove_pipeline_error_file_handler,
+    remove_pipeline_error_file_handlers,
+)
 from utils.tools import _time_hms
 
 class AlertPipelineRunner(PipelineRunnerBase):
@@ -38,6 +44,15 @@ class AlertPipelineRunner(PipelineRunnerBase):
         gard_task = None
         clinical_trial_task = None
         publication_task = None
+        error_handler_records = attach_pipeline_error_file_handlers(
+            self.logger,
+            self.log_dir,
+            (
+                "error-alert-pipeline-1-gard.log",
+                "error-alert-pipeline-2-clinical-trial.log",
+                "error-alert-pipeline-3-publication.log",
+            ),
+        )
 
         try:
             from pipelines.pipeline_1_gard.task_gard_1 import GardNodeNamesTask
@@ -131,14 +146,15 @@ class AlertPipelineRunner(PipelineRunnerBase):
             '''
             self._run_pipeline_task(ExistingClinicalTrialStudyUpdateTask)
 
-        except Exception as e:
-            self.logger.error(f"run_find_new_clinical_trial_and_publication_updates() failed: {e}") 
+        except Exception:
+            self.logger.exception("run_find_new_clinical_trial_and_publication_updates() failed.")
 
         finally:
             for task in (clinical_trial_task, publication_task, gard_task):
                 self._close_task_if_needed(task)
 
             self.logger.info(f"Processed {total_gard_nodes} GARD nodes.")
+            remove_pipeline_error_file_handlers(self.logger, error_handler_records)
 
 
 
@@ -259,18 +275,29 @@ class AlertPipelineRunner(PipelineRunnerBase):
 
         alert_sender = None
         days = look_back_days if look_back_days is not None else self.look_back_days
+        error_handler = None
+        error_handler_added = False
 
         try:
             from alert_sender import AlertSender
 
+            error_handler, error_handler_added = attach_pipeline_error_file_handler(
+                self.logger,
+                self.log_dir,
+                module_name=AlertSender.__module__,
+                task_class=AlertSender,
+            )
             alert_sender = AlertSender(days)
             alert_sender.find_new_and_send_alert()
 
-        except Exception as e:
-            self.logger.error(f"send_alert_emails() failed: {e}")
+        except Exception:
+            self.logger.exception("send_alert_emails() failed.")
 
         finally:
             self._close_task_if_needed(alert_sender)
+
+            if error_handler_added:
+                remove_pipeline_error_file_handler(self.logger, error_handler)
 
 
 
