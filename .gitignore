@@ -6,7 +6,7 @@
 *.log
 *.sh
 *.json
-/*.sql
+*.sql
 /*.txt
 !/requirements.txt
 *.cypher
@@ -64,3 +64,5 @@ F_person/riea/Author disambiguation.docx
 F_person/riea/Moon-2025-09-22.csv
 Z_Alert/emails/alert_email_preview.html
 Z_Alert/pipelines/pipeline_4_grant/x_glioblastoma_grant_count_diagnostic.md
+gard_glioblastoma_matches.csv
+gard_glioblastoma_unique.tsv

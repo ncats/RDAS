@@ -12,9 +12,9 @@ PHR, and abstract for processed GARD disease terms, scores any matches,
 and inserts the resulting GARD-project relationship rows with `is_new = 1`.
 
 To speed up processing, the task splits eligible `grant_project.id` ranges
-across multiple worker processes. Each worker opens its own MySQL connection,
-loads the processed GARD disease terms once, scans its assigned projects, and
-writes relationship rows in batches.
+across multiple worker processes. Each worker loads the processed GARD disease
+terms once, scans its assigned projects with a read connection, and writes
+relationship rows in batches with a separate write connection.
 
 Required inputs:
     `grant_project`
@@ -121,6 +121,21 @@ MARK_CURRENT_RELATIONSHIPS_NEW_SQL = """
         AND p.is_new = 1
     SET gpr.is_new = 1
     WHERE COALESCE(gpr.is_new, 0) <> 1
+"""
+
+RELATION_INSERT_SQL = """
+    INSERT INTO grant_gard_project_relation (
+        gard_id,
+        application_id,
+        gard_name,
+        source_type,
+        confidence_score,
+        semantic_similarity,
+        core_project_num,
+        raw_result,
+        is_new
+    )
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1)
 """
 
 
@@ -586,39 +601,51 @@ def append_worker_log(message: str) -> None:
     _append_to_file(LOG_FILE_PATH, message)
 
 
-def flush_relationships(mysql, insert_cursor, insert_values: List[Tuple[Any, ...]]) -> Tuple[int, int]:
-    """Insert one relationship batch and clear the caller-owned list."""
+def flush_relationships(write_mysql, insert_cursor, insert_values: List[Tuple[Any, ...]]) -> Tuple[int, int, int]:
+    """Insert one relationship batch and retry individual rows after a batch failure."""
 
     if not insert_values:
-        return 0, 0
+        return 0, 0, 0
 
-    RELATION_INSERT_SQL = """
-        INSERT INTO grant_gard_project_relation (
-            gard_id,
-            application_id,
-            gard_name,
-            source_type,
-            confidence_score,
-            semantic_similarity,
-            core_project_num,
-            raw_result,
-            is_new
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1)
-    """
+    rows_to_insert = list(insert_values)
 
     try:
-        insert_cursor.executemany(RELATION_INSERT_SQL, insert_values) 
-        mysql.commit()
-        inserted_count = len(insert_values)
+        insert_cursor.executemany(RELATION_INSERT_SQL, rows_to_insert)
+        write_mysql.commit()
+        inserted_count = len(rows_to_insert)
         insert_values.clear()
-        return inserted_count, 0
+        return inserted_count, 0, 0
 
     except Exception as exc:
-        mysql.rollback()
-        append_worker_log(f"Relationship insert batch failed: {exc}")
-        insert_values.clear()
-        return 0, 1
+        write_mysql.rollback()
+        append_worker_log(f"Relationship insert batch failed; retrying {len(rows_to_insert)} rows individually: {exc}")
+
+    inserted_count = 0
+    failed_rows = 0
+
+    for row in rows_to_insert:
+        try:
+            insert_cursor.execute(RELATION_INSERT_SQL, row)
+            write_mysql.commit()
+            inserted_count += 1
+
+        except Exception as row_exc:
+            write_mysql.rollback()
+            failed_rows += 1
+            append_worker_log(
+                "Relationship insert row failed: "
+                f"gard_id={row[0]}, application_id={row[1]}, gard_name={row[2]}, "
+                f"source_type={row[3]}, error={row_exc}"
+            )
+
+    if failed_rows:
+        append_worker_log(f"Relationship insert retry completed with failed_rows={failed_rows}.")
+
+    else:
+        append_worker_log("Relationship insert retry completed successfully after batch failure.")
+
+    insert_values.clear()
+    return inserted_count, 1, failed_rows
 
 
 def build_relationship_rows(project_row: Dict[str, Any], result_dict: Dict[str, List[float]], source_type: str) -> List[Tuple[Any, ...]]:
@@ -660,7 +687,8 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
     from baseclass.conn import DBConnection as db
 
     start_id, end_id, fetch_size, insert_batch_size = worker_args
-    mysql = None
+    read_mysql = None
+    write_mysql = None
     dict_cursor = None
     insert_cursor = None
     insert_values: List[Tuple[Any, ...]] = []
@@ -670,6 +698,7 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
         "projects_failed": 0,
         "relationships_inserted": 0,
         "relationship_insert_failed_batches": 0,
+        "relationship_insert_failed_rows": 0,
         "failed_ranges": 0,
     }
 
@@ -679,15 +708,16 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
             append_worker_log(f"[{start_id}-{end_id}]: no processed GARD terms found.")
             return summary
 
-        mysql = db().mysql_conn()
+        read_mysql = db().mysql_conn()
+        write_mysql = db().mysql_conn()
 
-        if mysql is None:
+        if read_mysql is None or write_mysql is None:
             summary["failed_ranges"] += 1
-            append_worker_log(f"[{start_id}-{end_id}]: unable to create MySQL connection.")
+            append_worker_log(f"[{start_id}-{end_id}]: unable to create MySQL read/write connections.")
             return summary
 
-        dict_cursor = mysql.cursor(dictionary=True)
-        insert_cursor = mysql.cursor()
+        dict_cursor = read_mysql.cursor(dictionary=True)
+        insert_cursor = write_mysql.cursor()
         dict_cursor.execute(PROJECT_SELECT_SQL, (start_id, end_id))
 
         while True:
@@ -724,13 +754,15 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
                 insert_values.extend(build_relationship_rows(row, result_dict, source_type))
 
                 if len(insert_values) >= insert_batch_size:
-                    inserted_count, failed_batches = flush_relationships(mysql, insert_cursor, insert_values)
+                    inserted_count, failed_batches, failed_rows = flush_relationships(write_mysql, insert_cursor, insert_values)
                     summary["relationships_inserted"] += inserted_count
                     summary["relationship_insert_failed_batches"] += failed_batches
+                    summary["relationship_insert_failed_rows"] += failed_rows
 
-        inserted_count, failed_batches = flush_relationships(mysql, insert_cursor, insert_values)
+        inserted_count, failed_batches, failed_rows = flush_relationships(write_mysql, insert_cursor, insert_values)
         summary["relationships_inserted"] += inserted_count
         summary["relationship_insert_failed_batches"] += failed_batches
+        summary["relationship_insert_failed_rows"] += failed_rows
         return summary
 
     except Exception as exc:
@@ -745,8 +777,11 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
         if insert_cursor is not None:
             insert_cursor.close()
 
-        if mysql is not None and mysql.is_connected():
-            mysql.close()
+        if write_mysql is not None and write_mysql.is_connected():
+            write_mysql.close()
+
+        if read_mysql is not None and read_mysql.is_connected():
+            read_mysql.close()
 
 
 def merge_summary(total_summary: Dict[str, int], range_summary: Dict[str, int]) -> None:
@@ -786,6 +821,7 @@ class GrantGardProjectRelationshipTask(GrantPipelineBase):
             "relationships_inserted": 0,
             "relationships_marked_new": 0,
             "relationship_insert_failed_batches": 0,
+            "relationship_insert_failed_rows": 0,
             "failed_ranges": 0,
         }
 
