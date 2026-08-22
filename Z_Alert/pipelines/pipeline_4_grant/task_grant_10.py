@@ -82,6 +82,7 @@ DEFAULT_ID_STEP = 1
 DEFAULT_RANGE_BATCH_SIZE = 2000
 DEFAULT_FETCH_SIZE = 250
 DEFAULT_INSERT_BATCH_SIZE = 100
+DEFAULT_WORKER_PROGRESS_LOG_INTERVAL = 500
 DEFAULT_NUM_PROCESSES = min(4, os.cpu_count() or 1)
 
 GARD_PROCESSED_NAMES: List[Dict[str, Any]] = []
@@ -601,6 +602,22 @@ def append_worker_log(message: str) -> None:
     _append_to_file(LOG_FILE_PATH, message)
 
 
+def prepare_worker_log() -> None:
+    """Start this task run with a fresh worker log while preserving the previous one."""
+
+    LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    if LOG_FILE_PATH.exists() and LOG_FILE_PATH.stat().st_size > 0:
+        archived_log_path = LOG_FILE_PATH.with_name(
+            f"{LOG_FILE_PATH.stem}-{time.strftime('%Y%m%d-%H%M%S')}{LOG_FILE_PATH.suffix}"
+        )
+        LOG_FILE_PATH.replace(archived_log_path)
+
+    LOG_FILE_PATH.write_text(
+        f"Grant GARD project relationship worker log started at {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+    )
+
+
 def flush_relationships(write_mysql, insert_cursor, insert_values: List[Tuple[Any, ...]]) -> Tuple[int, int, int]:
     """Insert one relationship batch and retry individual rows after a batch failure."""
 
@@ -719,6 +736,7 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
         dict_cursor = read_mysql.cursor(dictionary=True)
         insert_cursor = write_mysql.cursor()
         dict_cursor.execute(PROJECT_SELECT_SQL, (start_id, end_id))
+        append_worker_log(f"[{start_id}-{end_id}]: started")
 
         while True:
             rows = dict_cursor.fetchmany(fetch_size)
@@ -731,7 +749,15 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
                 project_id = row["id"]
                 application_id = row["APPLICATION_ID"]
                 message = f"[{start_id}-{end_id}]: id={project_id}, application_id={application_id}"
-                append_worker_log(message)
+
+                if summary["projects_scanned"] % DEFAULT_WORKER_PROGRESS_LOG_INTERVAL == 0:
+                    append_worker_log(
+                        f"[{start_id}-{end_id}]: progress "
+                        f"projects_scanned={summary['projects_scanned']}, "
+                        f"projects_with_results={summary['projects_with_results']}, "
+                        f"relationships_inserted={summary['relationships_inserted']}, "
+                        f"projects_failed={summary['projects_failed']}"
+                    )
 
                 try:
                     result_dict, source_type = project_gard_relationship(
@@ -750,7 +776,6 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
                     continue
 
                 summary["projects_with_results"] += 1
-                append_worker_log(f"{message}; source_type={source_type}; result={result_dict}")
                 insert_values.extend(build_relationship_rows(row, result_dict, source_type))
 
                 if len(insert_values) >= insert_batch_size:
@@ -763,6 +788,7 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
         summary["relationships_inserted"] += inserted_count
         summary["relationship_insert_failed_batches"] += failed_batches
         summary["relationship_insert_failed_rows"] += failed_rows
+        append_worker_log(f"[{start_id}-{end_id}]: completed summary={summary}")
         return summary
 
     except Exception as exc:
@@ -826,7 +852,7 @@ class GrantGardProjectRelationshipTask(GrantPipelineBase):
         }
 
         try: 
-            LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            prepare_worker_log()
 
             if self.mysql is None:
                 self.logger.error("Unable to create MySQL connection.")
