@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta
 from firebase.firebase_query import FirebaseAgent
 from emails.email_client import EmailClient
 from pipelines.pipeline_base import PipelineBase 
+from pipelines.pipeline_4_grant.grant_alert_helper import GrantAlertHelper
 from utils.tools import _recipient_list
 
 load_dotenv()
@@ -60,10 +61,18 @@ class AlertSender(PipelineBase):
         firebaseAgent = None
 
         try: 
-            # For a single GARD ID, return counts of unsent new clinical trials
-            # and new publications. clinical_trial has alert_sent; publication_article
-            # does not, so publication alerts are selected by is_new only.
+            '''
+            For a single GARD ID, return counts of alertable clinical trials and
+            publications. Grant alerts are handled by GrantAlertHelper because
+            they need previous-year grant filtering plus the global
+            grant_alert_sent ledger.
+            '''
             find_new_items_query = '''
+                /*
+                Clinical trial alerts still use clinical_trial.alert_sent.
+                The same NCTID can become alertable again only when upstream
+                clinical-trial change detection resets alert_sent to '0'.
+                */
                 SELECT
                     ct.gardId,
                     'trials'        AS item_name,
@@ -76,6 +85,11 @@ class AlertSender(PipelineBase):
 
                 UNION ALL
 
+                /*
+                Publication alerts do not have an alert_sent ledger in this
+                query. They are selected by publication_article.is_new and the
+                GARD/search-term mapping built by the publication pipeline.
+                */
                 SELECT
                     m.gard_id,
                     'articles'      AS item_name,
@@ -92,11 +106,13 @@ class AlertSender(PipelineBase):
             # active, verified users and their Firestore subscriptions.
             emailClient = EmailClient()
             firebaseAgent = FirebaseAgent()
+            grantAlertHelper = GrantAlertHelper(self.mysql, self.logger)
 
             ''' 1. Get all users '''
             users = firebaseAgent.get_firebase_authed_users_with_firestore_gard_ids_list()
 
             all_updates_summary = []
+            alerted_grant_pairs = set()
             update_date_end = date.today()
             update_date_start = update_date_end - timedelta(days=self.LOOK_BACK_DAYS)
             
@@ -123,10 +139,18 @@ class AlertSender(PipelineBase):
                         "GARD:0023954": "childhood leukemia",
                         "GARD:0024146": "leukemia",
                         "GARD:0016773": "hepatocellular carcinoma"
+                    },
+                    "grant_alert_data": {
+                        "GARD:0023606": {
+                            "grant_row": [ "GARD:0023606", "grants", 2 ],
+                            "grant_pairs": [
+                                [ "GARD:0023606", 12345678, 2025 ],
+                                [ "GARD:0023606", 12345679, 2025 ]
+                            ]
+                        }
                     }
-                }        
+                }
                 '''
-
                 gard_id_list = user['gard_id_list']
                 if not gard_id_list:
                     continue
@@ -149,18 +173,34 @@ class AlertSender(PipelineBase):
                 
                 datasets = set()
                 active_subscriptions = {}
+                ''' for Grant alert tracking '''
+                user_grant_alert_pairs = set()
+
                 ''' 3. For each user subscriped GARD id'''
                 for gard_id in gard_id_list:
 
+                    #1. Find new clinical-trial and publication items by gard_id. 
                     cursor = self.mysql.cursor()
-                    try:
-                        ''' Find new clinical-trial & publication items by gard_id '''
+                    try:                        
                         cursor.execute(find_new_items_query, (gard_id, gard_id))
-                        rows = cursor.fetchall()
+                        rows = list(cursor.fetchall())
                     finally:
                         cursor.close()
 
-                    # No rows means this subscribed disease has no new alertable trials or articles in the current staging tables.
+                    #2. Find new grant of previous fiscal year
+                    '''
+                    GrantAlertHelper owns the grant-specific rules: previous
+                    fiscal year, no grant is_new dependency, and excluding pairs
+                    already recorded in grant_alert_sent. The returned grant row
+                    has the same shape as the trial/publication rows so the
+                    payload loop below can stay generic.
+                    '''
+                    grant_row, grant_pairs = grantAlertHelper.find_alertable_grants(gard_id)
+                    if grant_row:
+                        rows.append(grant_row) 
+                        user_grant_alert_pairs.update(grant_pairs) 
+
+                    # No rows means this subscribed disease has no new alertable rows in the current staging tables.
                     if not rows:
                         continue
 
@@ -176,7 +216,8 @@ class AlertSender(PipelineBase):
 
                 '''
                 active_subscriptions only contains subscribed GARD IDs that
-                returned at least one new clinical trial or publication row.
+                returned at least one new clinical trial, publication, or grant
+                row.
                 If it is empty, this user has no alertable updates, so continue
                 before send_html_alert_email(). This guarantees no user alert
                 email is sent with an empty update payload.
@@ -186,7 +227,8 @@ class AlertSender(PipelineBase):
                     self.logger.info(f'* No new subscriptions found for user: {user} - {datetime.now()}')
                     continue 
 
-                payload["data"]["datasets"] = sorted(datasets)
+                dataset_order = ("articles", "trials", "grants")
+                payload["data"]["datasets"] = [dataset for dataset in dataset_order if dataset in datasets]
                 payload["data"]["subscriptions"] = active_subscriptions
                 payload["data"]["total"] = subscription_count
                  
@@ -206,12 +248,15 @@ class AlertSender(PipelineBase):
                 
                 self.logger.info(f'\nSent alert to user: {user} - {datetime.now()}')
                 self.logger.info(json.dumps(payload, indent=2, ensure_ascii=False))
+                alerted_grant_pairs.update(user_grant_alert_pairs)
                  
                 ''' add to summary'''
                 all_updates_summary.append({"email": email, "display_name": display_name, "payload": payload})
 
-            ''' Save the full alert summary payload into MySQL as a JSON string. ''' 
+            # Save the full alert summary payload into MySQL as a JSON string. 
             self.save_alert_summary(datetime.now(), update_date_start, update_date_end, all_updates_summary)
+            # For alert tracking
+            grantAlertHelper.save_alert_sent_pairs(alerted_grant_pairs)
 
             ''' 5. Send summary email to admins '''
             '''
