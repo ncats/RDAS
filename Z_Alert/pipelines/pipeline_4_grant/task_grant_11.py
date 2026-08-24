@@ -52,6 +52,7 @@ time the task runs in a fresh environment.
 
 # Reference: D_grant/init_11_Project_annotation_generator.py
 
+import os
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -66,10 +67,18 @@ MODEL_NAMES = (
 )
 
 DEFAULT_ID_STEP = 1
-DEFAULT_RANGE_BATCH_SIZE = 10
-DEFAULT_NLP_BATCH_SIZE = 8
+DEFAULT_RANGE_BATCH_SIZE = 50
+DEFAULT_NLP_BATCH_SIZE = 32
 DEFAULT_WORK_INSERT_BATCH_SIZE = 1000
 PROCESSED_FLAG = 1
+LOW_CAPACITY_RANGE_BATCH_SIZE = 10
+LOW_CAPACITY_NLP_BATCH_SIZE = 8
+HIGH_CAPACITY_RANGE_BATCH_SIZE = 100
+HIGH_CAPACITY_NLP_BATCH_SIZE = 64
+MEDIUM_CAPACITY_MIN_CPU_COUNT = 8
+MEDIUM_CAPACITY_MIN_MEMORY_GB = 32
+HIGH_CAPACITY_MIN_CPU_COUNT = 16
+HIGH_CAPACITY_MIN_MEMORY_GB = 64
 
 PIPE_COMPONENTS_TO_DISABLE = (
     "tagger",
@@ -203,11 +212,13 @@ class ModelResource:
 class GrantProjectAnnotationTask(GrantPipelineBase):
     """Generate UMLS annotations for new grant-project abstracts."""
 
-    def __init__(self, id_step: int = DEFAULT_ID_STEP, range_batch_size: int = DEFAULT_RANGE_BATCH_SIZE, nlp_batch_size: int = DEFAULT_NLP_BATCH_SIZE, work_insert_batch_size: int = DEFAULT_WORK_INSERT_BATCH_SIZE):
+    def __init__(self, id_step: int = DEFAULT_ID_STEP, range_batch_size: Optional[int] = None, nlp_batch_size: Optional[int] = None, work_insert_batch_size: int = DEFAULT_WORK_INSERT_BATCH_SIZE):
         super().__init__(init_mysql=True, init_memgraph=False)
+        self.machine_cpu_count, self.machine_memory_gb = self._detect_machine_capacity()
+        machine_range_batch_size, machine_nlp_batch_size = self._select_machine_batch_sizes()
         self.id_step = id_step
-        self.range_batch_size = range_batch_size
-        self.nlp_batch_size = nlp_batch_size
+        self.range_batch_size = range_batch_size if range_batch_size is not None else machine_range_batch_size
+        self.nlp_batch_size = nlp_batch_size if nlp_batch_size is not None else machine_nlp_batch_size
         self.work_insert_batch_size = work_insert_batch_size
 
 
@@ -241,6 +252,16 @@ class GrantProjectAnnotationTask(GrantPipelineBase):
             if self.mysql is None:
                 self.logger.error("Unable to create MySQL connection.")
                 return
+
+            self.logger.info(
+                "Project annotation runtime settings: "
+                f"machine_cpu_count={self.machine_cpu_count}, "
+                f"machine_memory_gb={self._format_machine_memory_gb()}, "
+                f"id_step={self.id_step}, "
+                f"range_batch_size={self.range_batch_size}, "
+                f"nlp_batch_size={self.nlp_batch_size}, "
+                f"work_insert_batch_size={self.work_insert_batch_size}"
+            )
 
             # The initializer expected this work table to be populated manually.
             # In the alert pipeline, task_grant_10 may have just inserted new
@@ -314,6 +335,67 @@ class GrantProjectAnnotationTask(GrantPipelineBase):
             hours, minutes, seconds = _time_hms(time.time() - start_time)
             self.logger.info(f"Total time elapsed: {hours} hours, {minutes} minutes, {seconds} seconds")
             self.close()
+
+
+    def _detect_machine_capacity(self) -> Tuple[int, Optional[float]]:
+        """
+        Detect the local machine capacity using only Python standard-library APIs.
+
+        `os.cpu_count()` works across common deployment platforms. Total memory
+        detection uses POSIX `sysconf`, which is available on macOS and Linux.
+        If memory cannot be detected, the task still runs with a conservative
+        CPU-based fallback instead of failing startup.
+        """
+
+        cpu_count = os.cpu_count() or 1
+        memory_gb = None
+
+        try:
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            physical_pages = os.sysconf("SC_PHYS_PAGES")
+        except (AttributeError, ValueError, OSError):
+            page_size = None
+            physical_pages = None
+
+        if page_size and physical_pages:
+            memory_gb = (page_size * physical_pages) / (1024 ** 3)
+
+        return cpu_count, memory_gb
+
+
+    def _select_machine_batch_sizes(self) -> Tuple[int, int]:
+        """
+        Choose annotation batch sizes from detected CPU and RAM.
+
+        The NLP models and UMLS linker are memory-heavy, so RAM is the main
+        guardrail. CPU count is also checked because larger batches are most
+        useful on machines that can keep the Python process and database client
+        busy without starving other services. Unknown RAM never selects the high
+        profile, which keeps new deployments safer.
+        """
+
+        if self.machine_memory_gb is not None:
+            if self.machine_cpu_count >= HIGH_CAPACITY_MIN_CPU_COUNT and self.machine_memory_gb >= HIGH_CAPACITY_MIN_MEMORY_GB:
+                return HIGH_CAPACITY_RANGE_BATCH_SIZE, HIGH_CAPACITY_NLP_BATCH_SIZE
+
+            if self.machine_cpu_count >= MEDIUM_CAPACITY_MIN_CPU_COUNT and self.machine_memory_gb >= MEDIUM_CAPACITY_MIN_MEMORY_GB:
+                return DEFAULT_RANGE_BATCH_SIZE, DEFAULT_NLP_BATCH_SIZE
+
+            return LOW_CAPACITY_RANGE_BATCH_SIZE, LOW_CAPACITY_NLP_BATCH_SIZE
+
+        if self.machine_cpu_count >= MEDIUM_CAPACITY_MIN_CPU_COUNT:
+            return DEFAULT_RANGE_BATCH_SIZE, DEFAULT_NLP_BATCH_SIZE
+
+        return LOW_CAPACITY_RANGE_BATCH_SIZE, LOW_CAPACITY_NLP_BATCH_SIZE
+
+
+    def _format_machine_memory_gb(self) -> str:
+        """Return the detected RAM as log-friendly text."""
+
+        if self.machine_memory_gb is None:
+            return "unknown"
+
+        return f"{self.machine_memory_gb:.1f}"
 
 
     def _validate_runtime_options(self) -> bool:
