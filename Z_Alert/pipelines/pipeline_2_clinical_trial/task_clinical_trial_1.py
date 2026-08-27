@@ -126,7 +126,7 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
                                     result = self.study_change_handler.save_or_update_study(gardId, name, nctid, study_response, initial_query)
 
                                     if result.get("action") == "updated":
-                                        self.logger.info(f"Clinical trial study JSON changed for NCTID={nctid}; differences={result.get('differences')}")
+                                        self.logger.info(f"Clinical trial study JSON changed for NCTID={nctid};")
 
                                 except Exception as error:
                                     self.logger.error(f"Failed to save or update clinical trial study for nctid={nctid}: {error}", exc_info=True)
