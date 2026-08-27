@@ -40,6 +40,9 @@ __init__.py
 !X_epi_nhs_predict_local/data/__init__.py
 !X_epi_nhs_predict_local/data/gard-id-name-synonyms.json
 
+x_*.md
+X_*.md
+
 # Jupyter
 .ipynb_checkpoints/
 .virtual_documents/

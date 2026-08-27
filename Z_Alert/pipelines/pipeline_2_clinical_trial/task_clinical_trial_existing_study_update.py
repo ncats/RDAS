@@ -135,7 +135,6 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
                     self.logger.info(
                         f"Existing ClinicalTrials.gov study changed: NCTID={nctid}, "
                         f"gardId={context['gard_id']}, disease={context['disease_name']}, "
-                        f"differences={result.get('differences')}"
                     )
 
                 elif action == "unchanged":

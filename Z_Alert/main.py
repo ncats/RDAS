@@ -357,7 +357,7 @@ class AlertPipelineRunner(PipelineRunnerBase):
 
 if __name__ == "__main__":
 
-    LOOK_BACK_DAYS = 21
+    LOOK_BACK_DAYS = 7
     
     total_run_start_time = time.time()
 
