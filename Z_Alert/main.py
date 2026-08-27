@@ -56,8 +56,8 @@ class AlertPipelineRunner(PipelineRunnerBase):
 
         try:
             from pipelines.pipeline_1_gard.task_gard_1 import GardNodeNamesTask
-            from pipelines.pipeline_2_clinical_trial.task_clinical_trial_existing_study_update import ExistingClinicalTrialStudyUpdateTask
             from pipelines.pipeline_2_clinical_trial.task_clinical_trial_1 import NewClinicalTrialDiscoveryTask
+            from pipelines.pipeline_2_clinical_trial.task_clinical_trial_1sub import ExistingClinicalTrialStudyUpdateTask
             from pipelines.pipeline_3_publication.task_publication_1 import NewPublicationDiscoveryTask
 
             gard_task = GardNodeNamesTask()
@@ -137,13 +137,15 @@ class AlertPipelineRunner(PipelineRunnerBase):
                 
                 self.logger.info(f"\n# Total GARD nodes processed {total_gard_nodes}\n")
 
+
+            # Step 8:
             '''
-            Step 8:
             Directly refresh all NCT IDs already stored in
             clinical_trial_unique. This catches changed ClinicalTrials.gov
             studies that were not returned by the disease-name discovery query
             for the current GARD update window.
             '''
+            # _run_pipeline_task() handles task creation, process_new_data(), timing logs, error handling, and closing resources.
             self._run_pipeline_task(ExistingClinicalTrialStudyUpdateTask)
 
         except Exception:
