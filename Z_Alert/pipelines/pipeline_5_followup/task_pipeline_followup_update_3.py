@@ -1,8 +1,6 @@
 import os
 import sys 
-import json
 import time
-from typing import Tuple
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -104,31 +102,36 @@ class DiseaseCountsRefreshTask(PipelineBase):
     diseaseTrialsByPhase, diseaseTrialsByStatus & diseaseTrialsByType
     '''
     fetch_nctid_by_gard_id_query = '''
-        SELECT distinct nctid 
+        SELECT DISTINCT gardId AS gard_id, nctid
         FROM clinical_trial 
-        WHERE gardId = %s
-        AND  nctid is not null;
+        WHERE gardId IN ({placeholders})
+        AND nctid IS NOT NULL
     '''
 
     disease_clinical_trial_query = '''        
         
-        WITH $nctids AS nctids
+        WITH $trial_rows AS trial_rows
 
+        UNWIND trial_rows AS row
         MATCH (ct:ClinicalTrial)
-        WHERE ct.nctId IN nctids
+        WHERE ct.nctId = row.nctid
 
-        WITH collect(ct) AS trials
+        WITH DISTINCT row.gard_id AS gard_id, ct
+
+        WITH gard_id, collect(ct) AS trials
 
         UNWIND trials AS ct
         WITH
+            gard_id,
             trials,
             CASE
                 WHEN ct.phase IS NULL OR ct.phase = "" THEN "NA"
                 ELSE ct.phase
             END AS phase_term,
             count(*) AS phase_count
-        ORDER BY phase_term
+        ORDER BY gard_id, phase_term
         WITH
+            gard_id,
             trials,
             collect({
                 term: phase_term,
@@ -137,6 +140,7 @@ class DiseaseCountsRefreshTask(PipelineBase):
 
         UNWIND trials AS ct
         WITH
+            gard_id,
             trials,
             phase,
             CASE
@@ -144,8 +148,9 @@ class DiseaseCountsRefreshTask(PipelineBase):
                 ELSE ct.overallStatus
             END AS overallStatus_term,
             count(*) AS overallStatus_count
-        ORDER BY overallStatus_count DESC, overallStatus_term
+        ORDER BY gard_id, overallStatus_count DESC, overallStatus_term
         WITH
+            gard_id,
             trials,
             phase,
             collect({
@@ -155,6 +160,7 @@ class DiseaseCountsRefreshTask(PipelineBase):
 
         UNWIND trials AS ct
         WITH
+            gard_id,
             phase,
             overallStatus,
             CASE
@@ -162,8 +168,9 @@ class DiseaseCountsRefreshTask(PipelineBase):
                 ELSE ct.studyType
             END AS studyType_term,
             count(*) AS studyType_count
-        ORDER BY studyType_count DESC, studyType_term
+        ORDER BY gard_id, studyType_count DESC, studyType_term
         WITH
+            gard_id,
             phase,
             overallStatus,
             collect({
@@ -171,7 +178,7 @@ class DiseaseCountsRefreshTask(PipelineBase):
                 count: studyType_count
             }) AS studyType
 
-        RETURN {
+        RETURN gard_id, {
             phase: phase,
             overallStatus: overallStatus,
             studyType: studyType
@@ -188,14 +195,24 @@ class DiseaseCountsRefreshTask(PipelineBase):
         batch_num = 0
         batch_size = 100     
         total_updated = 0
+        last_gard_id = None
         very_start_time = time.time()
 
-        fetch_GARD_nodes_cypher = '''
+        fetch_first_GARD_nodes_cypher = '''
             MATCH (g:GARD)
             WHERE g.gardId IS NOT NULL
             RETURN g.gardId AS gard_id
             ORDER BY g.gardId
-            SKIP $skip LIMIT $limit
+            LIMIT $limit
+        '''
+
+        fetch_next_GARD_nodes_cypher = '''
+            MATCH (g:GARD)
+            WHERE g.gardId IS NOT NULL
+            AND g.gardId > $last_gard_id
+            RETURN g.gardId AS gard_id
+            ORDER BY g.gardId
+            LIMIT $limit
         '''
 
         batch_update_GARD_nodes_cypher = '''
@@ -210,19 +227,26 @@ class DiseaseCountsRefreshTask(PipelineBase):
             while True:
                 batch_start_time = time.time()
 
-                params = {
-                    "skip": batch_num * batch_size,
-                    "limit": batch_size,
-                }
-                results = list(self.memgraph.execute_and_fetch(fetch_GARD_nodes_cypher, params))
+                params = {"limit": batch_size}
+                fetch_query = fetch_first_GARD_nodes_cypher
+
+                if last_gard_id:
+                    params["last_gard_id"] = last_gard_id
+                    fetch_query = fetch_next_GARD_nodes_cypher
+
+                results = list(self.memgraph.execute_and_fetch(fetch_query, params))
  
                 if not results:
                     break
  
                 gard_id_list = [row.get("gard_id") for row in results if row.get("gard_id")]
-                
+
+                if not gard_id_list:
+                    break
+
                 batch_num += 1 
-                self.logger.info(f'\n--- Processing batch {batch_num} ---\n')
+                last_gard_id = gard_id_list[-1]
+                self.logger.info(f'\n--- Processing batch {batch_num}; GARD ID range {gard_id_list[0]} to {last_gard_id} ---\n')
 
                 # Step 1:
                 # Fetch all article filter counts for this Memgraph GARD batch in a single MySQL round trip. 
@@ -232,29 +256,29 @@ class DiseaseCountsRefreshTask(PipelineBase):
                 self.logger.info(f'\n\ndisease_article_counts_by_gard: time={hours} hours, {minutes} minutes, {seconds} seconds')
                 
                 # Step 2:
-                # Fetch all project-by-year counts for the same GARD IDs in one query. 
+                # Fetch all project-by-year counts for the same GARD IDs in one query.
                 # The idx_gpr_gard_application index supports the gpr.gard_id IN (...) filter plus application_id join path.
                 disease_project_counts_by_gard = self._disease_project_by_year_count_batch(gard_id_list, fetch_cursor)
                 hours, minutes, seconds = _time_hms(time.time() - batch_start_time)
                 self.logger.info(f'disease_project_counts_by_gard: time={hours} hours, {minutes} minutes, {seconds} seconds')
-                
+
                 # Step 3:
+                # Fetch clinical-trial counts for the whole GARD batch. This replaces the old per-GARD MySQL query plus per-GARD Memgraph query loop.
+                disease_clinical_trial_counts_by_gard = self._disease_clinical_trial_terms_count_batch(gard_id_list, fetch_cursor)
+                hours, minutes, seconds = _time_hms(time.time() - batch_start_time)
+                self.logger.info(f'disease_clinical_trial_counts_by_gard: time={hours} hours, {minutes} minutes, {seconds} seconds')
+
+                # Step 4:
                 batch = []
                 for gard_id in gard_id_list:
 
-                    self.logger.info(f'Processing GARD ID: {gard_id}')
-                   
-                    # Clinical-trial counts still need Memgraph trial node properties, so keep that helper per GARD ID for now.
-                    disease_clinical_trial_terms_count = self._disease_clinical_trial_terms_count(gard_id, fetch_cursor)
-                    hours, minutes, seconds = _time_hms(time.time() - batch_start_time)
-                    self.logger.info(f'disease_clinical_trial_terms_count: time={hours} hours, {minutes} minutes, {seconds} seconds')
-
                     disease_article_iterms_count = disease_article_counts_by_gard[gard_id]
                     disease_project_by_year_count = disease_project_counts_by_gard[gard_id]
+                    disease_clinical_trial_terms_count = disease_clinical_trial_counts_by_gard[gard_id]
 
                     total_updated += 1
 
-                    # Step 4:
+                    # Step 5:
                     # Merge the three independent count payloads into the final filterCounts object written to the matching GARD node.
                     obj = {'gard_id': gard_id,
                                   "data": {
@@ -263,14 +287,21 @@ class DiseaseCountsRefreshTask(PipelineBase):
                                         **disease_clinical_trial_terms_count,
                                     }
                                 }
-                    batch.append(obj)                    
-                    self.logger.info(f'\n{json.dumps(obj, ensure_ascii=False)}')                 
+                    batch.append(obj)
+                    self.logger.info(
+                        f'Prepared filterCounts for GARD ID: {gard_id}; '
+                        f'article_year_terms={len(disease_article_iterms_count["diseaseArticleByYear"])}, '
+                        f'project_year_terms={len(disease_project_by_year_count["diseaseProjectsByYear"])}, '
+                        f'trial_phase_terms={len(disease_clinical_trial_terms_count["diseaseTrialsByPhase"])}, '
+                        f'trial_status_terms={len(disease_clinical_trial_terms_count["diseaseTrialsByStatus"])}, '
+                        f'trial_type_terms={len(disease_clinical_trial_terms_count["diseaseTrialsByType"])}'
+                    )
 
                 if batch:
                     try:
-                        # Step 5:
+                        # Step 6:
                         # Write the whole GARD batch to Memgraph in one call instead of updating each GARD node separately.
-                        self.memgraph.execute(batch_update_GARD_nodes_cypher, {"batch": batch}) 
+                        self.memgraph.execute(batch_update_GARD_nodes_cypher, {"batch": batch})
                     except Exception as e:
                         self.logger.error(f'{e}')
 
@@ -457,38 +488,86 @@ class DiseaseCountsRefreshTask(PipelineBase):
             diseaseTrialsByStatus: [{term: "COMPLETED", count: n}, ...]
             diseaseTrialsByType: [{term: "INTERVENTIONAL", count: n}, ...]
         """
-        _empty = {
-            "diseaseTrialsByPhase": [],
-            "diseaseTrialsByStatus": [],
-            "diseaseTrialsByType": [],
+
+        return self._disease_clinical_trial_terms_count_batch([gard_id], fetch_cursor).get(gard_id, self._empty_disease_clinical_trial_terms_count(),)
+
+
+    def _disease_clinical_trial_terms_count_batch(self, gard_id_list, fetch_cursor):
+        """
+        Return clinical-trial count buckets for a batch of GARD IDs.
+
+        The shape follows disease-counts.json:
+            diseaseTrialsByPhase: [{term: "PHASE3", count: n}, ...]
+            diseaseTrialsByStatus: [{term: "COMPLETED", count: n}, ...]
+            diseaseTrialsByType: [{term: "INTERVENTIONAL", count: n}, ...]
+        """
+
+        if not gard_id_list:
+            return {}
+
+        counts_by_gard = {
+            gard_id: self._empty_disease_clinical_trial_terms_count()
+            for gard_id in gard_id_list
         }
 
+        nctids_by_gard = {
+            gard_id: set()
+            for gard_id in gard_id_list
+        }
 
-        fetch_cursor.execute(self.fetch_nctid_by_gard_id_query, (gard_id,))
+        placeholders = self._sql_placeholders(gard_id_list)
+        query = self.fetch_nctid_by_gard_id_query.format(placeholders=placeholders)
+        fetch_cursor.execute(query, tuple(gard_id_list))
 
-        rows = fetch_cursor.fetchall()
+        for row in fetch_cursor.fetchall():
+            gard_id = row.get("gard_id")
+            nctid = row.get("nctid")
 
-        nctid_list = sorted({row.get("nctid") for row in rows if row.get("nctid")})
+            if gard_id not in nctids_by_gard or not nctid:
+                continue
 
-        if not nctid_list:
-            return _empty
+            nctids_by_gard[gard_id].add(nctid)
+
+        trial_rows = []
+        for gard_id in gard_id_list:
+            for nctid in sorted(nctids_by_gard[gard_id]):
+                trial_rows.append({
+                    "gard_id": gard_id,
+                    "nctid": nctid,
+                })
+
+        if not trial_rows:
+            return counts_by_gard
 
         results = list(
             self.memgraph.execute_and_fetch(
                 self.disease_clinical_trial_query,
-                {"nctids": nctid_list},
+                {"trial_rows": trial_rows},
             )
         )
 
-        if not results:
-            return _empty
+        for row in results:
+            gard_id = row.get("gard_id")
+            result = row.get("result") or {}
 
-        result = results[0].get("result") or {}
+            if gard_id not in counts_by_gard:
+                continue
+
+            counts_by_gard[gard_id] = {
+                "diseaseTrialsByPhase": result.get("phase") or [],
+                "diseaseTrialsByStatus": result.get("overallStatus") or [],
+                "diseaseTrialsByType": result.get("studyType") or [],
+            }
+
+        return counts_by_gard
+
+
+    def _empty_disease_clinical_trial_terms_count(self):
 
         return {
-            "diseaseTrialsByPhase": result.get("phase") or [],
-            "diseaseTrialsByStatus": result.get("overallStatus") or [],
-            "diseaseTrialsByType": result.get("studyType") or [],
+            "diseaseTrialsByPhase": [],
+            "diseaseTrialsByStatus": [],
+            "diseaseTrialsByType": [],
         }
 
 
