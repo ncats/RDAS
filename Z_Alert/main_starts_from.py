@@ -7,10 +7,20 @@ from utils.tools import _time_hms
 if __name__ == "__main__":
 
     LOOK_BACK_DAYS = 7
-    STARTS_FROM_STEP = 0
+
+    # STARTS_FROM_STEP is inclusive. END_AT_STEP is exclusive.
+    # Example: STARTS_FROM_STEP = 4 and END_AT_STEP = 8 runs steps 4, 5, 6, and 7.
+    STARTS_FROM_STEP = 1
+    END_AT_STEP = 12
 
     if not isinstance(STARTS_FROM_STEP, int) or STARTS_FROM_STEP < 1 or STARTS_FROM_STEP > 11:
         raise ValueError("STARTS_FROM_STEP must be an integer from 1 to 11.")
+
+    if not isinstance(END_AT_STEP, int) or END_AT_STEP < 2 or END_AT_STEP > 12:
+        raise ValueError("END_AT_STEP must be an integer from 2 to 12.")
+
+    if STARTS_FROM_STEP >= END_AT_STEP:
+        raise ValueError("STARTS_FROM_STEP must be less than END_AT_STEP.")
 
     total_run_start_time = time.time()
 
@@ -75,12 +85,16 @@ if __name__ == "__main__":
     ]
 
     try:
-        runner.logger.info(f"Starting alert pipeline from step {STARTS_FROM_STEP}.")
+        runner.logger.info(f"Starting alert pipeline for step range [{STARTS_FROM_STEP}, {END_AT_STEP}).")
 
         for step_number, step_name, step_func in steps:
             if step_number < STARTS_FROM_STEP:
                 runner.logger.info(f"Skipping {step_name} because STARTS_FROM_STEP={STARTS_FROM_STEP}.")
                 continue
+
+            if step_number >= END_AT_STEP:
+                runner.logger.info(f"Stopping before {step_name} because END_AT_STEP={END_AT_STEP}.")
+                break
 
             runner._run_step_with_timing(step_name, step_func)
 
