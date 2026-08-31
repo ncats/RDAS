@@ -144,11 +144,13 @@ Run the grant alert pipeline:
 python Z_Alert/main_grant.py
 ```
 
-Run one main alert step directly:
+Run a selected main alert step range by editing `STARTS_FROM_STEP` and
+`END_AT_STEP` in `Z_Alert/main_steps_by_range.py`. The start value is inclusive
+and the end value is exclusive, so one step can be run by setting
+`END_AT_STEP = STARTS_FROM_STEP + 1`.
 
 ```bash
-python Z_Alert/steps_of_main/main-step-1.py
-python Z_Alert/steps_of_main/main-step-11.py
+python Z_Alert/main_steps_by_range.py
 ```
 
 ## Memgraph Dump Utility
