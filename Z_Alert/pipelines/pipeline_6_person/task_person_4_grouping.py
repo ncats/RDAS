@@ -338,21 +338,40 @@ class NewPersonGroupingTask(PipelineBase):
 
 
     def _resolve_max_workers(self) -> int:
-        """Resolve multiprocessing worker count from env, capped by CPU count."""
+        """Resolve multiprocessing worker count from env, leaving CPU room for other work."""
 
         cpu_count = os.cpu_count() or 1
+        reserved_cpu_count = 2
+        usable_cpu_count = max(1, cpu_count - reserved_cpu_count)
         configured_workers = os.getenv("PERSON_GROUPING_MAX_WORKERS")
 
         if configured_workers:
             try:
-                return max(1, min(int(configured_workers), cpu_count))
+                '''
+                Treat PERSON_GROUPING_MAX_WORKERS as the requested upper bound,
+                not as a guaranteed worker count. This keeps the code portable:
+                a strong 24-CPU server can use a larger pool, while a smaller
+                VM is automatically capped below its CPU count.
+
+                Reserve two CPUs for the parent process, MySQL/Memgraph client
+                work, the operating system, and any concurrent alert-pipeline
+                task. For tiny machines with one or two CPUs, max(1, ...) still
+                allows the task to run instead of producing zero workers.
+                '''
+                return max(1, min(int(configured_workers), usable_cpu_count))
             except ValueError:
                 self.logger.info(
                     f"Invalid PERSON_GROUPING_MAX_WORKERS={configured_workers}; "
                     f"using default {self.DEFAULT_MAX_WORKERS}."
                 )
 
-        return max(1, min(self.DEFAULT_MAX_WORKERS, cpu_count))
+        '''
+        Without an environment override, use the code default as the requested
+        upper bound and apply the same machine-aware cap. This makes the default
+        portable across laptops, small VMs, and larger servers without editing
+        the source for each deployment.
+        '''
+        return max(1, min(self.DEFAULT_MAX_WORKERS, usable_cpu_count))
 
 
     def _drain_grouping_futures(self, pending_futures, wait_for_all: bool):
