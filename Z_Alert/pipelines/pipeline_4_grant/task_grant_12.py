@@ -1,7 +1,7 @@
 """
 Download grant-linked PubMed articles that are missing from publication_article table.
 
-Missing grant-linked articles are inserted directly into `publication_article` with `is_new = 1`, 
+Missing grant-linked articles are inserted directly into `publication_article` with `is_new = 1`,
 so the downstream publication graph tasks can process them the same way they process
 other new publication rows.
 
@@ -14,7 +14,7 @@ Processing flow:
 
     3. Skip PMIDs that already exist in `publication_article`.
 
-    4. Download missing article metadata from Europe PMC using the shared `PublicationWorker`.
+    4. Download missing article metadata from Europe PMC using thread-local `PublicationWorker` instances.
 
     5. Insert downloaded rows into `publication_article` with `is_new = 1`.
 
@@ -40,8 +40,9 @@ Environment:
 
 # Reference: D_grant/init_12_grant_publications_not_in_Article_table_multi.py
 
+from concurrent.futures import ThreadPoolExecutor
+import threading
 import time
-from multiprocessing import Pool
 from typing import Any, List, Optional, Tuple
 
 from pipelines.pipeline_4_grant.grant_base import GrantPipelineBase
@@ -52,10 +53,12 @@ from utils.tools import _id_range_generator, _resolve_worker_count, _time_hms
 PROCESSED_FLAG = 1
 DEFAULT_ID_STEP = 1
 DEFAULT_RANGE_BATCH_SIZE = 5
-DEFAULT_PROCESS_COUNT = 16
+DEFAULT_WORKER_COUNT = 16
+# Keep the old constant as a compatibility alias for scripts that may import it.
+DEFAULT_PROCESS_COUNT = DEFAULT_WORKER_COUNT
 
 PublicationRow = Tuple[Any, ...]
-_PUBLICATION_WORKER: Optional[PublicationWorker] = None
+_PUBLICATION_WORKER_LOCAL = threading.local()
 
 PENDING_BOUNDS_SQL = """
     SELECT
@@ -122,43 +125,40 @@ MARK_RANGE_PROCESSED_SQL = """
 """
 
 
-def init_publication_worker() -> None:
-    """Create one PublicationWorker per worker process."""
-
-    global _PUBLICATION_WORKER
-    _PUBLICATION_WORKER = PublicationWorker()
-
-
 def download_by_pmid(pmid: Any) -> Optional[PublicationRow]:
-    """Download one PMID in a worker process and return an insert-ready row."""
+    """Download one PMID in a worker thread and return an insert-ready row."""
 
-    global _PUBLICATION_WORKER
+    publication_worker = getattr(_PUBLICATION_WORKER_LOCAL, "worker", None)
 
-    if _PUBLICATION_WORKER is None:
-        _PUBLICATION_WORKER = PublicationWorker()
+    if publication_worker is None:
+        publication_worker = PublicationWorker()
+        _PUBLICATION_WORKER_LOCAL.worker = publication_worker
 
-    return _PUBLICATION_WORKER.download_by_pmid(pmid)
+    return publication_worker.download_by_pmid(pmid)
 
 
 class GrantPublicationArticleImportTask(GrantPipelineBase):
     """Download missing Article rows for current new grant/GARD relationships."""
 
-    def __init__(self, id_step: int = DEFAULT_ID_STEP, range_batch_size: int = DEFAULT_RANGE_BATCH_SIZE, process_count: Optional[int] = None):
+    def __init__(self, id_step: int = DEFAULT_ID_STEP, range_batch_size: int = DEFAULT_RANGE_BATCH_SIZE, worker_count: Optional[int] = None, process_count: Optional[int] = None):
         super().__init__(init_mysql=True, init_memgraph=False)
         self.id_step = id_step
         self.range_batch_size = range_batch_size
         '''
-        Publication download workers are process-based because each worker owns a
-        PublicationWorker. Keep DEFAULT_PROCESS_COUNT as the requested upper
-        bound, but resolve the actual pool size from this machine so a small VM
-        does not try to start a server-sized worker pool.
+        Europe PMC downloads are network-bound, so threads are lighter than
+        process workers here. worker_count is the preferred argument name after
+        this task moved to ThreadPoolExecutor; process_count remains accepted as
+        a legacy requested upper bound for older callers.
         '''
-        self.process_count = _resolve_worker_count(
-            DEFAULT_PROCESS_COUNT,
-            configured_worker_count=process_count,
+        requested_worker_count = worker_count if worker_count is not None else process_count
+        self.worker_count = _resolve_worker_count(
+            DEFAULT_WORKER_COUNT,
+            configured_worker_count=requested_worker_count,
             env_var_name="GRANT_PUBLICATION_IMPORT_MAX_WORKERS",
             logger=self.logger
         )
+        # Backward-compatible attribute for any external code that still reads it.
+        self.process_count = self.worker_count
 
 
     def find_new_data(self, gard_node) -> None:
@@ -199,21 +199,24 @@ class GrantPublicationArticleImportTask(GrantPipelineBase):
             min_id, max_id = bounds
             self.logger.info(
                 "Grant publication article import starting: "
-                f"min_id={min_id}, max_id={max_id}, process_count={self.process_count}"
+                f"min_id={min_id}, max_id={max_id}, worker_count={self.worker_count}"
             )
 
-            # Reuse a single pool across all ranges. The initializer used this
-            # pattern to avoid repeatedly loading PublicationWorker resources.
-            with Pool(processes=self.process_count, initializer=init_publication_worker) as pool:
+            '''
+            Reuse one thread pool across all ranges. Each thread lazily creates
+            and reuses its own PublicationWorker through thread-local storage,
+            avoiding multiprocessing startup/pickle overhead for HTTP downloads.
+            '''
+            with ThreadPoolExecutor(max_workers=self.worker_count) as executor:
 
                 for start_id, end_id in _id_range_generator(min_id, max_id, self.id_step, self.range_batch_size):
-                    
+
                     summary["ranges_seen"] += 1
                     range_label = f"[{start_id}-{end_id}]"
                     self.logger.info(f"Processing grant publication PMID range {range_label}.")
 
                     try:
-                        range_summary = self._process_id_range(start_id, end_id, pool)
+                        range_summary = self._process_id_range(start_id, end_id, executor)
 
                         if range_summary is None:
                             summary["ranges_failed"] += 1
@@ -254,7 +257,7 @@ class GrantPublicationArticleImportTask(GrantPipelineBase):
 
 
     def _validate_runtime_options(self) -> bool:
-        """Validate range and multiprocessing settings before work starts."""
+        """Validate range and thread settings before work starts."""
 
         if self.id_step <= 0:
             self.logger.error("id_step must be greater than 0")
@@ -264,8 +267,8 @@ class GrantPublicationArticleImportTask(GrantPipelineBase):
             self.logger.error("range_batch_size must be greater than 0")
             return False
 
-        if self.process_count <= 0:
-            self.logger.error("process_count must be greater than 0")
+        if self.worker_count <= 0:
+            self.logger.error("worker_count must be greater than 0")
             return False
 
         return True
@@ -298,7 +301,7 @@ class GrantPublicationArticleImportTask(GrantPipelineBase):
         return int(row["min_id"]), int(row["max_id"])
 
 
-    def _process_id_range(self, start_id: int, end_id: int, pool: Pool) -> Optional[dict]:
+    def _process_id_range(self, start_id: int, end_id: int, executor: ThreadPoolExecutor) -> Optional[dict]:
         """Download missing PMIDs, insert article rows, and mark one range."""
 
         pmids = self._get_pmids_to_download(start_id, end_id)
@@ -312,7 +315,7 @@ class GrantPublicationArticleImportTask(GrantPipelineBase):
                 "marked_processed_count": marked_count,
             }
 
-        downloaded_rows = pool.map(download_by_pmid, pmids)
+        downloaded_rows = list(executor.map(download_by_pmid, pmids))
         batch_values = [
             (*row, row[0])
             for row in downloaded_rows
