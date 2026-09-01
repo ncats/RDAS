@@ -33,6 +33,77 @@ init()
 
 
 # -----------------------------------------------------------------------------
+# Runtime sizing
+# -----------------------------------------------------------------------------
+
+def _resolve_worker_count(default_worker_count: int, configured_worker_count: Any = None, env_var_name: Optional[str] = None, reserved_cpu_count: int = 2, logger: Any = None) -> int:
+
+    """
+    Resolve a portable worker count for thread/process pools.
+
+    The caller supplies a default worker count, and may also supply either an
+    explicit configured value or an environment variable name. The configured
+    value is treated as a requested upper bound, then capped to the machine's
+    detected CPU count minus a small reserve for the parent process, databases,
+    and operating-system work.
+    """
+
+    cpu_count = os.cpu_count() or 1
+
+    try:
+        reserved_cpu_count = max(0, int(reserved_cpu_count))
+    except (TypeError, ValueError):
+        reserved_cpu_count = 2
+
+    '''
+    Keep at least one usable worker even on one-CPU or two-CPU machines. This is
+    the portability guard: small VMs will not try to start the same pool size as
+    a 24-CPU server, while large hosts can still use the configured/default
+    upper bound.
+    '''
+    usable_cpu_count = max(1, cpu_count - reserved_cpu_count)
+    requested_value = configured_worker_count
+    requested_source = "configured value"
+
+    if requested_value is None and env_var_name:
+        env_value = os.getenv(env_var_name)
+        if env_value:
+            requested_value = env_value
+            requested_source = env_var_name
+
+    if requested_value is None:
+        requested_value = default_worker_count
+        requested_source = "default"
+
+    try:
+        requested_worker_count = int(requested_value)
+    except (TypeError, ValueError):
+        if logger:
+            logger.info(f"Invalid worker count from {requested_source}={requested_value}; using default {default_worker_count}.")
+
+        requested_worker_count = int(default_worker_count)
+        requested_source = "default"
+
+    if requested_worker_count < 1:
+        if logger:
+            logger.info(f"Worker count from {requested_source}={requested_worker_count} is less than 1; using 1.")
+
+        requested_worker_count = 1
+
+    resolved_worker_count = max(1, min(requested_worker_count, usable_cpu_count))
+
+    if logger:
+        logger.info(
+            "Resolved portable worker count: "
+            f"source={requested_source}, requested={requested_worker_count}, "
+            f"cpu_count={cpu_count}, reserved_cpu_count={reserved_cpu_count}, "
+            f"usable_cpu_count={usable_cpu_count}, resolved={resolved_worker_count}."
+        )
+
+    return resolved_worker_count
+
+
+# -----------------------------------------------------------------------------
 # File IO
 # -----------------------------------------------------------------------------
 

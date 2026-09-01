@@ -63,7 +63,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from pipelines.pipeline_4_grant.grant_base import GrantPipelineBase
 from pipelines.pipeline_error_logging import attach_pipeline_error_file_handler
 from utils.applogger import AppLogger
-from utils.tools import _time_hms
+from utils.tools import _resolve_worker_count, _time_hms
 
 
 WORD_PATTERN = re.compile(r"\b\w+\b")
@@ -86,7 +86,7 @@ DEFAULT_RANGE_BATCH_SIZE = 2000
 DEFAULT_FETCH_SIZE = 250
 DEFAULT_INSERT_BATCH_SIZE = 100
 DEFAULT_WORKER_PROGRESS_LOG_INTERVAL = 500
-DEFAULT_NUM_PROCESSES = min(4, os.cpu_count() or 1)
+DEFAULT_NUM_PROCESSES = 10
 
 GARD_PROCESSED_NAMES: List[Dict[str, Any]] = []
 GARD_ID_BY_NAME: Dict[str, Any] = {}
@@ -826,14 +826,25 @@ def merge_summary(total_summary: Dict[str, int], range_summary: Dict[str, int]) 
 class GrantGardProjectRelationshipTask(GrantPipelineBase):
     """Find and insert GARD disease relationships for pending grant projects."""
 
-    def __init__(self, id_step: int = DEFAULT_ID_STEP, range_batch_size: int = DEFAULT_RANGE_BATCH_SIZE, fetch_size: int = DEFAULT_FETCH_SIZE, insert_batch_size: int = DEFAULT_INSERT_BATCH_SIZE, num_processes = 10):
+    def __init__(self, id_step: int = DEFAULT_ID_STEP, range_batch_size: int = DEFAULT_RANGE_BATCH_SIZE, fetch_size: int = DEFAULT_FETCH_SIZE, insert_batch_size: int = DEFAULT_INSERT_BATCH_SIZE, num_processes: Optional[int] = None):
 
         super().__init__(init_mysql=True, init_memgraph=False)
         self.id_step = id_step
         self.range_batch_size = range_batch_size
         self.fetch_size = fetch_size
         self.insert_batch_size = insert_batch_size
-        self.num_processes = num_processes
+        '''
+        Keep the historical default as the requested upper bound, then resolve
+        the actual process count from this machine's capacity. If a caller passes
+        num_processes or GRANT_PROJECT_RELATIONSHIP_MAX_WORKERS is set, that
+        value is still capped to CPU count minus two reserved CPUs.
+        '''
+        self.num_processes = _resolve_worker_count(
+            DEFAULT_NUM_PROCESSES,
+            configured_worker_count=num_processes,
+            env_var_name="GRANT_PROJECT_RELATIONSHIP_MAX_WORKERS",
+            logger=self.logger
+        )
 
 
     def find_new_data(self, gard_node) -> None:

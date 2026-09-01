@@ -41,12 +41,12 @@ Environment:
 # Reference: D_grant/init_12_grant_publications_not_in_Article_table_multi.py
 
 import time
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool
 from typing import Any, List, Optional, Tuple
 
 from pipelines.pipeline_4_grant.grant_base import GrantPipelineBase
 from utils.publication_worker import PublicationWorker
-from utils.tools import _id_range_generator, _time_hms
+from utils.tools import _id_range_generator, _resolve_worker_count, _time_hms
 
 
 PROCESSED_FLAG = 1
@@ -143,11 +143,22 @@ def download_by_pmid(pmid: Any) -> Optional[PublicationRow]:
 class GrantPublicationArticleImportTask(GrantPipelineBase):
     """Download missing Article rows for current new grant/GARD relationships."""
 
-    def __init__(self, id_step: int = DEFAULT_ID_STEP, range_batch_size: int = DEFAULT_RANGE_BATCH_SIZE, process_count: int = DEFAULT_PROCESS_COUNT):
+    def __init__(self, id_step: int = DEFAULT_ID_STEP, range_batch_size: int = DEFAULT_RANGE_BATCH_SIZE, process_count: Optional[int] = None):
         super().__init__(init_mysql=True, init_memgraph=False)
         self.id_step = id_step
         self.range_batch_size = range_batch_size
-        self.process_count = process_count
+        '''
+        Publication download workers are process-based because each worker owns a
+        PublicationWorker. Keep DEFAULT_PROCESS_COUNT as the requested upper
+        bound, but resolve the actual pool size from this machine so a small VM
+        does not try to start a server-sized worker pool.
+        '''
+        self.process_count = _resolve_worker_count(
+            DEFAULT_PROCESS_COUNT,
+            configured_worker_count=process_count,
+            env_var_name="GRANT_PUBLICATION_IMPORT_MAX_WORKERS",
+            logger=self.logger
+        )
 
 
     def find_new_data(self, gard_node) -> None:

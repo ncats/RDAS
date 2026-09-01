@@ -5,7 +5,7 @@ import requests
 import json
 from multiprocessing import Pool
 from utils.https_request import HTTPSUtils as HttpsUtil
-from utils.tools import _to_txt
+from utils.tools import _resolve_worker_count, _to_txt
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -200,10 +200,17 @@ def process_publication_article(obj: Dict[str, Any]) -> Optional[Tuple[bool, boo
 
 class PublicationEpiNhsClassificationTask(PipelineBase):
 
+    DEFAULT_PROCESS_COUNT = 20
 
-    def __init__(self, fetch_order: str = "ASC"):
+    def __init__(self, fetch_order: str = "ASC", process_count: Optional[int] = None):
         super().__init__(init_mysql=True, init_memgraph=False)
         self.fetch_order = fetch_order.upper()
+        self.process_count = _resolve_worker_count(
+            self.DEFAULT_PROCESS_COUNT,
+            configured_worker_count=process_count,
+            env_var_name="PUBLICATION_EPI_NHS_API_MAX_WORKERS",
+            logger=self.logger
+        )
 
         if self.fetch_order not in {"ASC", "DESC"}:
             raise ValueError("fetch_order must be ASC or DESC.")
@@ -228,10 +235,16 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
         self.logger.info(f"Fetching new publication_article rows in id {self.fetch_order} order.")
 
         batch_num = 0
-        batch_size = 20
+        '''
+        Keep the fetch batch aligned with the process pool size so each worker
+        receives at most one API-bound article at a time. The actual process
+        count is resolved at task startup from PUBLICATION_EPI_NHS_API_MAX_WORKERS
+        or DEFAULT_PROCESS_COUNT, capped to CPU count minus two reserved CPUs.
+        '''
+        batch_size = self.process_count
 
         try: 
-            with Pool(processes=batch_size) as active_pool:
+            with Pool(processes=self.process_count) as active_pool:
                 while True:
 
                     '''

@@ -16,7 +16,7 @@ sys.path.extend([
 
 from pipelines.pipeline_base import PipelineBase
 from utils.organization_name_extractor import OrganizationNameExtractor
-from utils.tools import _time_hms, _to_float, _to_int
+from utils.tools import _resolve_worker_count, _time_hms, _to_float, _to_int
 
 ROR_LOOKUP_API_FAILED = "ROR_LOOKUP_API_FAILED"
 
@@ -158,7 +158,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
 
     TABLE_NAME = "organization_location"
     BATCH_SIZE = 100
-    MAX_WORKERS = 20
+    DEFAULT_MAX_WORKERS = 20
     ROR_TIMEOUT = 20
 
     # If ROR has no match, mark the Organization node so future runs do not keep
@@ -225,6 +225,11 @@ class OrganizationLocationRorLookupTask(PipelineBase):
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=True)
         self.org_name_extractor = OrganizationNameExtractor(logger=self.logger)
+        self.max_workers = _resolve_worker_count(
+            self.DEFAULT_MAX_WORKERS,
+            env_var_name="ROR_LOOKUP_MAX_WORKERS",
+            logger=self.logger
+        )
 
 
     def close(self) -> None:
@@ -656,8 +661,10 @@ class OrganizationLocationRorLookupTask(PipelineBase):
         Step 3:
         Run ROR lookups in parallel.
         These are network-bound API calls, so ThreadPoolExecutor is enough and avoids multiprocessing overhead.
+        ROR_LOOKUP_MAX_WORKERS is a requested upper bound only; the shared helper caps
+        it to the current machine's CPU count minus two reserved CPUs when the task starts.
         '''
-        max_workers = min(self.MAX_WORKERS, len(prepared_orgs))
+        max_workers = min(self.max_workers, len(prepared_orgs))
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_org = {
