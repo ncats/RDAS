@@ -1,8 +1,8 @@
 """
 Grant alert helper for AlertSender.
 
-This file owns the grant-specific alert rules so Z_Alert/alert_sender.py can
-focus on Firebase users, payload assembly, email delivery, and summary logging.
+This file owns the grant-specific alert rules so AlertSender can focus on
+Firebase users, payload assembly, email delivery, and summary logging.
 """
 
 from typing import Any, Dict, Optional, Set, Tuple

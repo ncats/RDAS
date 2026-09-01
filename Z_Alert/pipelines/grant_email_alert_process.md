@@ -1,14 +1,14 @@
 # Grant Email Alert Process
 
 This document describes how grant updates are included in RDAS alert emails by
-`Z_Alert/alert_sender.py`.
+`Z_Alert/pipelines/pipeline_8_notification/task_alert_sender.py`.
 
 ## Related Files
 
 - `Z_Alert/main.py`
   - Runs `AlertPipelineRunner.send_alert_emails()` as Step 8.
   - Step 8 creates `AlertSender` and calls `find_new_and_send_alert()`.
-- `Z_Alert/alert_sender.py`
+- `Z_Alert/pipelines/pipeline_8_notification/task_alert_sender.py`
   - Builds per-user alert payloads from Firebase subscriptions and MySQL data.
   - Sends user alert emails and the admin summary email.
   - Delegates grant-specific alert logic to `GrantAlertHelper`.

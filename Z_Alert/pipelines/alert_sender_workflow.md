@@ -1,6 +1,7 @@
 # AlertSender Workflow
 
-This document describes the current workflow in `Z_Alert/alert_sender.py`.
+This document describes the current workflow in
+`Z_Alert/pipelines/pipeline_8_notification/task_alert_sender.py`.
 
 ## Purpose
 
@@ -107,7 +108,7 @@ Current behavior:
 - Requires `clinical_trial.is_new = 1`.
 - Requires `clinical_trial.alert_sent` to be missing or `0`.
 - Returns a row shaped as `(gard_id, "trials", count)`.
-- `alert_sender.py` reads `alert_sent`, but does not update
+- `task_alert_sender.py` reads `alert_sent`, but does not update
   `clinical_trial.alert_sent` after delivery.
 
 ### Publications

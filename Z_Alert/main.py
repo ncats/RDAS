@@ -281,7 +281,7 @@ class AlertPipelineRunner(PipelineRunnerBase):
         error_handler_added = False
 
         try:
-            from alert_sender import AlertSender
+            from pipelines.pipeline_8_notification.task_alert_sender import AlertSender
 
             error_handler, error_handler_added = attach_pipeline_error_file_handler(
                 self.logger,

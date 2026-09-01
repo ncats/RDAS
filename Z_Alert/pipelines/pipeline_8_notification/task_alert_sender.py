@@ -10,10 +10,10 @@ sys.path.extend([
 ])
 
 from dotenv import load_dotenv
-from datetime import date, datetime, timedelta 
+from datetime import date, datetime, timedelta
 from firebase.firebase_query import FirebaseAgent
 from emails.email_client import EmailClient
-from pipelines.pipeline_base import PipelineBase 
+from pipelines.pipeline_base import PipelineBase
 from pipelines.pipeline_4_grant.grant_alert_helper import GrantAlertHelper
 from utils.tools import _recipient_list
 
@@ -40,9 +40,9 @@ class AlertSender(PipelineBase):
     # Not implemented
     def process_new_data(self) -> None:
         raise NotImplementedError("AlertSender does not implement process_new_data().")
-   
 
-    # Not implemented   
+
+    # Not implemented
     def find_new_data(self, gard_node) -> None:
         raise NotImplementedError("AlertSender does not implement find_new_data().")
 
@@ -60,7 +60,7 @@ class AlertSender(PipelineBase):
         """
         firebaseAgent = None
 
-        try: 
+        try:
             '''
             For a single GARD ID, return counts of alertable clinical trials and
             publications. Grant alerts are handled by GrantAlertHelper because
@@ -97,7 +97,7 @@ class AlertSender(PipelineBase):
                 FROM publication_article a
                 INNER JOIN publication_gard_searchterm_pubmed_mapping m
                     ON  a.pubmed_id   = m.pubmed_id
-                    AND  m.gard_id     = %s 
+                    AND  m.gard_id     = %s
                 WHERE a.is_new    = 1
                 GROUP BY m.gard_id
             '''
@@ -115,7 +115,7 @@ class AlertSender(PipelineBase):
             alerted_grant_pairs = set()
             update_date_end = date.today()
             update_date_start = update_date_end - timedelta(days=self.LOOK_BACK_DAYS)
-            
+
             ''' 2. Send alert to each user '''
             for user in users:
                 '''
@@ -170,7 +170,7 @@ class AlertSender(PipelineBase):
                         "update_date_end": update_date_end.strftime("%Y-%m-%d"),
                     }
                 }
-                
+
                 datasets = set()
                 active_subscriptions = {}
                 ''' for Grant alert tracking '''
@@ -179,9 +179,9 @@ class AlertSender(PipelineBase):
                 ''' 3. For each user subscriped GARD id'''
                 for gard_id in gard_id_list:
 
-                    #1. Find new clinical-trial and publication items by gard_id. 
+                    #1. Find new clinical-trial and publication items by gard_id.
                     cursor = self.mysql.cursor()
-                    try:                        
+                    try:
                         cursor.execute(find_new_items_query, (gard_id, gard_id))
                         rows = list(cursor.fetchall())
                     finally:
@@ -197,8 +197,8 @@ class AlertSender(PipelineBase):
                     '''
                     grant_row, grant_pairs = grantAlertHelper.find_alertable_grants(gard_id)
                     if grant_row:
-                        rows.append(grant_row) 
-                        user_grant_alert_pairs.update(grant_pairs) 
+                        rows.append(grant_row)
+                        user_grant_alert_pairs.update(grant_pairs)
 
                     # No rows means this subscribed disease has no new alertable rows in the current staging tables.
                     if not rows:
@@ -210,7 +210,7 @@ class AlertSender(PipelineBase):
                     active_subscriptions[gard_id] = user_subscriptions.get(gard_id, gard_id)
 
                     for row in rows:
-                        gardId, item_name, new_items_count = row     
+                        gardId, item_name, new_items_count = row
                         payload["data"][gardId][item_name] = new_items_count
                         datasets.add(item_name)
 
@@ -225,19 +225,19 @@ class AlertSender(PipelineBase):
                 subscription_count = len(active_subscriptions)
                 if subscription_count == 0:
                     self.logger.info(f'* No new subscriptions found for user: {user} - {datetime.now()}')
-                    continue 
+                    continue
 
                 dataset_order = ("articles", "trials", "grants")
                 payload["data"]["datasets"] = [dataset for dataset in dataset_order if dataset in datasets]
                 payload["data"]["subscriptions"] = active_subscriptions
                 payload["data"]["total"] = subscription_count
-                 
+
                 ''' 4. Send alert email to user '''
                 ''' The payload contains only subscriptions that actually had new content, so users do not receive empty disease sections. '''
                 try:
                     emailClient.send_html_alert_email(
                         subject = self.subject,
-                        payload = payload,                            
+                        payload = payload,
                         mail_to = user.get('email'),
                         #mail_to = 'tongan.zhao@nih.gov', # For testing, remove for PRODUCTION
                         mail_cc = None,
@@ -245,15 +245,15 @@ class AlertSender(PipelineBase):
                 except Exception as e:
                     self.logger.error(f"Unable to send alert email to {email}: {e}")
                     continue
-                
+
                 self.logger.info(f'\nSent alert to user: {user} - {datetime.now()}')
                 self.logger.info(json.dumps(payload, indent=2, ensure_ascii=False))
                 alerted_grant_pairs.update(user_grant_alert_pairs)
-                 
+
                 ''' add to summary'''
                 all_updates_summary.append({"email": email, "display_name": display_name, "payload": payload})
 
-            # Save the full alert summary payload into MySQL as a JSON string. 
+            # Save the full alert summary payload into MySQL as a JSON string.
             self.save_alert_summary(datetime.now(), update_date_start, update_date_end, all_updates_summary)
             # For alert tracking
             grantAlertHelper.save_alert_sent_pairs(alerted_grant_pairs)
@@ -278,7 +278,7 @@ class AlertSender(PipelineBase):
 
                     if not all_updates_summary:
                         summary_subject = f"{summary_subject} - No Updates"
-                        
+
                     self.logger.info("Sending summary alert email...")
 
                     emailClient.send_html_summary_email(
