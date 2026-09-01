@@ -1,9 +1,10 @@
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
+import threading
 from typing import Any, Dict, Optional, Sequence, Tuple
 import requests
 import json
-from multiprocessing import Pool
 from utils.https_request import HTTPSUtils as HttpsUtil
 from utils.tools import _resolve_worker_count, _to_txt
 
@@ -24,8 +25,17 @@ Update is_EPI and is_NHS for new rows in publication_article.
 # Reference: C_publication/init_4_publication-update-EPI-NHS-of-Article-multi.py
 
 '''
-These are module-level functions, not class methods, and keeping them outside PublicationEpiNhsClassificationTask is correct for multiprocessing.
+These are module-level functions, not class methods. Keeping the HTTP work
+outside PublicationEpiNhsClassificationTask lets worker threads call the APIs
+without sharing the parent task's MySQL cursor or connection.
 '''
+
+def _worker_log_prefix(article_id: Any, pubmed_id: Any) -> str:
+
+    """Return a compact runtime label for API worker log messages."""
+
+    return f'OS.process_id:{os.getpid()}\tThread.id:{threading.get_ident()}\tId:{article_id} - pubmed_id:{pubmed_id}'
+
 
 def get_nhs_extract(texts: Sequence[str]) -> Optional[bool]:
     """
@@ -167,10 +177,11 @@ def process_publication_article(obj: Dict[str, Any]) -> Optional[Tuple[bool, boo
     abstract_text = _to_txt(obj['abstract_text'])
 
     text_to_predict = (title + ' ' + abstract_text).strip()
+    worker_log_prefix = _worker_log_prefix(article_id, pubmed_id)
 
     epi_prediction = get_is_epi(text_to_predict)
     if epi_prediction is None:
-        print(f'OS.process_id:{os.getpid()}\tId:{article_id} - pubmed_id:{pubmed_id}\tEPI classification failed; database row will not be updated.')
+        print(f'{worker_log_prefix}\tEPI classification failed; database row will not be updated.')
         return None
 
     is_epi = epi_prediction['isEpi']
@@ -178,17 +189,17 @@ def process_publication_article(obj: Dict[str, Any]) -> Optional[Tuple[bool, boo
 
     is_nhs = get_nhs_extract([text_to_predict])
     if is_nhs is None:
-        print(f'OS.process_id:{os.getpid()}\tId:{article_id} - pubmed_id:{pubmed_id}\tNHS prediction failed; database row will not be updated.')
+        print(f'{worker_log_prefix}\tNHS prediction failed; database row will not be updated.')
         return None
 
-    print(f'OS.process_id:{os.getpid()}\tId:{article_id} - pubmed_id:{pubmed_id}\tis_EPI={is_epi}\tepiProbability={epi_probability}\tis_NHS={is_nhs}')
+    print(f'{worker_log_prefix}\tis_EPI={is_epi}\tepiProbability={epi_probability}\tis_NHS={is_nhs}')
 
     epi_extract = None
 
     if is_epi:
         epi_extract_json = get_epi_extract(text_to_predict)
         if epi_extract_json is None:
-            print(f'OS.process_id:{os.getpid()}\tId:{article_id} - pubmed_id:{pubmed_id}\tEPI extraction failed; database row will not be updated.')
+            print(f'{worker_log_prefix}\tEPI extraction failed; database row will not be updated.')
             return None
 
         epi_extract = json.dumps(epi_extract_json)
@@ -200,17 +211,28 @@ def process_publication_article(obj: Dict[str, Any]) -> Optional[Tuple[bool, boo
 
 class PublicationEpiNhsClassificationTask(PipelineBase):
 
-    DEFAULT_PROCESS_COUNT = 20
+    DEFAULT_WORKER_COUNT = 20
+    # Keep the old constant as a compatibility alias for scripts that may import it.
+    DEFAULT_PROCESS_COUNT = DEFAULT_WORKER_COUNT
 
-    def __init__(self, fetch_order: str = "ASC", process_count: Optional[int] = None):
+    def __init__(self, fetch_order: str = "ASC", worker_count: Optional[int] = None, process_count: Optional[int] = None):
         super().__init__(init_mysql=True, init_memgraph=False)
         self.fetch_order = fetch_order.upper()
-        self.process_count = _resolve_worker_count(
-            self.DEFAULT_PROCESS_COUNT,
-            configured_worker_count=process_count,
+        '''
+        These calls are HTTP-bound, so threads are lighter than processes and
+        avoid multiprocessing startup/pickle overhead. worker_count is the
+        preferred argument name; process_count remains accepted as a legacy
+        requested upper bound for older scripts.
+        '''
+        requested_worker_count = worker_count if worker_count is not None else process_count
+        self.worker_count = _resolve_worker_count(
+            self.DEFAULT_WORKER_COUNT,
+            configured_worker_count=requested_worker_count,
             env_var_name="PUBLICATION_EPI_NHS_API_MAX_WORKERS",
             logger=self.logger
         )
+        # Backward-compatible attribute for any external code that still reads it.
+        self.process_count = self.worker_count
 
         if self.fetch_order not in {"ASC", "DESC"}:
             raise ValueError("fetch_order must be ASC or DESC.")
@@ -223,28 +245,27 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
 
     # implement
     def process_new_data(self) -> None:
-        
+
         fetch_is_new_query = f'SELECT id, pubmed_id, title, abstract_text FROM publication_article WHERE is_EPI is null AND is_new = 1 ORDER BY id {self.fetch_order} LIMIT %s'
 
         update_sql = " UPDATE publication_article SET is_EPI = %s, is_NHS = %s, epi_probability =%s, epi_extract = %s WHERE pubmed_id = %s "
 
-        
-        update_cursor = self.mysql.cursor()    
+        update_cursor = self.mysql.cursor()
 
         fetch_cursor = self.mysql.cursor(dictionary=True)
         self.logger.info(f"Fetching new publication_article rows in id {self.fetch_order} order.")
 
         batch_num = 0
         '''
-        Keep the fetch batch aligned with the process pool size so each worker
-        receives at most one API-bound article at a time. The actual process
+        Keep the fetch batch aligned with the thread pool size so each worker
+        receives at most one API-bound article at a time. The actual worker
         count is resolved at task startup from PUBLICATION_EPI_NHS_API_MAX_WORKERS
-        or DEFAULT_PROCESS_COUNT, capped to CPU count minus two reserved CPUs.
+        or DEFAULT_WORKER_COUNT, capped to CPU count minus two reserved CPUs.
         '''
-        batch_size = self.process_count
+        batch_size = self.worker_count
 
-        try: 
-            with Pool(processes=self.process_count) as active_pool:
+        try:
+            with ThreadPoolExecutor(max_workers=self.worker_count) as executor:
                 while True:
 
                     '''
@@ -263,7 +284,7 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
                     if not rows:
                         self.logger.info(f"No more rows to fetch.")
                         break
- 
+
                     obj_list = [{
                         'id': row['id'],
                         'title': row['title'],
@@ -272,7 +293,7 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
                     } for row in rows]
 
                     try:
-                        processed_values = active_pool.map(process_publication_article, obj_list)
+                        processed_values = list(executor.map(process_publication_article, obj_list))
                         val_list = [value for value in processed_values if value is not None]
                         skipped_count = len(processed_values) - len(val_list)
                         if skipped_count:
@@ -281,7 +302,7 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
                     except Exception as e:
                         self.logger.error(f"Error processing batch#{batch_num}: {e}")
                         continue
- 
+
                     try:
                         if not val_list:
                             self.logger.warning(f"No publication_article rows updated for batch#{batch_num}; all rows remain retryable.")
@@ -294,7 +315,7 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
                         self.logger.error(f"Error during update: {e}")
                         self.mysql.rollback()
                         continue
-                        
+
         except Exception as e:
             self.logger.error(f"An unexpected error occurred: {e}")
 
