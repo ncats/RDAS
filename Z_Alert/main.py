@@ -351,7 +351,7 @@ class AlertPipelineRunner(PipelineRunnerBase):
     def run_memgraph_index_initialization(self) -> None:
         """Run Memgraph index initialization through the standard task lifecycle."""
 
-        from init_index import MemgraphIndexInitializationTask
+        from pipelines.pipeline_0_setup.task_memgraph_index_initialization import MemgraphIndexInitializationTask
 
         self._run_pipeline_task(MemgraphIndexInitializationTask)
 

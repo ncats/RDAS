@@ -6,6 +6,7 @@ from typing import Iterable, List, Optional, Tuple, Type
 
 
 PIPELINE_ERROR_LOG_FILES: Tuple[Tuple[str, str, str], ...] = (
+    ("pipelines.pipeline_0_setup", "pipeline_0_setup", "error-alert-index.log"),
     ("pipelines.pipeline_1_gard", "pipeline_1_gard", "error-alert-pipeline-1-gard.log"),
     ("pipelines.pipeline_2_clinical_trial", "pipeline_2_clinical_trial", "error-alert-pipeline-2-clinical-trial.log"),
     ("pipelines.pipeline_3_publication", "pipeline_3_publication", "error-alert-pipeline-3-publication.log"),
@@ -16,7 +17,6 @@ PIPELINE_ERROR_LOG_FILES: Tuple[Tuple[str, str, str], ...] = (
 )
 Z_ALERT_ERROR_LOG_FILES: Tuple[Tuple[str, str], ...] = (
     ("alert_sender.py", "error-alert-email.log"),
-    ("init_index.py", "error-alert-index.log"),
 )
 PIPELINE_ERROR_LOG_MAX_BYTES = 1024 * 1024 * 10
 PIPELINE_ERROR_LOG_BACKUP_COUNT = 10
