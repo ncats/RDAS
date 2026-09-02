@@ -19,6 +19,8 @@ from pipelines.pipeline_base import PipelineBase
 from F_person.person_disambiguation import PersonDisambiguator
 from utils.tools import _curr_timestamp, _resolve_worker_count
 
+LIKE_ESCAPE_CHARACTER = "="
+
 """
 Generate RDAS person groups.
 
@@ -225,6 +227,23 @@ def _is_empty_group_id_for_worker(value: Any) -> bool:
     return bool(pd.isna(value))
 
 
+def _build_last_name_prefix_like_pattern(prefix: str) -> str:
+
+    """Build an escaped MySQL LIKE pattern for a literal last-name prefix."""
+
+    '''
+    MySQL LIKE treats "_" as a one-character wildcard and "%" as an
+    any-length wildcard. Prefixes such as "A_" are generated intentionally to
+    find last names whose second character is a real underscore. Escape LIKE
+    metacharacters before appending "%" so prefix traversal stays literal.
+    '''
+    escaped_prefix = str(prefix or "").replace(LIKE_ESCAPE_CHARACTER, LIKE_ESCAPE_CHARACTER * 2)
+    escaped_prefix = escaped_prefix.replace("%", LIKE_ESCAPE_CHARACTER + "%")
+    escaped_prefix = escaped_prefix.replace("_", LIKE_ESCAPE_CHARACTER + "_")
+
+    return escaped_prefix + "%"
+
+
 class NewPersonGroupingTask(PipelineBase):
     """Assign group IDs to new people without changing existing group IDs."""
 
@@ -416,7 +435,8 @@ class NewPersonGroupingTask(PipelineBase):
         uppercase.extend(lowercase)
 
         # The second character list includes common punctuation seen in names,
-        # keeping prefix scans indexed while covering names like O'Neil.
+        # keeping prefix scans indexed while covering names like O'Neil. The
+        # underscore is escaped before SQL LIKE so it is treated literally.
         lowercase.append(" ")
         lowercase.append("'")
         lowercase.append(".")
@@ -446,7 +466,7 @@ class NewPersonGroupingTask(PipelineBase):
         query = f'''
             SELECT DISTINCT last_name
             FROM {self.PERSON_TABLE}
-            WHERE last_name LIKE %s
+            WHERE last_name LIKE %s ESCAPE '{LIKE_ESCAPE_CHARACTER}'
             AND is_new = 1
             AND (rdas_group_id IS NULL OR rdas_group_id = '')
         '''
@@ -455,7 +475,7 @@ class NewPersonGroupingTask(PipelineBase):
 
         try:
             cursor = self.mysql.cursor(buffered=True, dictionary=True)
-            cursor.execute(query, (prefix + "%",))
+            cursor.execute(query, (_build_last_name_prefix_like_pattern(prefix),))
 
             return [row["last_name"] for row in cursor.fetchall()]
 
