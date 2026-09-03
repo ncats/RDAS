@@ -534,7 +534,9 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
             relationship_rewire_hours, relationship_rewire_minutes, relationship_rewire_seconds = _time_hms(time.time() - relationship_rewire_start)
             delete_start = time.time()
-            deleted_count = self.delete_duplicate_nodes(label, batch_duplicate_ids)
+            delete_result = self.delete_duplicate_nodes_after_rewire(label, batch_duplicate_ids)
+            deleted_count = delete_result["deleted_count"]
+            delete_mode = delete_result["delete_mode"]
             delete_hours, delete_minutes, delete_seconds = _time_hms(time.time() - delete_start)
             batch_hours, batch_minutes, batch_seconds = _time_hms(time.time() - batch_start)
             merged_count += deleted_count
@@ -546,6 +548,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                 f"outgoing_relationships={outgoing_rewired_count}, incoming_relationships={incoming_rewired_count}, "
                 f"relationship_type_source=label_cache, "
                 f"relationship_rewire_time={relationship_rewire_hours} hours, {relationship_rewire_minutes} minutes, {relationship_rewire_seconds} seconds, "
+                f"delete_mode={delete_mode}, "
                 f"delete_time={delete_hours} hours, {delete_minutes} minutes, {delete_seconds} seconds, "
                 f"batch_time={batch_hours} hours, {batch_minutes} minutes, {batch_seconds} seconds."
             )
@@ -594,6 +597,57 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
         rows = self.memgraph.execute_and_fetch(query)
         return {row["relationship_type"] for row in rows if row.get("relationship_type")}
+
+
+    def delete_duplicate_nodes_after_rewire(self, label: str, duplicate_ids: List[int]) -> Dict[str, Any]:
+        """Delete duplicate nodes, falling back to DETACH DELETE only when needed."""
+
+        if not duplicate_ids:
+            return {
+                "deleted_count": 0,
+                "delete_mode": "skip_empty"
+            }
+
+        '''
+        Rewire queries delete the normal external relationships before this
+        point, so a plain DELETE should usually be enough and avoids Memgraph
+        doing another relationship-detach pass. Keep the DETACH DELETE fallback
+        for rare groups that still have internal duplicate-to-duplicate or
+        duplicate-to-keeper relationships after rewiring.
+        '''
+        try:
+            return {
+                "deleted_count": self.delete_duplicate_nodes_without_detach(label, duplicate_ids),
+                "delete_mode": "delete"
+            }
+        except Exception as e:
+            self.logger.info(
+                f"Plain DELETE failed for {len(duplicate_ids)} duplicate {label} nodes; "
+                f"falling back to DETACH DELETE. Error: {e}"
+            )
+
+            return {
+                "deleted_count": self.detach_delete_duplicate_nodes(label, duplicate_ids),
+                "delete_mode": "detach_delete"
+            }
+
+
+    def delete_duplicate_nodes_without_detach(self, label: str, duplicate_ids: List[int]) -> int:
+        """Delete duplicate nodes when rewiring already removed their relationships."""
+
+        if not duplicate_ids:
+            return 0
+
+        query = f"""
+            MATCH (duplicate:{label})
+            WHERE id(duplicate) IN $duplicate_ids
+            WITH collect(duplicate) AS duplicates, count(duplicate) AS deleted_count
+            FOREACH (duplicate IN duplicates | DELETE duplicate)
+            RETURN deleted_count
+        """
+
+        rows = list(self.memgraph.execute_and_fetch(query, {"duplicate_ids": duplicate_ids}))
+        return int(rows[0].get("deleted_count") or 0) if rows else 0
 
 
     def fetch_relationship_types_for_nodes(self, node_ids: List[int]) -> Set[str]:
@@ -657,7 +711,13 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
 
     def delete_duplicate_nodes(self, label: str, duplicate_ids: List[int]) -> int:
-        """Delete duplicate nodes after their relationships have been rewired."""
+        """Delete duplicate nodes and any remaining relationships."""
+
+        return self.detach_delete_duplicate_nodes(label, duplicate_ids)
+
+
+    def detach_delete_duplicate_nodes(self, label: str, duplicate_ids: List[int]) -> int:
+        """Delete duplicate nodes and any remaining relationships."""
 
         if not duplicate_ids:
             return 0
