@@ -31,8 +31,10 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
     """Apply newly staged organization_location rows to the Memgraph graph."""
 
     BATCH_SIZE = 200
-    DUPLICATE_KEY_BATCH_SIZE = 100
+    DUPLICATE_KEY_BATCH_SIZE = 500
     DUPLICATE_MERGE_BATCH_SIZE = 500
+    DUPLICATE_KEY_BATCH_SIZE_ENV_VAR = "ORGANIZATION_LOCATION_DUPLICATE_KEY_BATCH_SIZE"
+    DUPLICATE_MERGE_BATCH_SIZE_ENV_VAR = "ORGANIZATION_LOCATION_DUPLICATE_MERGE_BATCH_SIZE"
     TABLE_NAME = "organization_location"
 
     # Relationship types are discovered from the graph and inserted into Cypher
@@ -98,6 +100,47 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=True)
+        self.duplicate_key_batch_size = self._resolve_positive_int_setting(
+            self.DUPLICATE_KEY_BATCH_SIZE_ENV_VAR,
+            self.DUPLICATE_KEY_BATCH_SIZE,
+        )
+        self.duplicate_merge_batch_size = self._resolve_positive_int_setting(
+            self.DUPLICATE_MERGE_BATCH_SIZE_ENV_VAR,
+            self.DUPLICATE_MERGE_BATCH_SIZE,
+        )
+        self.logger.info(
+            "OrganizationLocationGraphSyncTask configured with "
+            f"batch_size={self.BATCH_SIZE}, "
+            f"duplicate_key_batch_size={self.duplicate_key_batch_size}, "
+            f"duplicate_merge_batch_size={self.duplicate_merge_batch_size}."
+        )
+
+
+    def _resolve_positive_int_setting(self, env_var_name: str, default_value: int) -> int:
+        """Resolve a positive integer setting from an environment variable."""
+
+        '''
+        Duplicate merging is write-heavy in Memgraph, so the best batch size can
+        differ between machines and graph sizes. Keep conservative defaults in
+        code, but allow operations to tune the merge checks without another
+        source edit or redeploy.
+        '''
+        env_value = os.getenv(env_var_name)
+
+        if not env_value:
+            return default_value
+
+        try:
+            parsed_value = int(env_value)
+        except ValueError:
+            self.logger.info(f"{env_var_name}={env_value} is not an integer; using default {default_value}.")
+            return default_value
+
+        if parsed_value <= 0:
+            self.logger.info(f"{env_var_name}={env_value} must be greater than 0; using default {default_value}.")
+            return default_value
+
+        return parsed_value
 
 
     def find_new_data(self, gard_node) -> None:
@@ -295,20 +338,26 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         merged_count = 0
         key_batch_count = 0
 
-        for start in range(0, len(filtered_merge_keys), self.DUPLICATE_KEY_BATCH_SIZE):
+        for start in range(0, len(filtered_merge_keys), self.duplicate_key_batch_size):
             key_batch_count += 1
-            merge_key_batch = filtered_merge_keys[start:start + self.DUPLICATE_KEY_BATCH_SIZE]
+            merge_key_batch = filtered_merge_keys[start:start + self.duplicate_key_batch_size]
+            duplicate_fetch_start = time.time()
             duplicate_groups = self.fetch_duplicate_groups_for_keys(label, property_name, merge_key_batch)
+            fetch_hours, fetch_minutes, fetch_seconds = _time_hms(time.time() - duplicate_fetch_start)
 
             self.logger.info(
                 f"Duplicate {label} touched key batch #{key_batch_count}: "
                 f"merge_keys={len(merge_key_batch)}, duplicate_groups={len(duplicate_groups)}, "
                 f"last_{property_name}={merge_key_batch[-1]}, "
-                f"duplicate_merge_batch_size={self.DUPLICATE_MERGE_BATCH_SIZE}."
+                f"duplicate_merge_batch_size={self.duplicate_merge_batch_size}, "
+                f"duplicate_group_fetch_time={fetch_hours} hours, {fetch_minutes} minutes, {fetch_seconds} seconds."
             )
 
             if not duplicate_groups:
                 continue
+
+            batch_merge_start = time.time()
+            batch_merged_count = 0
 
             for duplicate_group in duplicate_groups:
                 merge_key = duplicate_group["merge_key"]
@@ -325,7 +374,16 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                     f"{property_name}={merge_key}; keeper_id={keeper_id}."
                 )
 
-                merged_count += self.merge_duplicate_group(label, keeper_id, duplicate_ids)
+                duplicate_merged_count = self.merge_duplicate_group(label, keeper_id, duplicate_ids)
+                batch_merged_count += duplicate_merged_count
+                merged_count += duplicate_merged_count
+
+            merge_hours, merge_minutes, merge_seconds = _time_hms(time.time() - batch_merge_start)
+            self.logger.info(
+                f"Duplicate {label} touched key batch #{key_batch_count} merge complete: "
+                f"merged_nodes={batch_merged_count}, "
+                f"merge_time={merge_hours} hours, {merge_minutes} minutes, {merge_seconds} seconds."
+            )
 
         self.logger.info(f"Merged {merged_count} duplicate {label} nodes for {len(filtered_merge_keys)} updated keys.")
         return merged_count
@@ -351,17 +409,23 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
             key_batch_count += 1
             last_merge_key = merge_keys[-1]
+            duplicate_fetch_start = time.time()
             duplicate_groups = self.fetch_duplicate_groups_for_keys(label, property_name, merge_keys)
+            fetch_hours, fetch_minutes, fetch_seconds = _time_hms(time.time() - duplicate_fetch_start)
 
             self.logger.info(
                 f"Duplicate {label} key batch #{key_batch_count}: "
                 f"merge_keys={len(merge_keys)}, duplicate_groups={len(duplicate_groups)}, "
                 f"last_{property_name}={last_merge_key}, "
-                f"duplicate_merge_batch_size={self.DUPLICATE_MERGE_BATCH_SIZE}."
+                f"duplicate_merge_batch_size={self.duplicate_merge_batch_size}, "
+                f"duplicate_group_fetch_time={fetch_hours} hours, {fetch_minutes} minutes, {fetch_seconds} seconds."
             )
 
             if not duplicate_groups:
                 continue
+
+            batch_merge_start = time.time()
+            batch_merged_count = 0
 
             for duplicate_group in duplicate_groups:
                 merge_key = duplicate_group["merge_key"]
@@ -378,9 +442,18 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                     f"{property_name}={merge_key}; keeper_id={keeper_id}."
                 )
 
-                merged_count += self.merge_duplicate_group(label, keeper_id, duplicate_ids)
+                duplicate_merged_count = self.merge_duplicate_group(label, keeper_id, duplicate_ids)
+                batch_merged_count += duplicate_merged_count
+                merged_count += duplicate_merged_count
 
-            if len(merge_keys) < self.DUPLICATE_KEY_BATCH_SIZE:
+            merge_hours, merge_minutes, merge_seconds = _time_hms(time.time() - batch_merge_start)
+            self.logger.info(
+                f"Duplicate {label} key batch #{key_batch_count} merge complete: "
+                f"merged_nodes={batch_merged_count}, "
+                f"merge_time={merge_hours} hours, {merge_minutes} minutes, {merge_seconds} seconds."
+            )
+
+            if len(merge_keys) < self.duplicate_key_batch_size:
                 break
 
         self.logger.info(f"Merged {merged_count} duplicate {label} nodes.")
@@ -402,7 +475,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
         rows = self.memgraph.execute_and_fetch(query, {
             "lastMergeKey": last_merge_key,
-            "limit": self.DUPLICATE_KEY_BATCH_SIZE,
+            "limit": self.duplicate_key_batch_size,
         })
         return [row["merge_key"] for row in rows if row.get("merge_key")]
 
@@ -439,11 +512,15 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         merged_count = 0
         total_duplicate_count = len(duplicate_ids)
 
-        for start in range(0, total_duplicate_count, self.DUPLICATE_MERGE_BATCH_SIZE):
-            batch_duplicate_ids = duplicate_ids[start:start + self.DUPLICATE_MERGE_BATCH_SIZE]
+        for start in range(0, total_duplicate_count, self.duplicate_merge_batch_size):
+            batch_start = time.time()
+            batch_duplicate_ids = duplicate_ids[start:start + self.duplicate_merge_batch_size]
+            relationship_type_start = time.time()
             relationship_types = self.fetch_relationship_types_for_nodes(batch_duplicate_ids)
+            relationship_type_hours, relationship_type_minutes, relationship_type_seconds = _time_hms(time.time() - relationship_type_start)
             outgoing_rewired_count = 0
             incoming_rewired_count = 0
+            relationship_rewire_start = time.time()
 
             for relationship_type in relationship_types:
                 if not self.RELATIONSHIP_TYPE_RE.match(relationship_type):
@@ -452,14 +529,22 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                 outgoing_rewired_count += self.rewire_outgoing_relationships_for_nodes(label, keeper_id, batch_duplicate_ids, relationship_type)
                 incoming_rewired_count += self.rewire_incoming_relationships_for_nodes(label, keeper_id, batch_duplicate_ids, relationship_type)
 
+            relationship_rewire_hours, relationship_rewire_minutes, relationship_rewire_seconds = _time_hms(time.time() - relationship_rewire_start)
+            delete_start = time.time()
             deleted_count = self.delete_duplicate_nodes(label, batch_duplicate_ids)
+            delete_hours, delete_minutes, delete_seconds = _time_hms(time.time() - delete_start)
+            batch_hours, batch_minutes, batch_seconds = _time_hms(time.time() - batch_start)
             merged_count += deleted_count
 
             self.logger.info(
                 f"Merged duplicate {label} batch "
                 f"{start + 1}-{start + len(batch_duplicate_ids)} of {total_duplicate_count}; "
                 f"deleted_nodes={deleted_count}, relationship_types={len(relationship_types)}, "
-                f"outgoing_relationships={outgoing_rewired_count}, incoming_relationships={incoming_rewired_count}."
+                f"outgoing_relationships={outgoing_rewired_count}, incoming_relationships={incoming_rewired_count}, "
+                f"relationship_type_fetch_time={relationship_type_hours} hours, {relationship_type_minutes} minutes, {relationship_type_seconds} seconds, "
+                f"relationship_rewire_time={relationship_rewire_hours} hours, {relationship_rewire_minutes} minutes, {relationship_rewire_seconds} seconds, "
+                f"delete_time={delete_hours} hours, {delete_minutes} minutes, {delete_seconds} seconds, "
+                f"batch_time={batch_hours} hours, {batch_minutes} minutes, {batch_seconds} seconds."
             )
 
         return merged_count
