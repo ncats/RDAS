@@ -61,6 +61,8 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
 
     SOURCE_TABLE_NAME = "organization_location_source"
     ORGANIZATION_LOCATION_TABLE_NAME = "organization_location"
+    TEMP_CLINICAL_TRIAL_SOURCE_IDS_TABLE_NAME = "tmp_current_clinical_trial_source_ids"
+    TEMP_CLINICAL_TRIAL_SOURCE_KEEP_TABLE_NAME = "tmp_current_clinical_trial_source_keep"
 
     SOURCE_NODE_TYPE_CLINICAL_TRIAL = "ClinicalTrial"
     SOURCE_NODE_TYPE_CORE_PROJECT = "CoreProject"
@@ -107,7 +109,9 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
         FROM clinical_trial_unique
         WHERE is_new = 1
         AND nctid IS NOT NULL
+        AND id > %s
         ORDER BY id ASC
+        LIMIT %s
     """
 
     '''
@@ -124,7 +128,9 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
             IC_NAME AS ic_name
         FROM grant_project
         WHERE is_new = 1
+        AND id > %s
         ORDER BY id ASC
+        LIMIT %s
     """
 
     '''
@@ -139,7 +145,9 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
         WHERE is_new = 1
         AND affiliation IS NOT NULL
         AND TRIM(affiliation) <> ''
+        AND id > %s
         ORDER BY id ASC
+        LIMIT %s
     """
 
     def __init__(self):
@@ -185,6 +193,11 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
         generic source tracker only inserts or updates current rows; this
         clinical-trial-specific path also removes source rows for the same NCTID
         when their Organization key is no longer present in the latest JSON.
+
+        The studies column can be large JSON, so this method uses keyset
+        pagination instead of a buffered full-result cursor. That keeps each
+        database round trip and each in-memory batch bounded to the configured
+        batch size.
         """
 
         fetch_cursor = None
@@ -194,14 +207,19 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
         total_without_location = 0
         total_stale_deleted = 0
         batch_num = 0
+        last_seen_id = 0
 
         try:
-            fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
+            fetch_cursor = self.mysql.cursor(dictionary=True)
             update_cursor = self.mysql.cursor()
-            fetch_cursor.execute(self.FETCH_NEW_CLINICAL_TRIALS_QUERY)
+            self._create_clinical_trial_source_cleanup_tables(update_cursor)
 
             while True:
-                rows = fetch_cursor.fetchmany(self.CLINICAL_TRIAL_BATCH_SIZE)
+                fetch_cursor.execute(
+                    self.FETCH_NEW_CLINICAL_TRIALS_QUERY,
+                    (last_seen_id, self.CLINICAL_TRIAL_BATCH_SIZE),
+                )
+                rows = fetch_cursor.fetchall()
 
                 if not rows:
                     self.logger.info(
@@ -214,6 +232,7 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
                     break
 
                 batch_num += 1
+                last_seen_id = max(row.get("id") or last_seen_id for row in rows)
                 source_rows = []
                 current_org_keys_by_nctid = {}
 
@@ -301,9 +320,9 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
         Fetch new source rows, transform them to organization source tuples, and
         insert them into organization_location_source.
 
-        The cursor streams in fetchmany() batches. The SQL query already limits
-        the input set to is_new = 1, so there is no keyset pagination here; this
-        task is intended for the small incremental alert set.
+        The input queries use keyset pagination with id > last_seen_id and LIMIT
+        batch_size. That avoids loading every new source row into a buffered
+        cursor before the first insert batch can start.
         """
 
         fetch_cursor = None
@@ -312,14 +331,15 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
         total_db_changes = 0
         total_without_location = 0
         batch_num = 0
+        last_seen_id = 0
 
         try:
-            fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
+            fetch_cursor = self.mysql.cursor(dictionary=True)
             update_cursor = self.mysql.cursor()
-            fetch_cursor.execute(query)
 
             while True:
-                rows = fetch_cursor.fetchmany(batch_size)
+                fetch_cursor.execute(query, (last_seen_id, batch_size))
+                rows = fetch_cursor.fetchall()
 
                 if not rows:
                     self.logger.info(
@@ -331,6 +351,7 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
                     break
 
                 batch_num += 1
+                last_seen_id = max(row.get("id") or last_seen_id for row in rows)
                 source_rows = []
 
                 for row in rows:
@@ -442,31 +463,118 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
         row instead of replacing the old one. This cleanup keeps the source table
         aligned with the latest clinical-trial JSON.
         """
-        deleted_count = 0
+        if not current_org_keys_by_nctid:
+            return 0
+
+        current_nctids = []
+        keep_rows = []
 
         for nctid, current_org_keys in current_org_keys_by_nctid.items():
-            if current_org_keys:
-                placeholders = ", ".join(["%s"] * len(current_org_keys))
-                delete_sql = f"""
-                    DELETE FROM {self.SOURCE_TABLE_NAME}
-                    WHERE node_type_name = %s
-                    AND node_type_id = %s
-                    AND original_name_in_graph_db_idx_key NOT IN ({placeholders})
-                """
-                params = (self.SOURCE_NODE_TYPE_CLINICAL_TRIAL, nctid, *current_org_keys)
+            clean_nctid = self._clean_value(nctid)
 
-            else:
-                delete_sql = f"""
-                    DELETE FROM {self.SOURCE_TABLE_NAME}
-                    WHERE node_type_name = %s
-                    AND node_type_id = %s
-                """
-                params = (self.SOURCE_NODE_TYPE_CLINICAL_TRIAL, nctid)
+            if not clean_nctid:
+                continue
 
-            update_cursor.execute(delete_sql, params)
-            deleted_count += max(update_cursor.rowcount, 0)
+            current_nctids.append((clean_nctid,))
+            seen_org_keys = set()
 
-        return deleted_count
+            for org_key in current_org_keys:
+                clean_org_key = self._clean_value(org_key)
+
+                if not clean_org_key or clean_org_key in seen_org_keys:
+                    continue
+
+                seen_org_keys.add(clean_org_key)
+                keep_rows.append((clean_nctid, clean_org_key))
+
+        if not current_nctids:
+            return 0
+
+        '''
+        Load the current batch into connection-local temporary tables so MySQL
+        can perform the stale cleanup as one indexed joined DELETE.
+
+        The previous implementation issued one DELETE per NCTID. On large alert
+        runs that meant tens of thousands of tiny statements, and the live log
+        showed those statements usually deleted zero rows. The temp-table path
+        keeps the same semantics while reducing client/server round trips:
+          - tmp_current_clinical_trial_source_ids lists all changed NCTIDs that
+            had valid current JSON and are safe to clean up.
+          - tmp_current_clinical_trial_source_keep lists Organization keys that
+            should remain for those NCTIDs. If a changed NCTID has no keep row,
+            all ClinicalTrial source rows for that NCTID are stale.
+        '''
+        update_cursor.execute(f"DELETE FROM {self.TEMP_CLINICAL_TRIAL_SOURCE_IDS_TABLE_NAME}")
+        update_cursor.execute(f"DELETE FROM {self.TEMP_CLINICAL_TRIAL_SOURCE_KEEP_TABLE_NAME}")
+
+        update_cursor.executemany(
+            f"""
+                INSERT IGNORE INTO {self.TEMP_CLINICAL_TRIAL_SOURCE_IDS_TABLE_NAME}
+                (node_type_id)
+                VALUES (%s)
+            """,
+            current_nctids,
+        )
+
+        if keep_rows:
+            update_cursor.executemany(
+                f"""
+                    INSERT IGNORE INTO {self.TEMP_CLINICAL_TRIAL_SOURCE_KEEP_TABLE_NAME}
+                    (node_type_id, original_name_in_graph_db_idx_key)
+                    VALUES (%s, %s)
+                """,
+                keep_rows,
+            )
+
+        delete_sql = f"""
+            DELETE source_row
+            FROM {self.SOURCE_TABLE_NAME} AS source_row
+            INNER JOIN {self.TEMP_CLINICAL_TRIAL_SOURCE_IDS_TABLE_NAME} AS current_source
+                ON current_source.node_type_id = source_row.node_type_id
+            LEFT JOIN {self.TEMP_CLINICAL_TRIAL_SOURCE_KEEP_TABLE_NAME} AS keep_source
+                ON keep_source.node_type_id = source_row.node_type_id
+                AND keep_source.original_name_in_graph_db_idx_key = source_row.original_name_in_graph_db_idx_key
+            WHERE source_row.node_type_name = %s
+            AND keep_source.node_type_id IS NULL
+        """
+
+        update_cursor.execute(delete_sql, (self.SOURCE_NODE_TYPE_CLINICAL_TRIAL,))
+
+        return max(update_cursor.rowcount, 0)
+
+
+    def _create_clinical_trial_source_cleanup_tables(self, update_cursor) -> None:
+
+        """
+        Create per-connection temporary tables used for batch stale cleanup.
+
+        MySQL temporary tables are visible only to this connection and are
+        dropped automatically when the connection closes. Keeping them on the
+        same connection as the source-table updates lets each clinical-trial
+        batch commit or roll back as one unit.
+        """
+
+        update_cursor.execute(f"""
+            CREATE TEMPORARY TABLE IF NOT EXISTS {self.TEMP_CLINICAL_TRIAL_SOURCE_IDS_TABLE_NAME}
+            (
+                node_type_id varchar(45) NOT NULL,
+                PRIMARY KEY (node_type_id)
+            )
+            ENGINE=MEMORY
+            DEFAULT CHARSET=utf8mb4
+            COLLATE=utf8mb4_unicode_ci
+        """)
+        update_cursor.execute(f"""
+            CREATE TEMPORARY TABLE IF NOT EXISTS {self.TEMP_CLINICAL_TRIAL_SOURCE_KEEP_TABLE_NAME}
+            (
+                node_type_id varchar(45) NOT NULL,
+                original_name_in_graph_db_idx_key varchar(100) NOT NULL,
+                PRIMARY KEY (node_type_id, original_name_in_graph_db_idx_key)
+            )
+            ENGINE=MEMORY
+            DEFAULT CHARSET=utf8mb4
+            COLLATE=utf8mb4_unicode_ci
+        """)
 
 
     def _create_core_project_source_row(self, row: Dict[str, Any]) -> Optional[SourceRow]:
