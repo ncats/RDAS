@@ -108,6 +108,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             self.DUPLICATE_MERGE_BATCH_SIZE_ENV_VAR,
             self.DUPLICATE_MERGE_BATCH_SIZE,
         )
+        self.relationship_type_cache: Dict[str, List[str]] = {}
         self.logger.info(
             "OrganizationLocationGraphSyncTask configured with "
             f"batch_size={self.BATCH_SIZE}, "
@@ -356,6 +357,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             if not duplicate_groups:
                 continue
 
+            relationship_types = self.get_relationship_types_for_label(label)
             batch_merge_start = time.time()
             batch_merged_count = 0
 
@@ -374,7 +376,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                     f"{property_name}={merge_key}; keeper_id={keeper_id}."
                 )
 
-                duplicate_merged_count = self.merge_duplicate_group(label, keeper_id, duplicate_ids)
+                duplicate_merged_count = self.merge_duplicate_group(label, keeper_id, duplicate_ids, relationship_types)
                 batch_merged_count += duplicate_merged_count
                 merged_count += duplicate_merged_count
 
@@ -424,6 +426,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             if not duplicate_groups:
                 continue
 
+            relationship_types = self.get_relationship_types_for_label(label)
             batch_merge_start = time.time()
             batch_merged_count = 0
 
@@ -442,7 +445,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                     f"{property_name}={merge_key}; keeper_id={keeper_id}."
                 )
 
-                duplicate_merged_count = self.merge_duplicate_group(label, keeper_id, duplicate_ids)
+                duplicate_merged_count = self.merge_duplicate_group(label, keeper_id, duplicate_ids, relationship_types)
                 batch_merged_count += duplicate_merged_count
                 merged_count += duplicate_merged_count
 
@@ -498,7 +501,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         return list(self.memgraph.execute_and_fetch(query, {"mergeKeys": merge_keys}))
 
 
-    def merge_duplicate_group(self, label: str, keeper_id: int, duplicate_ids: List[int]) -> int:
+    def merge_duplicate_group(self, label: str, keeper_id: int, duplicate_ids: List[int], relationship_types: Optional[List[str]] = None) -> int:
         """
         Rewire relationships from duplicate nodes to the keeper, then delete them.
 
@@ -512,12 +515,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         merged_count = 0
         total_duplicate_count = len(duplicate_ids)
 
+        if relationship_types is None:
+            relationship_types = self.get_relationship_types_for_label(label)
+
         for start in range(0, total_duplicate_count, self.duplicate_merge_batch_size):
             batch_start = time.time()
             batch_duplicate_ids = duplicate_ids[start:start + self.duplicate_merge_batch_size]
-            relationship_type_start = time.time()
-            relationship_types = self.fetch_relationship_types_for_nodes(batch_duplicate_ids)
-            relationship_type_hours, relationship_type_minutes, relationship_type_seconds = _time_hms(time.time() - relationship_type_start)
             outgoing_rewired_count = 0
             incoming_rewired_count = 0
             relationship_rewire_start = time.time()
@@ -541,13 +544,56 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                 f"{start + 1}-{start + len(batch_duplicate_ids)} of {total_duplicate_count}; "
                 f"deleted_nodes={deleted_count}, relationship_types={len(relationship_types)}, "
                 f"outgoing_relationships={outgoing_rewired_count}, incoming_relationships={incoming_rewired_count}, "
-                f"relationship_type_fetch_time={relationship_type_hours} hours, {relationship_type_minutes} minutes, {relationship_type_seconds} seconds, "
+                f"relationship_type_source=label_cache, "
                 f"relationship_rewire_time={relationship_rewire_hours} hours, {relationship_rewire_minutes} minutes, {relationship_rewire_seconds} seconds, "
                 f"delete_time={delete_hours} hours, {delete_minutes} minutes, {delete_seconds} seconds, "
                 f"batch_time={batch_hours} hours, {batch_minutes} minutes, {batch_seconds} seconds."
             )
 
         return merged_count
+
+
+    def get_relationship_types_for_label(self, label: str) -> List[str]:
+        """Return cached relationship types connected to the given node label."""
+
+        cached_relationship_types = self.relationship_type_cache.get(label)
+
+        if cached_relationship_types is not None:
+            return cached_relationship_types
+
+        '''
+        The old merge path discovered relationship types for every duplicate
+        group. The live logs showed that discovery alone cost about 4-5 seconds
+        per group, even when the group only had one relationship type. Fetching
+        the label-level type list once preserves the same copy/delete behavior
+        while removing hundreds of repeated read queries during large merges.
+        '''
+        relationship_type_start = time.time()
+        relationship_types = sorted(self.fetch_relationship_types_for_label(label))
+        relationship_type_hours, relationship_type_minutes, relationship_type_seconds = _time_hms(time.time() - relationship_type_start)
+        self.relationship_type_cache[label] = relationship_types
+
+        self.logger.info(
+            f"Cached {len(relationship_types)} relationship types for {label}: "
+            f"relationship_types={relationship_types}. "
+            f"relationship_type_cache_fetch_time={relationship_type_hours} hours, "
+            f"{relationship_type_minutes} minutes, {relationship_type_seconds} seconds."
+        )
+
+        return relationship_types
+
+
+    def fetch_relationship_types_for_label(self, label: str) -> Set[str]:
+        """Fetch all relationship types connected to nodes with the given label."""
+
+        query = f"""
+            MATCH (n:{label})-[r]-()
+            RETURN DISTINCT type(r) AS relationship_type
+            ORDER BY relationship_type
+        """
+
+        rows = self.memgraph.execute_and_fetch(query)
+        return {row["relationship_type"] for row in rows if row.get("relationship_type")}
 
 
     def fetch_relationship_types_for_nodes(self, node_ids: List[int]) -> Set[str]:
