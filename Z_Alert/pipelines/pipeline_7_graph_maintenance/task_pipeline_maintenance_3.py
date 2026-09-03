@@ -210,7 +210,7 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
         last_seen_id = 0
 
         try:
-            fetch_cursor = self.mysql.cursor(dictionary=True)
+            fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
             update_cursor = self.mysql.cursor()
             self._create_clinical_trial_source_cleanup_tables(update_cursor)
 
@@ -334,7 +334,7 @@ class NewOrganizationSourceTrackingTask(PipelineBase):
         last_seen_id = 0
 
         try:
-            fetch_cursor = self.mysql.cursor(dictionary=True)
+            fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
             update_cursor = self.mysql.cursor()
 
             while True:
