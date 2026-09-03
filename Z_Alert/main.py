@@ -265,7 +265,9 @@ class AlertPipelineRunner(PipelineRunnerBase):
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_2 import ArticleGeneReviewFlagUpdateTask
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_3 import DiseaseCountsRefreshTask
         from pipelines.pipeline_5_followup.task_pipeline_followup_update_4 import DashboardFieldCountsRefreshTask
+        from pipelines.pipeline_5_followup.task_pipeline_followup_update_5 import ClinicalTrialArticleRelationshipUpdateTask
 
+        self._run_pipeline_task(ClinicalTrialArticleRelationshipUpdateTask)
         self._run_pipeline_task(GardRelationshipCountRefreshTask)
         self._run_pipeline_task(ArticleGeneReviewFlagUpdateTask)
         self._run_pipeline_task(DiseaseCountsRefreshTask)
