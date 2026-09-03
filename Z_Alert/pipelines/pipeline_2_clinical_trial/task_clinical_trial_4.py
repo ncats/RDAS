@@ -56,19 +56,16 @@ class ClinicalTrialPublicationMappingTask(PipelineBase):
         '''
 
         '''
-        The NOT EXISTS guard keeps the mapping table idempotent across reruns.
-        Existing pairs are left unchanged; only brand-new PMIDs are inserted with
-        is_new=1.
+        The unique key on (nctid, pmid) is now the duplicate guard for this
+        table. ON DUPLICATE KEY UPDATE performs a no-op update when the pair
+        already exists, so concurrent reruns cannot slip through the old
+        SELECT-before-INSERT race window. Existing pairs are left unchanged;
+        only brand-new PMIDs are inserted with is_new=1.
         '''
         insert_sql = '''
             INSERT INTO clinical_trial_nctid_pmids_mapping (nctid, pmid, is_new)
-            SELECT %s, %s, 1
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM clinical_trial_nctid_pmids_mapping
-                WHERE nctid = %s
-                AND pmid = %s
-            )
+            VALUES (%s, %s, 1)
+            ON DUPLICATE KEY UPDATE id = id
         '''
 
         mapping_cursor = None
@@ -85,7 +82,7 @@ class ClinicalTrialPublicationMappingTask(PipelineBase):
                     continue
 
                 insert_pairs = [
-                    (nctid, pmid, nctid, pmid)
+                    (nctid, pmid)
                     for nctid, pmid in current_pairs
                 ]
                 mapping_cursor.executemany(insert_sql, insert_pairs)

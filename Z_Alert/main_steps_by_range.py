@@ -10,7 +10,7 @@ if __name__ == "__main__":
 
     # STARTS_FROM_STEP is inclusive. END_AT_STEP is exclusive.
     # Example: STARTS_FROM_STEP = 4 and END_AT_STEP = 8 runs steps 4, 5, 6, and 7.
-    STARTS_FROM_STEP = 7
+    STARTS_FROM_STEP = 10
     END_AT_STEP = 12
 
     if not isinstance(STARTS_FROM_STEP, int) or STARTS_FROM_STEP < 1 or STARTS_FROM_STEP > 11:

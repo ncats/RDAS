@@ -83,8 +83,16 @@ if __name__ == "__main__":
     _count = 0
     id_ranges = _id_range_generator(min_id, max_id, step, batch_size)
 
-    #
-    insert_nctid_pmid_sql = 'INSERT INTO clinical_trial_nctid_pmids_mapping (nctid, pmid) VALUES(%s,%s)' 
+    '''
+    The table should have a unique key on (nctid, pmid). The no-op duplicate
+    update keeps this initializer safe to rerun while still allowing unrelated
+    insert errors to surface instead of being silently ignored.
+    '''
+    insert_nctid_pmid_sql = '''
+        INSERT INTO clinical_trial_nctid_pmids_mapping (nctid, pmid)
+        VALUES(%s, %s)
+        ON DUPLICATE KEY UPDATE id = id
+    '''
  
     with Pool(processes=20) as pool:
 
@@ -104,7 +112,7 @@ if __name__ == "__main__":
                 insert_nctid_pmid_cursor.executemany(insert_nctid_pmid_sql, chunks)
                 mysql.commit() 
 
-                _count += len(chunks)
+                _count += max(insert_nctid_pmid_cursor.rowcount, 0)
                 
             except Exception as e:
                 print(e)
@@ -128,7 +136,6 @@ if __name__ == "__main__":
 
     if mysql:
         mysql.close()
-
 
 
 

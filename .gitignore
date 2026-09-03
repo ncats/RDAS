@@ -41,9 +41,9 @@ __init__.py
 !X_epi_nhs_predict_local/data/__init__.py
 !X_epi_nhs_predict_local/data/gard-id-name-synonyms.json
 Z_Alert/pipelines/pipeline_2_clinical_trial/NCT06487273_location_count_mismatch_report.md
-x_*.md
-X_*.md
-x_*.csv
+**/x_*.md
+**/X_*.md
+**/x_*.csv
 
 # Jupyter
 .ipynb_checkpoints/
