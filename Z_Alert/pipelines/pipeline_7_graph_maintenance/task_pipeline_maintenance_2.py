@@ -32,8 +32,10 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
     BATCH_SIZE = 200
     DUPLICATE_KEY_BATCH_SIZE = 500
+    DUPLICATE_GROUP_BATCH_SIZE = 50
     DUPLICATE_MERGE_BATCH_SIZE = 500
     DUPLICATE_KEY_BATCH_SIZE_ENV_VAR = "ORGANIZATION_LOCATION_DUPLICATE_KEY_BATCH_SIZE"
+    DUPLICATE_GROUP_BATCH_SIZE_ENV_VAR = "ORGANIZATION_LOCATION_DUPLICATE_GROUP_BATCH_SIZE"
     DUPLICATE_MERGE_BATCH_SIZE_ENV_VAR = "ORGANIZATION_LOCATION_DUPLICATE_MERGE_BATCH_SIZE"
     TABLE_NAME = "organization_location"
 
@@ -104,6 +106,10 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             self.DUPLICATE_KEY_BATCH_SIZE_ENV_VAR,
             self.DUPLICATE_KEY_BATCH_SIZE,
         )
+        self.duplicate_group_batch_size = self._resolve_positive_int_setting(
+            self.DUPLICATE_GROUP_BATCH_SIZE_ENV_VAR,
+            self.DUPLICATE_GROUP_BATCH_SIZE,
+        )
         self.duplicate_merge_batch_size = self._resolve_positive_int_setting(
             self.DUPLICATE_MERGE_BATCH_SIZE_ENV_VAR,
             self.DUPLICATE_MERGE_BATCH_SIZE,
@@ -113,6 +119,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             "OrganizationLocationGraphSyncTask configured with "
             f"batch_size={self.BATCH_SIZE}, "
             f"duplicate_key_batch_size={self.duplicate_key_batch_size}, "
+            f"duplicate_group_batch_size={self.duplicate_group_batch_size}, "
             f"duplicate_merge_batch_size={self.duplicate_merge_batch_size}."
         )
 
@@ -358,27 +365,14 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                 continue
 
             relationship_types = self.get_relationship_types_for_label(label)
+            merge_groups = self.create_duplicate_merge_groups(duplicate_groups)
+
+            if not merge_groups:
+                continue
+
             batch_merge_start = time.time()
-            batch_merged_count = 0
-
-            for duplicate_group in duplicate_groups:
-                merge_key = duplicate_group["merge_key"]
-                node_ids = [int(node_id) for node_id in duplicate_group["node_ids"]]
-
-                if len(node_ids) < 2:
-                    continue
-
-                keeper_id = min(node_ids)
-                duplicate_ids = [node_id for node_id in node_ids if node_id != keeper_id]
-
-                self.logger.info(
-                    f"Batch merging {len(duplicate_ids)} duplicate {label} nodes for "
-                    f"{property_name}={merge_key}; keeper_id={keeper_id}."
-                )
-
-                duplicate_merged_count = self.merge_duplicate_group(label, keeper_id, duplicate_ids, relationship_types)
-                batch_merged_count += duplicate_merged_count
-                merged_count += duplicate_merged_count
+            batch_merged_count = self.merge_duplicate_group_batches(label, property_name, merge_groups, relationship_types)
+            merged_count += batch_merged_count
 
             merge_hours, merge_minutes, merge_seconds = _time_hms(time.time() - batch_merge_start)
             self.logger.info(
@@ -427,27 +421,14 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                 continue
 
             relationship_types = self.get_relationship_types_for_label(label)
+            merge_groups = self.create_duplicate_merge_groups(duplicate_groups)
+
+            if not merge_groups:
+                continue
+
             batch_merge_start = time.time()
-            batch_merged_count = 0
-
-            for duplicate_group in duplicate_groups:
-                merge_key = duplicate_group["merge_key"]
-                node_ids = [int(node_id) for node_id in duplicate_group["node_ids"]]
-
-                if len(node_ids) < 2:
-                    continue
-
-                keeper_id = min(node_ids)
-                duplicate_ids = [node_id for node_id in node_ids if node_id != keeper_id]
-
-                self.logger.info(
-                    f"Batch merging {len(duplicate_ids)} duplicate {label} nodes for "
-                    f"{property_name}={merge_key}; keeper_id={keeper_id}."
-                )
-
-                duplicate_merged_count = self.merge_duplicate_group(label, keeper_id, duplicate_ids, relationship_types)
-                batch_merged_count += duplicate_merged_count
-                merged_count += duplicate_merged_count
+            batch_merged_count = self.merge_duplicate_group_batches(label, property_name, merge_groups, relationship_types)
+            merged_count += batch_merged_count
 
             merge_hours, merge_minutes, merge_seconds = _time_hms(time.time() - batch_merge_start)
             self.logger.info(
@@ -499,6 +480,84 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         """
 
         return list(self.memgraph.execute_and_fetch(query, {"mergeKeys": merge_keys}))
+
+
+    def create_duplicate_merge_groups(self, duplicate_groups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Create keeper/duplicate payloads for batched duplicate merges."""
+
+        merge_groups = []
+
+        for duplicate_group in duplicate_groups:
+            merge_key = duplicate_group["merge_key"]
+            node_ids = [int(node_id) for node_id in duplicate_group["node_ids"]]
+
+            if len(node_ids) < 2:
+                continue
+
+            keeper_id = min(node_ids)
+            duplicate_ids = [node_id for node_id in node_ids if node_id != keeper_id]
+
+            merge_groups.append({
+                "merge_key": merge_key,
+                "keeper_id": keeper_id,
+                "duplicate_ids": duplicate_ids,
+                "duplicate_count": len(duplicate_ids)
+            })
+
+        return merge_groups
+
+
+    def merge_duplicate_group_batches(self, label: str, property_name: str, merge_groups: List[Dict[str, Any]], relationship_types: List[str]) -> int:
+        """Merge duplicate groups in bounded batches to reduce Memgraph round trips."""
+
+        merged_count = 0
+        total_group_count = len(merge_groups)
+
+        for start in range(0, total_group_count, self.duplicate_group_batch_size):
+            batch_start = time.time()
+            merge_group_batch = merge_groups[start:start + self.duplicate_group_batch_size]
+            duplicate_node_count = sum(merge_group["duplicate_count"] for merge_group in merge_group_batch)
+            outgoing_rewired_count = 0
+            incoming_rewired_count = 0
+            relationship_rewire_start = time.time()
+
+            '''
+            Each merge group still keeps its own keeper_id and duplicate_ids.
+            Batching here only reduces client/server round trips and transaction
+            overhead; it does not merge nodes across different ror_id/_idx_key
+            groups.
+            '''
+            for relationship_type in relationship_types:
+                if not self.RELATIONSHIP_TYPE_RE.match(relationship_type):
+                    raise ValueError(f"Unsafe relationship type from graph: {relationship_type}")
+
+                outgoing_rewired_count += self.rewire_outgoing_relationships_for_group_batch(label, merge_group_batch, relationship_type)
+                incoming_rewired_count += self.rewire_incoming_relationships_for_group_batch(label, merge_group_batch, relationship_type)
+
+            relationship_rewire_hours, relationship_rewire_minutes, relationship_rewire_seconds = _time_hms(time.time() - relationship_rewire_start)
+            delete_start = time.time()
+            delete_result = self.delete_duplicate_nodes_for_group_batch_after_rewire(label, merge_group_batch)
+            deleted_count = delete_result["deleted_count"]
+            delete_mode = delete_result["delete_mode"]
+            delete_hours, delete_minutes, delete_seconds = _time_hms(time.time() - delete_start)
+            batch_hours, batch_minutes, batch_seconds = _time_hms(time.time() - batch_start)
+            merged_count += deleted_count
+
+            self.logger.info(
+                f"Merged duplicate {label} group batch "
+                f"{start + 1}-{start + len(merge_group_batch)} of {total_group_count}; "
+                f"{property_name}_range={merge_group_batch[0]['merge_key']}..{merge_group_batch[-1]['merge_key']}, "
+                f"duplicate_groups={len(merge_group_batch)}, duplicate_nodes={duplicate_node_count}, "
+                f"deleted_nodes={deleted_count}, relationship_types={len(relationship_types)}, "
+                f"outgoing_relationships={outgoing_rewired_count}, incoming_relationships={incoming_rewired_count}, "
+                f"relationship_type_source=label_cache, "
+                f"relationship_rewire_time={relationship_rewire_hours} hours, {relationship_rewire_minutes} minutes, {relationship_rewire_seconds} seconds, "
+                f"delete_mode={delete_mode}, "
+                f"delete_time={delete_hours} hours, {delete_minutes} minutes, {delete_seconds} seconds, "
+                f"batch_time={batch_hours} hours, {batch_minutes} minutes, {batch_seconds} seconds."
+            )
+
+        return merged_count
 
 
     def merge_duplicate_group(self, label: str, keeper_id: int, duplicate_ids: List[int], relationship_types: Optional[List[str]] = None) -> int:
@@ -666,6 +725,58 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         return {row["relationship_type"] for row in rows if row.get("relationship_type")}
 
 
+    def rewire_outgoing_relationships_for_group_batch(self, label: str, merge_groups: List[Dict[str, Any]], relationship_type: str) -> int:
+        """Copy outgoing relationships for many duplicate groups in one query."""
+
+        if not merge_groups:
+            return 0
+
+        query = f"""
+            UNWIND $merge_groups AS merge_group
+            MATCH (keeper:{label})
+            WHERE id(keeper) = merge_group.keeper_id
+            UNWIND merge_group.duplicate_ids AS duplicate_id
+            MATCH (duplicate:{label})
+            WHERE id(duplicate) = duplicate_id
+            MATCH (duplicate)-[r:{relationship_type}]->(target)
+            WHERE id(target) <> merge_group.keeper_id
+              AND NOT id(target) IN merge_group.duplicate_ids
+            MERGE (keeper)-[new_r:{relationship_type}]->(target)
+            SET new_r += properties(r)
+            DELETE r
+            RETURN count(*) AS rewired_count
+        """
+
+        rows = list(self.memgraph.execute_and_fetch(query, {"merge_groups": merge_groups}))
+        return int(rows[0].get("rewired_count") or 0) if rows else 0
+
+
+    def rewire_incoming_relationships_for_group_batch(self, label: str, merge_groups: List[Dict[str, Any]], relationship_type: str) -> int:
+        """Copy incoming relationships for many duplicate groups in one query."""
+
+        if not merge_groups:
+            return 0
+
+        query = f"""
+            UNWIND $merge_groups AS merge_group
+            MATCH (keeper:{label})
+            WHERE id(keeper) = merge_group.keeper_id
+            UNWIND merge_group.duplicate_ids AS duplicate_id
+            MATCH (duplicate:{label})
+            WHERE id(duplicate) = duplicate_id
+            MATCH (source)-[r:{relationship_type}]->(duplicate)
+            WHERE id(source) <> merge_group.keeper_id
+              AND NOT id(source) IN merge_group.duplicate_ids
+            MERGE (source)-[new_r:{relationship_type}]->(keeper)
+            SET new_r += properties(r)
+            DELETE r
+            RETURN count(*) AS rewired_count
+        """
+
+        rows = list(self.memgraph.execute_and_fetch(query, {"merge_groups": merge_groups}))
+        return int(rows[0].get("rewired_count") or 0) if rows else 0
+
+
     def rewire_outgoing_relationships_for_nodes(self, label: str, keeper_id: int, duplicate_ids: List[int], relationship_type: str) -> int:
         """Copy duplicate outgoing relationships to the keeper node in one batch."""
 
@@ -708,6 +819,45 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
         rows = list(self.memgraph.execute_and_fetch(query, {"keeper_id": keeper_id, "duplicate_ids": duplicate_ids}))
         return int(rows[0].get("rewired_count") or 0) if rows else 0
+
+
+    def delete_duplicate_nodes_for_group_batch_after_rewire(self, label: str, merge_groups: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Delete many duplicate groups after batched relationship rewiring."""
+
+        duplicate_ids = self.flatten_duplicate_ids_from_merge_groups(merge_groups)
+
+        if not duplicate_ids:
+            return {
+                "deleted_count": 0,
+                "delete_mode": "skip_empty"
+            }
+
+        try:
+            return {
+                "deleted_count": self.delete_duplicate_nodes_without_detach(label, duplicate_ids),
+                "delete_mode": "delete"
+            }
+        except Exception as e:
+            self.logger.info(
+                f"Plain DELETE failed for {len(duplicate_ids)} duplicate {label} nodes across "
+                f"{len(merge_groups)} merge groups; falling back to DETACH DELETE. Error: {e}"
+            )
+
+            return {
+                "deleted_count": self.detach_delete_duplicate_nodes(label, duplicate_ids),
+                "delete_mode": "detach_delete"
+            }
+
+
+    def flatten_duplicate_ids_from_merge_groups(self, merge_groups: List[Dict[str, Any]]) -> List[int]:
+        """Return all duplicate node ids from prepared merge groups."""
+
+        duplicate_ids = []
+
+        for merge_group in merge_groups:
+            duplicate_ids.extend(merge_group["duplicate_ids"])
+
+        return duplicate_ids
 
 
     def delete_duplicate_nodes(self, label: str, duplicate_ids: List[int]) -> int:
