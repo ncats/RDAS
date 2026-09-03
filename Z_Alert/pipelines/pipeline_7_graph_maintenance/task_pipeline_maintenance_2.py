@@ -23,6 +23,20 @@ Sync new organization location rows from MySQL back to Memgraph.
 5. Create (Organization)-[:has_location]->(Location) relationships.
 6. Merge duplicate Organization nodes by real ror_id.
 7. Merge duplicate Location nodes by _idx_key.
+
+Operational notes:
+
+1. This task is normally Step 10 of the alert pipeline maintenance flow.
+2. The MySQL organization_location table is the staging area populated by
+   OrganizationLocationRorLookupTask. Rows marked is_new=1 are the current
+   maintenance input.
+3. The graph sync itself is intentionally incremental. After updating only the
+   newly staged Organizations/Locations, duplicate cleanup checks only the ROR
+   ids and Location keys touched by those rows.
+4. Duplicate cleanup is write-heavy in Memgraph. The code therefore uses three
+   separate batch concepts: key batches for duplicate discovery, group batches
+   for many independent keeper/duplicate groups, and merge batches for very
+   large duplicate-id lists inside one group.
 """
 
 # Reference: G_update/update_organization_location_db_step_3_graph.py
@@ -30,6 +44,24 @@ Sync new organization location rows from MySQL back to Memgraph.
 class OrganizationLocationGraphSyncTask(PipelineBase):
     """Apply newly staged organization_location rows to the Memgraph graph."""
 
+    '''
+    BATCH_SIZE controls MySQL fetch size and the number of staged
+    organization_location rows submitted to the graph update query at once.
+
+    DUPLICATE_KEY_BATCH_SIZE controls how many touched merge keys are checked
+    for duplicates in one read query. For Organizations the merge key is ror_id;
+    for Locations the merge key is _idx_key.
+
+    DUPLICATE_GROUP_BATCH_SIZE controls how many independent duplicate groups
+    are rewired and deleted in one write batch. This is the main performance
+    lever for duplicate cleanup because it reduces client/server round trips
+    and Memgraph transaction overhead.
+
+    DUPLICATE_MERGE_BATCH_SIZE is kept for the legacy single-group merge helper.
+    It only matters when one duplicate group contains more duplicate node ids
+    than the configured batch size, or when external/manual code calls
+    merge_duplicate_group() directly.
+    '''
     BATCH_SIZE = 200
     DUPLICATE_KEY_BATCH_SIZE = 500
     DUPLICATE_GROUP_BATCH_SIZE = 50
@@ -39,12 +71,21 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
     DUPLICATE_MERGE_BATCH_SIZE_ENV_VAR = "ORGANIZATION_LOCATION_DUPLICATE_MERGE_BATCH_SIZE"
     TABLE_NAME = "organization_location"
 
-    # Relationship types are discovered from the graph and inserted into Cypher
-    # as literal tokens, so validate them before constructing merge queries.
+    '''
+    Relationship types are discovered from the live graph and interpolated into
+    Cypher as literal relationship tokens. Cypher cannot parameterize a
+    relationship type, so validate every discovered type before using f-strings
+    to construct MERGE/DELETE relationship queries.
+    '''
     RELATIONSHIP_TYPE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
     
-    # Step 1 stores found and not-found ROR lookups in organization_location.
-    # This task only consumes rows marked is_new=1 for the current alert run.
+    '''
+    Step 1 stores both found and not-found ROR lookup results in
+    organization_location. A found row has organization/location metadata from
+    ROR; a not-found row has enough information to mark the graph Organization
+    ror_id as N/A so it will not be repeatedly searched in future maintenance
+    runs. This task only consumes is_new=1 rows.
+    '''
     FETCH_NEW_ORGANIZATION_LOCATIONS_QUERY = f'''
         SELECT
             ror_id,
@@ -68,9 +109,17 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         WHERE is_new = 1
     '''
 
-    # A chunk with location data updates the Organization and links it to a
-    # Location node. A chunk without location data marks the Organization as
-    # not found so it will not be repeatedly searched.
+    '''
+    The graph update query handles two row types in one UNWIND:
+
+    1. hasLocation=True rows update the Organization with ROR metadata, create
+       or reuse the Location node, and create the Organization->Location edge.
+    2. hasLocation=False rows represent ROR not-found results and only mark the
+       Organization ror_id as N/A.
+
+    FOREACH with a CASE list is used as a Cypher conditional so both branches
+    can share the same input shape without splitting the batch into two queries.
+    '''
     BATCH_UPDATE_ORGANIZATIONS = '''
         UNWIND $chunks AS chunk
 
@@ -102,6 +151,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
     def __init__(self):
         super().__init__(init_mysql=True, init_memgraph=True)
+        '''
+        Batch-size settings are environment-overridable because the best values
+        depend on graph size, Memgraph host capacity, and network distance.
+        Defaults are conservative enough for normal maintenance runs, while
+        operations can tune one process without editing source code.
+        '''
         self.duplicate_key_batch_size = self._resolve_positive_int_setting(
             self.DUPLICATE_KEY_BATCH_SIZE_ENV_VAR,
             self.DUPLICATE_KEY_BATCH_SIZE,
@@ -114,6 +169,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             self.DUPLICATE_MERGE_BATCH_SIZE_ENV_VAR,
             self.DUPLICATE_MERGE_BATCH_SIZE,
         )
+        '''
+        Relationship type discovery was the first observed merge bottleneck:
+        fetching relationship types per duplicate group took several seconds
+        even for tiny groups. Cache per label so the duplicate merge loop pays
+        that cost once for Organization and once for Location.
+        '''
         self.relationship_type_cache: Dict[str, List[str]] = {}
         self.logger.info(
             "OrganizationLocationGraphSyncTask configured with "
@@ -158,6 +219,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
     def process_new_data(self) -> None:
         """Read staged location rows and sync Organization/Location graph data."""
 
+        '''
+        Track the merge keys touched during this task run. At the end we only
+        inspect duplicates for these keys, which keeps scheduled maintenance
+        incremental and avoids a full graph duplicate scan every time Step 10
+        runs.
+        '''
         fetch_cursor = None
         total_updated = 0
         batch_num = 0
@@ -169,6 +236,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
             fetch_cursor.execute(self.FETCH_NEW_ORGANIZATION_LOCATIONS_QUERY)
 
+            '''
+            The cursor reads MySQL rows in bounded batches, but each batch is
+            sent to Memgraph as one UNWIND payload. This keeps Python memory
+            steady and avoids one graph transaction per organization row.
+            '''
             while True:
                 rows = fetch_cursor.fetchmany(self.BATCH_SIZE)
 
@@ -179,8 +251,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                 batch_num += 1
                 batch_start = time.time()
 
-                # Convert raw MySQL rows into the exact payload shape expected
-                # by the Cypher batch update.
+                '''
+                Convert raw MySQL rows into the exact payload shape expected by
+                BATCH_UPDATE_ORGANIZATIONS. Keeping this conversion in Python
+                makes the Cypher simpler and centralizes null/empty cleanup.
+                '''
                 chunks = self.create_organization_location_chunks(rows)
 
                 if not chunks:
@@ -194,6 +269,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                     without_location_count = len(chunks) - with_location_count
                     total_updated += len(chunks)
 
+                    '''
+                    Only found ROR rows can create real duplicate Organizations
+                    or Locations. Not-found rows update ror_id='N/A' and are
+                    intentionally excluded from duplicate merge-key tracking.
+                    '''
                     for chunk in chunks:
                         if not chunk["hasLocation"]:
                             continue
@@ -222,6 +302,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             merged_locations = 0
 
             if total_updated > 0:
+                '''
+                Run Organization merging before Location merging. Organization
+                duplicates are created when several graph Organizations resolve
+                to the same real ROR id; after that, Location duplicate checks
+                clean up any newly shared Location _idx_key values.
+                '''
                 merged_organizations = self.merge_duplicate_organizations(updated_ror_ids)
                 merged_locations = self.merge_duplicate_locations(updated_location_idx_keys)
             else:
@@ -251,7 +337,9 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         '''
         Convert organization_location rows into the Cypher payload shape.
         Rows without org_name are treated as ROR not-found rows and only mark
-        the matching Organization node with ror_id = 'N/A'.
+        the matching Organization node with ror_id = 'N/A'. Returning only
+        normalized dictionaries from this method keeps the graph query free of
+        source-table column names and repeated cleanup logic.
         '''
         chunks = []
 
@@ -267,6 +355,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
     def create_organization_location_chunk(self, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Create one Organization sync chunk from an organization_location row."""
 
+        '''
+        original_name_in_graph_db_idx_key is the stable bridge back to the
+        existing Organization node in Memgraph. If it is missing, there is no
+        safe graph node to update, even if the ROR lookup returned metadata.
+        '''
         org_idx_key = row.get("original_name_in_graph_db_idx_key")
 
         if not org_idx_key:
@@ -286,8 +379,13 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         lng = _to_float(row.get("lng"))
         types = _parse_json_list(row.get("types"))
 
-        # Prefer coordinates for Location identity. If coordinates are missing,
-        # fall back to the organization name so a stable key is still produced.
+        '''
+        Prefer coordinates for Location identity because they are more stable
+        than display text and line up with the historical initializer behavior.
+        If coordinates are unavailable, fall back to the display name so the
+        Location still gets a deterministic key instead of being recreated on
+        every run.
+        '''
         if lat is not None and lng is not None:
             location_idx_key = _make_hash_key(f"{lat}{lng}")
         else:
@@ -311,6 +409,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
     def merge_duplicate_organizations(self, ror_ids: Optional[Set[str]] = None) -> int:
         """Merge Organization nodes that now share the same real ROR id."""
 
+        '''
+        Normal alert maintenance passes the touched ROR ids from this run, so
+        duplicate checking stays incremental. Passing None intentionally falls
+        back to a full graph-wide cleanup path for manual recovery jobs.
+        '''
         if ror_ids is not None:
             return self.merge_duplicate_nodes_for_keys("Organization", "ror_id", ror_ids)
 
@@ -321,6 +424,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
     def merge_duplicate_locations(self, location_idx_keys: Optional[Set[str]] = None) -> int:
         """Merge duplicate Location nodes that share the same stable _idx_key."""
 
+        '''
+        Location duplicate cleanup follows the same incremental/full-scan split
+        as Organization cleanup. The scheduled path only checks Location keys
+        touched by current ROR location rows.
+        '''
         if location_idx_keys is not None:
             return self.merge_duplicate_nodes_for_keys("Location", "_idx_key", location_idx_keys)
 
@@ -337,6 +445,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         cleanup, but the scheduled path only needs keys from is_new rows.
         """
 
+        '''
+        Sort keys before batching so logs are deterministic and the last key in
+        each batch can be used as a stable progress marker when investigating a
+        long-running maintenance process.
+        '''
         filtered_merge_keys = sorted(merge_key for merge_key in merge_keys if merge_key)
 
         if not filtered_merge_keys:
@@ -350,6 +463,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             key_batch_count += 1
             merge_key_batch = filtered_merge_keys[start:start + self.duplicate_key_batch_size]
             duplicate_fetch_start = time.time()
+            '''
+            This read query finds all duplicate groups for the current key page.
+            The expensive part happens only after duplicate_groups is non-empty,
+            so batches without duplicates are cheap and skipped immediately.
+            '''
             duplicate_groups = self.fetch_duplicate_groups_for_keys(label, property_name, merge_key_batch)
             fetch_hours, fetch_minutes, fetch_seconds = _time_hms(time.time() - duplicate_fetch_start)
 
@@ -364,6 +482,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             if not duplicate_groups:
                 continue
 
+            '''
+            Relationship types are label-scoped and cached once, then reused for
+            every group batch. create_duplicate_merge_groups() turns Memgraph
+            row data into a compact payload for the batched write queries.
+            '''
             relationship_types = self.get_relationship_types_for_label(label)
             merge_groups = self.create_duplicate_merge_groups(duplicate_groups)
 
@@ -398,6 +521,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         last_merge_key = None
 
         while True:
+            '''
+            The full-scan path pages by merge key instead of SKIP/LIMIT. That
+            avoids repeatedly walking past already processed keys as the graph
+            changes during duplicate cleanup.
+            '''
             merge_keys = self.fetch_duplicate_merge_key_batch(label, property_name, where_clause, last_merge_key)
 
             if not merge_keys:
@@ -406,6 +534,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             key_batch_count += 1
             last_merge_key = merge_keys[-1]
             duplicate_fetch_start = time.time()
+            '''
+            Re-fetch duplicate groups for the current page after collecting the
+            keys. Some keys may no longer be duplicates if an earlier page or
+            previous run already cleaned them up.
+            '''
             duplicate_groups = self.fetch_duplicate_groups_for_keys(label, property_name, merge_keys)
             fetch_hours, fetch_minutes, fetch_seconds = _time_hms(time.time() - duplicate_fetch_start)
 
@@ -420,6 +553,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             if not duplicate_groups:
                 continue
 
+            '''
+            The same group-batch merge implementation is used by the incremental
+            and full-scan paths so both paths get the performance improvement
+            and produce comparable timing logs.
+            '''
             relationship_types = self.get_relationship_types_for_label(label)
             merge_groups = self.create_duplicate_merge_groups(duplicate_groups)
 
@@ -447,6 +585,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
     def fetch_duplicate_merge_key_batch(self, label: str, property_name: str, where_clause: str, last_merge_key: Optional[str]) -> List[str]:
         """Return the next bounded page of merge keys for duplicate discovery."""
 
+        '''
+        Labels and property names are intentionally interpolated instead of
+        passed as parameters because Cypher parameters cannot replace label or
+        property tokens. Callers only pass constants defined in this task.
+        '''
         query = f"""
             MATCH (n:{label})
             WHERE {where_clause}
@@ -470,6 +613,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         if not merge_keys:
             return []
 
+        '''
+        Collect node ids instead of full nodes. The merge code only needs
+        internal ids to pick a keeper and rewire/delete duplicates, and keeping
+        the result payload small matters when hundreds of duplicate groups are
+        returned.
+        '''
         query = f"""
             MATCH (n:{label})
             WHERE n.{property_name} IN $mergeKeys
@@ -494,6 +643,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             if len(node_ids) < 2:
                 continue
 
+            '''
+            Keep the oldest/smallest internal Memgraph id as the keeper. That
+            preserves the historical behavior from the original one-group merge
+            path and gives deterministic results across restarts.
+            '''
             keeper_id = min(node_ids)
             duplicate_ids = [node_id for node_id in node_ids if node_id != keeper_id]
 
@@ -515,6 +669,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
         for start in range(0, total_group_count, self.duplicate_group_batch_size):
             batch_start = time.time()
+            '''
+            A group batch contains many independent duplicate groups. The
+            keeper/duplicate mapping stays inside each merge_group dict, so a
+            50-group batch still performs 50 separate logical merges inside one
+            smaller set of Memgraph queries.
+            '''
             merge_group_batch = merge_groups[start:start + self.duplicate_group_batch_size]
             duplicate_node_count = sum(merge_group["duplicate_count"] for merge_group in merge_group_batch)
             outgoing_rewired_count = 0
@@ -571,6 +731,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         bounded while still avoiding one transaction per duplicate node.
         """
 
+        '''
+        This is the legacy single-group merge helper. The scheduled path now
+        uses merge_duplicate_group_batches(), but keeping this method makes
+        manual/debug usage and older tests safe. When called without an explicit
+        relationship type list, it uses the same label cache as the batched path.
+        '''
         merged_count = 0
         total_duplicate_count = len(duplicate_ids)
 
@@ -584,6 +750,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
             incoming_rewired_count = 0
             relationship_rewire_start = time.time()
 
+            '''
+            Rewire outgoing and incoming directions separately because Cypher
+            needs the relationship direction in the pattern. Each query copies
+            relationship properties to the keeper-side relationship before
+            deleting the old relationship from the duplicate node.
+            '''
             for relationship_type in relationship_types:
                 if not self.RELATIONSHIP_TYPE_RE.match(relationship_type):
                     raise ValueError(f"Unsafe relationship type from graph: {relationship_type}")
@@ -621,6 +793,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         cached_relationship_types = self.relationship_type_cache.get(label)
 
         if cached_relationship_types is not None:
+            '''
+            Relationship types do not need to be re-fetched within one task run.
+            Any new relationship type created later will be picked up by the
+            next process restart, which is enough for this maintenance step.
+            '''
             return cached_relationship_types
 
         '''
@@ -648,6 +825,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
     def fetch_relationship_types_for_label(self, label: str) -> Set[str]:
         """Fetch all relationship types connected to nodes with the given label."""
 
+        '''
+        This scans the current live graph for relationship types connected to a
+        label, not only the current duplicate node ids. The scan costs a few
+        seconds, but it happens once per label and avoids hundreds of per-group
+        relationship-type discovery queries.
+        '''
         query = f"""
             MATCH (n:{label})-[r]-()
             RETURN DISTINCT type(r) AS relationship_type
@@ -680,6 +863,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                 "delete_mode": "delete"
             }
         except Exception as e:
+            '''
+            Plain DELETE can fail if any relationship remains on a duplicate
+            node. That should be rare after rewiring, but DETACH DELETE keeps the
+            method correct for self-relationships, duplicate-to-duplicate edges,
+            or unexpected relationship patterns.
+            '''
             self.logger.info(
                 f"Plain DELETE failed for {len(duplicate_ids)} duplicate {label} nodes; "
                 f"falling back to DETACH DELETE. Error: {e}"
@@ -697,6 +886,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         if not duplicate_ids:
             return 0
 
+        '''
+        DELETE is tried before DETACH DELETE because the rewire step should
+        already have removed the relationships that pointed at duplicate nodes.
+        On the observed graph this mode succeeded, and the log exposes whether
+        the fallback was needed.
+        '''
         query = f"""
             MATCH (duplicate:{label})
             WHERE id(duplicate) IN $duplicate_ids
@@ -715,6 +910,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         if not node_ids:
             return set()
 
+        '''
+        Kept for compatibility with the original one-group implementation.
+        The optimized scheduled path uses fetch_relationship_types_for_label()
+        instead so relationship types are discovered once per label.
+        '''
         query = """
             MATCH (n)-[r]-()
             WHERE id(n) IN $node_ids
@@ -731,6 +931,13 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         if not merge_groups:
             return 0
 
+        '''
+        UNWIND first walks merge groups, then duplicate ids within each group.
+        merge_group.keeper_id and merge_group.duplicate_ids keep each logical
+        merge isolated while still letting Memgraph process many groups in one
+        query. The target filters avoid creating keeper self-loops or preserving
+        edges to nodes that are about to be deleted in the same group.
+        '''
         query = f"""
             UNWIND $merge_groups AS merge_group
             MATCH (keeper:{label})
@@ -757,6 +964,12 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         if not merge_groups:
             return 0
 
+        '''
+        Incoming edges are handled separately from outgoing edges so relationship
+        direction is preserved. MERGE prevents duplicate relationships when the
+        keeper already has the same edge, and SET copies over relationship
+        properties from the duplicate-side edge.
+        '''
         query = f"""
             UNWIND $merge_groups AS merge_group
             MATCH (keeper:{label})
@@ -780,6 +993,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
     def rewire_outgoing_relationships_for_nodes(self, label: str, keeper_id: int, duplicate_ids: List[int], relationship_type: str) -> int:
         """Copy duplicate outgoing relationships to the keeper node in one batch."""
 
+        '''
+        Single-group version retained for merge_duplicate_group() compatibility.
+        The scheduled path normally uses rewire_outgoing_relationships_for_group_batch()
+        to reduce the number of Memgraph write queries.
+        '''
         query = f"""
             MATCH (keeper:{label})
             WHERE id(keeper) = $keeper_id
@@ -802,6 +1020,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
     def rewire_incoming_relationships_for_nodes(self, label: str, keeper_id: int, duplicate_ids: List[int], relationship_type: str) -> int:
         """Copy duplicate incoming relationships to the keeper node in one batch."""
 
+        '''
+        Single-group version retained for manual/debug callers. Its filtering
+        mirrors the group-batch query so either path avoids keeper self-loops and
+        relationships to nodes deleted in the same merge group.
+        '''
         query = f"""
             MATCH (keeper:{label})
             WHERE id(keeper) = $keeper_id
@@ -824,6 +1047,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
     def delete_duplicate_nodes_for_group_batch_after_rewire(self, label: str, merge_groups: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Delete many duplicate groups after batched relationship rewiring."""
 
+        '''
+        Batched rewiring leaves all duplicate node ids in merge_group payloads.
+        Flatten them here so the delete step can remove all duplicate nodes from
+        the group batch with one query instead of one delete per merge group.
+        '''
         duplicate_ids = self.flatten_duplicate_ids_from_merge_groups(merge_groups)
 
         if not duplicate_ids:
@@ -838,6 +1066,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
                 "delete_mode": "delete"
             }
         except Exception as e:
+            '''
+            Keep the same correctness fallback as the single-group delete path.
+            The log records both group count and duplicate node count so slow or
+            fallback-heavy batches can be tuned with DUPLICATE_GROUP_BATCH_SIZE.
+            '''
             self.logger.info(
                 f"Plain DELETE failed for {len(duplicate_ids)} duplicate {label} nodes across "
                 f"{len(merge_groups)} merge groups; falling back to DETACH DELETE. Error: {e}"
@@ -854,6 +1087,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
         duplicate_ids = []
 
+        '''
+        Preserve group order in the flattened list. Ordering is not required by
+        Memgraph for deletion, but deterministic payloads make debugging easier
+        when comparing logs across repeated maintenance runs.
+        '''
         for merge_group in merge_groups:
             duplicate_ids.extend(merge_group["duplicate_ids"])
 
@@ -863,6 +1101,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
     def delete_duplicate_nodes(self, label: str, duplicate_ids: List[int]) -> int:
         """Delete duplicate nodes and any remaining relationships."""
 
+        '''
+        Compatibility wrapper for older code that called delete_duplicate_nodes()
+        expecting DETACH DELETE semantics. The optimized scheduled path calls
+        delete_duplicate_nodes_without_detach() first through a fallback helper.
+        '''
         return self.detach_delete_duplicate_nodes(label, duplicate_ids)
 
 
@@ -872,6 +1115,11 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         if not duplicate_ids:
             return 0
 
+        '''
+        DETACH DELETE is slower but safest when unexpected relationships remain
+        on a duplicate node. This is used as a fallback path and as the legacy
+        behavior for external callers of delete_duplicate_nodes().
+        '''
         query = f"""
             MATCH (duplicate:{label})
             WHERE id(duplicate) IN $duplicate_ids
