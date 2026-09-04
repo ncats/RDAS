@@ -88,6 +88,8 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
+from gard_rollup_helpers import build_gard_rollup_targets, build_relationship_tuple, build_rollup_raw_result, build_rollup_source_type
+
 WORD_PATTERN = re.compile(r"\b\w+\b")
 GARD_TERM_SEPARATOR = "$$$"
 LOG_FILE_PATH = PROJECT_ROOT / "logs" / "grant_GARD_Project_relation_process.log"
@@ -103,6 +105,7 @@ DEFAULT_NUM_PROCESSES = min(4, os.cpu_count() or 1)
 
 GARD_PROCESSED_NAMES: List[Dict[str, Any]] = []
 GARD_ID_BY_NAME: Dict[str, Any] = {}
+GARD_ROLLUP_TARGETS_BY_SOURCE_NAME: Dict[str, List[Dict[str, str]]] = {}
 SPACY_MODEL = None
 CLINICAL_BERT_TOKENIZER = None
 CLINICAL_BERT_MODEL = None
@@ -240,6 +243,7 @@ def ensure_gard_terms_loaded() -> None:
 
     global GARD_PROCESSED_NAMES
     global GARD_ID_BY_NAME
+    global GARD_ROLLUP_TARGETS_BY_SOURCE_NAME
 
     if GARD_PROCESSED_NAMES:
         return
@@ -250,6 +254,7 @@ def ensure_gard_terms_loaded() -> None:
         for row in GARD_PROCESSED_NAMES
         if row.get("name")
     }
+    GARD_ROLLUP_TARGETS_BY_SOURCE_NAME = build_gard_rollup_targets(GARD_PROCESSED_NAMES)
 
 
 def initialize_worker() -> None:
@@ -688,32 +693,66 @@ def flush_relationships(mysql, insert_cursor, insert_values: List[Tuple[Any, ...
 def build_relationship_rows(project_row: Dict[str, Any], result_dict: Dict[str, List[float]], source_type: str) -> List[Tuple[Any, ...]]:
     """Convert one project result dictionary into insert-ready tuples."""
 
-    from utils.tools import _normalize_tuple, _val
+    from utils.tools import _val
 
     application_id = project_row["APPLICATION_ID"]
     core_project_num = _val(project_row.get("core_project_num"))
     raw_result = str(result_dict)
     relationship_rows: List[Tuple[Any, ...]] = []
+    seen_gard_ids = set()
 
     for gard_name, value in result_dict.items():
         confidence_score = value[0]
         semantic_similarity_value = value[1]
         gard_id = get_gard_id_by_name(gard_name)
 
+        if gard_id in seen_gard_ids:
+            continue
+
+        seen_gard_ids.add(gard_id)
         relationship_rows.append(
-            _normalize_tuple(
-                (
-                    gard_id,
+            build_relationship_tuple(
+                gard_id,
+                application_id,
+                gard_name,
+                source_type,
+                confidence_score,
+                semantic_similarity_value,
+                core_project_num,
+                raw_result,
+            )
+        )
+
+        """
+        The direct matcher prunes shorter contained disease names. Add inferred
+        base-disease rows here so old initializer runs keep both the specific
+        disease and its generic roll-up relationship for the same project.
+        """
+        for rollup_target in GARD_ROLLUP_TARGETS_BY_SOURCE_NAME.get(gard_name, []):
+            target_gard_id = rollup_target["target_gard_id"]
+
+            if target_gard_id in seen_gard_ids:
+                continue
+
+            seen_gard_ids.add(target_gard_id)
+            relationship_rows.append(
+                build_relationship_tuple(
+                    target_gard_id,
                     application_id,
-                    gard_name,
-                    source_type,
+                    rollup_target["target_gard_name"],
+                    build_rollup_source_type(source_type),
                     confidence_score,
                     semantic_similarity_value,
                     core_project_num,
-                    raw_result,
+                    build_rollup_raw_result(
+                        rollup_target["source_gard_id"],
+                        rollup_target["source_gard_name"],
+                        target_gard_id,
+                        rollup_target["target_gard_name"],
+                        rollup_target["rollup_rule"],
+                    ),
                 )
             )
-        )
 
     return relationship_rows
 
