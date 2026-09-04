@@ -50,13 +50,14 @@ from utils.tools import _normalize_txt, _time_hms
 
 
 TERM_SEPARATOR = "$$$"
-DEFAULT_BATCH_SIZE = 500
+DEFAULT_BATCH_SIZE = 5000
 DEFAULT_MIN_BASE_NAME_CHARS = 5
 MAX_SOURCE_TYPE_LENGTH = 45
 MAX_RAW_RESULT_LENGTH = 4000
 MAX_LOGGED_PAIR_EXAMPLES = 20
 EXCLUSION_CONTEXT_WORDS = {"exclude", "excluded", "excluding", "except", "without", "non", "not"}
 EXCLUSION_CONTEXT_WINDOW = 3
+MYSQL_LOCK_NAME = "rdas_gard_project_rollup_relationship_makeup"
 
 
 @dataclass(frozen=True)
@@ -124,34 +125,48 @@ class GardProjectRollupRelationshipMakeupTask(PipelineBase):
         VALUES (%s, %s, %s, %s, %s)
     """
 
-    COUNT_MISSING_MYSQL_ROLLUPS_QUERY = """
-        SELECT COUNT(*) AS missing_count
-        FROM (
-            SELECT
-                pair.target_gard_id,
-                source.application_id
-            FROM grant_gard_project_relation AS source
-            INNER JOIN tmp_gard_project_rollup_pairs AS pair
-                ON pair.source_gard_id = source.gard_id
-            LEFT JOIN grant_gard_project_relation AS existing
-                ON existing.application_id = source.application_id
-                AND existing.gard_id = pair.target_gard_id
-            WHERE
-                source.application_id IS NOT NULL
-                AND source.gard_id IS NOT NULL
-                AND (source.source_type IS NULL OR source.source_type NOT LIKE 'rollup%%')
-                AND existing.id IS NULL
-            GROUP BY
-                pair.target_gard_id,
-                source.application_id
-        ) AS missing_rollups
+    DROP_TEMP_ROLLUP_CANDIDATES_QUERY = """
+        DROP TEMPORARY TABLE IF EXISTS tmp_gard_project_rollup_candidates
     """
 
-    FETCH_MISSING_MYSQL_ROLLUPS_QUERY = """
+    CREATE_TEMP_ROLLUP_CANDIDATES_QUERY = """
+        CREATE TEMPORARY TABLE tmp_gard_project_rollup_candidates (
+            candidate_id BIGINT NOT NULL AUTO_INCREMENT,
+            source_relation_id INT NOT NULL,
+            source_gard_id VARCHAR(45) DEFAULT NULL,
+            source_gard_name VARCHAR(300) DEFAULT NULL,
+            target_gard_id VARCHAR(45) NOT NULL,
+            target_gard_name VARCHAR(300) NOT NULL,
+            rollup_rule VARCHAR(80) NOT NULL,
+            application_id INT NOT NULL,
+            core_project_num VARCHAR(45) DEFAULT NULL,
+            source_type VARCHAR(45) DEFAULT NULL,
+            confidence_score DECIMAL(19,18) DEFAULT NULL,
+            semantic_similarity DECIMAL(19,18) DEFAULT NULL,
+            PRIMARY KEY (candidate_id),
+            UNIQUE KEY idx_tmp_rollup_target_application (target_gard_id, application_id),
+            KEY idx_tmp_rollup_source_relation (source_relation_id)
+        ) ENGINE=InnoDB
+    """
+
+    MATERIALIZE_MISSING_MYSQL_ROLLUPS_QUERY = """
+        INSERT INTO tmp_gard_project_rollup_candidates (
+            source_relation_id,
+            source_gard_id,
+            source_gard_name,
+            target_gard_id,
+            target_gard_name,
+            rollup_rule,
+            application_id,
+            core_project_num,
+            source_type,
+            confidence_score,
+            semantic_similarity
+        )
         SELECT
             candidate.source_relation_id,
             source.gard_id AS source_gard_id,
-            COALESCE(source.gard_name, candidate.source_gard_name) AS source_gard_name,
+            source.gard_name AS source_gard_name,
             candidate.target_gard_id,
             candidate.target_gard_name,
             candidate.rollup_rule,
@@ -163,10 +178,9 @@ class GardProjectRollupRelationshipMakeupTask(PipelineBase):
         FROM (
             SELECT
                 MIN(source.id) AS source_relation_id,
-                SUBSTRING_INDEX(GROUP_CONCAT(pair.source_gard_name ORDER BY source.id SEPARATOR '\t'), '\t', 1) AS source_gard_name,
                 pair.target_gard_id,
-                pair.target_gard_name,
-                SUBSTRING_INDEX(GROUP_CONCAT(pair.rollup_rule ORDER BY source.id SEPARATOR '\t'), '\t', 1) AS rollup_rule,
+                MIN(pair.target_gard_name) AS target_gard_name,
+                MIN(pair.rollup_rule) AS rollup_rule,
                 source.application_id
             FROM grant_gard_project_relation AS source
             INNER JOIN tmp_gard_project_rollup_pairs AS pair
@@ -181,14 +195,35 @@ class GardProjectRollupRelationshipMakeupTask(PipelineBase):
                 AND existing.id IS NULL
             GROUP BY
                 pair.target_gard_id,
-                pair.target_gard_name,
                 source.application_id
-            ORDER BY source_relation_id
-            LIMIT %s
         ) AS candidate
         INNER JOIN grant_gard_project_relation AS source
             ON source.id = candidate.source_relation_id
-        ORDER BY candidate.source_relation_id
+    """
+
+    COUNT_TEMP_ROLLUP_CANDIDATES_QUERY = """
+        SELECT COUNT(*) AS missing_count
+        FROM tmp_gard_project_rollup_candidates
+    """
+
+    FETCH_TEMP_ROLLUP_CANDIDATES_QUERY = """
+        SELECT
+            candidate_id,
+            source_relation_id,
+            source_gard_id,
+            source_gard_name,
+            target_gard_id,
+            target_gard_name,
+            rollup_rule,
+            application_id,
+            core_project_num,
+            source_type,
+            confidence_score,
+            semantic_similarity
+        FROM tmp_gard_project_rollup_candidates
+        WHERE candidate_id > %s
+        ORDER BY candidate_id
+        LIMIT %s
     """
 
     INSERT_MYSQL_ROLLUP_RELATION_QUERY = """
@@ -270,11 +305,22 @@ class GardProjectRollupRelationshipMakeupTask(PipelineBase):
             "memgraph_rollups_submitted": 0,
             "memgraph_rollups_matched": 0,
         }
+        lock_acquired = False
 
         try:
             if self.mysql is None:
                 self.logger.error("Unable to create MySQL connection.")
                 return
+
+            if self.apply_changes:
+                lock_acquired = self._acquire_mysql_lock()
+
+                if not lock_acquired:
+                    self.logger.error(
+                        f"Another {type(self).__name__} run appears to be active. "
+                        "Stop the other run or wait for it to finish before applying roll-up repairs."
+                    )
+                    return
 
             gard_names = self._fetch_gard_names()
             summary["gard_names_seen"] = len(gard_names)
@@ -288,7 +334,8 @@ class GardProjectRollupRelationshipMakeupTask(PipelineBase):
 
             self._log_rollup_pair_examples(rollup_pairs)
             self._create_temp_rollup_pair_table(rollup_pairs)
-            missing_count = self._count_missing_mysql_rollups()
+            self._create_temp_rollup_candidate_table()
+            missing_count = self._count_temp_rollup_candidates()
             summary["missing_mysql_rollups"] = missing_count
 
             if not self.apply_changes:
@@ -319,6 +366,9 @@ class GardProjectRollupRelationshipMakeupTask(PipelineBase):
             self.logger.exception(f"GardProjectRollupRelationshipMakeupTask failed. Summary={summary}")
 
         finally:
+            if lock_acquired:
+                self._release_mysql_lock()
+
             self.close()
 
 
@@ -517,15 +567,48 @@ class GardProjectRollupRelationshipMakeupTask(PipelineBase):
                 cursor.close()
 
 
-    def _count_missing_mysql_rollups(self) -> int:
+    def _create_temp_rollup_candidate_table(self) -> None:
 
-        """Count how many target Project-to-GARD rows are missing in MySQL."""
+        """Materialize missing repair rows once so insertion does not rescan every batch."""
+
+        cursor = None
+        start_time = time.time()
+
+        try:
+            cursor = self.mysql.cursor()
+            cursor.execute(self.DROP_TEMP_ROLLUP_CANDIDATES_QUERY)
+            cursor.execute(self.CREATE_TEMP_ROLLUP_CANDIDATES_QUERY)
+
+            '''
+            This is the one intentionally heavy query in the task. The original
+            implementation ran this relationship/pair/existing anti-join before
+            every 500-row insert batch. Materializing the result once changes the
+            expensive part from "one full scan per batch" to "one full scan per
+            script run"; the later insert loop only pages through the temporary
+            candidate table by its auto-increment key.
+            '''
+            cursor.execute(self.MATERIALIZE_MISSING_MYSQL_ROLLUPS_QUERY)
+            self.mysql.commit()
+            hours, minutes, seconds = _time_hms(time.time() - start_time)
+            self.logger.info(
+                f"Materialized {cursor.rowcount} missing roll-up candidates into temporary MySQL table. "
+                f"Candidate build time={hours} hours, {minutes} minutes, {seconds} seconds."
+            )
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+
+    def _count_temp_rollup_candidates(self) -> int:
+
+        """Count materialized target Project-to-GARD rows missing in MySQL."""
 
         cursor = None
 
         try:
             cursor = self.mysql.cursor(dictionary=True, buffered=True)
-            cursor.execute(self.COUNT_MISSING_MYSQL_ROLLUPS_QUERY)
+            cursor.execute(self.COUNT_TEMP_ROLLUP_CANDIDATES_QUERY)
             row = cursor.fetchone() or {}
             return int(row.get("missing_count") or 0)
 
@@ -536,25 +619,27 @@ class GardProjectRollupRelationshipMakeupTask(PipelineBase):
 
     def _insert_missing_mysql_rollups(self) -> int:
 
-        """Insert missing inferred Project-to-base-GARD rows in restartable batches."""
+        """Insert materialized Project-to-base-GARD repair rows in keyset batches."""
 
         fetch_cursor = None
         insert_cursor = None
         inserted_count = 0
         batch_number = 0
+        last_seen_candidate_id = 0
 
         try:
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
             insert_cursor = self.mysql.cursor()
 
             while True:
-                fetch_cursor.execute(self.FETCH_MISSING_MYSQL_ROLLUPS_QUERY, (self.batch_size,))
+                fetch_cursor.execute(self.FETCH_TEMP_ROLLUP_CANDIDATES_QUERY, (last_seen_candidate_id, self.batch_size))
                 rows = fetch_cursor.fetchall()
 
                 if not rows:
                     break
 
                 batch_number += 1
+                last_seen_candidate_id = max(int(row.get("candidate_id") or last_seen_candidate_id) for row in rows)
                 insert_values = [self._build_mysql_insert_values(row) for row in rows]
 
                 try:
@@ -563,7 +648,8 @@ class GardProjectRollupRelationshipMakeupTask(PipelineBase):
                     inserted_count += len(insert_values)
                     self.logger.info(
                         f"Inserted MySQL roll-up batch {batch_number}: "
-                        f"rows={len(insert_values)}, total_inserted={inserted_count}."
+                        f"rows={len(insert_values)}, last_candidate_id={last_seen_candidate_id}, "
+                        f"total_inserted={inserted_count}."
                     )
 
                 except Exception:
@@ -580,6 +666,47 @@ class GardProjectRollupRelationshipMakeupTask(PipelineBase):
 
             if insert_cursor is not None:
                 insert_cursor.close()
+
+
+    def _acquire_mysql_lock(self) -> bool:
+
+        """Acquire a connection-scoped lock so two optimized repair runs do not overlap."""
+
+        cursor = None
+
+        try:
+            cursor = self.mysql.cursor(dictionary=True, buffered=True)
+            cursor.execute("SELECT GET_LOCK(%s, 0) AS lock_acquired", (MYSQL_LOCK_NAME,))
+            row = cursor.fetchone() or {}
+            lock_acquired = int(row.get("lock_acquired") or 0) == 1
+
+            if lock_acquired:
+                self.logger.info(f"Acquired MySQL makeup lock: {MYSQL_LOCK_NAME}.")
+
+            return lock_acquired
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+
+    def _release_mysql_lock(self) -> None:
+
+        """Release the connection-scoped MySQL makeup lock before closing."""
+
+        cursor = None
+
+        try:
+            cursor = self.mysql.cursor()
+            cursor.execute("SELECT RELEASE_LOCK(%s)", (MYSQL_LOCK_NAME,))
+            self.logger.info(f"Released MySQL makeup lock: {MYSQL_LOCK_NAME}.")
+
+        except Exception:
+            self.logger.exception(f"Failed to release MySQL makeup lock: {MYSQL_LOCK_NAME}.")
+
+        finally:
+            if cursor is not None:
+                cursor.close()
 
 
     def _build_mysql_insert_values(self, row: Dict[str, Any]) -> Tuple[Any, ...]:
