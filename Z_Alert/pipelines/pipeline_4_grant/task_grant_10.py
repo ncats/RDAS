@@ -9,7 +9,8 @@ eligible when it has a matching abstract row and does not already have rows in
 `grant_gard_project_relation`.
 For each eligible project, the task searches the project title, project terms,
 PHR, and abstract for processed GARD disease terms, scores any matches,
-and inserts the resulting GARD-project relationship rows with `is_new = 1`.
+adds inferred base-disease roll-up relationships, and inserts the resulting
+GARD-project relationship rows with `is_new = 1`.
 
 To speed up processing, the task splits eligible `grant_project.id` ranges
 across multiple worker processes. Each worker loads the processed GARD disease
@@ -38,6 +39,8 @@ The task preserves the initializer's matching strategy:
     - two-word bag-of-words term variants from `grant_gard_processed_names`
     - spaCy sentence priority logic for PHR and abstract text
     - ClinicalBERT semantic similarity scoring
+    - phrase-based base-disease roll-up rows, for example
+      `adult glioblastoma` -> `glioblastoma`
     - batched relationship inserts
 
 NLTK data note preserved from the initializer:
@@ -53,20 +56,22 @@ NLTK data note preserved from the initializer:
 # Reference: D_grant/init_9_GARD_and_Project_relationship.multi.py
 
 import math
+import json
 import os
 import re
 import time
 import warnings
 from multiprocessing import Pool
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from pipelines.pipeline_4_grant.grant_base import GrantPipelineBase
 from pipelines.pipeline_error_logging import attach_pipeline_error_file_handler
 from utils.applogger import AppLogger
-from utils.tools import _resolve_worker_count, _time_hms
+from utils.tools import _normalize_txt, _resolve_worker_count, _time_hms
 
 
 WORD_PATTERN = re.compile(r"\b\w+\b")
+NORMALIZED_WORD_PATTERN = re.compile(r"[a-z0-9]+")
 GARD_TERM_SEPARATOR = "$$$"
 TASK_LOGGER_NAME = "GrantGardProjectRelationshipTask"
 WORKER_LOGGER = None
@@ -87,9 +92,16 @@ DEFAULT_FETCH_SIZE = 250
 DEFAULT_INSERT_BATCH_SIZE = 100
 DEFAULT_WORKER_PROGRESS_LOG_INTERVAL = 500
 DEFAULT_NUM_PROCESSES = 10
+ROLLUP_SOURCE_TYPE_PREFIX = "rollup"
+MAX_SOURCE_TYPE_LENGTH = 45
+MAX_RAW_RESULT_LENGTH = 4000
+MIN_ROLLUP_BASE_NAME_CHARS = 5
+EXCLUSION_CONTEXT_WORDS = {"exclude", "excluded", "excluding", "except", "without", "non", "not"}
+EXCLUSION_CONTEXT_WINDOW = 3
 
 GARD_PROCESSED_NAMES: List[Dict[str, Any]] = []
 GARD_ID_BY_NAME: Dict[str, Any] = {}
+GARD_ROLLUP_TARGETS_BY_SOURCE_NAME: Dict[str, List[Dict[str, str]]] = {}
 SPACY_MODEL = None
 CLINICAL_BERT_TOKENIZER = None
 CLINICAL_BERT_MODEL = None
@@ -199,6 +211,193 @@ def safe_split_terms(value: Any) -> List[str]:
     ]
 
 
+def normalize_gard_rollup_phrase(value: Any) -> str:
+
+    """Normalize a GARD disease phrase to lowercase ASCII whole-word text."""
+
+    if value is None:
+        return ""
+
+    normalized_value = _normalize_txt(str(value)).lower()
+    words = NORMALIZED_WORD_PATTERN.findall(normalized_value)
+    return " ".join(words)
+
+
+def iter_normalized_gard_terms(value: Any) -> Iterable[str]:
+
+    """Yield normalized processed GARD terms from either a list or $$$ string."""
+
+    if not value:
+        return
+
+    if isinstance(value, (list, tuple, set)):
+        raw_terms = value
+
+    else:
+        raw_terms = str(value).split(GARD_TERM_SEPARATOR)
+
+    for raw_term in raw_terms:
+        term = normalize_gard_rollup_phrase(raw_term)
+
+        if term:
+            yield term
+
+
+def generate_contiguous_phrases(words: Tuple[str, ...]) -> Iterable[str]:
+
+    """Yield each contiguous whole-word phrase from a normalized disease name."""
+
+    for start_index in range(len(words)):
+        for end_index in range(start_index + 1, len(words) + 1):
+            yield " ".join(words[start_index:end_index])
+
+
+def has_exclusion_context(source_words: Tuple[str, ...], target_words: Tuple[str, ...]) -> bool:
+
+    """Return True when a target phrase appears in an excluding/without context."""
+
+    if not source_words or not target_words:
+        return False
+
+    target_length = len(target_words)
+
+    for start_index in range(0, len(source_words) - target_length + 1):
+        if source_words[start_index:start_index + target_length] != target_words:
+            continue
+
+        '''
+        Disease names such as "astrocytoma (excluding glioblastoma)" contain a
+        target disease phrase textually, but they should not become roll-up
+        relationships to that excluded disease. A short left-context window
+        catches those negative labels without blocking normal modifier/base
+        disease names such as "adult glioblastoma".
+        '''
+        context_start_index = max(0, start_index - EXCLUSION_CONTEXT_WINDOW)
+        context_words = set(source_words[context_start_index:start_index])
+
+        if context_words & EXCLUSION_CONTEXT_WORDS:
+            return True
+
+    return False
+
+
+def is_valid_rollup_target(source_gard: Dict[str, Any], target_gard: Dict[str, Any]) -> bool:
+
+    """Return True when target_gard is a shorter/base disease for source_gard."""
+
+    if source_gard["gard_id"] == target_gard["gard_id"]:
+        return False
+
+    if source_gard["normalized_name"] == target_gard["normalized_name"]:
+        return False
+
+    if len(target_gard["normalized_name"]) < MIN_ROLLUP_BASE_NAME_CHARS:
+        return False
+
+    return len(target_gard["words"]) < len(source_gard["words"])
+
+
+def add_rollup_targets_for_phrase(pairs_by_source_name: Dict[str, Dict[Tuple[str, str], Dict[str, str]]], names_by_phrase: Dict[str, List[Dict[str, Any]]], source_gard: Dict[str, Any], phrase: str, rollup_rule: str) -> None:
+
+    """Add all base-disease targets whose primary name equals this source phrase."""
+
+    if not phrase:
+        return
+
+    for target_gard in names_by_phrase.get(phrase, []):
+        if not is_valid_rollup_target(source_gard, target_gard):
+            continue
+
+        if has_exclusion_context(source_gard["words"], target_gard["words"]):
+            continue
+
+        source_pairs = pairs_by_source_name.setdefault(source_gard["name"], {})
+        pair_key = (source_gard["gard_id"], target_gard["gard_id"])
+        current_pair = source_pairs.get(pair_key)
+
+        if current_pair and current_pair["rollup_rule"] == "target_name_in_source_terms":
+            continue
+
+        source_pairs[pair_key] = {
+            "source_gard_id": source_gard["gard_id"],
+            "source_gard_name": source_gard["name"],
+            "target_gard_id": target_gard["gard_id"],
+            "target_gard_name": target_gard["name"],
+            "rollup_rule": rollup_rule,
+        }
+
+
+def build_gard_rollup_targets(gard_rows: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, str]]]:
+
+    """Build source-name to base-disease roll-up targets from processed GARD rows."""
+
+    normalized_gards: List[Dict[str, Any]] = []
+    names_by_phrase: Dict[str, List[Dict[str, Any]]] = {}
+    seen_rows: Set[Tuple[str, str]] = set()
+
+    for row in gard_rows:
+        gard_id = str(row.get("gardid") or "").strip()
+        gard_name = str(row.get("name") or "").strip()
+        normalized_name = normalize_gard_rollup_phrase(gard_name)
+
+        if not gard_id or not gard_name or not normalized_name:
+            continue
+
+        row_key = (gard_id, normalized_name)
+
+        if row_key in seen_rows:
+            continue
+
+        seen_rows.add(row_key)
+        source_terms = set(iter_normalized_gard_terms(row.get("synonyms_sw")))
+        source_terms.add(normalized_name)
+        normalized_gard = {
+            "gard_id": gard_id,
+            "name": gard_name,
+            "normalized_name": normalized_name,
+            "words": tuple(normalized_name.split()),
+            "source_terms": source_terms,
+        }
+        normalized_gards.append(normalized_gard)
+        names_by_phrase.setdefault(normalized_name, []).append(normalized_gard)
+
+    pairs_by_source_name: Dict[str, Dict[Tuple[str, str], Dict[str, str]]] = {}
+
+    for source_gard in normalized_gards:
+        '''
+        This mirrors the makeup task's repair rule. If a specific disease has a
+        base disease's primary name as one exact processed search term, future
+        project matches should create both the specific and base relationships.
+        '''
+        for source_term in source_gard["source_terms"]:
+            add_rollup_targets_for_phrase(
+                pairs_by_source_name,
+                names_by_phrase,
+                source_gard,
+                source_term,
+                "target_name_in_source_terms",
+            )
+
+        '''
+        Primary-name containment catches modifier/base names even when the
+        source synonym list is incomplete. Only contiguous whole-word phrases
+        are considered, so partial-word matches do not create roll-up rules.
+        '''
+        for source_name_phrase in generate_contiguous_phrases(source_gard["words"]):
+            add_rollup_targets_for_phrase(
+                pairs_by_source_name,
+                names_by_phrase,
+                source_gard,
+                source_name_phrase,
+                "source_name_contains_target_name",
+            )
+
+    return {
+        source_name: sorted(pairs.values(), key=lambda pair: (pair["target_gard_id"], pair["source_gard_id"]))
+        for source_name, pairs in pairs_by_source_name.items()
+    }
+
+
 def load_gard_processed_names() -> List[Dict[str, Any]]:
     """Load processed GARD names and term lists from MySQL."""
 
@@ -241,6 +440,7 @@ def ensure_gard_terms_loaded() -> bool:
 
     global GARD_PROCESSED_NAMES
     global GARD_ID_BY_NAME
+    global GARD_ROLLUP_TARGETS_BY_SOURCE_NAME
 
     if GARD_PROCESSED_NAMES:
         return True
@@ -252,6 +452,7 @@ def ensure_gard_terms_loaded() -> bool:
         for row in GARD_PROCESSED_NAMES
         if row.get("name")
     }
+    GARD_ROLLUP_TARGETS_BY_SOURCE_NAME = build_gard_rollup_targets(GARD_PROCESSED_NAMES)
 
     return bool(GARD_PROCESSED_NAMES)
 
@@ -670,35 +871,117 @@ def flush_relationships(write_mysql, insert_cursor, insert_values: List[Tuple[An
     return inserted_count, 1, failed_rows
 
 
+def build_relationship_tuple(gard_id: Any, application_id: Any, gard_name: Any, source_type: Any, confidence_score: Any, semantic_similarity_value: Any, core_project_num: Any, raw_result: Any) -> Tuple[Any, ...]:
+
+    """Build one normalized grant_gard_project_relation insert tuple."""
+
+    from utils.tools import _normalize_tuple
+
+    return _normalize_tuple(
+        (
+            gard_id,
+            application_id,
+            gard_name,
+            source_type,
+            confidence_score,
+            semantic_similarity_value,
+            core_project_num,
+            raw_result,
+        )
+    )
+
+
+def build_rollup_source_type(source_type: Any) -> str:
+
+    """Create a source_type value that marks an inferred base-disease row."""
+
+    source_type_value = str(source_type or "").strip()
+
+    if not source_type_value:
+        return ROLLUP_SOURCE_TYPE_PREFIX
+
+    return f"{ROLLUP_SOURCE_TYPE_PREFIX}:{source_type_value}"[:MAX_SOURCE_TYPE_LENGTH]
+
+
+def build_rollup_raw_result(source_gard_id: Any, source_gard_name: Any, target_gard_id: Any, target_gard_name: Any, rollup_rule: Any) -> str:
+
+    """Build compact trace metadata for an inferred roll-up relationship row."""
+
+    raw_result = {
+        "rollup_rule": rollup_rule,
+        "source_gard_id": source_gard_id,
+        "source_gard_name": source_gard_name,
+        "target_gard_id": target_gard_id,
+        "target_gard_name": target_gard_name,
+    }
+    return json.dumps(raw_result, sort_keys=True, default=str)[:MAX_RAW_RESULT_LENGTH]
+
+
 def build_relationship_rows(project_row: Dict[str, Any], result_dict: Dict[str, List[float]], source_type: str) -> List[Tuple[Any, ...]]:
     """Convert one project result dictionary into insert-ready tuples."""
 
-    from utils.tools import _normalize_tuple, _val
+    from utils.tools import _val
 
     application_id = project_row["APPLICATION_ID"]
     core_project_num = _val(project_row.get("core_project_num"))
     raw_result = str(result_dict)
     relationship_rows: List[Tuple[Any, ...]] = []
+    seen_gard_ids: Set[Any] = set()
 
     for gard_name, value in result_dict.items():
         confidence_score = value[0]
         semantic_similarity_value = value[1]
         gard_id = get_gard_id_by_name(gard_name)
 
+        if gard_id in seen_gard_ids:
+            continue
+
+        seen_gard_ids.add(gard_id)
         relationship_rows.append(
-            _normalize_tuple(
-                (
-                    gard_id,
+            build_relationship_tuple(
+                gard_id,
+                application_id,
+                gard_name,
+                source_type,
+                confidence_score,
+                semantic_similarity_value,
+                core_project_num,
+                raw_result,
+            )
+        )
+
+        '''
+        The direct matcher intentionally prunes shorter contained names, so a
+        specific match such as "adult glioblastoma" can remove the base disease
+        "glioblastoma". Add the same phrase-based roll-up behavior used by the
+        makeup repair task here, so future runs create Project->specific and
+        Project->base GARD relationships together.
+        '''
+        for rollup_target in GARD_ROLLUP_TARGETS_BY_SOURCE_NAME.get(gard_name, []):
+            target_gard_id = rollup_target["target_gard_id"]
+
+            if target_gard_id in seen_gard_ids:
+                continue
+
+            seen_gard_ids.add(target_gard_id)
+            relationship_rows.append(
+                build_relationship_tuple(
+                    target_gard_id,
                     application_id,
-                    gard_name,
-                    source_type,
+                    rollup_target["target_gard_name"],
+                    build_rollup_source_type(source_type),
                     confidence_score,
                     semantic_similarity_value,
                     core_project_num,
-                    raw_result,
+                    build_rollup_raw_result(
+                        rollup_target["source_gard_id"],
+                        rollup_target["source_gard_name"],
+                        target_gard_id,
+                        rollup_target["target_gard_name"],
+                        rollup_target["rollup_rule"],
+                    ),
                 )
             )
-        )
 
     return relationship_rows
 
