@@ -53,6 +53,10 @@ NLTK data note preserved from the initializer:
         wget --no-check-certificate https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/english_wordnet.zip
 """
 
+#
+# 1. If a project matched "adult glioblastoma", the code also creates a second relationship to generic "glioblastoma" for the same project.
+# 2. A project that only matches generic "glioblastoma" will not be added to "adult glioblastoma"
+#
 # Reference: D_grant/init_9_GARD_and_Project_relationship.multi.py
 
 import math
