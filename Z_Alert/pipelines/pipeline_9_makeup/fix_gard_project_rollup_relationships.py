@@ -697,9 +697,11 @@ class GardProjectRollupRelationshipMakeupTask(PipelineBase):
         cursor = None
 
         try:
-            cursor = self.mysql.cursor()
+            cursor = self.mysql.cursor(dictionary=True, buffered=True)
             cursor.execute("SELECT RELEASE_LOCK(%s)", (MYSQL_LOCK_NAME,))
-            self.logger.info(f"Released MySQL makeup lock: {MYSQL_LOCK_NAME}.")
+            row = cursor.fetchone() or {}
+            release_result = list(row.values())[0] if row else None
+            self.logger.info(f"Released MySQL makeup lock: {MYSQL_LOCK_NAME}. release_result={release_result}.")
 
         except Exception:
             self.logger.exception(f"Failed to release MySQL makeup lock: {MYSQL_LOCK_NAME}.")
