@@ -38,12 +38,9 @@ INSERT_GARD_SQL = """
     )
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 """
-
-TRUNCATE_GARD_SQL = "TRUNCATE TABLE gard"
-
+ 
 
 class GardMysqlNomenclatureLoadTask(PipelineBase):
-
     """Load refreshed raw GARD nomenclature data into MySQL."""
 
     def __init__(self, data_file: Any = GARD_NOMENCLATURE_FILE, batch_size: int = 500, clear_existing: bool = False, allow_append: bool = False):
@@ -56,12 +53,10 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
 
 
     def find_new_data(self, gard_node) -> None:
-
         raise NotImplementedError("GardMysqlNomenclatureLoadTask does not implement find_new_data().")
 
 
     def process_new_data(self) -> None:
-
         """
         Insert GARD nomenclature rows into MySQL in batches.
 
@@ -89,7 +84,7 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
 
             if self.clear_existing:
                 self.logger.info("Clearing existing MySQL gard rows with TRUNCATE TABLE gard.")
-                cursor.execute(TRUNCATE_GARD_SQL)
+                cursor.execute("TRUNCATE TABLE gard")
                 self.mysql.commit()
 
             inserted_count = self._insert_rows(cursor)
@@ -111,7 +106,6 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
 
 
     def _get_existing_row_count(self) -> int:
-
         """Return the current number of rows in MySQL table `gard`."""
 
         cursor = self.mysql.cursor(dictionary=True)
@@ -126,7 +120,6 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
 
 
     def _insert_rows(self, cursor) -> int:
-
         """Stream the CSV and insert rows with executemany batches."""
 
         insert_values: List[Tuple[Any, ...]] = []
@@ -154,7 +147,6 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
 
 
     def _flush_insert_batch(self, cursor, insert_values: List[Tuple[Any, ...]], inserted_count: int) -> int:
-
         """Write one queued insert batch and return the updated total."""
 
         if not insert_values:
@@ -163,15 +155,16 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
         batch_count = len(insert_values)
         cursor.executemany(INSERT_GARD_SQL, insert_values)
         self.mysql.commit()
+
         inserted_count += batch_count
         self.logger.info(f"Inserted MySQL gard rows={inserted_count}.")
         insert_values.clear()
+
         return inserted_count
 
 
     @staticmethod
     def _build_insert_values(row: Dict[str, Any]) -> Tuple[Any, ...]:
-
         """Convert one raw nomenclature CSV row into the `gard` insert tuple."""
 
         xref = (row["Label_Xref"] or "").strip("[]")
