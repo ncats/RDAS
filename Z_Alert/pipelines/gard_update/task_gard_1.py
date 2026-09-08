@@ -39,7 +39,6 @@ INSERT_GARD_SQL = """
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 """
 
-COUNT_GARD_SQL = "SELECT COUNT(*) AS row_count FROM gard"
 TRUNCATE_GARD_SQL = "TRUNCATE TABLE gard"
 
 
@@ -77,9 +76,11 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
         try:
             csv_row_count = count_csv_rows(self.data_file)
             existing_row_count = self._get_existing_row_count()
+
             self.logger.info(f"GARD nomenclature input file: {self.data_file}")
             self.logger.info(f"CSV rows available={csv_row_count}; existing MySQL gard rows={existing_row_count}.")
 
+            # Do nothing !!!
             if existing_row_count > 0 and not self.clear_existing and not self.allow_append:
                 self.logger.info("Skipped MySQL gard load because the table already has rows. Set clear_existing=True for a rebuild or allow_append=True for an intentional append.")
                 return
@@ -116,7 +117,7 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
         cursor = self.mysql.cursor(dictionary=True)
 
         try:
-            cursor.execute(COUNT_GARD_SQL)
+            cursor.execute("SELECT COUNT(*) AS row_count FROM gard")
             row = cursor.fetchone() or {}
             return int(row.get("row_count") or 0)
 
@@ -132,6 +133,7 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
         inserted_count = 0
 
         with self.data_file.open("r", encoding="utf-8-sig", newline="") as csv_file:
+
             reader = csv.DictReader(csv_file)
             self.logger.info(f"GARD nomenclature CSV fields: {', '.join(reader.fieldnames or [])}")
 
@@ -144,19 +146,26 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
                     continue
 
                 if len(insert_values) >= self.batch_size:
-                    cursor.executemany(INSERT_GARD_SQL, insert_values)
-                    self.mysql.commit()
-                    inserted_count += len(insert_values)
-                    self.logger.info(f"Inserted MySQL gard rows={inserted_count}.")
-                    insert_values.clear()
+                    inserted_count = self._flush_insert_batch(cursor, insert_values, inserted_count)
 
-            if insert_values:
-                cursor.executemany(INSERT_GARD_SQL, insert_values)
-                self.mysql.commit()
-                inserted_count += len(insert_values)
-                self.logger.info(f"Inserted MySQL gard rows={inserted_count}.")
-                insert_values.clear()
+            inserted_count = self._flush_insert_batch(cursor, insert_values, inserted_count)
 
+        return inserted_count
+
+
+    def _flush_insert_batch(self, cursor, insert_values: List[Tuple[Any, ...]], inserted_count: int) -> int:
+
+        """Write one queued insert batch and return the updated total."""
+
+        if not insert_values:
+            return inserted_count
+
+        batch_count = len(insert_values)
+        cursor.executemany(INSERT_GARD_SQL, insert_values)
+        self.mysql.commit()
+        inserted_count += batch_count
+        self.logger.info(f"Inserted MySQL gard rows={inserted_count}.")
+        insert_values.clear()
         return inserted_count
 
 

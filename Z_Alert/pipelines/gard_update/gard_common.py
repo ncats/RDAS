@@ -46,7 +46,6 @@ def ensure_project_paths_on_path() -> None:
 
 
 def resolve_data_file(file_path: Any) -> Path:
-
     """Resolve and validate one GARD update data file."""
 
     path = Path(file_path).expanduser().resolve()
