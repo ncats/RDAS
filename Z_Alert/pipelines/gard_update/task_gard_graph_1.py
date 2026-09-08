@@ -39,9 +39,7 @@ FETCH_GARD_NODE_ROWS_SQL = """
         MONDO_ID,
         Label_Source
 """
-
-COUNT_GARD_NODE_ROWS_SQL = f"SELECT COUNT(*) AS row_count FROM ({FETCH_GARD_NODE_ROWS_SQL}) AS gard_nodes"
-
+ 
 UPSERT_GARD_NODES_CYPHER = """
     UNWIND $chunks AS chunk
     MERGE (d:GARD {gardId: chunk.gardId})
@@ -59,6 +57,7 @@ UPSERT_GARD_NODES_CYPHER = """
         d.synonyms = chunk.synonyms
 """
 
+# Afterward
 ADD_DISEASE_LABEL_CYPHER = "MATCH (n:GARD) SET n:Disease"
 
 INITIALIZE_COUNT_PROPERTIES_CYPHER = """
@@ -75,7 +74,6 @@ INITIALIZE_COUNT_PROPERTIES_CYPHER = """
 
 
 class GardGraphNodeInitializationTask(PipelineBase):
-
     """Create/update `:GARD` nodes and attach the shared `:Disease` label."""
 
     def __init__(self, batch_size: int = 100):
@@ -85,26 +83,14 @@ class GardGraphNodeInitializationTask(PipelineBase):
 
 
     def find_new_data(self, gard_node) -> None:
-
         raise NotImplementedError("GardGraphNodeInitializationTask does not implement find_new_data().")
 
 
     def process_new_data(self) -> None:
 
         cursor = None
-
         try:
-            create_memgraph_indexes_if_missing(
-                self.memgraph,
-                {
-                    "GARD": ["gardId"],
-                    "Disease": ["gardId"],
-                },
-                self.logger,
-            )
-
-            source_count = self._count_source_rows()
-            self.logger.info(f"MySQL source GARD node rows available={source_count}.")
+            create_memgraph_indexes_if_missing(self.memgraph, { "GARD": ["gardId"],"Disease": ["gardId"],}, self.logger, ) 
 
             cursor = self.mysql.cursor(dictionary=True, buffered=True)
             cursor.execute(FETCH_GARD_NODE_ROWS_SQL)
@@ -114,7 +100,6 @@ class GardGraphNodeInitializationTask(PipelineBase):
 
             while True:
                 rows = cursor.fetchmany(self.batch_size)
-
                 if not rows:
                     break
 
@@ -129,10 +114,12 @@ class GardGraphNodeInitializationTask(PipelineBase):
                     continue
 
                 self.memgraph.execute(UPSERT_GARD_NODES_CYPHER, {"chunks": chunks})
+
                 total_submitted += len(chunks)
                 batch_number += 1
                 self.logger.info(f"Upserted GARD node batch={batch_number}, rows={len(chunks)}, total={total_submitted}.")
 
+            # Add extra label & init counts
             """
             A `GARD` node is also a disease node in the RDAS graph. Count fields
             are initialized with coalesce so a re-run fills missing properties
@@ -151,26 +138,10 @@ class GardGraphNodeInitializationTask(PipelineBase):
                 cursor.close()
 
             self.close()
-
-
-    def _count_source_rows(self) -> int:
-
-        """Count the grouped MySQL rows that feed the GARD graph node load."""
-
-        cursor = self.mysql.cursor(dictionary=True)
-
-        try:
-            cursor.execute(COUNT_GARD_NODE_ROWS_SQL)
-            row = cursor.fetchone() or {}
-            return int(row.get("row_count") or 0)
-
-        finally:
-            cursor.close()
-
+ 
 
     @staticmethod
     def _build_gard_node_chunk(row: Dict[str, Any]) -> Dict[str, Any]:
-
         """Convert one grouped MySQL `gard` row into Memgraph properties."""
 
         row = none_to_empty(row)

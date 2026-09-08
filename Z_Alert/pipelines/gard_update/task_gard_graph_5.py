@@ -39,7 +39,6 @@ UPSERT_CHILD_RELATIONSHIPS_CYPHER = """
 
 
 class GardGraphHierarchyRelationshipInitializationTask(PipelineBase):
-
     """Create `:subclass_of` relationships between existing GARD nodes."""
 
     def __init__(self, data_file: Any = GARD_HIERARCHY_FILE, batch_size: int = 200):
@@ -50,7 +49,6 @@ class GardGraphHierarchyRelationshipInitializationTask(PipelineBase):
 
 
     def find_new_data(self, gard_node) -> None:
-
         raise NotImplementedError("GardGraphHierarchyRelationshipInitializationTask does not implement find_new_data().")
 
 
@@ -97,19 +95,18 @@ class GardGraphHierarchyRelationshipInitializationTask(PipelineBase):
 
 
     def _submit_batch(self, chunks: List[Dict[str, Any]], batch_number: int, total_submitted: int) -> int:
-
         """Submit parent and child hierarchy relationships for one batch."""
 
         self.memgraph.execute(UPSERT_PARENT_RELATIONSHIPS_CYPHER, {"chunks": chunks})
         self.memgraph.execute(UPSERT_CHILD_RELATIONSHIPS_CYPHER, {"chunks": chunks})
         total_submitted += len(chunks)
         self.logger.info(f"Upserted GARD hierarchy batch={batch_number}, rows={len(chunks)}, total={total_submitted}.")
+
         return total_submitted
 
 
     @staticmethod
     def _build_hierarchy_chunk(row: Dict[str, Any]) -> Dict[str, Any]:
-
         """Convert one hierarchy CSV row into parent/child relationship inputs."""
 
         current = clean_optional_text(row["GardID"])

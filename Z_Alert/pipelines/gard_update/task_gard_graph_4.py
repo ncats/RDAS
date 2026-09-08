@@ -35,7 +35,6 @@ UPSERT_GARD_PHENOTYPE_CYPHER = """
 
 
 class GardGraphPhenotypeRelationshipInitializationTask(PipelineBase):
-
     """Create Phenotype nodes and connect them to existing GARD nodes."""
 
     def __init__(self, data_file: Any = GARD_PHENOTYPE_FILE, batch_size: int = 200):
@@ -46,7 +45,6 @@ class GardGraphPhenotypeRelationshipInitializationTask(PipelineBase):
 
 
     def find_new_data(self, gard_node) -> None:
-
         raise NotImplementedError("GardGraphPhenotypeRelationshipInitializationTask does not implement find_new_data().")
 
 
@@ -100,7 +98,6 @@ class GardGraphPhenotypeRelationshipInitializationTask(PipelineBase):
 
 
     def _submit_batch(self, chunks: List[Dict[str, Any]], batch_number: int, total_submitted: int) -> int:
-
         """Submit one Phenotype relationship batch and return the new submitted count."""
 
         self.memgraph.execute(UPSERT_GARD_PHENOTYPE_CYPHER, {"chunks": chunks})
@@ -111,7 +108,6 @@ class GardGraphPhenotypeRelationshipInitializationTask(PipelineBase):
 
     @staticmethod
     def _build_phenotype_chunk(row: Dict[str, Any]) -> Dict[str, Any]:
-
         """Convert one phenotype CSV row into graph-ready properties."""
 
         gard_id = clean_optional_text(row["GardID"])

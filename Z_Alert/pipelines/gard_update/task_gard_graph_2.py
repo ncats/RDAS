@@ -39,7 +39,6 @@ UPDATE_GARD_XREFS_CYPHER = """
 
 
 class GardGraphXrefUpdateTask(PipelineBase):
-
     """Update xref-related properties on existing `:GARD` nodes."""
 
     def __init__(self, data_file: Any = GARD_XREF_FILE, batch_size: int = 100):
@@ -50,7 +49,6 @@ class GardGraphXrefUpdateTask(PipelineBase):
 
 
     def find_new_data(self, gard_node) -> None:
-
         raise NotImplementedError("GardGraphXrefUpdateTask does not implement find_new_data().")
 
 
@@ -92,18 +90,17 @@ class GardGraphXrefUpdateTask(PipelineBase):
 
 
     def _submit_batch(self, chunks: List[Dict[str, Any]], batch_number: int, total_submitted: int) -> int:
-
         """Submit one xref batch and return the new submitted count."""
 
         self.memgraph.execute(UPDATE_GARD_XREFS_CYPHER, {"chunks": chunks})
         total_submitted += len(chunks)
         self.logger.info(f"Updated GARD xref batch={batch_number}, rows={len(chunks)}, total={total_submitted}.")
+
         return total_submitted
 
 
     @staticmethod
     def _build_xref_chunk(row: Dict[str, Any]) -> Dict[str, Any]:
-
         """Convert one xref CSV row into Memgraph properties."""
 
         return {

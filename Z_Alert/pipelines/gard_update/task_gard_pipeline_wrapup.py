@@ -28,7 +28,6 @@ MYSQL_GARD_SUMMARY_SQL = """
 
 
 class GardUpdatePipelineWrapUpTask(PipelineBase):
-
     """Log final MySQL and Memgraph counts for the GARD update run."""
 
     def __init__(self):
@@ -37,14 +36,12 @@ class GardUpdatePipelineWrapUpTask(PipelineBase):
 
 
     def find_new_data(self, gard_node) -> None:
-
         raise NotImplementedError("GardUpdatePipelineWrapUpTask does not implement find_new_data().")
 
 
     def process_new_data(self) -> None:
 
         cursor = None
-
         try:
             cursor = self.mysql.cursor(dictionary=True)
             cursor.execute(MYSQL_GARD_SUMMARY_SQL)
@@ -74,7 +71,6 @@ class GardUpdatePipelineWrapUpTask(PipelineBase):
 
 
     def _fetch_memgraph_count(self, cypher: str) -> int:
-
         """Run one Memgraph count query and return the numeric result."""
 
         rows = list(self.memgraph.execute_and_fetch(cypher))
