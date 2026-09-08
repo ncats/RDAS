@@ -60,6 +60,19 @@ UPSERT_GARD_NODES_CYPHER = """
 # Afterward
 ADD_DISEASE_LABEL_CYPHER = "MATCH (n:GARD) SET n:Disease"
 
+"""
+These count properties are initialized here only so every refreshed GARD node has
+the fields expected by the UI and downstream graph queries. The real values are
+refreshed later by the alert pipeline:
+
+Z_Alert/pipelines/pipeline_5_followup/task_pipeline_followup_update_1.py
+    GardRelationshipCountRefreshTask recalculates countArticles, countTrials,
+    countProjects, countGenes, and countPhenotypes from Memgraph relationships.
+
+Z_Alert/pipelines/pipeline_3_publication/task_publication_graph_7.py
+    GardPublicationEpiNhsCountUpdateTask recalculates countEpiArticles and
+    countNhsArticles from publication MySQL tables and writes them to Memgraph.
+"""
 INITIALIZE_COUNT_PROPERTIES_CYPHER = """
     MATCH (n:GARD)
     SET
