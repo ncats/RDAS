@@ -8,9 +8,10 @@ operator controls when new source files are placed in that folder.
 
 import csv
 import sys
-from ast import literal_eval
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Mapping, Sequence, Tuple
+
+from pipelines.pipeline_0_setup.memgraph_index_utils import create_indexes
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -46,6 +47,7 @@ def ensure_project_paths_on_path() -> None:
 
 
 def resolve_data_file(file_path: Any) -> Path:
+
     """Resolve and validate one GARD update data file."""
 
     path = Path(file_path).expanduser().resolve()
@@ -152,64 +154,6 @@ def validate_batch_size(batch_size: int) -> int:
     return max(1, batch_size)
 
 
-def _index_property_list(value: Any) -> List[str]:
-
-    """Normalize SHOW INDEX INFO property values across Memgraph versions."""
-
-    if value is None or value == "":
-        return []
-
-    if isinstance(value, list):
-        return value
-
-    if isinstance(value, tuple):
-        return list(value)
-
-    if isinstance(value, str):
-        text = value.strip()
-
-        if not text:
-            return []
-
-        if text.startswith("[") and text.endswith("]"):
-            try:
-                parsed = literal_eval(text)
-                return parsed if isinstance(parsed, list) else [text]
-            except (SyntaxError, ValueError):
-                return [text]
-
-        return [text]
-
-    return [str(value)]
-
-
-def _index_type(row: Mapping[str, Any]) -> str:
-
-    """Return the Memgraph index type column across driver/key variants."""
-
-    return str(row.get("index type") or row.get("type") or row.get("index_type") or "")
-
-
-def is_memgraph_index_field_exists(memgraph: Any, label_name: str, field: str) -> bool:
-
-    """Return True when a label-property index already exists."""
-
-    for row in memgraph.execute_and_fetch("SHOW INDEX INFO"):
-        if row.get("label") != label_name:
-            continue
-
-        index_type = _index_type(row)
-        properties = _index_property_list(row.get("property"))
-
-        if index_type and index_type != "label+property":
-            continue
-
-        if properties == [field]:
-            return True
-
-    return False
-
-
 def create_memgraph_indexes_if_missing(memgraph: Any, index_config: Mapping[str, Sequence[str]], logger: Any) -> Tuple[int, int, int]:
 
     """
@@ -217,33 +161,21 @@ def create_memgraph_indexes_if_missing(memgraph: Any, index_config: Mapping[str,
 
     These concrete GARD tasks can be run outside the normal alert pipeline, so
     each task checks its own lookup indexes before writing. That keeps the
-    initializer portable while avoiding a dependency on the older `InitBase`
-    initializer classes or on the full pipeline_0 setup task.
+    initializer portable while reusing the same index helper implementation as
+    the full pipeline_0 setup task.
     """
 
-    created = 0
-    skipped = 0
-    errors = 0
+    created_total = 0
+    skipped_total = 0
+    error_total = 0
 
     for label, fields in index_config.items():
-        for field in fields:
-            if is_memgraph_index_field_exists(memgraph, label, field):
-                skipped += 1
-                logger.info(f"Index already exists: :{label}({field})")
-                continue
+        created, skipped, errors = create_indexes(memgraph, logger, label, fields)
+        created_total += created
+        skipped_total += skipped
+        error_total += errors
 
-            command = f"CREATE INDEX ON :{label}({field});"
-
-            try:
-                memgraph.execute(command)
-                created += 1
-                logger.info(f"Created Memgraph index: {command}")
-
-            except Exception as e:
-                errors += 1
-                logger.error(f"Error creating Memgraph index {command}: {e}")
-
-    return created, skipped, errors
+    return created_total, skipped_total, error_total
 
 
 def log_csv_file_summary(logger: Any, label: str, file_path: Path) -> int:
