@@ -185,8 +185,14 @@ class NewPublicationDiscoveryTask(PipelineBase):
 
         insert_gard_searchterm_pubmed_mapping_sql = '''
             INSERT INTO publication_gard_searchterm_pubmed_mapping (gard_id, search_term, pubmed_id)
-            VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE gard_id = VALUES(gard_id), search_term = VALUES(search_term), pubmed_id = VALUES(pubmed_id)
+            SELECT %s, %s, %s
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM publication_gard_searchterm_pubmed_mapping
+                WHERE gard_id = %s
+                AND search_term = %s
+                AND pubmed_id = %s
+            )
         '''
         
         try:
@@ -208,35 +214,52 @@ class NewPublicationDiscoveryTask(PipelineBase):
                 for existing_row in check_cursor.fetchall()
             }
 
+            new_articles_added = 0
+            existing_articles_seen = 0
+            mappings_added = 0
+
             # 3. 
             for pubmed_id in pubmed_ids: 
 
                 # the pubmed_id is already in publication_article table
                 if pubmed_id in existing_pubmed_ids:
-                    continue
-                 
-                # 5. the pubmed_id is NOT in publication_article, download article
-                article_val = self.publication_worker.download_by_pmid(pubmed_id)
+                    existing_articles_seen += 1
+                else:
+                    # 5. the pubmed_id is NOT in publication_article, download article
+                    article_val = self.publication_worker.download_by_pmid(pubmed_id)
 
-                if not article_val:
-                    url = f"{os.getenv('EURO_PEPMC_SERVICE_URL')}?query=EXT_ID:{pubmed_id}&resultType=core&format=json"
+                    if not article_val:
+                        url = f"{os.getenv('EURO_PEPMC_SERVICE_URL')}?query=EXT_ID:{pubmed_id}&resultType=core&format=json"
 
-                    self.logger.warning(f"GARD ID: {gard_id}, Search term: {search_term} - Unable to download: {url}")
-                    continue
-                 
-                # 6. save the new article into publication_article table
-                insert_article_cursor.execute(insert_new_article_sql, (*article_val, pubmed_id))
+                        self.logger.warning(f"GARD ID: {gard_id}, Search term: {search_term} - Unable to download: {url}")
+                        continue
 
-                self.mysql.commit()
+                    # 6. save the new article into publication_article table
+                    insert_article_cursor.execute(insert_new_article_sql, (*article_val, pubmed_id))
+                    existing_pubmed_ids.add(pubmed_id)
+                    new_articles_added += 1
 
-                pubmedid_gardid_searchitem_for_logging = f'PubMed ID: {pubmed_id}\tGARD ID: {gard_id}\tSearch term: {search_term}'
-                self.logger.info(f"1. New publication added to table publication_article :: {pubmedid_gardid_searchitem_for_logging}")
+                    pubmedid_gardid_searchitem_for_logging = f'PubMed ID: {pubmed_id}\tGARD ID: {gard_id}\tSearch term: {search_term}'
+                    self.logger.info(f"1. New publication added to table publication_article :: {pubmedid_gardid_searchitem_for_logging}")
 
-                # 7. save the gard_id, search_term and pubmed_id
-                insert_gard_searchterm_pubmed_mapping_cursor.execute(insert_gard_searchterm_pubmed_mapping_sql, (gard_id, search_term, pubmed_id))
-                self.mysql.commit()
+                # 7. save the gard_id, search_term and pubmed_id. This must run
+                # even when the Article row already exists from another disease.
+                insert_gard_searchterm_pubmed_mapping_cursor.execute(
+                    insert_gard_searchterm_pubmed_mapping_sql,
+                    (gard_id, search_term, pubmed_id, gard_id, search_term, pubmed_id),
+                )
+                mappings_added += insert_gard_searchterm_pubmed_mapping_cursor.rowcount
 
-                self.logger.info(f"2. New mapping added to table publication_gard_searchterm_pubmed_mapping :: {pubmedid_gardid_searchitem_for_logging}")
+                if insert_gard_searchterm_pubmed_mapping_cursor.rowcount:
+                    pubmedid_gardid_searchitem_for_logging = f'PubMed ID: {pubmed_id}\tGARD ID: {gard_id}\tSearch term: {search_term}'
+                    self.logger.info(f"2. New mapping added to table publication_gard_searchterm_pubmed_mapping :: {pubmedid_gardid_searchitem_for_logging}")
+
+            self.mysql.commit()
+            self.logger.info(
+                f"Publication discovery summary for GARD ID: {gard_id}, Search term: {search_term}; "
+                f"new_articles_added={new_articles_added}, existing_articles_seen={existing_articles_seen}, "
+                f"mappings_added={mappings_added}."
+            )
  
         except Exception as e:
             self.logger.error(e)

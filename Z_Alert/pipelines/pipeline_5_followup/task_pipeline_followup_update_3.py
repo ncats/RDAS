@@ -224,6 +224,8 @@ class DiseaseCountsRefreshTask(PipelineBase):
         fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
 
         try:
+            self._log_progress(f"Starting DiseaseCountsRefreshTask filterCounts refresh with batch_size={batch_size}.")
+
             while True:
                 batch_start_time = time.time()
 
@@ -246,27 +248,27 @@ class DiseaseCountsRefreshTask(PipelineBase):
 
                 batch_num += 1 
                 last_gard_id = gard_id_list[-1]
-                self.logger.info(f'\n--- Processing batch {batch_num}; GARD ID range {gard_id_list[0]} to {last_gard_id} ---\n')
+                self._log_progress(f"Processing filterCounts batch {batch_num}; GARD ID range {gard_id_list[0]} to {last_gard_id}.")
 
                 # Step 1:
                 # Fetch all article filter counts for this Memgraph GARD batch in a single MySQL round trip. 
                 # The result is keyed by gard_id, so the per-GARD loop below only does dictionary lookups.
                 disease_article_counts_by_gard = self._disease_article_iterms_count_batch(gard_id_list, fetch_cursor)
                 hours, minutes, seconds = _time_hms(time.time() - batch_start_time)
-                self.logger.info(f'\n\ndisease_article_counts_by_gard: time={hours} hours, {minutes} minutes, {seconds} seconds')
+                self._log_progress(f"Batch {batch_num}: article filter counts fetched in {hours} hours, {minutes} minutes, {seconds} seconds.")
                 
                 # Step 2:
                 # Fetch all project-by-year counts for the same GARD IDs in one query.
                 # The idx_gpr_gard_application index supports the gpr.gard_id IN (...) filter plus application_id join path.
                 disease_project_counts_by_gard = self._disease_project_by_year_count_batch(gard_id_list, fetch_cursor)
                 hours, minutes, seconds = _time_hms(time.time() - batch_start_time)
-                self.logger.info(f'disease_project_counts_by_gard: time={hours} hours, {minutes} minutes, {seconds} seconds')
+                self._log_progress(f"Batch {batch_num}: project-by-year counts fetched in {hours} hours, {minutes} minutes, {seconds} seconds.")
 
                 # Step 3:
                 # Fetch clinical-trial counts for the whole GARD batch. This replaces the old per-GARD MySQL query plus per-GARD Memgraph query loop.
                 disease_clinical_trial_counts_by_gard = self._disease_clinical_trial_terms_count_batch(gard_id_list, fetch_cursor)
                 hours, minutes, seconds = _time_hms(time.time() - batch_start_time)
-                self.logger.info(f'disease_clinical_trial_counts_by_gard: time={hours} hours, {minutes} minutes, {seconds} seconds')
+                self._log_progress(f"Batch {batch_num}: clinical-trial counts fetched in {hours} hours, {minutes} minutes, {seconds} seconds.")
 
                 # Step 4:
                 batch = []
@@ -302,11 +304,12 @@ class DiseaseCountsRefreshTask(PipelineBase):
                         # Step 6:
                         # Write the whole GARD batch to Memgraph in one call instead of updating each GARD node separately.
                         self.memgraph.execute(batch_update_GARD_nodes_cypher, {"batch": batch})
+                        self._log_progress(f"Batch {batch_num}: wrote filterCounts for {len(batch)} GARD nodes.")
                     except Exception as e:
                         self.logger.error(f'{e}')
 
                 hours, minutes, seconds = _time_hms(time.time() - batch_start_time)
-                self.logger.info(f'\n * Total updated={total_updated}. Batch processing time={hours} hours, {minutes} minutes, {seconds} seconds * \n')
+                self._log_progress(f"Batch {batch_num}: total_updated={total_updated}, batch_time={hours} hours, {minutes} minutes, {seconds} seconds.")
                     
         except Exception as e:
             self.logger.error(f'{e}')
@@ -316,10 +319,20 @@ class DiseaseCountsRefreshTask(PipelineBase):
                 fetch_cursor.close()
 
             hours, minutes, seconds = _time_hms(time.time() - very_start_time)
-            self.logger.info(f'\n\n****** Total time elapsed: {hours} hours, {minutes} minutes, {seconds} seconds ******\n\n')
+            self._log_progress(f"Completed DiseaseCountsRefreshTask filterCounts refresh in {hours} hours, {minutes} minutes, {seconds} seconds.")
 
             ''' Explicitly close all db connections. '''
             self.close()
+
+
+    def _log_progress(self, message: str) -> None:
+
+        """Write important progress to both the task logger and stdout."""
+
+        if self.logger is not None:
+            self.logger.info(message)
+
+        print(message, flush=True)
 
 
     def _disease_article_iterms_count(self, gard_id: str, fetch_cursor):
