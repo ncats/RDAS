@@ -10,7 +10,7 @@ reading `grant_gard_project_relation` directly where `is_new = 1`.
 Relationship direction:
     The initializer creates the relationship from GARD to CoreProject:
 
-        (GARD)-[:has_coreproject]->(CoreProject)
+        (GARD)-[:has_core_project]->(CoreProject)
 
     This task keeps grant CoreProject relationships under one relationship type
     and direction, independent of older `has_researched_disease` or
@@ -20,7 +20,7 @@ Processing flow:
     1. Read distinct current new `(gard_id, core_project_num)` pairs.
     2. Match the existing GARD node by `gardId`.
     3. Match the existing CoreProject node by `coreProjectNumber`.
-    4. MERGE the GARD -> CoreProject `has_coreproject` relationship.
+    4. MERGE the GARD -> CoreProject `has_core_project` relationship.
 
 Notes:
     This task expects CoreProject and GARD nodes to already exist in Memgraph.
@@ -56,7 +56,7 @@ class NewCoreProjectGardRelationshipGraphTask(PipelineBase):
         UNWIND $chunks AS chunk
         MATCH (gard:GARD {gardId: chunk.gardId})
         MATCH (cp:CoreProject {coreProjectNumber: chunk.coreProjectNumber})
-        MERGE (gard)-[:has_coreproject]->(cp)
+        MERGE (gard)-[:has_core_project]->(cp)
     '''
 
     '''

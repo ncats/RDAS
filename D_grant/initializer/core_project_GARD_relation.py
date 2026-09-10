@@ -6,7 +6,7 @@ from baseclass.init_base import InitBase
 from utils.file_appender import FileAppender
 from utils.tools import _date_string
 
-''' Create GARD-[has_coreproject]->CoreProject relationship '''
+''' Create GARD-[has_core_project]->CoreProject relationship '''
 class CoreProjectToGARDRelationInitializer(InitBase):
 
     def __init__(self): 
@@ -31,7 +31,7 @@ class CoreProjectToGARDRelationInitializer(InitBase):
             UNWIND $chunks AS chunk 
             MATCH(gard:GARD {gardId: chunk.gardId})
             MATCH(cp:CoreProject {coreProjectNumber: chunk.coreProjectNumber})
-            MERGE (gard)-[:has_coreproject]->(cp)
+            MERGE (gard)-[:has_core_project]->(cp)
         '''  
 
         fetch_query = f''' SELECT DISTINCT gard_id, core_project_num 
