@@ -62,3 +62,8 @@ __init__.py
 !Z_Alert/pipelines/alert_sender_workflow.md
 !Z_Alert/pipelines/grant_email_alert_process.md
 !Z_Alert/pipelines/pipeline_9_makeup/NCT06487273_location_count_mismatch_report.md
+
+# Keep the HPO extension table definitions visible under the broad SQL ignore.
+!Y_extension/hpo/20260925/create_extension_genes_to_disease.sql
+!Y_extension/hpo/20260925/create_extension_genes_to_phenotype.sql
+!Y_extension/hpo/20260925/create_extension_maxo_annotations.sql

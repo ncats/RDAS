@@ -1,4 +1,4 @@
-"""Replace extension_phneotype_hpoa with the dated HPO annotation data."""
+"""Replace extension_hpo_phenotype_to_genes with the dated HPO data."""
 
 import csv
 import sys
@@ -6,28 +6,21 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SCRIPT_DIR.parents[2]
+PROJECT_ROOT = SCRIPT_DIR.parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from baseclass.conn import DBConnection
 
 
-DATA_FILE = SCRIPT_DIR / "data" / "phenotype.hpoa.tsv"
-TABLE_NAME = "extension_phneotype_hpoa"
+DATA_FILE = SCRIPT_DIR.parent / "data" / "phenotype_to_genes.txt"
+TABLE_NAME = "extension_hpo_phenotype_to_genes"
 BATCH_SIZE = 1_000
 COLUMNS = (
-    "database_id",
-    "disease_name",
-    "qualifier",
     "hpo_id",
-    "reference",
-    "evidence",
-    "onset",
-    "frequency",
-    "sex",
-    "modifier",
-    "aspect",
-    "biocuration",
+    "hpo_name",
+    "ncbi_gene_id",
+    "gene_symbol",
+    "disease_id",
 )
 INSERT_SQL = f"""
     INSERT INTO {TABLE_NAME} ({", ".join(COLUMNS)})
@@ -87,6 +80,6 @@ def main() -> None:
             connection.close()
 
 
-# Feature: display batch and cumulative row progress during HPO phenotype loading
+# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/init/load_phenotype_to_genes.py
 if __name__ == "__main__":
     main()
