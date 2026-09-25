@@ -44,6 +44,7 @@ def main() -> None:
 
     cursor = connection.cursor()
     inserted_count = 0
+    batch_count = 0
 
     try:
         with DATA_FILE.open("r", encoding="utf-8-sig", newline="") as tsv_file:
@@ -62,12 +63,15 @@ def main() -> None:
                 if len(batch) == BATCH_SIZE:
                     cursor.executemany(INSERT_SQL, batch)
                     inserted_count += len(batch)
+                    batch_count += 1
                     batch.clear()
-                    print(f"Prepared {inserted_count} rows...", flush=True)
+                    print(f"Batch {batch_count}: prepared {inserted_count} rows.", flush=True)
 
             if batch:
                 cursor.executemany(INSERT_SQL, batch)
                 inserted_count += len(batch)
+                batch_count += 1
+                print(f"Batch {batch_count}: prepared {inserted_count} rows.", flush=True)
 
         connection.commit()
         print(f"Inserted {inserted_count} rows into {TABLE_NAME}.")
@@ -83,5 +87,6 @@ def main() -> None:
             connection.close()
 
 
+# Feature: display batch and cumulative row progress during HPO phenotype loading
 if __name__ == "__main__":
     main()
