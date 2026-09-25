@@ -20,6 +20,7 @@
 *.sql
 *.tsv
 *.txt
+PROJECT_MEMORY.md
 
 # Generated/intermediate directories
 memgraph_dumps/
