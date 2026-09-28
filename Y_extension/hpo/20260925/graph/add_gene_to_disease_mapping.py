@@ -37,7 +37,8 @@ MERGE_CYPHER = """
         gene.omim = row.omim,
         gene.orphanet = row.orphanet,
         gene.umls = '',
-        gene.countDiseases = 0
+        gene.countDiseases = 0,
+        gene.source = 'hpo'
     MERGE (gard)-[:has_associated_gene]->(gene)
     RETURN count(DISTINCT row.sourceRowId) AS matchedCount
 """

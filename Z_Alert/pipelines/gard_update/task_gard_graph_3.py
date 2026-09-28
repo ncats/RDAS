@@ -37,7 +37,8 @@ UPSERT_GARD_GENE_CYPHER = """
         d.mondo = chunk.mondo,
         d.omim = chunk.omim,
         d.orphanet = chunk.orphanet,
-        d.umls = chunk.umls
+        d.umls = chunk.umls,
+        d.source = 'GARD'
     MERGE (g)-[r:has_associated_gene]->(d)
     SET r.Reference = chunk.reference
 """

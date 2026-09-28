@@ -52,7 +52,8 @@ class GeneInitializer(InitBase):
                 d.mondo = chunk.mondo,
                 d.omim = chunk.omim,
                 d.orphanet = chunk.orphanet,
-                d.umls = chunk.umls
+                d.umls = chunk.umls,
+                d.source = 'GARD'
              
             MERGE (g)-[r:has_associated_gene]->(d)
             ON CREATE SET
