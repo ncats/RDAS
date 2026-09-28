@@ -4,6 +4,21 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+# Create and populate table extension_hpo_distinct_phenotye before running this script.
+"""
+CREATE TABLE extension_hpo_distinct_phenotye (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    hpo_id VARCHAR(50) NOT NULL,     
+    hpo_name VARCHAR(255),    
+    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_hpo_id (hpo_id)
+);
+
+INSERT INTO extension_hpo_distinct_phenotye (hpo_id, hpo_name)
+SELECT hpo_id, hpo_name
+FROM rdas_db.extension_hpo_genes_to_phenotype
+GROUP BY hpo_id, hpo_name;
+"""
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[3]
@@ -13,12 +28,14 @@ from baseclass.conn import DBConnection
 
 
 BATCH_SIZE = 1_000
+
 GARD_PROPERTY_BY_PREFIX = {
     "GARD": "gardId",
     "MONDO": "mondo",
     "OMIM": "omim",
     "ORPHA": "orphanet",
 }
+
 SELECT_SQL = """
     SELECT
         annotation.id AS source_row_id,
@@ -32,6 +49,7 @@ SELECT_SQL = """
     LEFT JOIN rdas_db.extension_hpo_distinct_phenotye AS phenotype
         ON phenotype.hpo_id = annotation.hpo_id
 """
+
 MERGE_CYPHER = """
     UNWIND $rows AS row
     MATCH (gard:GARD {GARD_PROPERTY: row.diseaseId})
@@ -87,10 +105,34 @@ def main() -> None:
             rows_by_gard_property = defaultdict(list)
             print(f"Batch {batch_count}: fetched {len(mysql_rows)} source rows.", flush=True)
 
+            """
+            One joined MySQL row looks like:
+                source_row_id=8001
+                disease_id="OMIM:619340"
+                hpo_id="HP:0011097"
+                hpo_name="Epileptic spasm"
+                evidence="PCS"
+                reference="PMID:31675180"
+                frequency="1/2"
+
+            The LEFT JOIN keeps annotation rows whose HPO identifier is missing
+            from extension_hpo_distinct_phenotye. Those rows have hpo_id=None
+            here and are deliberately ignored before any Memgraph write.
+            """
             for row in mysql_rows:
                 if not row["disease_id"] or not row["hpo_id"]:
                     continue
 
+                """
+                Route each disease identifier to its matching indexed property:
+                    GARD:0000001  -> GARD.gardId
+                    MONDO:0011308 -> GARD.mondo
+                    OMIM:619340   -> GARD.omim
+                    ORPHA:53693   -> GARD.orphanet
+
+                DECIPHER identifiers have no configured GARD property, so a
+                value such as DECIPHER:58 is ignored.
+                """
                 disease_id = str(row["disease_id"]).strip()
                 disease_prefix = disease_id.split(":", 1)[0]
                 gard_property = GARD_PROPERTY_BY_PREFIX.get(disease_prefix)
@@ -98,6 +140,19 @@ def main() -> None:
                 if not gard_property:
                     continue
 
+                """
+                References become a Memgraph list. For example:
+                    "PMID:123;PMID:456" -> ["PMID:123", "PMID:456"]
+
+                The example row above becomes this graph-ready payload:
+                    sourceRowId=8001
+                    diseaseId="OMIM:619340"
+                    hpoId="HP:0011097"
+                    hpoName="Epileptic spasm"
+                    evidence="PCS"
+                    references=["PMID:31675180"]
+                    frequency="1/2"
+                """
                 references = [
                     reference.strip()
                     for reference in str(row["reference"] or "").split(";")
@@ -117,6 +172,18 @@ def main() -> None:
 
             matched_rows = 0
 
+            """
+            Each group replaces the trusted GARD_PROPERTY placeholder with one
+            indexed property. The OMIM example produces:
+                MATCH (gard:GARD {omim: row.diseaseId})
+
+            If no GARD node matches, the row stops at MATCH: no Phenotype node
+            or has_phenotype relationship is created. A successful row merges:
+                (:GARD)-[:has_phenotype]->
+                (:Phenotype {hpoId: "HP:0011097", hpoTerm: "Epileptic spasm"})
+
+            The relationship stores evidence, references, and term frequency.
+            """
             for gard_property, rows in rows_by_gard_property.items():
                 print(
                     f"Batch {batch_count}: submitting {len(rows)} rows using indexed GARD.{gard_property} matching...",
@@ -155,6 +222,6 @@ def main() -> None:
             mysql.close()
 
 
-# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/graph/add_phenotype_to_disease_mapping.py
+# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/graph/step_2_add_phenotype_to_disease_mapping.py
 if __name__ == "__main__":
     main()
