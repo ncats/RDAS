@@ -44,7 +44,8 @@ SELECT_SQL = """
         phenotype.hpo_name,
         annotation.evidence,
         annotation.reference,
-        annotation.frequency
+        annotation.frequency,
+        annotation.onset
     FROM rdas_db.extension_hpo_phneotype_hpoa AS annotation
     LEFT JOIN rdas_db.extension_hpo_distinct_phenotye AS phenotype
         ON phenotype.hpo_id = annotation.hpo_id
@@ -60,7 +61,8 @@ MERGE_CYPHER = """
     SET
         relationship.evidence = row.evidence,
         relationship.references = row.references,
-        relationship.hpoTermFrequency = row.frequency
+        relationship.hpoTermFrequency = row.frequency,
+        relationship.onset = row.onset
     RETURN count(DISTINCT row.sourceRowId) AS matchedCount
 """
 
@@ -114,6 +116,7 @@ def main() -> None:
                 evidence="PCS"
                 reference="PMID:31675180"
                 frequency="1/2"
+                onset=""
 
             The LEFT JOIN keeps annotation rows whose HPO identifier is missing
             from extension_hpo_distinct_phenotye. Those rows have hpo_id=None
@@ -152,6 +155,10 @@ def main() -> None:
                     evidence="PCS"
                     references=["PMID:31675180"]
                     frequency="1/2"
+                    onset=""
+
+                When populated, onset is an HPO identifier such as
+                "HP:0003593" and is stored on the relationship.
                 """
                 references = [
                     reference.strip()
@@ -167,6 +174,7 @@ def main() -> None:
                         "evidence": str(row["evidence"] or "").strip(),
                         "references": references,
                         "frequency": str(row["frequency"] or "").strip(),
+                        "onset": str(row["onset"] or "").strip(),
                     }
                 )
 
@@ -182,7 +190,8 @@ def main() -> None:
                 (:GARD)-[:has_phenotype]->
                 (:Phenotype {hpoId: "HP:0011097", hpoTerm: "Epileptic spasm"})
 
-            The relationship stores evidence, references, and term frequency.
+            The relationship stores evidence, references, term frequency, and
+            onset. For example, relationship.onset may be "HP:0003593" or "".
             """
             for gard_property, rows in rows_by_gard_property.items():
                 print(

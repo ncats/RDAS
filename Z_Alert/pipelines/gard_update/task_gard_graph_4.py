@@ -30,7 +30,8 @@ UPSERT_GARD_PHENOTYPE_CYPHER = """
     SET
         r.evidence = chunk.evidence,
         r.references = chunk.references,
-        r.hpoTermFrequency = chunk.hpoTermFrequency
+        r.hpoTermFrequency = chunk.hpoTermFrequency,
+        r.onset = ''
 """
 
 

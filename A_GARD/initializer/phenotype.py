@@ -47,7 +47,8 @@ class PhenotypeInitializer(InitBase):
             ON CREATE SET                 
                 r.evidence = chunk.evidence,
                 r.references = chunk.references,
-                r.hpoTermFrequency = chunk.hpoTermFrequency
+                r.hpoTermFrequency = chunk.hpoTermFrequency,
+                r.onset = ''
         '''
 
         chunks = self.get_data_from_csv_files()
