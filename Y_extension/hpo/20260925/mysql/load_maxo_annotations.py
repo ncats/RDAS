@@ -1,4 +1,4 @@
-"""Replace extension_pho_phneotype_hpoa with the dated HPO annotation data."""
+"""Replace extension_hpo_maxo_annotations with the dated HPO data."""
 
 import csv
 import sys
@@ -12,25 +12,26 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from baseclass.conn import DBConnection
 
 
-DATA_FILE = SCRIPT_DIR.parent / "data" / "phenotype.hpoa.tsv"
-TABLE_NAME = "extension_pho_phneotype_hpoa"
+DATA_FILE = SCRIPT_DIR.parent / "data" / "maxo-annotations.tsv"
+TABLE_NAME = "extension_hpo_maxo_annotations"
 BATCH_SIZE = 1_000
-
 COLUMNS = (
-    "database_id",
+    "disease_id",
     "disease_name",
-    "qualifier",
+    "source_id",
+    "maxo_id",
+    "maxo_name",
     "hpo_id",
-    "reference",
+    "relation",
     "evidence",
-    "onset",
-    "frequency",
-    "sex",
-    "modifier",
-    "aspect",
-    "biocuration",
+    "extension_id",
+    "extension_name",
+    "comment",
+    "other",
+    "author",
+    "last_updated",
+    "created",
 )
-
 INSERT_SQL = f"""
     INSERT INTO {TABLE_NAME} ({", ".join(COLUMNS)})
     VALUES ({", ".join(["%s"] * len(COLUMNS))})
@@ -89,6 +90,6 @@ def main() -> None:
             connection.close()
 
 
-# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/init/load_phenotype_hpoa.py
+# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/mysql/load_maxo_annotations.py
 if __name__ == "__main__":
     main()

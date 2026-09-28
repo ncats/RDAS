@@ -81,6 +81,6 @@ def main() -> None:
             connection.close()
 
 
-# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/init/load_genes_to_phenotype.py
+# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/mysql/load_genes_to_phenotype.py
 if __name__ == "__main__":
     main()

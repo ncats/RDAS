@@ -1,4 +1,4 @@
-"""Replace extension_hpo_phenotype_to_genes with the dated HPO data."""
+"""Replace extension_hpo_genes_to_disease with the dated HPO data."""
 
 import csv
 import sys
@@ -12,15 +12,15 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from baseclass.conn import DBConnection
 
 
-DATA_FILE = SCRIPT_DIR.parent / "data" / "phenotype_to_genes.txt"
-TABLE_NAME = "extension_hpo_phenotype_to_genes"
+DATA_FILE = SCRIPT_DIR.parent / "data" / "genes_to_disease.txt"
+TABLE_NAME = "extension_hpo_genes_to_disease"
 BATCH_SIZE = 1_000
 COLUMNS = (
-    "hpo_id",
-    "hpo_name",
     "ncbi_gene_id",
     "gene_symbol",
+    "association_type",
     "disease_id",
+    "source",
 )
 INSERT_SQL = f"""
     INSERT INTO {TABLE_NAME} ({", ".join(COLUMNS)})
@@ -80,6 +80,6 @@ def main() -> None:
             connection.close()
 
 
-# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/init/load_phenotype_to_genes.py
+# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/mysql/load_genes_to_disease.py
 if __name__ == "__main__":
     main()
