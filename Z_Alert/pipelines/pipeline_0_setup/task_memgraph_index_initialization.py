@@ -37,7 +37,7 @@ LABEL_INDEX_CONFIG = [
 
 INDEX_CONFIG = [
     # GARD/Disease base graph
-    {"Disease": ["gardId", "gardName", "synonyms", "countArticles", "countGenes", "countPhenotypes", "countProjects", "countTrials"]},
+    {"Disease": ["gardId", "gardName", "synonyms", "countArticles", "countGenes", "countPhenotypes", "countProjects", "countTrials", "mondo", "orphanet"]},
     {"GARD": ["gardId"]},
     {"Phenotype": ["hpoId"]},
     {"Gene": ["geneIdentifier"]},
