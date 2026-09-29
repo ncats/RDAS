@@ -250,6 +250,6 @@ def main() -> None:
 # Disease-aware implementation that requires one GARD node to connect both the Gene and Phenotype
 #
 # This backup preserves the previous disease-aware behavior and can be run manually if needed.
-# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/graph/step_4_add_genes_to_phenotype_mapping_disease_aware_backup.py
+# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/graph/step_4_v1_add_genes_to_phenotype_mapping_disease_aware_backup.py
 if __name__ == "__main__":
     main()
