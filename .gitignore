@@ -69,3 +69,4 @@ __init__.py
 !Y_extension/hpo/20260925/create_extension_maxo_annotations.sql
 !Y_extension/hpo/20260925/create_extension_hpo_phenotype_to_genes.sql
 !Y_extension/hpo/20260925/graph/set_gard_phenotype_onset.cypher
+!Y_extension/hpo/20260925/graph/remove_has_phenotype_association.cypher
