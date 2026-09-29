@@ -247,6 +247,6 @@ def main() -> None:
             mysql.close()
 
 
-# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/graph/step_3_2_genes_to_phenotype_mapping.py
+# conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/graph/step_3_add_genes_to_phenotype_mapping.py
 if __name__ == "__main__":
     main()
