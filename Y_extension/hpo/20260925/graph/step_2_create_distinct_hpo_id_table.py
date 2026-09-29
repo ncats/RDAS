@@ -1,5 +1,5 @@
 
-# Create and populate table extension_hpo_distinct_phenotye before running this script.
+# Create and populate table extension_hpo_distinct_phenotye before running the step_3_add_phenotype_to_disease_mapping.py.
 """
 CREATE TABLE extension_hpo_distinct_phenotye (
     id INT AUTO_INCREMENT PRIMARY KEY,
