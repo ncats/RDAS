@@ -233,3 +233,24 @@ def main() -> None:
 # conda run --no-capture-output -n rdas python Y_extension/hpo/20260925/graph/step_4_v2_add_genes_to_phenotype_mapping.py
 if __name__ == "__main__":
     main()
+
+
+
+# This returns the Gene–Phenotype relationship containing the largest number of disease references.
+'''
+
+MATCH (g:Gene)-[relationship:has_phenotype_association]->(p:Phenotype)
+WITH
+    g,
+    p,
+    relationship,
+    size(coalesce(relationship.reference, [])) AS referenceDiseaseIdCount
+RETURN
+    g.geneIdentifier AS geneIdentifier,
+    p.hpoId AS hpoId,
+    relationship.reference AS references,
+    referenceDiseaseIdCount
+ORDER BY referenceDiseaseIdCount DESC
+LIMIT 1;
+
+'''
