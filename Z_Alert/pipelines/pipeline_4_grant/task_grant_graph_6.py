@@ -13,7 +13,7 @@ Relationship direction:
         (GARD)-[:has_core_project]->(CoreProject)
 
     This task keeps grant CoreProject relationships under one relationship type
-    and direction, independent of older `has_researched_disease` or
+    and direction, independent of older `has_project` or
     `has_mention_under` graph data.
 
 Processing flow:

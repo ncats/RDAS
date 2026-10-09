@@ -50,7 +50,8 @@ VALID_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 # (old_from_label, old_relation, old_to_label, new_from_label, new_relation, new_to_label)
 RELATION_DIRECTION_CHANGE_SPECS = (
-    ("GARD", "has_researched_disease", "Project", "Project", "has_researched_disease", "GARD"),
+    ("Project", "has_researched_disease", "Disease", "Disease", "has_project", "Project"),
+    ("Condition", "has_mapped_condition", "Disease", "Disease", "has_mapped_condition", "Condition"),
 )
 
 

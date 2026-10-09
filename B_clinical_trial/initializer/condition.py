@@ -51,7 +51,7 @@ class ConditionInitializer(InitBase):
             
             UNWIND gardid_list AS gardId
             MATCH (g: GARD {gardId: gardId})
-            MERGE (con)-[:has_mapped_condition]->(g)
+            MERGE (g)-[:has_mapped_condition]->(con)
         '''
         
         # O(1) performance

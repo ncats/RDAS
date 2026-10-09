@@ -481,7 +481,7 @@ def cypher_Condition_mapping(cond_internal_id, condition_normalized, gard_id_nam
                 query = f"""
                     MATCH (x:GARD) WHERE x.GardId = "{gardid}"
                     MATCH (y:Condition) WHERE id(y) = {cond_internal_id}
-                    MERGE (y)-[:has_mapped_condition]->(x)
+                    MERGE (x)-[:has_mapped_condition]->(y)
                     return y
                 """
                 yield query 

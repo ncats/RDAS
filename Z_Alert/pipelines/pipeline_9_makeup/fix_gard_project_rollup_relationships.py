@@ -265,7 +265,7 @@ class GardProjectRollupRelationshipMakeupTask(PipelineBase):
         UNWIND $chunks AS chunk
         MATCH (p:Project {applicationId: chunk.applicationId})
         MATCH (g:GARD {gardId: chunk.gardId})
-        MERGE (p)-[r:has_researched_disease]->(g)
+        MERGE (g)-[r:has_project]->(p)
         SET
             r.confidenceScore = chunk.confidenceScore,
             r.semanticSimilarity = chunk.semanticSimilarity,

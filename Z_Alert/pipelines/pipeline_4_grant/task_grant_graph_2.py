@@ -6,18 +6,18 @@ This alert task narrows that input to only rows marked `grant_gard_project_relat
 which are the GARD-project matches generated or refreshed during the current grant alert run.
 
 Relationship direction:
-    The initializer creates the relationship from Project to GARD:
+    The initializer creates the relationship from Disease/GARD to Project:
 
-        (Project)-[:has_researched_disease]->(GARD)
+        (Disease)-[:has_project]->(Project)
 
-    This task keeps the same direction and relationship type so downstream
-    graph queries continue to see grant projects the same way.
+    This task uses the Disease -> Project direction so downstream graph queries
+    can traverse from a disease to its research projects.
 
 Processing flow:
     1. Read current new rows from `grant_gard_project_relation`.
     2. Convert MySQL row names into the relationship payload names used by Memgraph.
     3. Match the existing Project node by `applicationId`.
-    4. Match the existing GARD node by `gardId`.
+    4. Match the existing GARD/Disease node by `gardId`.
     5. MERGE the relationship and update confidence/source properties.
 
 Notes:
@@ -47,12 +47,12 @@ class NewGardProjectRelationshipGraphTask(PipelineBase):
 
     BATCH_SIZE = 200
 
-    ''' Create or update one has_researched_disease relationship per Project/GARD pair. '''
+    ''' Create or update one has_project relationship per Disease/Project pair. '''
     UPSERT_RELATIONSHIPS_CYPHER = '''
         UNWIND $chunks AS chunk
         MATCH (p:Project {applicationId: chunk.applicationId})
         MATCH (g:GARD {gardId: chunk.gardId})
-        MERGE (p)-[r:has_researched_disease]->(g)
+        MERGE (g)-[r:has_project]->(p)
         SET
             r.confidenceScore = chunk.confidenceScore,
             r.semanticSimilarity = chunk.semanticSimilarity,

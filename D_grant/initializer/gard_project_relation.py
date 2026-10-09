@@ -42,7 +42,7 @@ class GardProjectReleationInitializer(InitBase):
             UNWIND $chunks AS chunk 
             MATCH(p:Project) WHERE p.applicationId = chunk.applicationId
             MATCH (g:GARD) WHERE g.gardId = chunk.gardId 
-            MERGE (p)-[:has_researched_disease {confidenceScore: chunk.confidenceScore, semanticSimilarity: chunk.semanticSimilarity, sourceType: chunk.sourceType}]->(g) 
+            MERGE (g)-[:has_project {confidenceScore: chunk.confidenceScore, semanticSimilarity: chunk.semanticSimilarity, sourceType: chunk.sourceType}]->(p)
         '''      
 
         id_ranges = _id_range_generator(min_id, max_id, step, batch_size)
@@ -93,15 +93,3 @@ class GardProjectReleationInitializer(InitBase):
          
         self.appender.log_stdout(f'\n{"="*50} {_curr_timestamp()} Done Total = {total} {"="*50}\n\n')
         self.appender.close()
-        
-
-
-            
-
-
-            
-
-
-
-
-            
