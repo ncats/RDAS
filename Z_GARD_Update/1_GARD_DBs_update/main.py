@@ -15,10 +15,17 @@ sys.path.extend([
     os.path.abspath(os.path.join(_dir, ".")),
     os.path.abspath(os.path.join(_dir, "../..")),
     os.path.abspath(os.path.join(_dir, "../../..")),
+    os.path.abspath(os.path.join(_dir, "../../Z_Alert")),
 ])
-load_dotenv(os.path.abspath(os.path.join(_dir, "../../..", ".env")))
 
-from pipeline_runner_base import PipelineRunnerBase
+#
+##
+load_dotenv(os.path.abspath(os.path.join(_dir, "../..", ".env2")))
+##
+#
+
+from Z_Alert.pipeline_runner_base import PipelineRunnerBase
+
 from utils.tools import _time_hms
 
 
@@ -68,7 +75,7 @@ class GardUpdatePipelineRunner(PipelineRunnerBase):
 
         """Run the MySQL-side GARD nomenclature load."""
 
-        from pipelines.gard_update.task_gard_1 import GardMysqlNomenclatureLoadTask
+        from task_gard_1 import GardMysqlNomenclatureLoadTask
 
         self._run_pipeline_task(
             GardMysqlNomenclatureLoadTask,
@@ -82,11 +89,11 @@ class GardUpdatePipelineRunner(PipelineRunnerBase):
 
         """Run the Memgraph-side GARD node and relationship initialization tasks."""
 
-        from pipelines.gard_update.task_gard_graph_1 import GardGraphNodeInitializationTask
-        from pipelines.gard_update.task_gard_graph_2 import GardGraphXrefUpdateTask
-        from pipelines.gard_update.task_gard_graph_3 import GardGraphGeneRelationshipInitializationTask
-        from pipelines.gard_update.task_gard_graph_4 import GardGraphPhenotypeRelationshipInitializationTask
-        from pipelines.gard_update.task_gard_graph_5 import GardGraphHierarchyRelationshipInitializationTask
+        from task_gard_graph_1 import GardGraphNodeInitializationTask
+        from task_gard_graph_2 import GardGraphXrefUpdateTask
+        from task_gard_graph_3 import GardGraphGeneRelationshipInitializationTask
+        from task_gard_graph_4 import GardGraphPhenotypeRelationshipInitializationTask
+        from task_gard_graph_5 import GardGraphHierarchyRelationshipInitializationTask
 
         self._run_pipeline_task(GardGraphNodeInitializationTask, batch_size=self.graph_node_batch_size)
         self._run_pipeline_task(GardGraphXrefUpdateTask, batch_size=self.graph_xref_batch_size)
@@ -98,7 +105,7 @@ class GardUpdatePipelineRunner(PipelineRunnerBase):
     def run_gard_update_wrapup(self) -> None:
 
         """Run the final GARD update summary task."""
-        from pipelines.gard_update.task_gard_pipeline_wrapup import GardUpdatePipelineWrapUpTask
+        from task_gard_pipeline_wrapup import GardUpdatePipelineWrapUpTask
 
         self._run_pipeline_task(GardUpdatePipelineWrapUpTask)
 
@@ -115,7 +122,7 @@ if __name__ == "__main__":
     - Runs all concrete Memgraph initialization tasks in dependency order.
     """
 
-    RUN_GARD_MYSQL_INITIALIZATION = True
+    RUN_GARD_MYSQL_INITIALIZATION = False
     RUN_GARD_MEMGRAPH_INITIALIZATION = True
     RUN_GARD_UPDATE_WRAPUP = True
 

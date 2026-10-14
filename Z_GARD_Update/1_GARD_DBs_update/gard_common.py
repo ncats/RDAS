@@ -11,12 +11,9 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Mapping, Sequence, Tuple
 
-from pipelines.pipeline_0_setup.memgraph_index_utils import create_indexes
-
-
 SCRIPT_DIR = Path(__file__).resolve().parent
-Z_ALERT_DIR = SCRIPT_DIR.parents[1]
-PROJECT_ROOT = SCRIPT_DIR.parents[2]
+PROJECT_ROOT = SCRIPT_DIR.parents[1]
+Z_ALERT_DIR = PROJECT_ROOT / "Z_Alert"
 DATA_DIR = SCRIPT_DIR / "data"
 DATA_2025_DIR = DATA_DIR / "2025"
 
@@ -44,6 +41,11 @@ def ensure_project_paths_on_path() -> None:
 
         if path_text not in sys.path:
             sys.path.append(path_text)
+
+
+ensure_project_paths_on_path()
+
+from pipelines.pipeline_0_setup.memgraph_index_utils import create_indexes
 
 
 def resolve_data_file(file_path: Any) -> Path:

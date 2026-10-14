@@ -13,9 +13,10 @@ _dir = os.path.dirname(__file__)
 sys.path.extend([
     os.path.abspath(os.path.join(_dir, "../..")),
     os.path.abspath(os.path.join(_dir, "../../..")),
+    os.path.abspath(os.path.join(_dir, "../../Z_Alert")),
 ])
 
-from pipelines.gard_update.gard_common import GARD_GENE_FILE, clean_optional_text, create_memgraph_indexes_if_missing, iter_csv_dict_rows, log_csv_file_summary, resolve_data_file, split_bracketed_values, validate_batch_size
+from gard_common import GARD_GENE_FILE, clean_optional_text, create_memgraph_indexes_if_missing, iter_csv_dict_rows, log_csv_file_summary, resolve_data_file, split_bracketed_values, validate_batch_size
 from pipelines.pipeline_base import PipelineBase
 
 

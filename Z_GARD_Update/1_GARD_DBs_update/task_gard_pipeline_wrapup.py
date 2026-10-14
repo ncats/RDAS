@@ -13,6 +13,7 @@ _dir = os.path.dirname(__file__)
 sys.path.extend([
     os.path.abspath(os.path.join(_dir, "../..")),
     os.path.abspath(os.path.join(_dir, "../../..")),
+    os.path.abspath(os.path.join(_dir, "../../Z_Alert")),
 ])
 
 from pipelines.pipeline_base import PipelineBase

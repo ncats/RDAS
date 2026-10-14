@@ -15,9 +15,10 @@ _dir = os.path.dirname(__file__)
 sys.path.extend([
     os.path.abspath(os.path.join(_dir, "../..")),
     os.path.abspath(os.path.join(_dir, "../../..")),
+    os.path.abspath(os.path.join(_dir, "../../Z_Alert")),
 ])
 
-from pipelines.gard_update.gard_common import GARD_NOMENCLATURE_FILE, count_csv_rows, resolve_data_file, validate_batch_size
+from gard_common import GARD_NOMENCLATURE_FILE, count_csv_rows, resolve_data_file, validate_batch_size
 from pipelines.pipeline_base import PipelineBase
 from utils.tools import _na, _try_parse_int
 
