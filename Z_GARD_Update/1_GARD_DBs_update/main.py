@@ -8,7 +8,6 @@ high-level step order, while each concrete task owns its own database work.
 import os
 import sys
 import time
-from dotenv import load_dotenv
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -17,12 +16,6 @@ sys.path.extend([
     os.path.abspath(os.path.join(_dir, "../../..")),
     os.path.abspath(os.path.join(_dir, "../../Z_Alert")),
 ])
-
-#
-##
-load_dotenv(os.path.abspath(os.path.join(_dir, "../..", ".env2")))
-##
-#
 
 from Z_Alert.pipeline_runner_base import PipelineRunnerBase
 
