@@ -135,15 +135,35 @@ class GardNodeNamesTask(PipelineBase):
 
 
     def _get_filtered_gard_names(self, name, synonyms) -> list:
-        """Build the disease search names used by the first trial/publication tasks."""
+        """Build preferred and synonym search terms for the trial/publication tasks.
 
-        # Keep English synonyms, but skip very short synonym strings because they tend to create noisy publication/trial searches.
+        The preferred GARD name is always kept as the first search term. A
+        synonym is included only when ``_is_english`` recognizes it as a single
+        English word and ``_is_under_char_threshold`` does not classify it as
+        a single word shorter than four characters. This keeps short tokens
+        such as abbreviations from generating noisy searches. Multiword
+        synonyms are excluded by the single-word requirement in ``_is_english``.
+
+        For example, if ``cancer`` is in the configured English word list,
+        ``_get_filtered_gard_names("Example disorder", ["cancer", "rare disease", "ALS"])``
+        returns ``["Example disorder", "cancer"]``: the preferred name stays,
+        ``cancer`` qualifies, the phrase is multiword, and ``ALS`` is too short
+        (and is not required to be recognized as an English word).
+        """
+
+        # Keep synonyms accepted by the shared English-word list. That helper
+        # requires exactly one token, so phrases and unknown words are omitted.
         english_synonyms = [syn for syn in synonyms if _is_english(syn)]
+
+        # Exclude one-word synonyms shorter than four characters; these tend to
+        # be abbreviations or other broad terms that add noise to searches.
         short_synonyms = [syn for syn in synonyms if _is_under_char_threshold(syn)]
 
+        # Preserve the source synonym order while requiring both checks to pass.
         filtered_synonyms = [syn for syn in synonyms if syn in english_synonyms]
         filtered_synonyms = [syn for syn in filtered_synonyms if syn not in short_synonyms]
 
+        # Always search the preferred GARD name, followed by eligible synonyms.
         return [name] + filtered_synonyms
 
 
