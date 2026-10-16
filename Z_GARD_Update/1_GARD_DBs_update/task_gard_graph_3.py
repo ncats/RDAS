@@ -41,7 +41,7 @@ UPSERT_GARD_GENE_CYPHER = """
         d.umls = chunk.umls,
         d.source = 'GARD'
     MERGE (g)-[r:has_associated_gene]->(d)
-    SET r.Reference = chunk.reference
+    SET r.references = chunk.references
 """
 
 
@@ -141,6 +141,6 @@ class GardGraphGeneRelationshipInitializationTask(PipelineBase):
             "mondo": clean_optional_text(row.get("Equivalent_MONDO")),
             "omim": clean_optional_text(row.get("OMIM")),
             "orphanet": clean_optional_text(row.get("Equivalent_Orphanet")),
-            "reference": split_bracketed_values(row.get("Reference"), delimiter=";"),
+            "references": split_bracketed_values(row.get("Reference"), delimiter=";"),
             "umls": clean_optional_text(row.get("Equivalent_UMLS")),
         }

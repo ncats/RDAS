@@ -57,7 +57,7 @@ class GeneInitializer(InitBase):
              
             MERGE (g)-[r:has_associated_gene]->(d)
             ON CREATE SET
-                r.Reference = chunk.reference
+                r.references = chunk.references
         '''
 
         chunks = self.get_data_from_csv_files()
@@ -119,7 +119,7 @@ class GeneInitializer(InitBase):
                 'mondo': _val(row['Equivalent_MONDO']),
                 'omim': _val(row['OMIM']),
                 'orphanet': _val(row['Equivalent_Orphanet']),
-                'reference': reference,
+                'references': reference,
                 'umls': _val(row['Equivalent_UMLS'])
             })
 
