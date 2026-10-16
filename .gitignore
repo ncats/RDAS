@@ -17,8 +17,8 @@
 *.MD
 *.png
 *.sh
-!Z_GARD_Update/1_GARD_DBs_update/main-run.sh
-!Z_GARD_Update/2_pipelines/pipline_1_run.sh
+Z_GARD_Update/*.sh
+Z_GARD_Update/**/*.sh
 *.sql
 *.tsv
 *.txt
