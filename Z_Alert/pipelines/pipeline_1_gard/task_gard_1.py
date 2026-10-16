@@ -10,7 +10,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _is_english, _is_under_char_threshold
+from utils.tools import _gard_text_normalize, _is_english, _is_under_char_threshold
 
 class GardNodeNamesTask(PipelineBase):
     """
@@ -140,30 +140,61 @@ class GardNodeNamesTask(PipelineBase):
         The preferred GARD name is always kept as the first search term. A
         synonym is included only when ``_is_english`` recognizes it as a single
         English word and ``_is_under_char_threshold`` does not classify it as
-        a single word shorter than four characters. This keeps short tokens
-        such as abbreviations from generating noisy searches. Multiword
-        synonyms are excluded by the single-word requirement in ``_is_english``.
+        a single word shorter than four characters. A synonym is also excluded
+        when it is already one of the words in the preferred name, since that
+        would add a less specific duplicate search term. Multiword synonyms are
+        excluded by the single-word requirement in ``_is_english``.
 
-        For example, if ``cancer`` is in the configured English word list,
-        ``_get_filtered_gard_names("Example disorder", ["cancer", "rare disease", "ALS"])``
-        returns ``["Example disorder", "cancer"]``: the preferred name stays,
-        ``cancer`` qualifies, the phrase is multiword, and ``ALS`` is too short
-        (and is not required to be recognized as an English word).
+        The comments below use GARD:0024496, ``optic papillitis``, from
+        ``GARD_Nomenclature_eng_2_10_2025_WithOrphanetData.csv``. Its 39 source
+        synonyms demonstrate how the actual filters narrow a long list.
         """
 
-        # Keep synonyms accepted by the shared English-word list. That helper
-        # requires exactly one token, so phrases and unknown words are omitted.
-        english_synonyms = [syn for syn in synonyms if _is_english(syn)]
+        # Real CSV example: GARD:0024496, preferred name "optic papillitis".
+        # Source synonyms, in their original order:
+        # [
+        #   "Choked disks", "Edemas, optic disc", "Edemas, retinal",
+        #   "increased intracranial pressure associated papilledema",
+        #   "inflammation of optic disc", "oedema of the optic disc",
+        #   "optic nerve papillitis", "papilledema", "retinal oedema",
+        #   "Choked disc", "edema of the optic disk", "edema, retinal",
+        #   "optic papilla oedema", "papillitis, optic", "papilloedema",
+        #   "retinal edema", "decreased intraocular pressure associated papilledema",
+        #   "disk, Choked", "edema, optic disc", "optic discitis",
+        #   "papilledema associated with decreased intraocular pressure",
+        #   "papilledema associated with increased intraocular pressure",
+        #   "papillitis", "Choked discs", "Choked disk",
+        #   "decreased intraocular pressure-associated papilledema",
+        #   "disks, Choked", "edema, optic disk", "edema, optic papilla",
+        #   "Edemas, optic disk", "increased intracranial pressure-associated papilledema",
+        #   "inflammation of optic disk", "optic disc inflammation",
+        #   "optic disc oedema", "optic disk edema", "optic disk inflammation",
+        #   "optic papilla edema", "papillitis, optic nerve", "retinal Edemas"
+        # ]
 
-        # Exclude one-word synonyms shorter than four characters; these tend to
-        # be abbreviations or other broad terms that add noise to searches.
-        short_synonyms = [syn for syn in synonyms if _is_under_char_threshold(syn)]
+        # Compare normalized words so case, punctuation, and extra whitespace
+        # do not prevent detecting a synonym already present in the name.
+        preferred_name_words = set(_gard_text_normalize(name).split())
 
-        # Preserve the source synonym order while requiring both checks to pass.
-        filtered_synonyms = [syn for syn in synonyms if syn in english_synonyms]
-        filtered_synonyms = [syn for syn in filtered_synonyms if syn not in short_synonyms]
+        # Keep recognized English single words that are at least four
+        # characters long and are not already words in the preferred name.
+        # For the CSV example, the English/length checks pass these synonyms:
+        # ["papilledema", "papilloedema", "papillitis"]
 
-        # Always search the preferred GARD name, followed by eligible synonyms.
+        # "papillitis" is then excluded because it is already in "optic papillitis".
+        ''' For name="child leukemia " and synonyms=["child (disease) leukemia", "Leukemia"],
+          "Leukemia" is excluded because it is already a word in the preferred name.
+        '''
+        filtered_synonyms = [
+            syn for syn in synonyms
+            if _is_english(syn)
+            and not _is_under_char_threshold(syn)
+            and _gard_text_normalize(syn) not in preferred_name_words
+        ]
+
+        # Keep the preferred name first, followed by passing synonyms in their
+        # original source order. The CSV example result is:
+        ''' ["optic papillitis", "papilledema", "papilloedema"] '''
         return [name] + filtered_synonyms
 
 
