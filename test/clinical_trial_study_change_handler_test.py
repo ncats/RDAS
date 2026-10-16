@@ -40,7 +40,6 @@ def main() -> None:
     '''
     studies_api = (
         os.getenv("CLINICAL_TRIAL_STUDIES_API")
-        or os.getenv("CLINICAL_TRAIL_STUDY_URL")
         or "https://clinicaltrials.gov/api/v2/studies"
     ).rstrip("/")
 

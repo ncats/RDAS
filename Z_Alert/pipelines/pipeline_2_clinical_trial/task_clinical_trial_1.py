@@ -29,10 +29,7 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
         super().__init__(init_mysql=True, init_memgraph=False)
 
         self.LOOKBACK_DAYS =7
-        self.clinical_trials_studies_api = (
-            os.getenv("CLINICAL_TRIAL_STUDIES_API")
-            or os.getenv("CLINICAL_TRAIL_STUDY_URL")
-        )
+        self.clinical_trials_studies_api = os.getenv("CLINICAL_TRIAL_STUDIES_API")
         self.study_change_handler = ClinicalTrialStudyChangeHandler(self.mysql, self.logger)
 
 
