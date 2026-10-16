@@ -33,12 +33,8 @@ tools/
 movies/
 F_person/riea/
 
-# Local scratch test folder, while keeping selected tracked test files visible
-test
-!test/
-test/*
-!test/test_OrganizationNameExtractor.py
-!test/clinical_trial_study_change_handler_test.py
+# Ignore the local test directory and its contents.
+test/
 
 # Jupyter/editor checkpoint files
 .ipynb_checkpoints/

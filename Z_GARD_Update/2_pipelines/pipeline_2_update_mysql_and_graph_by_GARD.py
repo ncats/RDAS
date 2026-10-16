@@ -16,6 +16,9 @@ class GARDToMySQLAndMemgraphUpdateRunner(PipelineRunnerBase):
     def __init__(self):
 
         super().__init__()
+
+        self.START_DATE = '1971-01-01'
+
         self.logger.info("GARDToMySQLAndMemgraphUpdateRunner initialized.")
 
 
@@ -23,8 +26,10 @@ class GARDToMySQLAndMemgraphUpdateRunner(PipelineRunnerBase):
     def iterate_new_gard_nodes(self) -> None:
 
         from Z_Alert.pipelines.pipeline_1_gard.task_gard_1 import GardNodeNamesTask
+        from Z_Alert.pipelines.pipeline_2_clinical_trial.task_clinical_trial_1 import NewClinicalTrialDiscoveryTask
 
         gard_task = GardNodeNamesTask()
+        clinical_trial_task = NewClinicalTrialDiscoveryTask()
 
         try:
             for batch in gard_task.get_gard_nodes():
@@ -36,11 +41,22 @@ class GARDToMySQLAndMemgraphUpdateRunner(PipelineRunnerBase):
                     for new clinical trials and publications for this disease.
                     '''
                     filtered_names = gard_node.get("filtered_names")
-
                     synonyms = ", ".join(gard_node["synonyms"])
-                    print(f"{gard_node['gardId']}: {gard_node['gardName']}:")
-                    print(f"Synonyms      : {synonyms}")
-                    print(f"Filtered names: {filtered_names}\n\n")
+
+                    self.logger.info(
+                        f"{gard_node['gardId']}: {gard_node['gardName']}:\n"
+                        f"Synonyms      : {synonyms}\n"
+                        f"Filtered names: {filtered_names}"
+                    )
+
+                    target_gard_node={
+                        "gardId": gard_node['gardId'],
+                        "updated": self.START_DATE,
+                        "filtered_names": filtered_names
+                    }
+
+                    clinical_trial_task.find_new_data(target_gard_node)
+
         finally:
             gard_task.close()
 
