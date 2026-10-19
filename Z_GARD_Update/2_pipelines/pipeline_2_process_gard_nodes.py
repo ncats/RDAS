@@ -53,7 +53,7 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                     "Z_GARD_Update/1_GARD_DBs_update/main-run.sh before running pipeline 2."
                 )
 
-            for batch in gard_task.get_gard_nodes():
+            for batch in gard_task.get_gard_nodes(mark_updated_before_yield=False):
                 self.logger.info(f"\n\n*** Processing GARD discovery batch with {len(batch)} nodes. ***\n")
 
                 for gard_node in batch:
@@ -113,6 +113,11 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                         self._close_task_if_needed(clinical_trial_task)
                         self._close_task_if_needed(publication_task)
 
+                    # Finish the staged MySQL and graph work before discovering
+                    # the next GARD node, keeping each update batch bounded.
+                    self.run_post_discovery_steps(gard_node["gardId"])
+                    gard_task._set_updated_flag({gard_node["gardId"]})
+
                     total_gard_nodes += 1
 
                     self.logger.info(f"\n****** Processed: {gard_node['gardId']}: {gard_node['gardName']} ******\n")
@@ -123,15 +128,9 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
             self._close_task_if_needed(gard_task)
             self.logger.info(f"Processed {total_gard_nodes} GARD nodes.")
 
-        # The update tasks read shared is_new rows across all GARD IDs. Run them
-        # once after discovery, even when a retry has no eligible GARD nodes but
-        # previously staged rows still need to be processed.
-        self.run_post_discovery_steps()
+    def run_post_discovery_steps(self, gard_id: str) -> None:
 
-
-    def run_post_discovery_steps(self) -> None:
-
-        """Run the shared alert update steps after GARD discovery finishes."""
+        """Consume staged rows before advancing to the next GARD node."""
 
         steps = (
             ("Step 2: clinical-trial MySQL updates", self.run_clinical_trial_mysql_updates),
@@ -145,10 +144,11 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
             ("Step 11: pipeline wrap-up", self.run_pipeline_wrapup),
         )
 
-        # These database and API steps consume all newly discovered rows.
+        # The shared tasks consume staged rows, then wrap-up resets their flags
+        # before discovery moves to the next GARD node.
         # The index initialization step remains disabled, as in Z_Alert/main.py.
         for step_name, step_func in steps:
-            self._run_step_with_timing(step_name, step_func)
+            self._run_step_with_timing(f"{gard_id}: {step_name}", step_func)
 
 
 if __name__ == "__main__":
@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
     try:
         runner._run_step_with_timing(
-            "GARD nodes: discovery and shared updates",
+            "GARD nodes: discovery and per-node updates",
             runner.run_pipeline_for_each_gard_node,
         )
 

@@ -41,7 +41,8 @@ class GardNodeNamesTask(PipelineBase):
     Fetch GARD id, names and synonyms from MySQL in batches.
     Default batch size is 100.
     '''
-    def get_gard_nodes(self, batch_size: int = 100) -> Iterator[List[Dict[str, Any]]]:
+    def get_gard_nodes(self, batch_size: int = 100, mark_updated_before_yield: bool = True) -> Iterator[List[Dict[str, Any]]]:
+
         """
         Fetch GARD names and synonyms from MySQL in batches.
         """ 
@@ -123,8 +124,10 @@ class GardNodeNamesTask(PipelineBase):
             for item in batch:
                 self.logger.info(f"{item}")
 
-            ''' Update the 'updated' column in rdas_db.gard table with value CURDATE() '''
-            self._set_updated_flag(gard_id_set)
+            # The GARD update runner marks each ID after its downstream steps.
+            # The regular alert runner retains its existing batch marking.
+            if mark_updated_before_yield:
+                self._set_updated_flag(gard_id_set)
 
             yield batch
 

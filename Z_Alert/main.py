@@ -243,12 +243,12 @@ class AlertPipelineRunner(PipelineRunnerBase):
         from pipelines.pipeline_3_publication.task_publication_8 import NewOmimPublicationArticleImportTask
 
         self._run_pipeline_task(PublicationEpiNhsClassificationTask)
-        # A standalone publication step still maps all GARD IDs. After either
-        # runner's discovery pass, mappings were scoped to each visited node.
-        # If discovery found no nodes, retry any OMIM downloads left missing
-        # from older mappings without creating mappings for unrelated nodes.
-        if not self.gard_discovery_completed:
+        # A standalone publication step still maps all GARD IDs. The GARD
+        # runner calls this method before discovery ends, after it has already
+        # mapped and retrieved OMIM entries for the current GARD ID.
+        if not self.gard_discovery_completed and not self.omim_gard_ids_attempted:
             self._run_pipeline_task(GardOmimPublicationMappingTask)
+        # When discovery found no nodes, retry downloads from older mappings.
         if not self.omim_gard_ids_attempted:
             self._run_pipeline_task(PublicationOminDataRetrievalTask)
         self._run_pipeline_task(NewPublicationPubtatorRetrievalTask)
