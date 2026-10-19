@@ -138,7 +138,7 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
             ("Step 5: clinical-trial graph updates", self.run_clinical_trial_graph_updates),
             ("Step 6: publication graph updates", self.run_publication_graph_updates),
             ("Step 7: pipeline follow-up updates", self.run_pipeline_followup_updates),
-            ("Step 8: send alert emails", self.send_alert_emails),
+            #("Step 8: send alert emails", self.send_alert_emails), #NO NEED to send alerts
             ("Step 9: regroup people", self.run_regroup_the_person),
             ("Step 10: pipeline maintenance", self.run_pipeline_maintenance),
             ("Step 11: pipeline wrap-up", self.run_pipeline_wrapup),

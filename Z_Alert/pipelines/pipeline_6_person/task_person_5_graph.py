@@ -57,6 +57,16 @@ class NewPersonAgentGraphTask(PipelineBase):
             a.contactEmail = chunk.contactEmail,
             a.dateCreatedByRDAS = chunk.formattedToday
 
+        // This Memgraph version cannot evaluate a filtered list comprehension
+        // in SET. Collect distinct emails in a subquery, including an empty
+        // list for Agents without an email address.
+        WITH a, chunk
+        CALL {{
+            WITH a, chunk
+            UNWIND coalesce(a.contactEmail, []) + coalesce(chunk.contactEmail, []) AS email
+            RETURN collect(DISTINCT email) AS mergedContactEmails
+        }}
+
         // Fill only missing Agent fields on existing nodes, and always refresh lastUpdatedByRDAS.
         // This keeps old values stable while allowing a new person row to complete blank properties.
         SET
@@ -80,11 +90,7 @@ class NewPersonAgentGraphTask(PipelineBase):
                 WHEN coalesce(a.pi_id, '') = '' AND chunk.pi_id <> '' THEN chunk.pi_id
                 ELSE coalesce(a.pi_id, '')
             END,
-            a.contactEmail = CASE
-                WHEN chunk.contactEmail IS NULL THEN coalesce(a.contactEmail, [])
-                WHEN a.contactEmail IS NULL THEN chunk.contactEmail
-                ELSE a.contactEmail + [email IN chunk.contactEmail WHERE NOT email IN a.contactEmail]
-            END,
+            a.contactEmail = mergedContactEmails,
             a.lastUpdatedByRDAS = chunk.formattedToday
 
         WITH a, chunk
