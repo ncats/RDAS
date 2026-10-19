@@ -32,9 +32,8 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
 
     '''
     PrimaryOutcome nodes are keyed by a hashed composite key. A plain SET after
-    MERGE refreshes the node when the same outcome is reprocessed. The final
-    cleanup removes stale has_outcome relationships for each reprocessed NCT ID
-    when the changed study JSON no longer contains a previous outcome.
+    MERGE refreshes the node when the same outcome is reprocessed. A separate
+    query removes stale relationships after the new outcomes have been written.
     '''
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
@@ -46,31 +45,17 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
             y.primaryOutcomeDescription = chunk.description
 
         MERGE (x)-[:has_outcome]->(y)
-
-        WITH collect(DISTINCT chunk.nctId) AS nctids
-        UNWIND nctids AS current_nctid
-        MATCH (x: ClinicalTrial {nctId: current_nctid})
-        OPTIONAL MATCH (x)-[old_rel:has_outcome]->(old:PrimaryOutcome)
-        WHERE old_rel IS NOT NULL
-        AND (
-            old._composite_key IS NULL
-            OR NOT old._composite_key IN [
-                chunk IN $chunks
-                WHERE chunk.nctId = current_nctid
-                | chunk._composite_key
-            ]
-        )
-        DELETE old_rel
     '''
 
     '''
-    If a changed study has no current primary outcomes, no outcome chunk exists
-    for BATCH_CREATE. This query still clears stale outcome relationships for
-    those reprocessed NCT IDs.
+    Pass one list of current outcome keys per trial. This avoids the filtered
+    list comprehension unsupported by Memgraph. An empty list removes all old
+    outcome relationships for a trial with no current primary outcomes.
     '''
-    BATCH_DELETE_STALE_FOR_EMPTY_OUTCOMES = '''
-        UNWIND $nctids AS nctid
-        MATCH (x: ClinicalTrial {nctId: nctid})-[old_rel:has_outcome]->(:PrimaryOutcome)
+    BATCH_DELETE_STALE = '''
+        UNWIND $current_trials AS current
+        MATCH (x:ClinicalTrial {nctId: current.nctId})-[old_rel:has_outcome]->(old:PrimaryOutcome)
+        WHERE old._composite_key IS NULL OR NOT old._composite_key IN current.keys
         DELETE old_rel
     '''
 
@@ -101,7 +86,6 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
 
         count = 0
         batch_num = 0
-        empty_outcome_nctids = []
         fetch_cursor = None
 
         try:
@@ -119,6 +103,7 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
                 self.logger.info(f'--- batch# = {batch_num} ---')
 
                 chunks = []
+                current_trials = []
 
                 for row in rows:
                     nctid = row.get('nctid')
@@ -132,11 +117,11 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
                         continue
 
                     primary_outcome_chunks = self._create_primary_outcome_chunks(nctid, study)
-
-                    if primary_outcome_chunks:
-                        chunks.extend(primary_outcome_chunks)
-                    else:
-                        empty_outcome_nctids.append(nctid)
+                    chunks.extend(primary_outcome_chunks)
+                    current_trials.append({
+                        "nctId": nctid,
+                        "keys": [chunk["_composite_key"] for chunk in primary_outcome_chunks],
+                    })
 
                 if chunks:
                     self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
@@ -146,9 +131,8 @@ class NewClinicalTrialPrimaryOutcomeGraphTask(PipelineBase):
                 else:
                     self.logger.info('No valid primary outcomes to upsert into memgraph.')
 
-            if empty_outcome_nctids:
-                self.memgraph.execute(self.BATCH_DELETE_STALE_FOR_EMPTY_OUTCOMES, {"nctids": empty_outcome_nctids})
-                self.logger.info(f'Removed stale primary outcome mappings for {len(empty_outcome_nctids)} trials with no current primary outcomes.')
+                if current_trials:
+                    self.memgraph.execute(self.BATCH_DELETE_STALE, {"current_trials": current_trials})
 
         except Exception as e:
             self.logger.error(f"Error executing primary outcome graph task: {e}")

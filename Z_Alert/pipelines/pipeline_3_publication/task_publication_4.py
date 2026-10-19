@@ -1,7 +1,9 @@
 import os
 import sys 
 import json
+import time
 from typing import Optional
+import requests
 _dir = os.path.dirname(__file__)
 sys.path.extend([
     os.path.abspath(os.path.join(_dir, "..")),
@@ -9,7 +11,6 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.https_request import HTTPSUtils as HttpsUtil
 
 """
 1. Get unique omim_id list from table publication_gard_omim_mapping  which are not in publication_omim'
@@ -29,6 +30,7 @@ class PublicationOminDataRetrievalTask(PipelineBase):
 
 
     def __init__(self, gard_id: Optional[str] = None):
+
         """Initialize MySQL access and OMIM API configuration."""
 
         super().__init__(init_mysql=True, init_memgraph=False)
@@ -36,6 +38,7 @@ class PublicationOminDataRetrievalTask(PipelineBase):
         self.gard_id = gard_id
         self.api_key = os.getenv('OMIM_API_KEY')
         self.omim_entry_api = os.getenv('OMIM_ENTRY_API')
+        self.omim_rate_limited = False
 
 
     # Not implemented
@@ -44,26 +47,61 @@ class PublicationOminDataRetrievalTask(PipelineBase):
         raise NotImplementedError("PublicationOminDataRetrievalTask does not implement find_new_data().")
    
 
-    def get_omim(self, url) -> Optional[dict]:
-        """Call the OMIM API and return the parsed JSON response."""
+    def get_omim(self, omim_id: int) -> Optional[dict]:
 
-        def parse_api_response(response): 
-            try: 
-                response_json = response.json() 
-                return response_json
-            except (TypeError, ValueError, AttributeError) as e:
-                self.logger.error(f'Unable to parse OMIM API response: {e}. url={url}')
-            return None
-    
-        return HttpsUtil.with_api_retry_GET(url, parse_api_response)
+        """Fetch one OMIM entry, backing off when the API returns HTTP 429."""
+
+        params = {
+            "mimNumber": omim_id,
+            "include": "all",
+            "format": "json",
+            "apiKey": self.api_key,
+        }
+        max_attempts = 4
+
+        for attempt in range(max_attempts):
+            try:
+                response = requests.get(self.omim_entry_api, params=params, timeout=30)
+
+                if response.status_code == 429:
+                    if attempt == max_attempts - 1:
+                        self.omim_rate_limited = True
+                        self.logger.error(f"OMIM API remains rate limited for omim_id={omim_id} after {max_attempts} attempts.")
+                        return None
+
+                    # Respect a numeric Retry-After value; otherwise use a
+                    # bounded exponential delay before another HTTP request.
+                    retry_after = response.headers.get("Retry-After", "")
+                    try:
+                        delay = min(60.0, max(0.0, float(retry_after)))
+                    except ValueError:
+                        delay = min(60.0, 2 ** (attempt + 1))
+                    self.logger.warning(f"OMIM API rate limited omim_id={omim_id}; retrying in {delay:g} seconds.")
+                    time.sleep(delay)
+                    continue
+
+                response.raise_for_status()
+                return response.json()
+
+            except requests.exceptions.HTTPError:
+                self.logger.error(f"OMIM API returned HTTP {response.status_code} for omim_id={omim_id}.")
+                return None
+
+            except (requests.exceptions.RequestException, ValueError) as e:
+                # Never log the request URL: its query parameters contain the API key.
+                self.logger.error(f"OMIM API request failed for omim_id={omim_id}: {type(e).__name__}.")
+                return None
+
+        return None
     
 
     # implement
     def process_new_data(self) -> None:
+
         """Fetch missing OMIM entries and insert them into publication_omim."""
 
-        if not self.omim_entry_api:
-            self.logger.error("OMIM_ENTRY_API is not configured.")
+        if not self.omim_entry_api or not self.api_key:
+            self.logger.error("OMIM_ENTRY_API or OMIM_API_KEY is not configured.")
             self.close()
             return
         
@@ -108,6 +146,10 @@ class PublicationOminDataRetrievalTask(PipelineBase):
             insert_cursor = self.mysql.cursor()
 
             while True:
+                if self.omim_rate_limited:
+                    self.logger.warning("Stopping OMIM retrieval after repeated HTTP 429 responses; missing IDs remain retryable.")
+                    break
+
                 rows = fetch_cursor.fetchmany(batch_size)
 
                 if not rows:
@@ -120,14 +162,12 @@ class PublicationOminDataRetrievalTask(PipelineBase):
                 val_list = []
 
                 for row in rows:
+                    if self.omim_rate_limited:
+                        break
 
                     omim_id = row['omim_id'] 
     
-                    # The API key stays in env; this URL only adds the OMIM ID
-                    # and response-shaping parameters needed by the endpoint.
-                    url = f'{self.omim_entry_api}?mimNumber={omim_id}&include=all&format=json&apiKey={self.api_key}'
-
-                    entry_json = self.get_omim(url)
+                    entry_json = self.get_omim(omim_id)
 
                     if entry_json is None:
                         self.logger.error(f"OMIM API failed for omim_id={omim_id}; no publication_omim row inserted, so it remains retryable.")

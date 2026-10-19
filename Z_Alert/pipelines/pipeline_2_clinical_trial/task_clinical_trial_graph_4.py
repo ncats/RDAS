@@ -33,9 +33,8 @@ class NewClinicalTrialInterventionGraphTask(PipelineBase):
     '''
     Intervention nodes are keyed by a hash of name, type, and description. A
     plain SET after MERGE refreshes the node when the same intervention is
-    reprocessed. The cleanup removes stale has_intervention relationships for
-    each changed NCT ID when the latest study JSON no longer contains a previous
-    intervention.
+    reprocessed. A separate query removes stale relationships after the new
+    interventions have been written.
     '''
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
@@ -47,31 +46,18 @@ class NewClinicalTrialInterventionGraphTask(PipelineBase):
             y.interventionDescription = chunk.description,
             y._intervention_name_key = chunk._intervention_name_key
         MERGE (x)-[:has_intervention]->(y)
-
-        WITH collect(DISTINCT chunk.nctId) AS nctids
-        UNWIND nctids AS current_nctid
-        MATCH (x: ClinicalTrial {nctId: current_nctid})
-        OPTIONAL MATCH (x)-[old_rel:has_intervention]->(old:Intervention)
-        WHERE old_rel IS NOT NULL
-        AND (
-            old._composite_key IS NULL
-            OR NOT old._composite_key IN [
-                chunk IN $chunks
-                WHERE chunk.nctId = current_nctid
-                | chunk._composite_key
-            ]
-        )
-        DELETE old_rel
     '''
 
     '''
-    If a changed study has no current valid interventions, no intervention chunk
-    exists for BATCH_CREATE. This query still clears stale intervention
-    relationships for those reprocessed NCT IDs.
+    Pass the current keys for each trial from Python. Memgraph cannot evaluate
+    the filtered list comprehension previously used inside BATCH_CREATE.
+    An empty keys list removes all old relationships for a trial with no valid
+    interventions in its current study JSON.
     '''
-    BATCH_DELETE_STALE_FOR_EMPTY_INTERVENTIONS = '''
-        UNWIND $nctids AS nctid
-        MATCH (x: ClinicalTrial {nctId: nctid})-[old_rel:has_intervention]->(:Intervention)
+    BATCH_DELETE_STALE = '''
+        UNWIND $current_trials AS current
+        MATCH (x:ClinicalTrial {nctId: current.nctId})-[old_rel:has_intervention]->(old:Intervention)
+        WHERE old._composite_key IS NULL OR NOT old._composite_key IN current.keys
         DELETE old_rel
     '''
 
@@ -102,7 +88,6 @@ class NewClinicalTrialInterventionGraphTask(PipelineBase):
 
         count = 0
         batch_num = 0
-        empty_intervention_nctids = []
         fetch_cursor = None
 
         try:
@@ -120,6 +105,7 @@ class NewClinicalTrialInterventionGraphTask(PipelineBase):
                 self.logger.info(f'--- batch# = {batch_num} ---')
 
                 chunks = []
+                current_trials = []
 
                 for row in rows:
                     nctid = row.get('nctid')
@@ -137,12 +123,11 @@ class NewClinicalTrialInterventionGraphTask(PipelineBase):
                     relationship chunks.
                     '''
                     intervention_chunks = self._create_intervention_chunks(nctid, study)
-
-                    if not intervention_chunks:
-                        empty_intervention_nctids.append(nctid)
-                        continue
-
                     chunks.extend(intervention_chunks)
+                    current_trials.append({
+                        "nctId": nctid,
+                        "keys": [chunk["_composite_key"] for chunk in intervention_chunks],
+                    })
 
                 if chunks:
                     self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
@@ -152,9 +137,8 @@ class NewClinicalTrialInterventionGraphTask(PipelineBase):
                 else:
                     self.logger.info('No valid interventions to upsert into memgraph.')
 
-            if empty_intervention_nctids:
-                self.memgraph.execute(self.BATCH_DELETE_STALE_FOR_EMPTY_INTERVENTIONS, {"nctids": empty_intervention_nctids})
-                self.logger.info(f'Removed stale intervention mappings for {len(empty_intervention_nctids)} trials with no current valid interventions.')
+                if current_trials:
+                    self.memgraph.execute(self.BATCH_DELETE_STALE, {"current_trials": current_trials})
 
         except Exception as e:
             self.logger.error(f"Error executing intervention graph task: {e}")
