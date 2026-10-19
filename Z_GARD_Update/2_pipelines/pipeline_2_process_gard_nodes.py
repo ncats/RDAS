@@ -40,6 +40,19 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         the downstream clinical trial and publication discovery tasks.
         '''
         try:
+            cursor = gard_task.mysql.cursor()
+            try:
+                cursor.execute("SELECT COUNT(*) FROM gard")
+                gard_row_count = cursor.fetchone()[0]
+            finally:
+                cursor.close()
+
+            if gard_row_count == 0:
+                raise RuntimeError(
+                    "MySQL table gard is empty. Complete "
+                    "Z_GARD_Update/1_GARD_DBs_update/main-run.sh before running pipeline 2."
+                )
+
             for batch in gard_task.get_gard_nodes():
                 self.logger.info(f"\n\n*** Processing GARD discovery batch with {len(batch)} nodes. ***\n")
 
@@ -90,30 +103,35 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                         publication_task = NewPublicationDiscoveryTask()
                         publication_task.find_new_data(target_gard_node)
 
+                        # Stage only this GARD node's OMIM mappings and fetch
+                        # missing shared OMIM entries before the next node.
+                        self.run_omim_updates_for_gard_node(gard_node["gardId"])
+
                     finally:
                         # Later steps can run for a long time, so release these
                         # per-node database connections before starting them.
                         self._close_task_if_needed(clinical_trial_task)
                         self._close_task_if_needed(publication_task)
 
-                    '''
-                    Step 6:
-                    Run the shared update steps before moving to the next GARD node.
-                    '''
-                    self.run_post_discovery_steps_for_gard_node(gard_node["gardId"])
-
                     total_gard_nodes += 1
+
+                    self.logger.info(f"\n****** Processed: {gard_node['gardId']}: {gard_node['gardName']} ******\n")
                     self.logger.info(f"\n###### Total GARD nodes processed {total_gard_nodes} ######\n")
 
         finally:
+            self.gard_discovery_completed = True
             self._close_task_if_needed(gard_task)
             self.logger.info(f"Processed {total_gard_nodes} GARD nodes.")
 
+        # The update tasks read shared is_new rows across all GARD IDs. Run them
+        # once after discovery, even when a retry has no eligible GARD nodes but
+        # previously staged rows still need to be processed.
+        self.run_post_discovery_steps()
 
 
-    def run_post_discovery_steps_for_gard_node(self, gard_id: str) -> None:
+    def run_post_discovery_steps(self) -> None:
 
-        """Run the shared alert update steps for one discovered GARD node."""
+        """Run the shared alert update steps after GARD discovery finishes."""
 
         steps = (
             ("Step 2: clinical-trial MySQL updates", self.run_clinical_trial_mysql_updates),
@@ -127,10 +145,10 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
             ("Step 11: pipeline wrap-up", self.run_pipeline_wrapup),
         )
 
-        # These database and API steps run in order for the current GARD node.
+        # These database and API steps consume all newly discovered rows.
         # The index initialization step remains disabled, as in Z_Alert/main.py.
         for step_name, step_func in steps:
-            self._run_step_with_timing(f"{gard_id}: {step_name}", step_func)
+            self._run_step_with_timing(step_name, step_func)
 
 
 if __name__ == "__main__":
@@ -139,7 +157,7 @@ if __name__ == "__main__":
 
     try:
         runner._run_step_with_timing(
-            "GARD nodes: discovery and per-node updates",
+            "GARD nodes: discovery and shared updates",
             runner.run_pipeline_for_each_gard_node,
         )
 

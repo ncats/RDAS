@@ -31,6 +31,8 @@ class AlertPipelineRunner(PipelineRunnerBase):
     def __init__(self, look_back_days: int = 7):
 
         self.look_back_days = look_back_days
+        self.gard_discovery_completed = False
+        self.omim_gard_ids_attempted = set()
         super().__init__()
 
         self.logger.info(f"AlertPipelineRunner configured with look_back_days={self.look_back_days}.")
@@ -133,6 +135,10 @@ class AlertPipelineRunner(PipelineRunnerBase):
                     '''
                     publication_task.find_new_data(gard_node) 
 
+                    # Map and retrieve only this GARD node's missing OMIM IDs.
+                    # The later shared publication step handles all staged rows.
+                    self.run_omim_updates_for_gard_node(gard_id)
+
                     total_gard_nodes += 1
                 
                 self.logger.info(f"\n# Total GARD nodes processed {total_gard_nodes}\n")
@@ -152,6 +158,7 @@ class AlertPipelineRunner(PipelineRunnerBase):
             self.logger.exception("run_find_new_clinical_trial_and_publication_updates() failed.")
 
         finally:
+            self.gard_discovery_completed = True
             for task in (clinical_trial_task, publication_task, gard_task):
                 self._close_task_if_needed(task)
 
@@ -205,6 +212,23 @@ class AlertPipelineRunner(PipelineRunnerBase):
         self._run_pipeline_task(NewClinicalTrialOrganizationLocationGraphTask)
 
 
+    def run_omim_updates_for_gard_node(self, gard_id: str) -> None:
+
+        """Map one GARD ID to OMIM and fetch its missing OMIM entries."""
+
+        # GardNodeNamesTask can yield the same ID for multiple MONDO/source
+        # groups; the mapping task reads all labels for that ID on first visit.
+        if gard_id in self.omim_gard_ids_attempted:
+            return
+
+        from pipelines.pipeline_3_publication.task_publication_3 import GardOmimPublicationMappingTask
+        from pipelines.pipeline_3_publication.task_publication_4 import PublicationOminDataRetrievalTask
+
+        self._run_pipeline_task(GardOmimPublicationMappingTask, gard_id=gard_id)
+        self._run_pipeline_task(PublicationOminDataRetrievalTask, gard_id=gard_id)
+        self.omim_gard_ids_attempted.add(gard_id)
+
+
     def run_publication_mysql_updates(self) -> None:
         """Run publication MySQL enrichment tasks."""
 
@@ -219,8 +243,14 @@ class AlertPipelineRunner(PipelineRunnerBase):
         from pipelines.pipeline_3_publication.task_publication_8 import NewOmimPublicationArticleImportTask
 
         self._run_pipeline_task(PublicationEpiNhsClassificationTask)
-        self._run_pipeline_task(GardOmimPublicationMappingTask)
-        self._run_pipeline_task(PublicationOminDataRetrievalTask)
+        # A standalone publication step still maps all GARD IDs. After either
+        # runner's discovery pass, mappings were scoped to each visited node.
+        # If discovery found no nodes, retry any OMIM downloads left missing
+        # from older mappings without creating mappings for unrelated nodes.
+        if not self.gard_discovery_completed:
+            self._run_pipeline_task(GardOmimPublicationMappingTask)
+        if not self.omim_gard_ids_attempted:
+            self._run_pipeline_task(PublicationOminDataRetrievalTask)
         self._run_pipeline_task(NewPublicationPubtatorRetrievalTask)
         self._run_pipeline_task(NewPublicationChemicalSubstanceTask)
         self._run_pipeline_task(PublicationFalsePositiveFilterTask)

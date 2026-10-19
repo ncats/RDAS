@@ -1,5 +1,6 @@
 import os
 import sys 
+from typing import Optional
 _dir = os.path.dirname(__file__)
 sys.path.extend([
     os.path.abspath(os.path.join(_dir, "..")),
@@ -17,9 +18,10 @@ If there are no changes in GARD table for Label_Xref field, so no [gard_id - omi
 
 class GardOmimPublicationMappingTask(PipelineBase):
 
-    def __init__(self):
+    def __init__(self, gard_id: Optional[str] = None):
 
         super().__init__(init_mysql=True, init_memgraph=False)
+        self.gard_id = gard_id
 
 
     # Not implemented
@@ -31,7 +33,15 @@ class GardOmimPublicationMappingTask(PipelineBase):
     # implement
     def process_new_data(self) -> None:
         
-        fetch_query = 'SELECT GardID, group_concat(Label_Xref) AS xrefs FROM gard GROUP BY gardid ORDER BY GardID'
+        # The alert and GARD runners pass one ID so this task does not map the
+        # entire gard table while processing a single disease. A missing ID
+        # keeps the database-wide behavior for standalone publication runs.
+        fetch_query = 'SELECT GardID, group_concat(Label_Xref) AS xrefs FROM gard'
+        fetch_params = ()
+        if self.gard_id is not None:
+            fetch_query += ' WHERE GardID = %s'
+            fetch_params = (self.gard_id,)
+        fetch_query += ' GROUP BY GardID ORDER BY GardID'
 
         insert_sql = '''
             INSERT INTO publication_gard_omim_mapping (gard_id, omim_id, is_new)
@@ -56,7 +66,7 @@ class GardOmimPublicationMappingTask(PipelineBase):
             insert_cursor = self.mysql.cursor()
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
 
-            fetch_cursor.execute(fetch_query)
+            fetch_cursor.execute(fetch_query, fetch_params)
              
             while True:
 

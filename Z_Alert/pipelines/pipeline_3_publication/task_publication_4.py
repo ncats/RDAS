@@ -28,11 +28,12 @@ class PublicationOminDataRetrievalTask(PipelineBase):
     """
 
 
-    def __init__(self):
+    def __init__(self, gard_id: Optional[str] = None):
         """Initialize MySQL access and OMIM API configuration."""
 
         super().__init__(init_mysql=True, init_memgraph=False)
 
+        self.gard_id = gard_id
         self.api_key = os.getenv('OMIM_API_KEY')
         self.omim_entry_api = os.getenv('OMIM_ENTRY_API')
 
@@ -66,24 +67,34 @@ class PublicationOminDataRetrievalTask(PipelineBase):
             self.close()
             return
         
-        # Select only OMIM IDs found by the GARD/OMIM mapping task that have
-        # not already been inserted into publication_omim.
+        # A GARD-scoped run reads only that disease's mappings. DISTINCT avoids
+        # repeated API calls when several mapping rows share an OMIM ID.
+        # Check all mappings, including older ones, so failed downloads remain
+        # eligible for a later retry after is_new has been reset.
         fetch_query = '''
             SELECT DISTINCT pgom.omim_id
             FROM publication_gard_omim_mapping pgom
-
             LEFT JOIN publication_omim po 
                 ON pgom.omim_id = po.omim_id
-
             WHERE po.omim_id IS NULL
-            AND pgom.is_new = 1
-            ORDER BY pgom.omim_id;
         '''
+        fetch_params = ()
+        if self.gard_id is not None:
+            fetch_query += ' AND pgom.gard_id = %s'
+            fetch_params = (self.gard_id,)
+        fetch_query += ' ORDER BY pgom.omim_id'
 
         fetch_cursor = None
         insert_cursor = None
 
-        insert_sql = 'INSERT INTO publication_omim (omim_id, entry_json, is_new) VALUES (%s, %s, 1)'
+        # A second GARD node may reference an OMIM ID inserted since the read.
+        # The unique omim_id key makes that a harmless no-op, preserving the
+        # existing JSON and is_new state instead of replacing either value.
+        insert_sql = '''
+            INSERT INTO publication_omim (omim_id, entry_json, is_new)
+            VALUES (%s, %s, 1)
+            ON DUPLICATE KEY UPDATE omim_id = omim_id
+        '''
 
         batch_num = 0
         batch_size = 20
@@ -92,7 +103,7 @@ class PublicationOminDataRetrievalTask(PipelineBase):
 
         try:
             fetch_cursor = self.mysql.cursor(dictionary=True, buffered=True)
-            fetch_cursor.execute(fetch_query)
+            fetch_cursor.execute(fetch_query, fetch_params)
 
             insert_cursor = self.mysql.cursor()
 
@@ -100,7 +111,7 @@ class PublicationOminDataRetrievalTask(PipelineBase):
                 rows = fetch_cursor.fetchmany(batch_size)
 
                 if not rows:
-                    self.logger.info(f"No more rows to fetch.\nNo difference of omim_id between table publication_gard_omim_mapping and publication_omim.\n")
+                    self.logger.info("No more missing OMIM IDs to fetch for this run.")
                     break
  
                 batch_num += 1
@@ -137,9 +148,10 @@ class PublicationOminDataRetrievalTask(PipelineBase):
                     try:  
                         insert_cursor.executemany(insert_sql, val_list)
                         self.mysql.commit() 
-                        self.logger.info(f'Batch#: {batch_num} - {len(val_list)} rows have been inserted into publication_omim table')
+                        self.logger.info(f'Batch#: {batch_num} - {insert_cursor.rowcount} rows have been inserted into publication_omim table')
                     
                     except Exception as e:
+                        self.mysql.rollback()
                         self.logger.error(f'insert_sql error: \n{e}')
                 else:
                     self.logger.warning(f"Batch#: {batch_num} - no valid OMIM API responses to insert; skipped OMIM IDs remain retryable.")
