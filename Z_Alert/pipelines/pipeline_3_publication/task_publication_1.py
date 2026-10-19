@@ -26,7 +26,8 @@ Find and store newly published PubMed articles for updated GARD diseases.
 For each GARD node, this pipeline searches PubMed with the node's filtered
 disease names between the node's last update date and today. 
 
-It downloads article metadata for PMIDs that are NOT already in publication_article,
+It saves each PubMed search response in publication_gard_pubmed, downloads
+article metadata for PMIDs that are NOT already in publication_article,
 stores those article rows in publication_article, and records the
 GARD/search-term/PMID relationship(unique)in publication_gard_searchterm_pubmed_mapping.
 """
@@ -114,13 +115,14 @@ class NewPublicationDiscoveryTask(PipelineBase):
                     obj = response.json()
                     result = obj['esearchresult']
                     
-                    count = result['count']
                     retmax = result['retmax']
                     retstart = result['retstart']
                     pubmed_ids = result['idlist']
-                    querytranslation = result['querytranslation']
-                    phrasesignored = result['warninglist']['phrasesignored']
-                    quotedphrasesnotfound = result['warninglist']['quotedphrasesnotfound'] 
+                    querytranslation = result.get('querytranslation', '')
+                    warnings = result.get('warninglist') or {}
+                    phrasesignored = warnings.get('phrasesignored') or []
+                    quotedphrasesnotfound = warnings.get('quotedphrasesnotfound') or []
+                    count = result['count']
  
                 except KeyError as e:
                     self.logger.error(f"KeyError: {e} - The required key does not exist in the JSON structure.")
@@ -158,7 +160,48 @@ class NewPublicationDiscoveryTask(PipelineBase):
         """
 
         if count is not None:
-           return pubmed_ids
+            year_range = f"{mindate}-{maxdate}"
+            insert_sql = '''
+                INSERT INTO publication_gard_pubmed (
+                    gard_id, year_range, search_term, total, retmax, retstart,
+                    pubmed_ids, query_translation, phrases_ignored,
+                    quoted_phrases_not_found, ref_json
+                )
+                SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM publication_gard_pubmed
+                    WHERE gard_id = %s AND year_range = %s AND search_term = %s
+                )
+            '''
+            values = (
+                gard_id, year_range, search_term, int(count), int(retmax), int(retstart),
+                ",".join(pubmed_ids), querytranslation, ",".join(phrasesignored),
+                ",".join(quotedphrasesnotfound), json.dumps(obj),
+                gard_id, year_range, search_term,
+            )
+            cursor = self.mysql.cursor()
+            try:
+                # Retain the complete search response even when PubMed finds no
+                # IDs; later mapping repair jobs can read this raw source table.
+                cursor.execute(insert_sql, values)
+                inserted = cursor.rowcount
+                self.mysql.commit()
+            except Exception:
+                self.mysql.rollback()
+                self.logger.exception(
+                    f"Unable to save publication_gard_pubmed for {gard_id}: {search_term}."
+                )
+                raise
+            finally:
+                cursor.close()
+
+            if inserted:
+                self.logger.info(
+                    f"Saved publication_gard_pubmed for {gard_id}: {search_term}, "
+                    f"year_range={year_range}, total={count}."
+                )
+
+            return pubmed_ids
         else:
             return None
 
