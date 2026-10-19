@@ -115,9 +115,9 @@ if __name__ == "__main__":
     - Runs all concrete Memgraph initialization tasks in dependency order.
     """
 
-    RUN_GARD_MYSQL_INITIALIZATION = False
+    RUN_GARD_MYSQL_INITIALIZATION = True
     RUN_GARD_MEMGRAPH_INITIALIZATION = True
-    RUN_GARD_UPDATE_WRAPUP = True
+    RUN_GARD_UPDATE_WRAPUP = False
 
     # When True, Step 1 truncates MySQL table `gard` before loading the refreshed nomenclature CSV.
     CLEAR_EXISTING_MYSQL_GARD = False

@@ -23,15 +23,13 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
 
 
 
-    def run_find_new_clinical_trial_and_publication(self) -> None:
+    def run_pipeline_for_each_gard_node(self) -> None:
 
         from Z_Alert.pipelines.pipeline_1_gard.task_gard_1 import GardNodeNamesTask
         from Z_Alert.pipelines.pipeline_2_clinical_trial.task_clinical_trial_1 import NewClinicalTrialDiscoveryTask
         from Z_Alert.pipelines.pipeline_3_publication.task_publication_1 import NewPublicationDiscoveryTask
 
         gard_task = GardNodeNamesTask()
-        clinical_trial_task = NewClinicalTrialDiscoveryTask()
-        publication_task = NewPublicationDiscoveryTask()
 
         total_gard_nodes = 0
 
@@ -56,9 +54,9 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                     synonyms = ", ".join(gard_node["synonyms"])
 
                     self.logger.info(
-                        f"{gard_node['gardId']}: {gard_node['gardName']}:\n"
+                        f"\n*** {gard_node['gardId']}: {gard_node['gardName']}:\n"
                         f"Synonyms      : {synonyms}\n"
-                        f"Filtered names: {filtered_names}"
+                        f"Filtered names: {filtered_names}\n"
                     )
 
                     '''
@@ -77,21 +75,62 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                     Any newly discovered trial ids are staged for the later
                     clinical-trial MySQL and Memgraph update steps.
                     '''
-                    clinical_trial_task.find_new_data(target_gard_node)
+                    clinical_trial_task = None
+                    publication_task = None
+                    try:
+                        clinical_trial_task = NewClinicalTrialDiscoveryTask()
+                        clinical_trial_task.find_new_data(target_gard_node)
+
+                        '''
+                        Step 5:
+                        Search publication data for this GARD node using the same
+                        normalized search window and filtered disease names. Newly
+                        discovered PMIDs are staged for later publication updates.
+                        '''
+                        publication_task = NewPublicationDiscoveryTask()
+                        publication_task.find_new_data(target_gard_node)
+
+                    finally:
+                        # Later steps can run for a long time, so release these
+                        # per-node database connections before starting them.
+                        self._close_task_if_needed(clinical_trial_task)
+                        self._close_task_if_needed(publication_task)
 
                     '''
-                    Step 5:
-                    Search publication data for this GARD node using the same
-                    normalized search window and filtered disease names. Newly
-                    discovered PMIDs are staged for later publication updates.
+                    Step 6:
+                    Run the shared update steps before moving to the next GARD node.
                     '''
-                    publication_task.find_new_data(target_gard_node)
+                    self.run_post_discovery_steps_for_gard_node(gard_node["gardId"])
 
                     total_gard_nodes += 1
-                    self.logger.info(f"\n# Total GARD nodes processed {total_gard_nodes}\n")
+                    self.logger.info(f"\n###### Total GARD nodes processed {total_gard_nodes} ######\n")
 
         finally:
-            gard_task.close()
+            self._close_task_if_needed(gard_task)
+            self.logger.info(f"Processed {total_gard_nodes} GARD nodes.")
+
+
+
+    def run_post_discovery_steps_for_gard_node(self, gard_id: str) -> None:
+
+        """Run the shared alert update steps for one discovered GARD node."""
+
+        steps = (
+            ("Step 2: clinical-trial MySQL updates", self.run_clinical_trial_mysql_updates),
+            ("Step 3: publication MySQL updates", self.run_publication_mysql_updates),
+            ("Step 5: clinical-trial graph updates", self.run_clinical_trial_graph_updates),
+            ("Step 6: publication graph updates", self.run_publication_graph_updates),
+            ("Step 7: pipeline follow-up updates", self.run_pipeline_followup_updates),
+            ("Step 8: send alert emails", self.send_alert_emails),
+            ("Step 9: regroup people", self.run_regroup_the_person),
+            ("Step 10: pipeline maintenance", self.run_pipeline_maintenance),
+            ("Step 11: pipeline wrap-up", self.run_pipeline_wrapup),
+        )
+
+        # These database and API steps run in order for the current GARD node.
+        # The index initialization step remains disabled, as in Z_Alert/main.py.
+        for step_name, step_func in steps:
+            self._run_step_with_timing(f"{gard_id}: {step_name}", step_func)
 
 
 if __name__ == "__main__":
@@ -100,25 +139,10 @@ if __name__ == "__main__":
 
     try:
         runner._run_step_with_timing(
-            "GARD Step 1: discover new clinical trials and publications",
-            runner.run_find_new_clinical_trial_and_publication,
-        )
-        runner._run_step_with_timing(
-            "GARD Step 2: update clinical-trial MySQL data",
-            runner.run_clinical_trial_mysql_updates,
-        )
-        runner._run_step_with_timing(
-            "GARD Step 3: update publication MySQL data",
-            runner.run_publication_mysql_updates,
-        )
-        runner._run_step_with_timing(
-            "GARD Step 4: update clinical-trial graph data",
-            runner.run_clinical_trial_graph_updates,
-        )
-        runner._run_step_with_timing(
-            "GARD Step 5: update publication graph data",
-            runner.run_publication_graph_updates,
+            "GARD nodes: discovery and per-node updates",
+            runner.run_pipeline_for_each_gard_node,
         )
 
     finally:
         runner.close()
+        runner._archive_log_files_by_date()
