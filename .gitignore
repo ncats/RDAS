@@ -48,8 +48,9 @@ __init__.py
 !X_epi_nhs_predict_local/data/__init__.py
 !X_epi_nhs_predict_local/data/gard-id-name-synonyms.json
 
-# Keep currently tracked documentation and templates visible under broad
+# Keep repository instructions and documentation visible under broad
 # generated-file ignore rules.
+!AGENTS.md
 !MODEL_INSTALLATION.md
 !README.md
 !requirements.txt

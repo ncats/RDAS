@@ -10,6 +10,44 @@ for import_path in (str(PROJECT_ROOT), str(Z_ALERT_ROOT)):
         sys.path.insert(0, import_path)
 
 from Z_Alert.main import AlertPipelineRunner
+from pipelines.pipeline_2_clinical_trial.task_clinical_trial_6 import NewClinicalTrialAnnotationTask
+
+
+class GARDClinicalTrialAnnotationTask(NewClinicalTrialAnnotationTask):
+    """
+    Reuse scispaCy models while the GARD runner processes multiple GARD nodes.
+
+    The shared Alert runner creates a new annotation task for each call to
+    run_clinical_trial_mysql_updates(). In the per-node GARD runner, that would
+    reload both NER models and both UMLS linkers for every disease. The loaded
+    objects are kept on this subclass so the next task instance can reuse them.
+
+    Only the models and linkers are shared. Each task still opens and closes its
+    own MySQL connection and logger through the inherited task lifecycle. This
+    cache lives only in the current Python process; a new pipeline run loads
+    the models once again.
+    """
+
+    # Sequential GARD tasks share models; MySQL connections and loggers remain per task.
+    _cached_models = None
+    # Pipeline error logging uses the task's module to choose its error log.
+    __module__ = NewClinicalTrialAnnotationTask.__module__
+
+    def load_models(self):
+
+        """Return the cached model/linker tuple, loading it on the first successful call."""
+
+        if GARDClinicalTrialAnnotationTask._cached_models is not None:
+            self.logger.info("Reusing clinical-trial annotation models and UMLS linkers loaded for this GARD run.")
+            return GARDClinicalTrialAnnotationTask._cached_models
+
+        models = super().load_models()
+        # Do not cache a partial or failed load; the next node can retry it.
+        if all(model is not None for model in models):
+            GARDClinicalTrialAnnotationTask._cached_models = models
+
+        return models
+
 
 class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
 
@@ -20,6 +58,16 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         self.START_DATE = '1971-01-01'
 
         self.logger.info("GARDToMySQLAndMemgraphUpdateRunner initialized.")
+
+
+    def _run_pipeline_task(self, task_class, task_name=None, **kwargs) -> None:
+
+        # Substitute the cached task only for this GARD runner.
+        if task_class is NewClinicalTrialAnnotationTask:
+            task_class = GARDClinicalTrialAnnotationTask
+            task_name = task_name or NewClinicalTrialAnnotationTask.__name__
+
+        super()._run_pipeline_task(task_class, task_name=task_name, **kwargs)
 
 
 

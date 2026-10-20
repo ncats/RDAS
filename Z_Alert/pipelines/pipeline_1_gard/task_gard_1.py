@@ -127,6 +127,13 @@ class GardNodeNamesTask(PipelineBase):
             # The GARD update runner marks each ID after its downstream steps.
             # The regular alert runner retains its existing batch marking.
             if mark_updated_before_yield:
+
+                # Reset the 'update' flag to NULL for a re-run the whole GARD nodes.
+                '''
+                UPDATE gard_rdas_db.gard
+                SET updated = NULL
+                WHERE updated IS NOT NULL
+                '''
                 self._set_updated_flag(gard_id_set)
 
             yield batch
