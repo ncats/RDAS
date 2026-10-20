@@ -1,5 +1,6 @@
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, Iterator, List, Sequence
 from collections import OrderedDict
@@ -19,6 +20,7 @@ load_dotenv()
 
 from pipelines.pipeline_base import PipelineBase
 from utils.publication_worker import PublicationWorker
+from utils.tools import _resolve_worker_count
 
 """
 Find and store newly published PubMed articles for updated GARD diseases.
@@ -48,6 +50,8 @@ limit 10;
 '''
 
 class NewPublicationDiscoveryTask(PipelineBase):
+
+    PUBLICATION_INSERT_BATCH_SIZE = 100
 
 
     def __init__(self):
@@ -279,109 +283,144 @@ class NewPublicationDiscoveryTask(PipelineBase):
 
     # Step 2
     def find_new_publications(self, gard_id, search_term, pubmed_ids):
-  
+
+        '''
+        PubMed can return thousands of IDs for one complete date slice. Keep
+        the input order while removing duplicate IDs, then limit each MySQL
+        transaction and in-memory download set to a small chunk. A previous
+        slice may already have inserted an Article or this mapping, so check
+        both tables before downloading or preparing rows.
+        '''
+        unique_pubmed_ids = list(dict.fromkeys(str(pubmed_id) for pubmed_id in pubmed_ids if pubmed_id))
+        if not unique_pubmed_ids:
+            return
+
+        worker_count = _resolve_worker_count(
+            4, env_var_name="PUBLICATION_DOWNLOAD_MAX_WORKERS", logger=self.logger
+        )
         check_cursor = self.mysql.cursor()
-        insert_article_cursor = self.mysql.cursor(buffered=True)
-        insert_gard_searchterm_pubmed_mapping_cursor = self.mysql.cursor(buffered=True)
+        article_cursor = self.mysql.cursor()
+        mapping_cursor = self.mysql.cursor()
+        new_articles_added = 0
+        existing_articles_seen = 0
+        mappings_added = 0
+        failed_downloads = 0
 
-        insert_new_article_sql = '''
-            INSERT INTO publication_article (
-                pubmed_id, doi, title, abstract_text, affiliation,
-                first_publication_date, publication_year, cited_by_count, is_open_access, in_EPMC,
-                in_PMC, has_PDF, pub_type, source_json, is_new)
-            SELECT %s,%s,%s,%s,%s, %s,%s,%s,%s,%s, %s,%s,%s,%s, 1
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM publication_article
-                WHERE pubmed_id = %s
-            )
-        '''
-
-        insert_gard_searchterm_pubmed_mapping_sql = '''
-            INSERT INTO publication_gard_searchterm_pubmed_mapping (gard_id, search_term, pubmed_id)
-            SELECT %s, %s, %s
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM publication_gard_searchterm_pubmed_mapping
-                WHERE gard_id = %s
-                AND search_term = %s
-                AND pubmed_id = %s
-            )
-        '''
-        
         try:
-            # 1.
-              
-            # 2. check if the pubmed_id is already in publication_article
-            placeholders = ",".join(["%s"] * len(pubmed_ids))
-
-            batch_check_exist_query = f'''
-                SELECT pubmed_id
-                FROM publication_article
-                WHERE pubmed_id IN ({placeholders})
             '''
+            Europe PMC downloads spend most of their time waiting on HTTP, so
+            a bounded thread pool overlaps those waits. Workers only return
+            article tuples; all MySQL reads, writes, and commits stay in this
+            parent thread. Reuse one pool across chunks in this date slice.
+            '''
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                for start in range(0, len(unique_pubmed_ids), self.PUBLICATION_INSERT_BATCH_SIZE):
+                    batch_ids = unique_pubmed_ids[start:start + self.PUBLICATION_INSERT_BATCH_SIZE]
+                    placeholders = ",".join(["%s"] * len(batch_ids))
 
-            check_cursor.execute(batch_check_exist_query, list(pubmed_ids))
+                    check_cursor.execute(
+                        f"SELECT pubmed_id FROM publication_article WHERE pubmed_id IN ({placeholders})",
+                        batch_ids,
+                    )
+                    existing_article_ids = {str(row[0]) for row in check_cursor.fetchall()}
+                    check_cursor.execute(
+                        f'''SELECT pubmed_id FROM publication_gard_searchterm_pubmed_mapping
+                            WHERE gard_id = %s AND search_term = %s AND pubmed_id IN ({placeholders})''',
+                        [gard_id, search_term, *batch_ids],
+                    )
+                    existing_mapping_ids = {str(row[0]) for row in check_cursor.fetchall()}
+                    missing_article_ids = [pubmed_id for pubmed_id in batch_ids if pubmed_id not in existing_article_ids]
+                    existing_articles_seen += len(existing_article_ids)
 
-            existing_pubmed_ids = {
-                str(existing_row[0])
-                for existing_row in check_cursor.fetchall()
-            }
+                    '''
+                    End the read transaction before waiting for network calls.
+                    The unique keys on both publication tables protect
+                    against another writer inserting the same PMID meanwhile.
+                    '''
+                    self.mysql.commit()
 
-            new_articles_added = 0
-            existing_articles_seen = 0
-            mappings_added = 0
+                    article_rows = []
+                    eligible_mapping_ids = set(existing_article_ids)
+                    for pubmed_id, article_val in zip(
+                        missing_article_ids,
+                        executor.map(self.publication_worker.download_by_pmid, missing_article_ids),
+                    ):
+                        if article_val is None:
+                            failed_downloads += 1
+                            self.logger.warning(
+                                f"GARD ID: {gard_id}, Search term: {search_term} - Unable to download PubMed ID: {pubmed_id}."
+                            )
+                            continue
+                        article_rows.append((*article_val, 1))
+                        eligible_mapping_ids.add(pubmed_id)
 
-            # 3. 
-            for pubmed_id in pubmed_ids: 
+                    '''
+                    An Article may already belong to another GARD disease;
+                    its new mapping must still be inserted. A failed download
+                    of a missing Article does not create an orphan mapping.
+                    '''
+                    mapping_rows = [
+                        (gard_id, search_term, pubmed_id)
+                        for pubmed_id in batch_ids
+                        if pubmed_id in eligible_mapping_ids and pubmed_id not in existing_mapping_ids
+                    ]
 
-                # the pubmed_id is already in publication_article table
-                if pubmed_id in existing_pubmed_ids:
-                    existing_articles_seen += 1
-                else:
-                    # 5. the pubmed_id is NOT in publication_article, download article
-                    article_val = self.publication_worker.download_by_pmid(pubmed_id)
+                    try:
+                        if article_rows:
+                            article_placeholders = ",".join(["(" + ",".join(["%s"] * 15) + ")"] * len(article_rows))
+                            article_cursor.execute(
+                                f'''INSERT INTO publication_article (
+                                    pubmed_id, doi, title, abstract_text, affiliation,
+                                    first_publication_date, publication_year, cited_by_count,
+                                    is_open_access, in_EPMC, in_PMC, has_PDF, pub_type,
+                                    source_json, is_new
+                                ) VALUES {article_placeholders}
+                                ON DUPLICATE KEY UPDATE id = id''',
+                                [value for row in article_rows for value in row],
+                            )
+                        inserted_articles = article_cursor.rowcount if article_rows else 0
 
-                    if not article_val:
-                        url = f"{os.getenv('EURO_PEPMC_SERVICE_URL')}?query=EXT_ID:{pubmed_id}&resultType=core&format=json"
+                        if mapping_rows:
+                            mapping_placeholders = ",".join(["(%s,%s,%s)"] * len(mapping_rows))
+                            mapping_cursor.execute(
+                                f'''INSERT INTO publication_gard_searchterm_pubmed_mapping
+                                    (gard_id, search_term, pubmed_id)
+                                    VALUES {mapping_placeholders}
+                                    ON DUPLICATE KEY UPDATE id = id''',
+                                [value for row in mapping_rows for value in row],
+                            )
+                        inserted_mappings = mapping_cursor.rowcount if mapping_rows else 0
 
-                        self.logger.warning(f"GARD ID: {gard_id}, Search term: {search_term} - Unable to download: {url}")
-                        continue
+                        '''
+                        Article rows and their mappings commit together. If
+                        either INSERT fails, only this chunk rolls back; a
+                        rerun will still yield IDs from the saved raw search.
+                        '''
+                        self.mysql.commit()
+                    except Exception:
+                        self.mysql.rollback()
+                        raise
 
-                    # 6. save the new article into publication_article table
-                    insert_article_cursor.execute(insert_new_article_sql, (*article_val, pubmed_id))
-                    existing_pubmed_ids.add(pubmed_id)
-                    new_articles_added += 1
+                    new_articles_added += inserted_articles
+                    mappings_added += inserted_mappings
+                    self.logger.info(
+                        f"Publication discovery batch for GARD ID: {gard_id}, Search term: {search_term}; "
+                        f"ids={len(batch_ids)}, new_articles_added={inserted_articles}, "
+                        f"mappings_added={inserted_mappings}."
+                    )
 
-                    pubmedid_gardid_searchitem_for_logging = f'PubMed ID: {pubmed_id}\tGARD ID: {gard_id}\tSearch term: {search_term}'
-                    self.logger.info(f"1. New publication added to table publication_article :: {pubmedid_gardid_searchitem_for_logging}")
-
-                # 7. save the gard_id, search_term and pubmed_id. This must run
-                # even when the Article row already exists from another disease.
-                insert_gard_searchterm_pubmed_mapping_cursor.execute(
-                    insert_gard_searchterm_pubmed_mapping_sql,
-                    (gard_id, search_term, pubmed_id, gard_id, search_term, pubmed_id),
-                )
-                mappings_added += insert_gard_searchterm_pubmed_mapping_cursor.rowcount
-
-                if insert_gard_searchterm_pubmed_mapping_cursor.rowcount:
-                    pubmedid_gardid_searchitem_for_logging = f'PubMed ID: {pubmed_id}\tGARD ID: {gard_id}\tSearch term: {search_term}'
-                    self.logger.info(f"2. New mapping added to table publication_gard_searchterm_pubmed_mapping :: {pubmedid_gardid_searchitem_for_logging}")
-
-            self.mysql.commit()
             self.logger.info(
                 f"Publication discovery summary for GARD ID: {gard_id}, Search term: {search_term}; "
                 f"new_articles_added={new_articles_added}, existing_articles_seen={existing_articles_seen}, "
-                f"mappings_added={mappings_added}."
+                f"mappings_added={mappings_added}, failed_downloads={failed_downloads}."
             )
- 
+
         except Exception:
-            # Leave this search term retryable if article or mapping writes fail.
             self.mysql.rollback()
             self.logger.exception(f"Publication import failed for {gard_id}: {search_term}.")
             raise
 
         finally:
             check_cursor.close()
-            insert_article_cursor.close()
-            insert_gard_searchterm_pubmed_mapping_cursor.close()
+            article_cursor.close()
+            mapping_cursor.close()

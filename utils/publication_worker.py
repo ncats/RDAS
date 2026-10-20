@@ -70,7 +70,12 @@ class PublicationWorker:
         max_retries=10
         while retries < max_retries:
             try:                
-                response = requests.get(url, verify=False)
+                '''
+                Each publication download can run in a bounded thread pool.
+                A request timeout prevents one unresponsive Europe PMC call
+                from holding its worker and the whole database batch forever.
+                '''
+                response = requests.get(url, verify=False, timeout=30)
                 response.raise_for_status()  # Raise an exception for HTTP errors (4xx and 5xx)                                
                 try:
                     bigObj = response.json()
