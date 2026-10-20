@@ -50,7 +50,7 @@ __init__.py
 
 # Keep repository instructions and documentation visible under broad
 # generated-file ignore rules.
-!AGENTS.md
+AGENTS.md
 !MODEL_INSTALLATION.md
 !README.md
 !requirements.txt

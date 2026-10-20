@@ -10,6 +10,7 @@ This repo builds/maintains the RDAS Memgraph data pipeline.
 - Reuse helper methods from `utils/tools.py` whenever possible before adding local helper functions.
 - Ask before destructive Git operations.
 - When writing code, add detailed comments whenever they help explain the implementation.
+- When modifying existing code or fixing an error, add detailed comments beside the changed logic explaining how it works and why the change is needed.
 - While working, send brief visible progress notes that explain what you are checking, what you found, and why you are making an edit. Keep final answers concise, but preserve this trail of progress updates during the work.
 
 ## Commands

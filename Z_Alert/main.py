@@ -72,7 +72,12 @@ class AlertPipelineRunner(PipelineRunnerBase):
             memory at once. Each GARD node contains the names/synonyms used by
             the downstream clinical trial and publication discovery tasks.
             '''
-            for batch in gard_task.get_gard_nodes():
+            '''
+            Mark each GARD ID only after discovery succeeds. PubMed may need
+            multiple date slices, and an API failure must leave this node
+            eligible for retry instead of advancing its update date.
+            '''
+            for batch in gard_task.get_gard_nodes(mark_updated_before_yield=False):
                 self.logger.info(f"\n\n*** Processing GARD discovery batch with {len(batch)} nodes. ***\n")
 
                 for gard_node in batch:
@@ -138,6 +143,7 @@ class AlertPipelineRunner(PipelineRunnerBase):
                     # Map and retrieve only this GARD node's missing OMIM IDs.
                     # The later shared publication step handles all staged rows.
                     self.run_omim_updates_for_gard_node(gard_id)
+                    gard_task._set_updated_flag({gard_id})
 
                     total_gard_nodes += 1
                 
@@ -153,12 +159,13 @@ class AlertPipelineRunner(PipelineRunnerBase):
             '''
             # _run_pipeline_task() handles task creation, process_new_data(), timing logs, error handling, and closing resources.
             self._run_pipeline_task(ExistingClinicalTrialStudyUpdateTask)
+            self.gard_discovery_completed = True
 
         except Exception:
             self.logger.exception("run_find_new_clinical_trial_and_publication_updates() failed.")
+            raise
 
         finally:
-            self.gard_discovery_completed = True
             for task in (clinical_trial_task, publication_task, gard_task):
                 self._close_task_if_needed(task)
 

@@ -73,94 +73,160 @@ class NewPublicationDiscoveryTask(PipelineBase):
 
         for name in names:
 
-            pubmed_ids = self.retrieve_pubmed_ids(gard_id, name, last_update_date, today)
-
-            if not pubmed_ids:
-                #self.logger.warning(f"No new PubMed IDs found for [{gard_id}: {name}]")
-                continue
-            
-            self.find_new_publications(gard_id, name, pubmed_ids)
+            '''
+            Process each complete date slice before fetching the next one, so
+            a broad search never holds every matching PMID in memory at once.
+            '''
+            for pubmed_ids in self.retrieve_pubmed_ids(gard_id, name, last_update_date, today):
+                if pubmed_ids:
+                    self.find_new_publications(gard_id, name, pubmed_ids)
     
 
 
     # Step 1
-    def retrieve_pubmed_ids(self, gard_id, search_term, mindate=None, maxdate=None):
-                 
-        count = None  
-        search_term = search_term.lower() # lower case in database
- 
+    def retrieve_pubmed_ids(self, gard_id, search_term, mindate=None, maxdate=None) -> Iterator[List[str]]:
+
+        """Yield complete PubMed ESearch ID lists, one date slice at a time.
+
+        ``count`` is the number of matches in PubMed; ``idlist`` contains only
+        the IDs returned by this request. A broad search can report many more
+        matches than IDs because PubMed caps the returned list. For example,
+        the GARD:0000016 search for ``coma`` from 1971-01-01 to 2026-10-19
+        reported 41,918 matches but returned only 9,999 IDs. That response is
+        incomplete and must not be saved as though it contained every PMID.
+
+        Split incomplete searches by entry date until each slice has
+        ``count == len(idlist)``. Save each complete response separately, then
+        yield its IDs so the caller can import articles and mappings before
+        the next slice is fetched. The returned iterator is consumed by
+        ``find_new_data``; no large combined PMID list is built.
+        """
+
         if not self.pubmed_esearch_api:
-            self.logger.error("PUBMED_ESEARCH_API is not configured.")
-            return None
+            raise RuntimeError("PUBMED_ESEARCH_API is not configured.")
 
-        # Exact match uses the PubMed ESearch Title/Abstract syntax.
-        search_term_normalized = re.sub(r'\s+', '+', search_term) # replace whitespace with + sign
-        term_search_query = f'"{search_term_normalized}"[Title/Abstract:~0]'
+        search_term = search_term.lower()  # Store the same lowercase term in every slice.
+        '''
+        Both runners supply full dates: the regular Alert runner uses MySQL
+        dates and the GARD update runner uses an ISO date string. Converting
+        their string forms to YYYY-MM-DD also discards any time component.
+        A missing lower bound starts at 1970-01-01; a missing upper bound uses
+        today. Reject a reversed range before calling PubMed.
+        '''
+        start_date = date.fromisoformat(str(mindate or date(1970, 1, 1))[:10])
+        end_date = date.fromisoformat(str(maxdate or date.today())[:10])
+        if start_date > end_date:
+            raise ValueError(f"Invalid PubMed date range for {gard_id}: {start_date} > {end_date}.")
 
-        retries = 0
-        max_retries=10
-    
-        url = f"{self.pubmed_esearch_api}?db=pubmed&term={term_search_query}&mindate={mindate}&maxdate={maxdate}&retmode=json&retmax=10000&api_key={self.api_key}"
-        #print(url)
-        
-        while retries < max_retries:
-            try:                
-                response = requests.get(url)
+        '''
+        Keep the existing exact Title/Abstract search. Requests encodes its
+        spaces and punctuation as URL parameters, and EDAT makes the original
+        Date - Entry filter explicit. The stack begins with the whole requested
+        window; only oversized windows are added back as smaller slices.
+        '''
+        normalized_search_term = re.sub(r"\s+", " ", search_term)
+        term_search_query = f'"{normalized_search_term}"[Title/Abstract:~0]'
+        pending_ranges = [(start_date, end_date)]
 
-                if response.status_code >= 400:
-                    self.logger.error(f"PubMed request failed: status={response.status_code}, url={url}")
-                    break
-
-                try:
-                    obj = response.json()
-                    result = obj['esearchresult']
-                    
-                    retmax = result['retmax']
-                    retstart = result['retstart']
-                    pubmed_ids = result['idlist']
-                    querytranslation = result.get('querytranslation', '')
-                    warnings = result.get('warninglist') or {}
-                    phrasesignored = warnings.get('phrasesignored') or []
-                    quotedphrasesnotfound = warnings.get('quotedphrasesnotfound') or []
-                    count = result['count']
- 
-                except KeyError as e:
-                    self.logger.error(f"KeyError: {e} - The required key does not exist in the JSON structure.")
-                    self.logger.error(f'{url}')
-                    self.logger.error(f'\n{result}\n')
-                except (TypeError, AttributeError):
-                    self.logger.error("The JSON structure is not as expected or 'response' might not be JSON.")
-                    self.logger.error(f'{url}')
-                
-                break  # Exit the loop if successful
-            except requests.exceptions.Timeout:
-                retries += 1
-                time.sleep(1)
-            except requests.exceptions.RequestException as e:
-                break  # Exit the loop for non-retryable errors
-        """
-        {
-            "header": { "type": "esearch",  "version": "0.3" },
-            "esearchresult": {
-                "count": "10",
-                "retmax": "10",
-                "retstart": "0",
-                "idlist": [
-                    "39634243", "31075093", "23034868", "22821547", "23074680", "19996736", "19048502", "18230893",  "11045586", "8322820"
-                ],
-                "translationset": [],
-                "querytranslation": "\"momo syndrome\"[Title/Abstract:~0] AND 1970/01/01:2025/12/31[Date - Entry]",
-                "warninglist": {
-                "phrasesignored": [],
-                "quotedphrasesnotfound": [],
-                "outputmessages": [ "Restrictions achieved. start and count adjusted to 0, 9999" ]
-                }
+        while pending_ranges:
+            range_start, range_end = pending_ranges.pop()
+            '''
+            Request at most 9,999 IDs because PubMed capped the observed
+            10,000-ID request at 9,999. The response still reports the full
+            count, which lets us detect a truncated idlist. Include the API
+            key only when configured, so an unset key is not sent as text.
+            '''
+            params = {
+                "db": "pubmed",
+                "term": term_search_query,
+                "datetype": "edat",
+                "mindate": range_start.isoformat(),
+                "maxdate": range_end.isoformat(),
+                "retmode": "json",
+                "retmax": 9999,
             }
-        }
-        """
+            if self.api_key:
+                params["api_key"] = self.api_key
 
-        if count is not None:
-            year_range = f"{mindate}-{maxdate}"
+            '''
+            Retry temporary connection failures and timeouts for this same
+            slice. HTTP errors and malformed responses fail immediately.
+            Never turn an error into an empty PMID list: that would allow the
+            runner to advance the GARD update date despite missing results.
+            '''
+            for attempt in range(10):
+                try:
+                    response = requests.get(self.pubmed_esearch_api, params=params, timeout=30)
+                    response.raise_for_status()
+                    obj = response.json()
+                    result = obj["esearchresult"]
+                    count = int(result["count"])
+                    retmax = int(result["retmax"])
+                    retstart = int(result["retstart"])
+                    pubmed_ids = result["idlist"]
+                    '''
+                    This task never requests a nonzero offset. A mismatched
+                    offset or impossible count indicates an invalid response.
+                    '''
+                    if not isinstance(pubmed_ids, list) or retstart != 0 or count < len(pubmed_ids):
+                        raise ValueError("PubMed ESearch returned an inconsistent ID list or offset.")
+                    break
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                    if attempt == 9:
+                        self.logger.exception(
+                            f"PubMed ESearch failed for {gard_id}: {search_term}, {range_start} to {range_end}."
+                        )
+                        raise
+                    time.sleep(1)
+                except (requests.exceptions.RequestException, KeyError, TypeError, ValueError):
+                    self.logger.exception(
+                        f"PubMed ESearch failed for {gard_id}: {search_term}, {range_start} to {range_end}."
+                    )
+                    raise
+
+            '''
+            Compare count with the actual number of IDs, not with retmax.
+            For the 41,918-match coma example, 9,999 returned IDs cause this
+            branch to divide the date range instead of saving a partial row.
+            '''
+            if count > len(pubmed_ids):
+                if range_start == range_end:
+                    '''
+                    A single day cannot be split by date any further. Stop
+                    explicitly so the missing IDs are visible and retryable.
+                    '''
+                    raise RuntimeError(
+                        f"PubMed returned only {len(pubmed_ids)} of {count} PMIDs for "
+                        f"{gard_id}: {search_term} on {range_start}; date splitting cannot recover the rest."
+                    )
+
+                '''
+                The left slice ends on midpoint; the right starts the next
+                day. Those inclusive windows cover the parent exactly once.
+                Since this is a last-in-first-out stack, pushing the right
+                slice first makes the earlier dates run first. Repeat the
+                split if either child still exceeds PubMed's result limit.
+                '''
+                midpoint = range_start + (range_end - range_start) // 2
+                self.logger.info(
+                    f"Splitting PubMed search for {gard_id}: {search_term}, "
+                    f"{range_start} to {range_end}; returned {len(pubmed_ids)} of {count} PMIDs."
+                )
+                pending_ranges.append((midpoint + timedelta(days=1), range_end))
+                pending_ranges.append((range_start, midpoint))
+                continue
+
+            '''
+            Only complete responses reach this point. Store the exact date
+            slice in year_range so sibling slices have different keys and an
+            older broad, truncated row does not block this backfill. Preserve
+            the response JSON for later inspection and mapping repair.
+            '''
+            year_range = f"{range_start}-{range_end}"
+            querytranslation = result.get("querytranslation", "")
+            warnings = result.get("warninglist") or {}
+            phrasesignored = warnings.get("phrasesignored") or []
+            quotedphrasesnotfound = warnings.get("quotedphrasesnotfound") or []
             insert_sql = '''
                 INSERT INTO publication_gard_pubmed (
                     gard_id, year_range, search_term, total, retmax, retstart,
@@ -174,15 +240,18 @@ class NewPublicationDiscoveryTask(PipelineBase):
                 )
             '''
             values = (
-                gard_id, year_range, search_term, int(count), int(retmax), int(retstart),
+                gard_id, year_range, search_term, count, retmax, retstart,
                 ",".join(pubmed_ids), querytranslation, ",".join(phrasesignored),
                 ",".join(quotedphrasesnotfound), json.dumps(obj),
                 gard_id, year_range, search_term,
             )
             cursor = self.mysql.cursor()
             try:
-                # Retain the complete search response even when PubMed finds no
-                # IDs; later mapping repair jobs can read this raw source table.
+                '''
+                Record even a complete zero-match response. The NOT EXISTS
+                check avoids another raw row for the same GARD ID, term, and
+                date slice when discovery is retried after a later failure.
+                '''
                 cursor.execute(insert_sql, values)
                 inserted = cursor.rowcount
                 self.mysql.commit()
@@ -198,12 +267,14 @@ class NewPublicationDiscoveryTask(PipelineBase):
             if inserted:
                 self.logger.info(
                     f"Saved publication_gard_pubmed for {gard_id}: {search_term}, "
-                    f"year_range={year_range}, total={count}."
+                    f"year_range={year_range}, total={count}, returned={len(pubmed_ids)}."
                 )
 
-            return pubmed_ids
-        else:
-            return None
+            '''
+            Yield on reruns too: an existing raw row does not prove its
+            article and GARD/term/PMID mapping imports finished earlier.
+            '''
+            yield pubmed_ids
 
 
     # Step 2
@@ -304,12 +375,13 @@ class NewPublicationDiscoveryTask(PipelineBase):
                 f"mappings_added={mappings_added}."
             )
  
-        except Exception as e:
-            self.logger.error(e)
-            self.mysql.commit()
+        except Exception:
+            # Leave this search term retryable if article or mapping writes fail.
+            self.mysql.rollback()
+            self.logger.exception(f"Publication import failed for {gard_id}: {search_term}.")
+            raise
 
         finally:
             check_cursor.close()
             insert_article_cursor.close()
             insert_gard_searchterm_pubmed_mapping_cursor.close()
-            self.mysql.commit()
