@@ -62,11 +62,3 @@ AGENTS.md
 !Z_Alert/pipelines/grant_email_alert_process.md
 !Z_Alert/pipelines/pipeline_9_makeup/NCT06487273_location_count_mismatch_report.md
 
-# Keep the HPO extension table definitions visible under the broad SQL ignore.
-!Y_extension/hpo/20260925/create_extension_genes_to_disease.sql
-!Y_extension/hpo/20260925/create_extension_genes_to_phenotype.sql
-!Y_extension/hpo/20260925/create_extension_maxo_annotations.sql
-!Y_extension/hpo/20260925/create_extension_hpo_phenotype_to_genes.sql
-!Y_extension/hpo/20260925/graph/set_gard_phenotype_onset.cypher
-!Y_extension/hpo/20260925/graph/remove_has_phenotype_association.cypher
-!Y_extension/RARe-SOURCE/20260929/msql/create_extension_rare_source_tables.sql
