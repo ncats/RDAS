@@ -74,7 +74,7 @@ class GrantPipelineRunner(PipelineRunnerBase):
         self._run_pipeline_task(GrantProjectAnnotationTask)
 
         
-    """ Step 4 """
+    """ Step 5 """
     def graph_updates(self) -> None:
 
         from pipelines.pipeline_4_grant.task_grant_graph_1 import NewProjectGraphTask
@@ -117,7 +117,7 @@ class GrantPipelineRunner(PipelineRunnerBase):
 
         
 
-    """ Step 5 """
+    """ Step 4 """
     def followup_updates(self) -> None:
 
         from pipelines.pipeline_4_grant.task_grant_12 import GrantPublicationArticleImportTask
@@ -166,18 +166,24 @@ if __name__ == "__main__":
             lambda: runner.build_relationship(),
         )
 
+        '''
+        Import missing grant-linked PubMed articles before building the graph.
+        The import inserts publication_article rows with is_new = 1; the
+        publication graph task in Step 5 reads those rows to create Article
+        nodes needed by the CoreProject-Article relationship task.
+        '''
         # Step 4
         runner._run_step_with_timing(
-            "Step 4: graph_updates()",
+            "Step 4: followup_updates()",
             #lambda: runner.logger.info("\n\n*** Skip Step 4 ***\n\n"),
-            lambda: runner.graph_updates(),
+            lambda: runner.followup_updates(),
         )
 
         # Step 5
         runner._run_step_with_timing(
-            "Step 5: followup_updates()",
+            "Step 5: graph_updates()",
             #lambda: runner.logger.info("\n\n*** Skip Step 5 ***\n\n"),
-            lambda: runner.followup_updates(),
+            lambda: runner.graph_updates(),
         )
 
         # Step 6

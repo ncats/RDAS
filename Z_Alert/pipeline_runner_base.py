@@ -13,6 +13,9 @@ from utils.tools import _time_hms
 class PipelineRunnerBase:
     """Shared runner plumbing for alert entrypoints."""
 
+    # Existing Alert runners retain their continue-on-error task behavior.
+    raise_task_errors = False
+
     def __init__(self):
         self.log_dir = os.path.expanduser(os.getenv("ALERT_LOG_DIR", "logs"))
         os.makedirs(self.log_dir, exist_ok=True)
@@ -50,6 +53,15 @@ class PipelineRunnerBase:
         except Exception:
             self.logger.exception(f"Task failed: {name}.")
             hours, minutes, seconds = _time_hms(time.time() - start_time)
+            '''
+            The GARD grant runner opts into fail-fast task execution. If a
+            MySQL or graph task raises, do not reach the wrap-up task that
+            resets is_new flags needed for a retry. Other runners keep the
+            existing continue-after-error behavior by default.
+            '''
+            if self.raise_task_errors:
+                self.logger.error(f"\n*** Stopping after failed task: {name} in {hours} hours, {minutes} minutes, {seconds} seconds ***\n")
+                raise
             self.logger.error(f"\n*** Continuing after failed task: {name} in {hours} hours, {minutes} minutes, {seconds} seconds ***\n")
             return
 
