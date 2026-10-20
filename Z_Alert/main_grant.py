@@ -135,63 +135,117 @@ class GrantPipelineRunner(PipelineRunnerBase):
         self._run_pipeline_task(GrantPipelineWrapUpTask)
 
 
+class GARDGrantUpdateRunner(GrantPipelineRunner):
+    """Refresh GARD grant search terms before the shared grant stages."""
+
+    '''
+    A failed MySQL or graph task must stop this update before wrap-up clears
+    is_new flags. The regular Alert grant runner retains its existing policy.
+    '''
+    raise_task_errors = True
+
+    def build_relationship(self) -> None:
+
+        """Rebuild GARD search names, then run the shared relationship tasks."""
+
+        from baseclass.conn import DBConnection
+        from pipelines.pipeline_4_grant.task_grant_9 import GrantGardNameProcessingTask
+
+        mysql = DBConnection().mysql_conn()
+        if mysql is None:
+            raise ConnectionError("Unable to connect to MySQL for grant GARD name refresh.")
+
+        cursor = None
+        try:
+            cursor = mysql.cursor()
+            cursor.execute("SELECT COUNT(*) FROM gard")
+            gard_row_count = cursor.fetchone()[0]
+            if gard_row_count == 0:
+                raise RuntimeError("The gard table is empty; complete the GARD MySQL update first.")
+
+            '''
+            GrantGardNameProcessingTask updates derived search columns but
+            does not add source GARD rows. Rebuild those rows first using the
+            historical grant grouping. Keep DELETE and INSERT in one
+            transaction so a failed insert can restore the previous rows.
+            '''
+            cursor.execute("SET SESSION group_concat_max_len = 1048576")
+            cursor.execute("DELETE FROM grant_gard_processed_names")
+            cursor.execute('''
+                INSERT INTO grant_gard_processed_names
+                    (GardID, name, synonyms, data_source)
+                SELECT
+                    GardID,
+                    MAX(CASE WHEN Label_Predicate_Type = 'Name' THEN Label END),
+                    GROUP_CONCAT(
+                        CASE WHEN Label_Predicate_Type = 'Synonym' THEN Label END
+                        SEPARATOR '$$$'
+                    ),
+                    Label_Source
+                FROM gard
+                WHERE Label_Predicate_Mapping != 'DEPRECATED'
+                    AND LENGTH(Label) > 3
+                GROUP BY GardID, MONDO_ID, Label_Source
+            ''')
+            inserted_count = cursor.rowcount
+            if inserted_count == 0:
+                raise RuntimeError("No grant GARD name rows were built from the gard table.")
+
+            mysql.commit()
+            self.logger.info(f"Refreshed {inserted_count} grant_gard_processed_names rows from gard.")
+
+        except Exception:
+            mysql.rollback()
+            self.logger.exception("Unable to refresh grant GARD names from gard.")
+            raise
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+            mysql.close()
+
+        '''
+        Derive normalized terms from the rebuilt rows before the existing
+        project-matching task reads them. The base method then runs the same
+        relationship and annotation tasks as the regular Alert grant runner.
+        '''
+        self._run_pipeline_task(GrantGardNameProcessingTask)
+        super().build_relationship()
+
+
+def run_grant_pipeline(runner: GrantPipelineRunner) -> None:
+
+    """Run the shared grant stages for the Alert and GARD entry points."""
+
+    '''
+    Dispatch each stage through the supplied runner. The GARD runner overrides
+    build_relationship() to refresh GARD names before matching grant projects;
+    both entry points then execute the same remaining tasks in the same order.
+    '''
+    runner._run_step_with_timing("Step 1: download_reporters_data()", runner.download_reporters_data)
+    runner._run_step_with_timing("Step 2: upload_reporters_data_to_mysql()", runner.upload_reporters_data_to_mysql)
+    runner._run_step_with_timing("Step 3: build_relationship()", runner.build_relationship)
+
+    '''
+    GrantPublicationArticleImportTask inserts missing grant-linked PubMed rows
+    into publication_article with is_new = 1. Import and classify those rows
+    before the graph stage, which creates Article nodes and then connects them
+    to CoreProject nodes.
+    '''
+    runner._run_step_with_timing("Step 4: followup_updates()", runner.followup_updates)
+    runner._run_step_with_timing("Step 5: graph_updates()", runner.graph_updates)
+    runner._run_step_with_timing("Step 6: run_pipeline_wrapup()", runner.run_pipeline_wrapup)
+
 
 if __name__ == "__main__":
-    
+
     total_run_start_time = time.time()
 
     runner = GrantPipelineRunner()
 
     try:
         runner.logger.info(f"Grant pipeline generated latest completed year={LAST_YEAR}.")
- 
-        # Step 1
-        runner._run_step_with_timing(
-            "Step 1: download_reporters_data()",
-            #lambda: runner.logger.info("\n\n*** Skip Step 1 ***\n\n"),
-            lambda: runner.download_reporters_data(),
-        )
-
-        # Step 2
-        runner._run_step_with_timing(
-            "Step 2: upload_reporters_data_to_mysql()",
-            #lambda: runner.logger.info("\n\n*** Skip Step 2 ***\n\n"),
-            lambda: runner.upload_reporters_data_to_mysql(),
-        )
-
-        # Step 3
-        runner._run_step_with_timing(
-            "Step 3: build_relationship()",
-            #lambda: runner.logger.info("\n\n*** Skip Step 3 ***\n\n"),
-            lambda: runner.build_relationship(),
-        )
-
-        '''
-        Import missing grant-linked PubMed articles before building the graph.
-        The import inserts publication_article rows with is_new = 1; the
-        publication graph task in Step 5 reads those rows to create Article
-        nodes needed by the CoreProject-Article relationship task.
-        '''
-        # Step 4
-        runner._run_step_with_timing(
-            "Step 4: followup_updates()",
-            #lambda: runner.logger.info("\n\n*** Skip Step 4 ***\n\n"),
-            lambda: runner.followup_updates(),
-        )
-
-        # Step 5
-        runner._run_step_with_timing(
-            "Step 5: graph_updates()",
-            #lambda: runner.logger.info("\n\n*** Skip Step 5 ***\n\n"),
-            lambda: runner.graph_updates(),
-        )
-
-        # Step 6
-        runner._run_step_with_timing(
-            "Step 6: run_pipeline_wrapup()",
-            #lambda: runner.logger.info("\n\n*** Skip Step 6 ***\n\n"),
-            lambda: runner.run_pipeline_wrapup(),
-        )
+        run_grant_pipeline(runner)
 
 
     finally:
