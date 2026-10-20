@@ -18,7 +18,7 @@ from pipelines.pipeline_2_clinical_trial.task_clinical_trial_6 import NewClinica
 from pipelines.pipeline_3_publication.task_publication_7 import PublicationFalsePositiveFilterTask
 
 
-class GARDClinicalTrialAnnotationTask(NewClinicalTrialAnnotationTask):
+class GARDModelCachingClinicalTrialAnnotationTask(NewClinicalTrialAnnotationTask):
     """
     Reuse scispaCy models while the GARD runner processes multiple GARD nodes.
 
@@ -42,19 +42,19 @@ class GARDClinicalTrialAnnotationTask(NewClinicalTrialAnnotationTask):
 
         """Return the cached model/linker tuple, loading it on the first successful call."""
 
-        if GARDClinicalTrialAnnotationTask._cached_models is not None:
+        if GARDModelCachingClinicalTrialAnnotationTask._cached_models is not None:
             self.logger.info("Reusing clinical-trial annotation models and UMLS linkers loaded for this GARD run.")
-            return GARDClinicalTrialAnnotationTask._cached_models
+            return GARDModelCachingClinicalTrialAnnotationTask._cached_models
 
         models = super().load_models()
         # Do not cache a partial or failed load; the next node can retry it.
         if all(model is not None for model in models):
-            GARDClinicalTrialAnnotationTask._cached_models = models
+            GARDModelCachingClinicalTrialAnnotationTask._cached_models = models
 
         return models
 
 
-class GARDPublicationFalsePositiveFilterTask(PublicationFalsePositiveFilterTask):
+class GARDModelCachingPublicationFalsePositiveFilterTask(PublicationFalsePositiveFilterTask):
     """
     Reuse the small English spaCy model across this run's GARD node iterations.
 
@@ -81,13 +81,13 @@ class GARDPublicationFalsePositiveFilterTask(PublicationFalsePositiveFilterTask)
             self.umls_search_api = os.getenv("UMLS_SEARCH_API")
             self.umls_cui_api_template = os.getenv("UMLS_CUI_API_TEMPLATE")
 
-            if GARDPublicationFalsePositiveFilterTask._cached_nlp is None:
-                GARDPublicationFalsePositiveFilterTask._cached_nlp = spacy.load("en_core_web_sm")
+            if GARDModelCachingPublicationFalsePositiveFilterTask._cached_nlp is None:
+                GARDModelCachingPublicationFalsePositiveFilterTask._cached_nlp = spacy.load("en_core_web_sm")
                 self.logger.info("Loaded en_core_web_sm for GARD publication filtering.")
             else:
                 self.logger.info("Reusing en_core_web_sm for GARD publication filtering.")
 
-            self.nlp = GARDPublicationFalsePositiveFilterTask._cached_nlp
+            self.nlp = GARDModelCachingPublicationFalsePositiveFilterTask._cached_nlp
         except Exception:
             self.close()
             raise
@@ -108,10 +108,10 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
 
         # Substitute model-caching tasks only for this GARD runner.
         if task_class is NewClinicalTrialAnnotationTask:
-            task_class = GARDClinicalTrialAnnotationTask
+            task_class = GARDModelCachingClinicalTrialAnnotationTask
             task_name = task_name or NewClinicalTrialAnnotationTask.__name__
         elif task_class is PublicationFalsePositiveFilterTask:
-            task_class = GARDPublicationFalsePositiveFilterTask
+            task_class = GARDModelCachingPublicationFalsePositiveFilterTask
             task_name = task_name or PublicationFalsePositiveFilterTask.__name__
 
         super()._run_pipeline_task(task_class, task_name=task_name, **kwargs)
