@@ -38,15 +38,36 @@ class ClinicalTrialStudyChangeHandler:
         The clinical_trial table can contain multiple rows for the same NCT ID
         because a trial can match more than one GARD disease term. For change
         detection, clinical_trial_unique is the safer source because it has one
-        row per NCT ID. If the unique row is missing, this method inserts into
-        clinical_trial so task_clinical_trial_2.py can create the unique row in
-        the next pipeline step.
+        row per NCT ID. If the unique row is missing, reuse an identical
+        clinical_trial staging row from an interrupted discovery run, or insert
+        a new one for task_clinical_trial_2.py to process next.
         '''
         stored_study = self.load_unique_study(nctid)
         serialized_study = self._serialize_for_storage(fetched_study)
 
         try:
             if stored_study is None:
+                '''
+                A GARD run can stop after clinical_trial discovery commits but
+                before task_clinical_trial_2 creates clinical_trial_unique.
+                On restart, the missing unique row alone must not cause the
+                same GARD/name/NCT study to be inserted a second time. Reuse
+                an identical staged row and leave it marked is_new for task 2.
+                '''
+                staged_study = self.load_staged_study(gard_id, disease_name, nctid)
+                if staged_study is not None:
+                    is_same, _ = self.compare_studies(staged_study["studies"], fetched_study)
+                    if is_same:
+                        if not staged_study["is_new"]:
+                            cursor = self.mysql.cursor()
+                            try:
+                                cursor.execute("UPDATE clinical_trial SET is_new = 1 WHERE id = %s", (staged_study["id"],))
+                            finally:
+                                cursor.close()
+                        self.mysql.commit()
+                        self._log_info(f"Reusing staged nctid: {nctid} for: {gard_id}")
+                        return {"action": "unchanged", "is_same": True, "differences": []}
+
                 self._insert_clinical_trial(gard_id, disease_name, nctid, serialized_study, source_url)
                 self.mysql.commit()
                 self._log_info(f"New nctid added: {nctid} for: {gard_id}")
@@ -118,6 +139,29 @@ class ClinicalTrialStudyChangeHandler:
 
             return row.get("studies")
 
+        finally:
+            cursor.close()
+
+
+    def load_staged_study(self, gard_id: str, disease_name: str, nctid: str) -> Optional[Dict[str, Any]]:
+
+        '''
+        Find the latest staged study for this exact GARD search term.
+
+        clinical_trial can have multiple rows for an NCT ID across different
+        diseases or terms. Match all three identifiers so a restart reuses
+        only the row written by the same discovery search. MySQL can use
+        the existing nctid or gardId index to narrow the lookup.
+        '''
+        cursor = self.mysql.cursor(dictionary=True, buffered=True)
+        try:
+            cursor.execute(
+                '''SELECT id, studies, is_new FROM clinical_trial
+                   WHERE gardId = %s AND disease = %s AND nctid = %s
+                   ORDER BY id DESC LIMIT 1''',
+                (gard_id, disease_name, nctid),
+            )
+            return cursor.fetchone()
         finally:
             cursor.close()
 

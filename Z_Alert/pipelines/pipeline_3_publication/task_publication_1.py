@@ -388,7 +388,9 @@ class NewPublicationDiscoveryTask(PipelineBase):
                             A download can take long enough for another task
                             to save a tuple after the earlier batch precheck.
                             This preserves the old per-row NOT EXISTS behavior
-                            without requiring a unique mapping key.
+                            without requiring a unique mapping key. If the live
+                            database also has that key, the no-op duplicate
+                            handler covers a concurrent insert after this check.
                             '''
                             incoming_ids_sql = " UNION ALL ".join(
                                 ["SELECT %s AS pubmed_id"] + ["SELECT %s"] * (len(mapping_pubmed_ids) - 1)
@@ -403,7 +405,8 @@ class NewPublicationDiscoveryTask(PipelineBase):
                                         WHERE existing.gard_id = %s
                                           AND existing.search_term = %s
                                           AND existing.pubmed_id = incoming.pubmed_id
-                                    )''',
+                                    )
+                                    ON DUPLICATE KEY UPDATE id = id''',
                                 [gard_id, search_term, *mapping_pubmed_ids, gard_id, search_term],
                             )
                         inserted_mappings = mapping_cursor.rowcount if mapping_pubmed_ids else 0
