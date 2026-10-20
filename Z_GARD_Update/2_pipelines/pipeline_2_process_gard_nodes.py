@@ -1,6 +1,9 @@
 
+import os
 import sys
 from pathlib import Path
+
+import spacy
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -10,7 +13,9 @@ for import_path in (str(PROJECT_ROOT), str(Z_ALERT_ROOT)):
         sys.path.insert(0, import_path)
 
 from Z_Alert.main import AlertPipelineRunner
+from pipelines.pipeline_base import PipelineBase
 from pipelines.pipeline_2_clinical_trial.task_clinical_trial_6 import NewClinicalTrialAnnotationTask
+from pipelines.pipeline_3_publication.task_publication_7 import PublicationFalsePositiveFilterTask
 
 
 class GARDClinicalTrialAnnotationTask(NewClinicalTrialAnnotationTask):
@@ -49,6 +54,45 @@ class GARDClinicalTrialAnnotationTask(NewClinicalTrialAnnotationTask):
         return models
 
 
+class GARDPublicationFalsePositiveFilterTask(PublicationFalsePositiveFilterTask):
+    """
+    Reuse the small English spaCy model across this run's GARD node iterations.
+
+    The shared publication task loads en_core_web_sm in its constructor. The
+    GARD runner constructs that task for every node, including nodes with no
+    abbreviation mappings to validate. Keep the model on this subclass so its
+    pipeline is loaded once per Python process and reused by later task instances.
+
+    The model is used sequentially for text parsing. MySQL connections, loggers,
+    and UMLS endpoint settings still belong to each new task instance. The
+    regular Alert runner continues to use PublicationFalsePositiveFilterTask.
+    """
+
+    _cached_nlp = None
+    # Keep this task's errors in the publication pipeline error log.
+    __module__ = PublicationFalsePositiveFilterTask.__module__
+
+    def __init__(self):
+
+        # Bypass only the parent's spacy.load(); PipelineBase still opens per-task resources.
+        PipelineBase.__init__(self, init_mysql=True, init_memgraph=False)
+        try:
+            self.api_key = os.getenv("UMLS_API_KEY")
+            self.umls_search_api = os.getenv("UMLS_SEARCH_API")
+            self.umls_cui_api_template = os.getenv("UMLS_CUI_API_TEMPLATE")
+
+            if GARDPublicationFalsePositiveFilterTask._cached_nlp is None:
+                GARDPublicationFalsePositiveFilterTask._cached_nlp = spacy.load("en_core_web_sm")
+                self.logger.info("Loaded en_core_web_sm for GARD publication filtering.")
+            else:
+                self.logger.info("Reusing en_core_web_sm for GARD publication filtering.")
+
+            self.nlp = GARDPublicationFalsePositiveFilterTask._cached_nlp
+        except Exception:
+            self.close()
+            raise
+
+
 class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
 
     def __init__(self):
@@ -62,10 +106,13 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
 
     def _run_pipeline_task(self, task_class, task_name=None, **kwargs) -> None:
 
-        # Substitute the cached task only for this GARD runner.
+        # Substitute model-caching tasks only for this GARD runner.
         if task_class is NewClinicalTrialAnnotationTask:
             task_class = GARDClinicalTrialAnnotationTask
             task_name = task_name or NewClinicalTrialAnnotationTask.__name__
+        elif task_class is PublicationFalsePositiveFilterTask:
+            task_class = GARDPublicationFalsePositiveFilterTask
+            task_name = task_name or PublicationFalsePositiveFilterTask.__name__
 
         super()._run_pipeline_task(task_class, task_name=task_name, **kwargs)
 
