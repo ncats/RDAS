@@ -31,7 +31,7 @@ disease names between the node's last update date and today.
 It saves each PubMed search response in publication_gard_pubmed, downloads
 article metadata for PMIDs that are NOT already in publication_article,
 stores those article rows in publication_article, and records the
-GARD/search-term/PMID relationship(unique)in publication_gard_searchterm_pubmed_mapping.
+GARD/search-term/PMID relationship in publication_gard_searchterm_pubmed_mapping.
 """
 # Reference: C_publication/init_1_publication_gard_pubmed-id.py
 # Reference: C_publication/init_2_1_publication-gard-searchterm-pubmed-mapping.py
@@ -334,8 +334,10 @@ class NewPublicationDiscoveryTask(PipelineBase):
 
                     '''
                     End the read transaction before waiting for network calls.
-                    The unique keys on both publication tables protect
-                    against another writer inserting the same PMID meanwhile.
+                    The Article table's unique PMID key protects its insert
+                    if another writer saves that PMID during the download.
+                    Mapping rows have no unique key, so the mapping precheck
+                    above skips tuples already present before this download.
                     '''
                     self.mysql.commit()
 
@@ -359,8 +361,8 @@ class NewPublicationDiscoveryTask(PipelineBase):
                     its new mapping must still be inserted. A failed download
                     of a missing Article does not create an orphan mapping.
                     '''
-                    mapping_rows = [
-                        (gard_id, search_term, pubmed_id)
+                    mapping_pubmed_ids = [
+                        pubmed_id
                         for pubmed_id in batch_ids
                         if pubmed_id in eligible_mapping_ids and pubmed_id not in existing_mapping_ids
                     ]
@@ -380,16 +382,31 @@ class NewPublicationDiscoveryTask(PipelineBase):
                             )
                         inserted_articles = article_cursor.rowcount if article_rows else 0
 
-                        if mapping_rows:
-                            mapping_placeholders = ",".join(["(%s,%s,%s)"] * len(mapping_rows))
+                        if mapping_pubmed_ids:
+                            '''
+                            Recheck the mapping table in the bulk INSERT itself.
+                            A download can take long enough for another task
+                            to save a tuple after the earlier batch precheck.
+                            This preserves the old per-row NOT EXISTS behavior
+                            without requiring a unique mapping key.
+                            '''
+                            incoming_ids_sql = " UNION ALL ".join(
+                                ["SELECT %s AS pubmed_id"] + ["SELECT %s"] * (len(mapping_pubmed_ids) - 1)
+                            )
                             mapping_cursor.execute(
                                 f'''INSERT INTO publication_gard_searchterm_pubmed_mapping
                                     (gard_id, search_term, pubmed_id)
-                                    VALUES {mapping_placeholders}
-                                    ON DUPLICATE KEY UPDATE id = id''',
-                                [value for row in mapping_rows for value in row],
+                                    SELECT %s, %s, incoming.pubmed_id
+                                    FROM ({incoming_ids_sql}) AS incoming
+                                    WHERE NOT EXISTS (
+                                        SELECT 1 FROM publication_gard_searchterm_pubmed_mapping AS existing
+                                        WHERE existing.gard_id = %s
+                                          AND existing.search_term = %s
+                                          AND existing.pubmed_id = incoming.pubmed_id
+                                    )''',
+                                [gard_id, search_term, *mapping_pubmed_ids, gard_id, search_term],
                             )
-                        inserted_mappings = mapping_cursor.rowcount if mapping_rows else 0
+                        inserted_mappings = mapping_cursor.rowcount if mapping_pubmed_ids else 0
 
                         '''
                         Article rows and their mappings commit together. If
