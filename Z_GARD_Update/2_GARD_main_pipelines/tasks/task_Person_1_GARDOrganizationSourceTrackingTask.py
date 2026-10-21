@@ -2,8 +2,9 @@
 
 First invocation: per-node run_pipeline_maintenance() substitutes this task for
 the shared source tracker. It is also invoked later with person_only=True,
-after final person grouping and Agent graph updates. Its number records its
-FIRST invocation, not every subsequent use of the same class.
+after final person grouping and Agent graph updates. It is Person task 1 because
+it is the first Person-domain task invoked; grouping and Agent updates are
+Person tasks 2 and 3. Reusing this class later does not assign another number.
 
 Illustrative input states:
     trial = {"nctid": "NCT01234567", "is_new": 1}

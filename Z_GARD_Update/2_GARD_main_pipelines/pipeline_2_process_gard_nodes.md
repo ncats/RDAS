@@ -40,23 +40,24 @@ number. These tasks are used only by this runner.
 ### Task file order
 
 Filenames follow `task_<ClinicalTrial|Publication|Person>_<number>_<ClassName>.py`.
-Numbers follow **first invocation** in the normal runner flow across all three
-families, including shared methods inherited from Alert. They describe the listed
-GARD-specific tasks; shared Alert tasks and the model caches kept in the runner
-retain their existing names and order.
+Numbers start at **1 independently in each prefix domain** and follow first
+invocation within that domain, including shared methods inherited from Alert.
+For example, clinical-trial discovery and publication discovery are each task 1
+in their own domains. They describe the listed GARD-specific tasks; shared Alert
+tasks and the model caches kept in the runner retain their existing names and order.
 
-| Number | Task module | First invocation |
-| --- | --- | --- |
-| 1 | [GARDClinicalTrialDiscoveryTask](./tasks/task_ClinicalTrial_1_GARDClinicalTrialDiscoveryTask.py) | Per-node clinical-trial discovery |
-| 2 | [GARDPublicationDiscoveryTask](./tasks/task_Publication_2_GARDPublicationDiscoveryTask.py) | Per-node publication discovery |
-| 3 | [GARDOMIMPublicationMappingTask](./tasks/task_Publication_3_GARDOMIMPublicationMappingTask.py) | Current-GARD OMIM mapping |
-| 4 | [GARDOMIMDataRetrievalTask](./tasks/task_Publication_4_GARDOMIMDataRetrievalTask.py) | Current-GARD OMIM reuse/retrieval |
-| 5 | [GARDClinicalTrialPmidArticleImportTask](./tasks/task_ClinicalTrial_5_GARDClinicalTrialPmidArticleImportTask.py) | Clinical-trial MySQL updates |
-| 6 | [GARDOMIMPublicationArticleImportTask](./tasks/task_Publication_6_GARDOMIMPublicationArticleImportTask.py) | Publication MySQL updates |
-| 7 | [GARDPublicationGardArticleRelationshipTask](./tasks/task_Publication_7_GARDPublicationGardArticleRelationshipTask.py) | Publication graph updates |
-| 8 | [GARDOrganizationSourceTrackingTask](./tasks/task_Person_8_GARDOrganizationSourceTrackingTask.py) | Per-node maintenance; repeated with `person_only=True` after final Agent updates |
-| 9 | [GARDPersonGroupingTask](./tasks/task_Person_9_GARDPersonGroupingTask.py) | Final person grouping |
-| 10 | [GARDPersonAgentGraphTask](./tasks/task_Person_10_GARDPersonAgentGraphTask.py) | Final Agent graph updates |
+| Domain | Number | Task module | First invocation |
+| --- | --- | --- | --- |
+| ClinicalTrial | 1 | [GARDClinicalTrialDiscoveryTask](./tasks/task_ClinicalTrial_1_GARDClinicalTrialDiscoveryTask.py) | Per-node clinical-trial discovery |
+| ClinicalTrial | 2 | [GARDClinicalTrialPmidArticleImportTask](./tasks/task_ClinicalTrial_2_GARDClinicalTrialPmidArticleImportTask.py) | Clinical-trial MySQL updates |
+| Publication | 1 | [GARDPublicationDiscoveryTask](./tasks/task_Publication_1_GARDPublicationDiscoveryTask.py) | Per-node publication discovery |
+| Publication | 2 | [GARDOMIMPublicationMappingTask](./tasks/task_Publication_2_GARDOMIMPublicationMappingTask.py) | Current-GARD OMIM mapping |
+| Publication | 3 | [GARDOMIMDataRetrievalTask](./tasks/task_Publication_3_GARDOMIMDataRetrievalTask.py) | Current-GARD OMIM reuse/retrieval |
+| Publication | 4 | [GARDOMIMPublicationArticleImportTask](./tasks/task_Publication_4_GARDOMIMPublicationArticleImportTask.py) | Publication MySQL updates |
+| Publication | 5 | [GARDPublicationGardArticleRelationshipTask](./tasks/task_Publication_5_GARDPublicationGardArticleRelationshipTask.py) | Publication graph updates |
+| Person | 1 | [GARDOrganizationSourceTrackingTask](./tasks/task_Person_1_GARDOrganizationSourceTrackingTask.py) | Per-node maintenance; repeated with `person_only=True` after final Agent updates |
+| Person | 2 | [GARDPersonGroupingTask](./tasks/task_Person_2_GARDPersonGroupingTask.py) | Final person grouping |
+| Person | 3 | [GARDPersonAgentGraphTask](./tasks/task_Person_3_GARDPersonAgentGraphTask.py) | Final Agent graph updates |
 
 ```mermaid
 flowchart TD
