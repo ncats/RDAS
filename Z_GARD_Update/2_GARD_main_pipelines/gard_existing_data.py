@@ -3,6 +3,7 @@
 import json
 import re
 from contextlib import contextmanager
+from datetime import date
 
 from baseclass.conn import DBConnection
 from pipelines.pipeline_2_clinical_trial.clinical_trial_study_change_handler import ClinicalTrialStudyChangeHandler
@@ -20,6 +21,8 @@ class GARDExistingDataReuse:
         "clinical_trial_intervention_drug", "clinical_trial_nctid_pmids_mapping",
         "publication_article", "publication_pubtator", "publication_pubtator_parsed",
         "publication_substance", "publication_substance_unique",
+        "publication_gard_pubmed", "publication_gard_searchterm_pubmed_mapping",
+        "publication_gard_omim_mapping", "publication_omim", "publication_omim_pubmed_mapping",
     )
 
     def __init__(self):
@@ -61,7 +64,7 @@ class GARDExistingDataReuse:
             )
             available = {}
             for schema, table, column, extra in cursor.fetchall():
-                if table in self.TABLES and column not in {"id", "created", "processed"} and "GENERATED" not in extra.upper() and "auto_increment" not in extra.lower():
+                if table in self.TABLES and column not in {"id", "create", "created", "processed"} and "GENERATED" not in extra.upper() and "auto_increment" not in extra.lower():
                     available.setdefault((schema, table), []).append(column)
             for table in self.TABLES:
                 source = available.get((self.SOURCE_DATABASE, table), [])
@@ -93,8 +96,9 @@ class GARDExistingDataReuse:
         the current-node override here as well as at the discovery entry point
         so future copy callers cannot accidentally import other associations.
         '''
-        if "gardId" in columns and (not self.current_gard_id or overrides.get("gardId") != self.current_gard_id):
-            raise ValueError(f"{table} copies must explicitly use the current GARD ID.")
+        for gard_column in ("gardId", "gard_id"):
+            if gard_column in columns and (not self.current_gard_id or overrides.get(gard_column) != self.current_gard_id):
+                raise ValueError(f"{table} copies must explicitly use the current GARD ID.")
         expressions = []
         values = []
         for column in columns:
@@ -129,12 +133,13 @@ class GARDExistingDataReuse:
             cursor.execute(f"UPDATE `{self.TARGET_DATABASE}`.`{table}` d JOIN {incoming} ON {comparisons} SET d.is_new = 1", (*values, *params))
         return inserted
 
-    def copy_publications(self, mysql, logger, pubmed_ids):
+    def copy_publications(self, mysql, logger, pubmed_ids, search_term=None):
 
         '''
-        PubMed search responses and disease mappings are produced by current
-        discovery, never imported from another GARD ID. Reuse only the PMID's
-        metadata and supporting PubTator/substance records. Existing completed
+        Reuse the PMID's metadata and supporting PubTator/substance records.
+        A direct disease search also copies its exact source GARD/term mappings;
+        absent mappings still come from the shared current-search importer.
+        Trial/OMIM references do not invent disease search terms. Existing completed
         target Articles stay completed; a separate GARD relationship task
         handles their new disease mapping without duplicating author rows.
         '''
@@ -185,6 +190,25 @@ class GARDExistingDataReuse:
                             WHERE ps.pubmed_id IN ({marks}) AND ps.hash_id = s.hash_id)''',
                         reusable,
                     )
+                if search_term is not None:
+                    '''
+                    A PMID can match several diseases and search terms. Copy
+                    only this exact current association, retaining one source
+                    history row per tuple. Reset abbreviation decisions because
+                    current GARD labels/content may differ from production.
+                    Requiring a destination Article avoids orphan mappings.
+                    '''
+                    self._copy_rows(
+                        cursor, "publication_gard_searchterm_pubmed_mapping",
+                        f'''s.gard_id = %s AND BINARY s.search_term = BINARY %s
+                            AND s.pubmed_id IN ({placeholders})
+                            AND s.id = (SELECT MAX(m.id) FROM rdas_db.publication_gard_searchterm_pubmed_mapping m
+                                WHERE m.gard_id = s.gard_id AND BINARY m.search_term = BINARY s.search_term AND m.pubmed_id = s.pubmed_id)
+                            AND EXISTS (SELECT 1 FROM gard_rdas_db.publication_article a WHERE a.pubmed_id = s.pubmed_id)''',
+                        (self.current_gard_id, search_term, *batch),
+                        keys=["gard_id", "search_term", "pubmed_id"],
+                        overrides={"gard_id": self.current_gard_id, "search_term": search_term, "is_abbreviation": None, "is_valid": None},
+                    )
                 mysql.commit()
             logger.info(f"Reused {copied} publication_article rows from rdas_db; checked {len(identifiers)} PMIDs and copied their available enrichment.")
         except Exception:
@@ -192,6 +216,192 @@ class GARDExistingDataReuse:
             raise
         finally:
             cursor.close()
+
+    def copy_publication_search_history(self, mysql, logger, gard_id, search_term, mindate, maxdate):
+
+        '''
+        Copy complete historical responses only for this exact disease/term
+        and overlapping date window, after ALL live slices for the term finish.
+        A raw response includes a whole PMID list and count: matching just one
+        PMID cannot justify rebinding a different disease's response. Requiring
+        every cached PMID to have a current target mapping avoids importing
+        unrelated IDs. Count validation rejects older truncated rows such as
+        coma's 9,999-of-41,918 response. The current live row takes
+        precedence whenever its disease/term/date key already exists.
+        '''
+        self.validate_connection(mysql)
+        if gard_id != self.current_gard_id:
+            raise ValueError("PubMed search history must use the current GARD node.")
+        current_search_term = search_term
+        search_term = search_term.lower()
+        lower = date.fromisoformat(str(mindate or date(1970, 1, 1))[:10])
+        upper = date.fromisoformat(str(maxdate or date.today())[:10])
+        reader = mysql.cursor(dictionary=True, buffered=True)
+        writer = mysql.cursor(buffered=True)
+        copied = 0
+        try:
+            reader.execute(
+                '''SELECT id, year_range, total, retstart, pubmed_ids, ref_json
+                   FROM rdas_db.publication_gard_pubmed
+                   WHERE gard_id = %s AND BINARY search_term = BINARY %s ORDER BY id DESC''',
+                (gard_id, search_term),
+            )
+            for row in reader:
+                try:
+                    bounds = re.fullmatch(r"(\d{4}-\d{2}-\d{2})-(\d{4}-\d{2}-\d{2})", row["year_range"] or "")
+                    years = re.fullmatch(r"(\d{4})-(\d{4})", row["year_range"] or "")
+                    if bounds:
+                        start, end = date.fromisoformat(bounds[1]), date.fromisoformat(bounds[2])
+                    elif years:
+                        start, end = date(int(years[1]), 1, 1), date(int(years[2]), 12, 31)
+                    else:
+                        continue
+                    if start > end or end < lower or start > upper:
+                        continue
+                    result = json.loads(row["ref_json"])["esearchresult"]
+                    response_ids = result["idlist"]
+                    if not isinstance(response_ids, list) or any(not str(value).isdigit() for value in response_ids):
+                        continue
+                    ids = {str(value) for value in response_ids}
+                    stored_ids = set(filter(None, (row["pubmed_ids"] or "").split(",")))
+                    if int(result["count"]) != len(response_ids) or row["total"] != len(response_ids) or int(result["retstart"]) != 0 or row["retstart"] != 0 or stored_ids != ids:
+                        continue
+                except (ValueError, TypeError, KeyError):
+                    continue
+                '''
+                Verify IDs in small indexed lookups instead of collecting all
+                live search slices in memory. Run this after discovery finishes:
+                copying historical keys earlier could block a later live slice's
+                raw-row insert. Source date labels and response JSON stay intact.
+                '''
+                mapped = True
+                identifiers = list(ids)
+                for offset in range(0, len(identifiers), self.BATCH_SIZE):
+                    batch = identifiers[offset:offset + self.BATCH_SIZE]
+                    marks = ",".join(["%s"] * len(batch))
+                    writer.execute(
+                        f'''SELECT DISTINCT pubmed_id FROM gard_rdas_db.publication_gard_searchterm_pubmed_mapping
+                            WHERE gard_id = %s AND BINARY search_term = BINARY %s AND pubmed_id IN ({marks})''',
+                        (gard_id, current_search_term, *batch),
+                    )
+                    if {str(value[0]) for value in writer.fetchall()} != set(batch):
+                        mapped = False
+                        break
+                if not mapped:
+                    continue
+                copied += self._copy_rows(
+                    writer, "publication_gard_pubmed", "s.id = %s", (row["id"],),
+                    keys=["gard_id", "search_term", "year_range"],
+                    overrides={"gard_id": gard_id, "search_term": search_term},
+                )
+            mysql.commit()
+            if copied:
+                logger.info(f"{gard_id}: copied {copied} complete historical publication_gard_pubmed responses for {search_term}.")
+        except Exception:
+            mysql.rollback()
+            raise
+        finally:
+            reader.close()
+            writer.close()
+
+    def copy_gard_omim_mappings(self, mysql, logger, gard_id):
+
+        '''
+        Production associations are eligible only when the NEW GARD source
+        still lists that OMIM cross-reference. This avoids resurrecting retired
+        associations or attaching other diseases that happen to share a PMID.
+        The shared mapping task subsequently adds any new cross-references
+        missing from production; all writes explicitly use the current GARD ID.
+        '''
+        self.validate_connection(mysql)
+        if gard_id != self.current_gard_id:
+            raise ValueError("OMIM mapping copies must use the current GARD node.")
+        cursor = mysql.cursor(buffered=True)
+        try:
+            cursor.execute("SELECT Label_Xref FROM gard_rdas_db.gard WHERE GardID = %s", (gard_id,))
+            omim_ids = set()
+            for (xrefs,) in cursor.fetchall():
+                for item in (xrefs or "").split(","):
+                    prefix, separator, identifier = item.strip().partition(":")
+                    if prefix == "OMIM" and separator and identifier.isdigit():
+                        omim_ids.add(identifier)
+            identifiers = sorted(omim_ids, key=int)
+            copied = 0
+            for start in range(0, len(identifiers), self.BATCH_SIZE):
+                batch = identifiers[start:start + self.BATCH_SIZE]
+                marks = ",".join(["%s"] * len(batch))
+                copied += self._copy_rows(
+                    cursor, "publication_gard_omim_mapping", f"s.gard_id = %s AND s.omim_id IN ({marks})",
+                    (gard_id, *batch), keys=["gard_id", "omim_id"], overrides={"gard_id": gard_id}, restage_existing=True,
+                )
+            mysql.commit()
+            logger.info(f"{gard_id}: reused {copied} current GARD/OMIM associations from rdas_db.")
+        except Exception:
+            mysql.rollback()
+            raise
+        finally:
+            cursor.close()
+
+    def copy_omim_data(self, mysql, logger, gard_id):
+
+        '''
+        Cache OMIM entries for this disease's staged associations before the
+        shared API task asks for missing entries. Validate the entry's identity,
+        preserve existing destination JSON, and copy only references actually
+        present in that chosen JSON. Re-stage relevant existing OMIM entries:
+        the PMID importer/OMIMRef graph task must see them for this new GARD
+        association even if another disease previously consumed their flags.
+        '''
+        self.validate_connection(mysql)
+        if gard_id != self.current_gard_id:
+            raise ValueError("OMIM data copies must use the current GARD node.")
+        reader = mysql.cursor(dictionary=True, buffered=True)
+        writer = mysql.cursor(buffered=True)
+        copied = 0
+        copied_pairs = 0
+        try:
+            reader.execute("SELECT DISTINCT omim_id FROM gard_rdas_db.publication_gard_omim_mapping WHERE gard_id = %s AND omim_id IS NOT NULL", (gard_id,))
+            identifiers = [row["omim_id"] for row in reader.fetchall()]
+            for start in range(0, len(identifiers), self.BATCH_SIZE):
+                batch = identifiers[start:start + self.BATCH_SIZE]
+                marks = ",".join(["%s"] * len(batch))
+                reader.execute(f"SELECT s.id, s.omim_id, s.entry_json FROM rdas_db.publication_omim s WHERE s.omim_id IN ({marks}) AND s.id = (SELECT MAX(o.id) FROM rdas_db.publication_omim o WHERE o.omim_id = s.omim_id)", batch)
+                for row in reader.fetchall():
+                    try:
+                        entries = json.loads(row["entry_json"])["omim"]["entryList"]
+                        entries = [entries] if isinstance(entries, dict) else entries
+                        if not isinstance(entries, list):
+                            raise ValueError("Invalid OMIM entry list")
+                        entry = next(item["entry"] for item in entries if isinstance(item, dict) and isinstance(item.get("entry"), dict) and str(item["entry"].get("mimNumber")) == str(row["omim_id"]))
+                        references = entry.get("referenceList") or []
+                        references = [references] if isinstance(references, dict) else references
+                        if not isinstance(references, list):
+                            raise ValueError("Invalid OMIM reference list")
+                        pmids = sorted({str(item["reference"]["pubmedID"]) for item in references if isinstance(item, dict) and isinstance(item.get("reference"), dict) and str(item["reference"].get("pubmedID", "")).isdigit()}, key=int)
+                    except (ValueError, TypeError, KeyError, StopIteration):
+                        logger.warning(f"Invalid cached OMIM entry {row['omim_id']}; leave it for the normal OMIM retrieval task.")
+                        continue
+                    copied += self._copy_rows(writer, "publication_omim", "s.id = %s", (row["id"],), keys=["omim_id"])
+                    for ref_start in range(0, len(pmids), self.BATCH_SIZE):
+                        refs = pmids[ref_start:ref_start + self.BATCH_SIZE]
+                        ref_marks = ",".join(["%s"] * len(refs))
+                        copied_pairs += self._copy_rows(
+                            writer, "publication_omim_pubmed_mapping",
+                            f'''s.omim_id = %s AND s.pubmed_id IN ({ref_marks})
+                                AND EXISTS (SELECT 1 FROM gard_rdas_db.publication_omim d
+                                    WHERE d.omim_id = s.omim_id AND BINARY d.entry_json = BINARY %s)''',
+                            (row["omim_id"], *refs, row["entry_json"]), keys=["omim_id", "pubmed_id"],
+                        )
+                writer.execute(f"UPDATE gard_rdas_db.publication_omim SET is_new = 1 WHERE omim_id IN ({marks})", batch)
+                writer.execute(f"UPDATE gard_rdas_db.publication_gard_omim_mapping SET is_new = 1 WHERE gard_id = %s AND omim_id IN ({marks})", (gard_id, *batch))
+                mysql.commit()
+            logger.info(f"{gard_id}: reused {copied} publication_omim entries and {copied_pairs} OMIM/PMID pairs from rdas_db.")
+        except Exception:
+            mysql.rollback()
+            raise
+        finally:
+            reader.close()
+            writer.close()
 
     def copy_clinical_trials(self, mysql, logger, gard_id, disease, nctids, source_url):
 

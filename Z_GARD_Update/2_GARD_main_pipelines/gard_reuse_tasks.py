@@ -7,6 +7,8 @@ from itertools import repeat
 from pipelines.pipeline_2_clinical_trial.task_clinical_trial_1 import NewClinicalTrialDiscoveryTask
 from pipelines.pipeline_2_clinical_trial.task_clinical_trial_5 import ClinicalTrialPmidArticleImportTask
 from pipelines.pipeline_3_publication.task_publication_1 import NewPublicationDiscoveryTask
+from pipelines.pipeline_3_publication.task_publication_3 import GardOmimPublicationMappingTask
+from pipelines.pipeline_3_publication.task_publication_4 import PublicationOminDataRetrievalTask
 from pipelines.pipeline_3_publication.task_publication_8 import NewOmimPublicationArticleImportTask
 from pipelines.pipeline_3_publication.task_publication_graph_8 import NewPublicationGardArticleRelationshipTask
 from utils.tools import _escape_sql_literal, _resolve_worker_count, _safe_get
@@ -88,12 +90,73 @@ class GARDPublicationDiscoveryTask(NewPublicationDiscoveryTask):
         Copy complete cached metadata and available enrichment before the shared
         importer checks for missing Articles. Its bounded HTTP pool downloads
         only remaining PMIDs and creates mappings using this gard_id and term.
-        Source GARD/search-term mapping rows are deliberately not copied.
+        Matching source mapping rows are copied only for this exact GARD/term;
+        the shared importer adds associations missing from that cache.
         '''
         if gard_id != self.reuse.current_gard_id:
             raise ValueError("Publication mappings must use the current GARD node.")
-        self.reuse.copy_publications(self.mysql, self.logger, pubmed_ids)
+        self.reuse.copy_publications(self.mysql, self.logger, pubmed_ids, search_term=search_term)
         super().find_new_publications(gard_id, search_term, pubmed_ids)
+
+    def retrieve_pubmed_ids(self, gard_id, search_term, mindate=None, maxdate=None):
+
+        '''
+        Preserve the shared live search and complete date splitting. Copy
+        compatible source search history after every live slice has committed,
+        so historical keys cannot block later live response inserts. The helper
+        checks current mappings in batches rather than accumulating all PMIDs.
+        '''
+        if gard_id != self.reuse.current_gard_id:
+            raise ValueError("Publication searches must use the current GARD node.")
+        for pubmed_ids in super().retrieve_pubmed_ids(gard_id, search_term, mindate, maxdate):
+            yield pubmed_ids
+        self.reuse.copy_publication_search_history(self.mysql, self.logger, gard_id, search_term, mindate, maxdate)
+
+
+class GARDOMIMPublicationMappingTask(GardOmimPublicationMappingTask):
+    """Copy current source associations and let shared mapping add new GARD xrefs."""
+
+    __module__ = GardOmimPublicationMappingTask.__module__
+
+    def __init__(self, reuse, gard_id):
+
+        if gard_id != reuse.current_gard_id:
+            raise ValueError("OMIM mapping tasks require the current GARD node.")
+        super().__init__(gard_id=gard_id)
+        self.reuse = reuse
+
+    def process_new_data(self):
+
+        '''
+        Reuse only source pairs still present in current GARD cross-references.
+        The inherited task keeps its normal NOT EXISTS behavior for any pairs
+        absent from production, without changing the regular Alert task.
+        '''
+        self.reuse.copy_gard_omim_mappings(self.mysql, self.logger, self.gard_id)
+        super().process_new_data()
+
+
+class GARDOMIMDataRetrievalTask(PublicationOminDataRetrievalTask):
+    """Reuse current GARD's OMIM JSON/reference pairs before missing-entry HTTP calls."""
+
+    __module__ = PublicationOminDataRetrievalTask.__module__
+
+    def __init__(self, reuse, gard_id):
+
+        if gard_id != reuse.current_gard_id:
+            raise ValueError("OMIM retrieval tasks require the current GARD node.")
+        super().__init__(gard_id=gard_id)
+        self.reuse = reuse
+
+    def process_new_data(self):
+
+        '''
+        The shared retrieval query already excludes OMIM IDs in the target.
+        Copying before it runs avoids those API calls; genuinely absent or
+        invalid source entries continue through the normal downloader.
+        '''
+        self.reuse.copy_omim_data(self.mysql, self.logger, self.gard_id)
+        super().process_new_data()
 
 
 class GARDClinicalTrialPmidArticleImportTask(ClinicalTrialPmidArticleImportTask):
@@ -126,6 +189,24 @@ class GARDOMIMPublicationArticleImportTask(NewOmimPublicationArticleImportTask):
 
         super().__init__()
         self.reuse = reuse
+
+    def get_unique_new_omim_id_list(self):
+
+        '''
+        A restarted build may contain pending associations from earlier nodes.
+        Keep this import tied to CURRENT GARD mappings; the helper has staged
+        their OMIM JSON even when a shared OMIM entry was completed previously.
+        '''
+        cursor = self.mysql.cursor(buffered=True)
+        try:
+            cursor.execute(
+                '''SELECT DISTINCT omim_id FROM publication_gard_omim_mapping
+                   WHERE gard_id = %s AND is_new = 1 AND omim_id IS NOT NULL''',
+                (self.reuse.current_gard_id,),
+            )
+            return [row[0] for row in cursor.fetchall()]
+        finally:
+            cursor.close()
 
     def _retrieve_missing_publication_articles(self, pubmed_ids):
 

@@ -23,7 +23,7 @@ from pipelines.pipeline_5_followup.task_pipeline_followup_update_3 import Diseas
 from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_3 import NewOrganizationSourceTrackingTask
 from gard_person_tasks import GARDOrganizationSourceTrackingTask, GARDPersonAgentGraphTask, GARDPersonGroupingTask
 from gard_existing_data import GARDExistingDataReuse
-from gard_reuse_tasks import GARDClinicalTrialDiscoveryTask, GARDPublicationDiscoveryTask, GARDClinicalTrialPmidArticleImportTask, GARDOMIMPublicationArticleImportTask, GARDPublicationGardArticleRelationshipTask
+from gard_reuse_tasks import GARDClinicalTrialDiscoveryTask, GARDPublicationDiscoveryTask, GARDClinicalTrialPmidArticleImportTask, GARDOMIMPublicationMappingTask, GARDOMIMDataRetrievalTask, GARDOMIMPublicationArticleImportTask, GARDPublicationGardArticleRelationshipTask
 from utils.tools import _escape_sql_literal
 
 
@@ -204,6 +204,8 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
             return
 
         from pipelines.pipeline_2_clinical_trial.task_clinical_trial_5 import ClinicalTrialPmidArticleImportTask
+        from pipelines.pipeline_3_publication.task_publication_3 import GardOmimPublicationMappingTask
+        from pipelines.pipeline_3_publication.task_publication_4 import PublicationOminDataRetrievalTask
         from pipelines.pipeline_3_publication.task_publication_8 import NewOmimPublicationArticleImportTask
         from pipelines.pipeline_3_publication.task_publication_graph_8 import NewPublicationGardArticleRelationshipTask
 
@@ -215,6 +217,15 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         elif task_class is NewOmimPublicationArticleImportTask:
             task_name = task_name or task_class.__name__
             task_class = GARDOMIMPublicationArticleImportTask
+            kwargs["reuse"] = self.existing_data_reuse
+        elif task_class in (GardOmimPublicationMappingTask, PublicationOminDataRetrievalTask):
+            '''
+            Cover the remaining publication* cache tables inside the GARD
+            runner only. Inherited per-GARD orchestration supplies gard_id;
+            these tasks validate it before copying OMIM mappings and metadata.
+            '''
+            task_name = task_name or task_class.__name__
+            task_class = GARDOMIMPublicationMappingTask if task_class is GardOmimPublicationMappingTask else GARDOMIMDataRetrievalTask
             kwargs["reuse"] = self.existing_data_reuse
         elif task_class is NewPublicationGardArticleRelationshipTask:
             task_name = task_name or task_class.__name__

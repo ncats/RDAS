@@ -61,7 +61,15 @@ flowchart TD
 | `publication_article` | Copy metadata, classification, and EPI extraction fields for a missing PMID with `is_new=1`. A usable cached source JSON is required; otherwise the Article downloader remains available. |
 | `publication_pubtator`, `publication_pubtator_parsed` | Copy cached JSON and parsed annotations for matching Article content. Missing cache data follows the shared PubTator path. Generated `source_json_len` is computed by MySQL. |
 | `publication_substance`, `publication_substance_unique` | Copy related substance records; shared substance extraction fills remaining data. |
-| `publication_gard_searchterm_pubmed_mapping` | Create mappings from the current search's **`gard_id` and search term** using the shared discovery importer. Source GARD mappings are not imported. |
+| `publication_gard_searchterm_pubmed_mapping` | Copy matching source tuples with the **current `gard_id` and exact search term**, resetting abbreviation decisions for current validation. The shared importer creates missing tuples. Other diseases' mappings are excluded. |
+| `publication_gard_pubmed` | Keep live ID searches authoritative. After every live slice for a term finishes, copy complete historical source responses for that same GARD/term only when every PMID has a current destination mapping. Preserve original date labels and JSON; reject truncated responses. |
+| `publication_gard_omim_mapping` | Copy source pairs for the **current `gard_id`** only when the current GARD cross-references still include that OMIM ID. Shared mapping adds new pairs; relevant copied pairs are staged with `is_new=1`. |
+| `publication_omim` | Copy valid cached entries for current-GARD OMIM IDs before API retrieval. Existing destination JSON takes precedence; current-GARD entries are staged with `is_new=1` for PMID import and OMIMRef graph processing. |
+| `publication_omim_pubmed_mapping` | Copy reference pairs only for those OMIM IDs, only when their source entry matches destination JSON and the PMID appears in that JSON. Shared parsing fills missing pairs. |
+
+This covers all ten `rdas_db.publication*` tables and their corresponding
+`gard_rdas_db.publication*` tables, scoped to discovered PMIDs and current-GARD
+OMIM associations. It does not bulk-copy unrelated diseases or production history.
 
 Tables without a GARD column remain shared by NCT ID or PMID. Their current
 disease associations are represented by the explicit mapping rows above; raw
@@ -132,7 +140,7 @@ checkpoint.
 | --- | --- | --- |
 | 1 | `GARDClinicalTrialDiscoveryTask.find_new_data()` | Search NCT IDs, reuse destination/source study data, then download only missing studies. |
 | 2 | `GARDPublicationDiscoveryTask.find_new_data()` | Discover complete PubMed ID slices, reuse metadata/enrichment, and create current-GARD mappings. See the [PubMed retrieval workflow](../../Z_Alert/pipelines/pipeline_3_publication/task_publication_1.md). |
-| 3 | `run_omim_updates_for_gard_node(gard_id)` | Stage this GARD ID's OMIM mappings and retrieve missing shared OMIM entries. Repeated visits to the same ID skip this work after its first successful attempt in the current run. |
+| 3 | `run_omim_updates_for_gard_node(gard_id)` | Reuse current GARD/OMIM mappings, cached OMIM JSON and reference pairs; map new cross-references and retrieve genuinely missing entries. Repeated visits to the same ID skip this work after its first successful attempt in the current run. |
 | 4 | `run_clinical_trial_mysql_updates()` | Import and enrich staged trial data, including drugs, publication mappings, article imports, and annotations. |
 | 5 | `run_publication_mysql_updates()` | Import/reuse current OMIM reference Articles first, then classify Articles, retrieve missing PubTator/chemical data, and validate current-GARD abbreviation mappings. |
 | 6 | `run_clinical_trial_graph_updates()` | Update trial nodes and their disease, condition, intervention, drug, participant, outcome, design, annotation, organization, and location data. |
