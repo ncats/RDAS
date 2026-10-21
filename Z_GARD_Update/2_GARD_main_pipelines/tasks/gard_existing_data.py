@@ -4,6 +4,7 @@ import json
 import re
 from contextlib import contextmanager
 from datetime import date
+from time import perf_counter
 
 from baseclass.conn import DBConnection
 from pipelines.pipeline_2_clinical_trial.clinical_trial_study_change_handler import ClinicalTrialStudyChangeHandler
@@ -175,6 +176,11 @@ class GARDExistingDataReuse:
         try:
             for start in range(0, len(identifiers), self.BATCH_SIZE):
                 batch = identifiers[start:start + self.BATCH_SIZE]
+                batch_started = perf_counter()
+                copied_before = copied
+                batch_number = start // self.BATCH_SIZE + 1
+                batch_count = (len(identifiers) + self.BATCH_SIZE - 1) // self.BATCH_SIZE
+                logger.info(f"Publication copy batch {batch_number}/{batch_count}: checking {len(batch)} PMIDs.")
                 placeholders = ",".join(["%s"] * len(batch))
                 latest = f"s.id = (SELECT MAX(latest.id) FROM `{self.SOURCE_DATABASE}`.publication_article latest WHERE latest.pubmed_id = s.pubmed_id)"
                 valid = f"s.pubmed_id IN ({placeholders}) AND {latest} AND JSON_VALID(s.source_json)"
@@ -209,12 +215,28 @@ class GARDExistingDataReuse:
                     self._copy_rows(cursor, "publication_pubtator", f"s.pubmed_id IN ({marks}) AND JSON_VALID(s.source_json) AND s.id = (SELECT MAX(p.id) FROM rdas_db.publication_pubtator p WHERE p.pubmed_id = s.pubmed_id AND JSON_VALID(p.source_json))", reusable, keys=["pubmed_id"])
                     for table in ("publication_pubtator_parsed", "publication_substance"):
                         self._copy_rows(cursor, table, f"s.pubmed_id IN ({marks})", reusable)
-                    self._copy_rows(
-                        cursor, "publication_substance_unique",
-                        f'''EXISTS (SELECT 1 FROM `{self.TARGET_DATABASE}`.publication_substance ps
-                            WHERE ps.pubmed_id IN ({marks}) AND ps.hash_id = s.hash_id)''',
+                    '''
+                    Read only this PMID batch's substance hashes, then use the
+                    source hash index for bounded INSERT ... SELECT copies.
+                    The former correlated EXISTS could scan all unique source
+                    substances repeatedly; a running copy was observed taking
+                    over 27 seconds. These small identifier lists are query
+                    parameters, not another persistent or in-memory data cache.
+
+                    Example: PMIDs [9282845, 9280151] reference hashes H1/H2.
+                    Copy only source unique rows with hash_id IN (H1, H2),
+                    keeping NOT EXISTS retry checks in the destination.
+                    '''
+                    cursor.execute(
+                        f'''SELECT DISTINCT hash_id FROM `{self.TARGET_DATABASE}`.publication_substance
+                            WHERE pubmed_id IN ({marks}) AND hash_id IS NOT NULL''',
                         reusable,
                     )
+                    hashes = [row[0] for row in cursor.fetchall()]
+                    for offset in range(0, len(hashes), self.BATCH_SIZE):
+                        hash_batch = hashes[offset:offset + self.BATCH_SIZE]
+                        hash_marks = ",".join(["%s"] * len(hash_batch))
+                        self._copy_rows(cursor, "publication_substance_unique", f"s.hash_id IN ({hash_marks})", hash_batch)
                 if search_term is not None:
                     '''
                     A PMID can match several diseases and search terms. Copy
@@ -235,6 +257,7 @@ class GARDExistingDataReuse:
                         overrides={"gard_id": self.current_gard_id, "search_term": search_term, "is_abbreviation": None, "is_valid": None},
                     )
                 mysql.commit()
+                logger.info(f"Publication copy batch {batch_number}/{batch_count}: inserted {copied - copied_before} Articles; checked {start + len(batch)}/{len(identifiers)} PMIDs in {perf_counter() - batch_started:.2f}s.")
             logger.info(f"Reused {copied} publication_article rows from rdas_db; checked {len(identifiers)} PMIDs and copied their available enrichment.")
         except Exception:
             mysql.rollback()
@@ -447,25 +470,51 @@ class GARDExistingDataReuse:
         try:
             for start in range(0, len(nctids), self.BATCH_SIZE):
                 batch = list(dict.fromkeys(nctids[start:start + self.BATCH_SIZE]))
+                batch_started = perf_counter()
+                batch_number = start // self.BATCH_SIZE + 1
+                batch_count = (len(nctids) + self.BATCH_SIZE - 1) // self.BATCH_SIZE
+                logger.info(f"{gard_id}: trial copy batch {batch_number}/{batch_count}: checking {len(batch)} NCT IDs.")
                 marks = ",".join(["%s"] * len(batch))
-                cursor.execute(f"SELECT * FROM `{self.TARGET_DATABASE}`.clinical_trial_unique WHERE nctid IN ({marks})", batch)
+                cursor.execute(f"SELECT nctid, studies, is_new FROM `{self.TARGET_DATABASE}`.clinical_trial_unique WHERE nctid IN ({marks})", batch)
                 targets = {row["nctid"]: row for row in cursor.fetchall()}
-                cursor.execute(
-                    f'''SELECT s.* FROM gard_rdas_db.clinical_trial s
-                        JOIN (SELECT nctid, MAX(id) AS id FROM gard_rdas_db.clinical_trial
-                              WHERE nctid IN ({marks}) GROUP BY nctid) latest ON latest.id = s.id''', batch,
-                )
-                staged = {row["nctid"]: row for row in cursor.fetchall()}
-                cursor.execute(
-                    f'''SELECT s.* FROM `{self.SOURCE_DATABASE}`.clinical_trial s
-                        JOIN (SELECT nctid, MAX(id) AS id FROM `{self.SOURCE_DATABASE}`.clinical_trial
-                              WHERE nctid IN ({marks}) GROUP BY nctid) latest ON latest.id = s.id''', batch,
-                )
-                sources = {row["nctid"]: row for row in cursor.fetchall()}
-                cursor.execute(f"SELECT * FROM `{self.SOURCE_DATABASE}`.clinical_trial_unique WHERE nctid IN ({marks})", batch)
+                '''
+                Avoid transporting the same large studies JSON from staging
+                when a canonical row already supplies it. For production,
+                clinical_trial must still contain the NCT ID, but its payload
+                is needed only when clinical_trial_unique has no row.
+
+                Example: 100 IDs all have canonical source rows. Read those
+                payloads once, plus 100 small staging IDs, instead of reading
+                both complete staging and canonical payloads for every ID.
+                '''
+                staged = {}
+                missing_targets = [nctid for nctid in batch if nctid not in targets]
+                if missing_targets:
+                    missing_marks = ",".join(["%s"] * len(missing_targets))
+                    cursor.execute(
+                        f'''SELECT s.nctid, s.studies FROM gard_rdas_db.clinical_trial s
+                            JOIN (SELECT nctid, MAX(id) AS id FROM gard_rdas_db.clinical_trial
+                                  WHERE nctid IN ({missing_marks}) GROUP BY nctid) latest ON latest.id = s.id''', missing_targets,
+                    )
+                    staged = {row["nctid"]: row for row in cursor.fetchall()}
+                cursor.execute(f"SELECT nctid, studies, is_new, annotation_processed FROM `{self.SOURCE_DATABASE}`.clinical_trial_unique WHERE nctid IN ({marks})", batch)
                 uniques = {row["nctid"]: row for row in cursor.fetchall()}
+                cursor.execute(f"SELECT DISTINCT nctid FROM `{self.SOURCE_DATABASE}`.clinical_trial WHERE nctid IN ({marks})", batch)
+                sources = {row["nctid"]: row for row in cursor.fetchall()}
+                legacy_ids = [nctid for nctid in sources if nctid not in uniques]
+                if legacy_ids:
+                    legacy_marks = ",".join(["%s"] * len(legacy_ids))
+                    cursor.execute(
+                        f'''SELECT s.nctid, s.studies FROM `{self.SOURCE_DATABASE}`.clinical_trial s
+                            JOIN (SELECT nctid, MAX(id) AS id FROM `{self.SOURCE_DATABASE}`.clinical_trial
+                                  WHERE nctid IN ({legacy_marks}) GROUP BY nctid) latest ON latest.id = s.id''', legacy_ids,
+                    )
+                    sources.update((row["nctid"], row) for row in cursor.fetchall())
+                reads_finished = perf_counter()
                 compatible = []
                 prepared = {}
+                canonical_source_ids = []
+                canonical_rows = []
                 for nctid in batch:
                     source = (uniques.get(nctid) or sources.get(nctid)) if nctid in sources else None
                     target = targets.get(nctid) or staged.get(nctid)
@@ -479,27 +528,75 @@ class GARDExistingDataReuse:
                             logger.warning(f"Invalid cached study for {nctid}; use the ClinicalTrials.gov downloader.")
                         continue
                     prepared[nctid] = study
-                    if source and comparer.compare_studies(source.get("studies"), study)[0]:
+                    '''
+                    If the chosen study IS the source row, equality is already
+                    certain after validation; byte-identical target/source JSON
+                    also needs no deep copy/normalization. Retain the shared
+                    semantic comparison for genuinely different JSON strings.
+                    '''
+                    if source and (chosen is source or source.get("studies") == chosen.get("studies") or comparer.compare_studies(source.get("studies"), study)[0]):
                         compatible.append(nctid)
                     title = _safe_get(study, "protocolSection", "identificationModule", "briefTitle") or "N/A"
                     summary = _safe_get(study, "protocolSection", "descriptionModule", "briefSummary") or "N/A"
                     status = _safe_get(study, "protocolSection", "statusModule", "overallStatus") or "N/A"
                     if nctid not in targets:
                         if nctid in compatible and nctid in uniques:
-                            self._copy_rows(writer, "clinical_trial_unique", "s.nctid = %s", (nctid,), keys=["nctid"])
+                            canonical_source_ids.append(nctid)
                         else:
-                            writer.execute(
-                                '''INSERT INTO gard_rdas_db.clinical_trial_unique (nctid, studies, brief_title, brief_summary, overall_status, is_new)
-                                   VALUES (%s, %s, %s, %s, %s, 1)''',
-                                (nctid, json.dumps(study), title, summary, status),
-                            )
+                            canonical_rows.append((nctid, json.dumps(study), title, summary, status))
+                prepared_finished = perf_counter()
+                '''
+                Copy existing canonical studies inside MySQL in ONE statement
+                per batch. Only target-staged/legacy studies without a reusable
+                canonical source row need a VALUES insert from Python.
+                Existing target canonical rows and their flags are preserved.
+                '''
+                if canonical_source_ids:
+                    source_marks = ",".join(["%s"] * len(canonical_source_ids))
+                    self._copy_rows(writer, "clinical_trial_unique", f"s.nctid IN ({source_marks})", canonical_source_ids, keys=["nctid"])
+                if canonical_rows:
+                    row_marks = ",".join(["(%s, %s, %s, %s, %s, 1)"] * len(canonical_rows))
                     writer.execute(
-                        '''INSERT INTO gard_rdas_db.clinical_trial (gardId, disease, nctid, studies, brief_title, brief_summary, url, is_new)
-                           SELECT %s, %s, %s, %s, %s, %s, %s, 1 WHERE NOT EXISTS (
-                               SELECT 1 FROM gard_rdas_db.clinical_trial WHERE gardId = %s AND disease = %s AND nctid = %s)''',
-                        (gard_id, disease, nctid, json.dumps(study), title, summary, source_url, gard_id, disease, nctid),
+                        f'''INSERT INTO gard_rdas_db.clinical_trial_unique (nctid, studies, brief_title, brief_summary, overall_status, is_new)
+                            VALUES {row_marks} ON DUPLICATE KEY UPDATE nctid = nctid''',
+                        [value for row in canonical_rows for value in row],
                     )
-                    writer.execute("UPDATE gard_rdas_db.clinical_trial SET is_new = 1 WHERE gardId = %s AND disease = %s AND nctid = %s", (gard_id, disease, nctid))
+                if prepared:
+                    '''
+                    Build all current-GARD mappings with one INSERT ... SELECT
+                    and one flag UPDATE instead of two statements per study.
+                    Join the destination canonical JSON inside MySQL, so large
+                    studies are not serialized and sent back over the network.
+                    Copy the canonical studies/title/summary fields as stored;
+                    only GARD ID, disease, URL, and staging flag are overridden.
+                    List discovery columns explicitly so staging-only columns
+                    such as alert_sent keep their table defaults; those columns
+                    do not exist on clinical_trial_unique.
+
+                    Example: 100 new source-canonical IDs for GARD:0000522 need
+                    one canonical copy, one mapping insert, and one flag update,
+                    rather than roughly 300 individual write requests.
+                    NOT EXISTS still preserves retry-safe association checks;
+                    every mapping binds the current GARD ID and disease term.
+                    '''
+                    prepared_ids = list(prepared)
+                    prepared_marks = ",".join(["%s"] * len(prepared_ids))
+                    writer.execute(
+                        f'''INSERT INTO gard_rdas_db.clinical_trial (gardId, disease, nctid, studies, brief_title, brief_summary, url, is_new)
+                            SELECT %s, %s, s.nctid, s.studies, s.brief_title, s.brief_summary, %s, 1
+                            FROM gard_rdas_db.clinical_trial_unique s
+                            WHERE s.nctid IN ({prepared_marks}) AND NOT EXISTS (
+                                SELECT 1 FROM gard_rdas_db.clinical_trial d
+                                WHERE d.gardId = %s AND d.disease = %s AND d.nctid = s.nctid)''',
+                        (gard_id, disease, source_url, *prepared_ids, gard_id, disease),
+                    )
+                    writer.execute(
+                        f'''UPDATE gard_rdas_db.clinical_trial SET is_new = 1
+                            WHERE gardId = %s AND disease = %s AND nctid IN ({prepared_marks})
+                            AND (is_new IS NULL OR is_new <> 1)''',
+                        (gard_id, disease, *prepared_ids),
+                    )
+                writes_finished = perf_counter()
 
                 '''
                 Source enrichment is reusable only for the same study JSON
@@ -555,7 +652,9 @@ class GARDExistingDataReuse:
                         self.drug_nctids.add(nctid)
                 mysql.commit()
                 handled.update(prepared)
-            logger.info(f"Reused cached study data for {len(handled)}/{len(nctids)} NCT IDs; all clinical_trial and drug mappings use {gard_id}: {disease}.")
+                finished = perf_counter()
+                logger.info(f"{gard_id}: trial copy batch {batch_number}/{batch_count}: available={len(prepared)}/{len(batch)}, read={reads_finished - batch_started:.2f}s, prepare={prepared_finished - reads_finished:.2f}s, write={writes_finished - prepared_finished:.2f}s, enrichment={finished - writes_finished:.2f}s, total={finished - batch_started:.2f}s.")
+            logger.info(f"RDAS study reuse: available {len(handled)}/{len(nctids)} NCT IDs; all clinical_trial and drug mappings use {gard_id}: {disease}.")
             return handled
         except Exception:
             mysql.rollback()

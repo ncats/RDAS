@@ -227,14 +227,17 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         from pipelines.pipeline_3_publication.task_publication_graph_8 import NewPublicationGardArticleRelationshipTask
 
         enrichment_task_name = task_class.__name__
+
         if task_class is ClinicalTrialPmidArticleImportTask:
             task_name = task_name or task_class.__name__
             task_class = GARDClinicalTrialPmidArticleImportTask
             kwargs["reuse"] = self.existing_data_reuse
+
         elif task_class is NewOmimPublicationArticleImportTask:
             task_name = task_name or task_class.__name__
             task_class = GARDOMIMPublicationArticleImportTask
             kwargs["reuse"] = self.existing_data_reuse
+
         elif task_class in (GardOmimPublicationMappingTask, PublicationOminDataRetrievalTask):
             '''
             Cover the remaining publication* cache tables inside the GARD
@@ -244,6 +247,7 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
             task_name = task_name or task_class.__name__
             task_class = GARDOMIMPublicationMappingTask if task_class is GardOmimPublicationMappingTask else GARDOMIMDataRetrievalTask
             kwargs["reuse"] = self.existing_data_reuse
+
         elif task_class is NewPublicationGardArticleRelationshipTask:
             task_name = task_name or task_class.__name__
             task_class = GARDPublicationGardArticleRelationshipTask
@@ -253,10 +257,12 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         if task_class is NewClinicalTrialAnnotationTask:
             task_class = GARDModelCachingClinicalTrialAnnotationTask
             task_name = task_name or NewClinicalTrialAnnotationTask.__name__
+
         elif task_class is PublicationFalsePositiveFilterTask:
             task_class = GARDModelCachingPublicationFalsePositiveFilterTask
             task_name = task_name or PublicationFalsePositiveFilterTask.__name__
             kwargs["gard_id"] = self.current_gard_id
+
         elif task_class is NewOrganizationSourceTrackingTask:
             task_class = GARDOrganizationSourceTrackingTask
             task_name = task_name or NewOrganizationSourceTrackingTask.__name__
@@ -437,6 +443,10 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
 
                     self.logger.info(f"\n****** Processed: {gard_node['gardId']}: {gard_node['gardName']} ******\n")
                     self.logger.info(f"\n###### Total GARD nodes processed {total_gard_nodes} ######\n")
+
+                    # All records in the first batch have completed and saved checkpoints.
+                    #self.logger.info("\n\n*** First GARD batch completed; stopping ***\n\n")
+                    #raise SystemExit(0)
 
             # Refresh counts for the last partial batch. With no unprocessed
             # nodes, refresh once to finish a batch from a previous run.

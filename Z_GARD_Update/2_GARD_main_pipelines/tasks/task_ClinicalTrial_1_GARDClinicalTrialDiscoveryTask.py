@@ -24,6 +24,7 @@ finishes before requesting the next page, limiting retained study payloads."""
 import re
 from concurrent.futures import ThreadPoolExecutor
 from itertools import repeat
+from time import perf_counter
 
 from pipelines.pipeline_2_clinical_trial.task_clinical_trial_1 import NewClinicalTrialDiscoveryTask
 from utils.tools import _resolve_worker_count, _safe_get
@@ -57,14 +58,26 @@ class GARDClinicalTrialDiscoveryTask(NewClinicalTrialDiscoveryTask):
                 initial_query = f'{studies_api}?query.cond=(EXPANSION[Term]{name} OR AREA[DetailedDescription]EXPANSION[Term]{name} OR AREA[BriefSummary]EXPANSION[Term]{name}) AND AREA[LastUpdatePostDate]RANGE[{last_update_date},MAX]&fields=NCTId&pageSize=1000&countTotal=true'
                 page_token = None
                 seen_tokens = set()
+                page_number = 0
                 while True:
+                    '''
+                    Time ID search separately from SQL copying and missing
+                    study downloads. A long quiet interval previously combined
+                    all three, so the log could not identify its bottleneck.
+                    Example: search=0.4s, copy=2.1s, download/import=0.8s.
+                    '''
+                    page_number += 1
+                    page_started = perf_counter()
+                    self.logger.info(f"{gardId}: {name}; requesting NCT ID page {page_number}.")
                     result = self.call_get_nctids(initial_query, pageToken=page_token)
+                    search_finished = perf_counter()
                     if not isinstance(result, dict) or not result or not isinstance(result.get("studies", []), list) or ("studies" not in result and result.get("totalCount") != 0):
                         raise RuntimeError(f"Invalid ClinicalTrials.gov ID search response for {gardId}: {name}.")
                     identifiers = list(dict.fromkeys(study["protocolSection"]["identificationModule"]["nctId"] for study in result.get("studies", [])))
                     if any(not re.fullmatch(r"NCT\d{8}", nctid) for nctid in identifiers):
                         raise ValueError("ClinicalTrials.gov search returned an invalid NCT ID.")
                     handled = self.reuse.copy_clinical_trials(self.mysql, self.logger, gardId, name, identifiers, initial_query)
+                    copy_finished = perf_counter()
                     missing = [nctid for nctid in identifiers if nctid not in handled]
                     ''' Limit queued study payloads as well as active HTTP workers. '''
                     for start in range(0, len(missing), self.reuse.BATCH_SIZE):
@@ -80,7 +93,7 @@ class GARDClinicalTrialDiscoveryTask(NewClinicalTrialDiscoveryTask):
                         exists even when an invalid cache needed a fresh fetch.
                         '''
                         self.reuse.copy_clinical_trials(self.mysql, self.logger, gardId, name, download_batch, initial_query)
-                    self.logger.info(f"{gardId}: {name}; NCT IDs={len(identifiers)}, reused={len(handled)}, downloaded={len(missing)}.")
+                    self.logger.info(f"{gardId}: {name}; page={page_number}, NCT IDs={len(identifiers)}, reused={len(handled)}, downloaded={len(missing)}; search={search_finished - page_started:.2f}s, copy={copy_finished - search_finished:.2f}s, download/import={perf_counter() - copy_finished:.2f}s.")
                     page_token = result.get("nextPageToken")
                     if not page_token:
                         break
