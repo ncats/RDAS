@@ -197,7 +197,13 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
                     add_to_db(rxdata, intervention, drug, wspacy=1)
 
                 else:
-                    self.logger.error(f'\t\tMap to RxNorm failed for intervention name:{intervention}, drug name: {drug}')
+                    '''
+                    An extracted chemical can also have no RxNorm match, for
+                    example an investigational drug code. The lookup already
+                    logs actual API failures as errors; an unmapped candidate
+                    alone must not fail the GARD node's completion checkpoint.
+                    '''
+                    self.logger.warning(f'\t\tNo RxNorm mapping for intervention name:{intervention}, drug name: {drug}')
 
 
         def drug_normalize(drug_name):
@@ -269,28 +275,53 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
                         self.logger.error(f"RxNav request failed: status={response.status_code}, url={rq}")
                         break
 
-                    ''' Extract RxNormID from the response '''
+                    '''
+                    RxNav returns an empty idGroup when a successful name
+                    search has no match, for example {"idGroup": {}} for
+                    ACZ885. Missing, null, or empty rxnormId values within a
+                    valid group are ordinary misses, so return None and let
+                    rxnorm_map() try its existing spaCy chemical fallback.
+                    Do not log these as ERROR: the GARD runner deliberately
+                    stops before checkpoints when a task logs real failures.
+
+                    Keep malformed response structures as errors so an API
+                    failure is not mistaken for a legitimate unmatched drug.
+                    '''
                     try:
                         obj = response.json()
-                        rxnormid = obj['idGroup']['rxnormId'][0]
+                        if not isinstance(obj, dict) or 'idGroup' not in obj:
+                            raise ValueError("Expected an idGroup object in the RxNav response.")
+
+                        id_group = obj['idGroup']
+                        if id_group is None:
+                            id_group = {}
+                        if not isinstance(id_group, dict):
+                            raise ValueError("RxNav idGroup must be an object or null.")
+
+                        rxnorm_ids = id_group.get('rxnormId')
+                        if rxnorm_ids is None or rxnorm_ids == []:
+                            self.logger.warning(f"No RxNorm match for drug_name={drug_name}; trying remaining mapping fallbacks when available.")
+                            return None
+
+                        if not isinstance(rxnorm_ids, list) or not isinstance(rxnorm_ids[0], str) or not rxnorm_ids[0].strip():
+                            raise ValueError("RxNav rxnormId must be a list of nonempty identifiers.")
+
+                        rxnormid = rxnorm_ids[0]
                         rxdata['RxNormID'] = rxnormid
 
-                    except KeyError as e:
-                        self.logger.error(f"KeyError: {e} - The required key does not exist in the JSON structure.")
-                        self.logger.error(f'\n{obj}\n')
-                        rxnormid = None  # or some default value or behavior
-                    except IndexError:
-                        self.logger.error("IndexError: The 'rxnormId' list is empty or does not have an element at index 0.")
-                        self.logger.error(f'\n{obj}\n')
-                        rxnormid = None  # or handle this case appropriately
-                    except (TypeError, AttributeError, ValueError):
-                        self.logger.error("The JSON structure is not as expected or 'response' might not be JSON.")
-                        rxnormid = None  # or handle this case appropriately
+                    except (TypeError, ValueError) as e:
+                        self.logger.error(f"Invalid RxNav RxCUI response for drug_name={drug_name}: {e}, url={rq}")
+                        return None
 
                     break  # Exit the loop if successful
                 except requests.exceptions.Timeout:
                     retries += 1
-                    self.logger.error(f"RxNav RxCUI request timed out for drug_name={drug_name}. attempt={retries}/{max_retries}, url={rq}")
+                    '''
+                    A timeout can recover on the next attempt. Log retries as
+                    warnings; the terminal failure below remains an ERROR if
+                    all attempts fail, preserving the GARD retry checkpoint.
+                    '''
+                    self.logger.warning(f"RxNav RxCUI request timed out for drug_name={drug_name}. attempt={retries}/{max_retries}, url={rq}")
                     time.sleep(1)
                 except requests.exceptions.RequestException as e:
                     self.logger.error(f"RxNav RxCUI request failed for drug_name={drug_name}: {e}, url={rq}")
@@ -331,7 +362,12 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
                 except requests.exceptions.Timeout:
                     retries += 1
-                    self.logger.error(f"RxNav property request timed out for rxnormid={rxnormid}, drug_name={drug_name}. attempt={retries}/{max_retries}, url={rq2}")
+                    '''
+                    Apply the same retry policy to the property request: a
+                    recovered timeout must not leave a task-level ERROR that
+                    makes the GARD runner reject an otherwise complete lookup.
+                    '''
+                    self.logger.warning(f"RxNav property request timed out for rxnormid={rxnormid}, drug_name={drug_name}. attempt={retries}/{max_retries}, url={rq2}")
                     time.sleep(1)
                 except requests.exceptions.RequestException as e:
                     self.logger.error(f"RxNav property request failed for rxnormid={rxnormid}, drug_name={drug_name}: {e}, url={rq2}")
