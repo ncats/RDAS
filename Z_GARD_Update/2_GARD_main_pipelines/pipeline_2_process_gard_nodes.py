@@ -9,7 +9,8 @@ import spacy
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 Z_ALERT_ROOT = PROJECT_ROOT / "Z_Alert"
-for import_path in (str(PROJECT_ROOT), str(Z_ALERT_ROOT)):
+GARD_PIPELINE_ROOT = Path(__file__).resolve().parent
+for import_path in (str(PROJECT_ROOT), str(Z_ALERT_ROOT), str(GARD_PIPELINE_ROOT)):
     if import_path not in sys.path:
         sys.path.insert(0, import_path)
 
@@ -18,10 +19,12 @@ from pipelines.pipeline_base import PipelineBase
 from pipelines.pipeline_2_clinical_trial.task_clinical_trial_6 import NewClinicalTrialAnnotationTask
 from pipelines.pipeline_3_publication.task_publication_7 import PublicationFalsePositiveFilterTask
 from pipelines.pipeline_5_followup.task_pipeline_followup_update_3 import DiseaseCountsRefreshTask
+from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_3 import NewOrganizationSourceTrackingTask
+from gard_person_tasks import GARDOrganizationSourceTrackingTask, GARDPersonAgentGraphTask, GARDPersonGroupingTask
 
 
-class GARDCountsRefreshErrorCapture(logging.Handler):
-    """Remember errors that the shared disease-count task logs without raising."""
+class GARDTaskErrorCapture(logging.Handler):
+    """Remember task errors that shared Alert tasks log without raising."""
 
     def __init__(self):
 
@@ -33,21 +36,20 @@ class GARDCountsRefreshErrorCapture(logging.Handler):
         self.had_error = True
 
 
-class GARDCountsRefreshTask(DiseaseCountsRefreshTask):
-    """Run the full count refresh at a GARD checkpoint and surface logged errors."""
-
-    __module__ = DiseaseCountsRefreshTask.__module__
+class GARDTaskErrorCheckingMixin:
+    """Prevent GARD checkpoints and flag cleanup after a logged task failure."""
 
     def process_new_data(self) -> None:
 
         '''
-        DiseaseCountsRefreshTask catches some MySQL and Memgraph failures and
-        only logs them. Surface those errors to the GARD runner so it does not
-        mark the current disease complete after a failed count refresh. The
-        regular Alert task keeps its existing error handling.
+        Some shared tasks catch failures, log them, and return normally. Attach
+        this handler after task initialization so normal task log configuration
+        is preserved. Keep a reference even when a task closes its own logger;
+        an error must still stop the build before pending flags are cleared.
+        The recurring Alert runner does not use this GARD-specific mixin.
         '''
         task_logger = self.logger
-        error_capture = GARDCountsRefreshErrorCapture()
+        error_capture = GARDTaskErrorCapture()
         task_logger.addHandler(error_capture)
         try:
             super().process_new_data()
@@ -56,7 +58,13 @@ class GARDCountsRefreshTask(DiseaseCountsRefreshTask):
             error_capture.close()
 
         if error_capture.had_error:
-            raise RuntimeError(f"{type(self).__name__} logged an error; disease counts need a retry.")
+            raise RuntimeError(f"{type(self).__name__} logged an error; pending GARD work needs a retry.")
+
+
+class GARDCountsRefreshTask(GARDTaskErrorCheckingMixin, DiseaseCountsRefreshTask):
+    """Run the full count refresh at a GARD checkpoint and surface logged errors."""
+
+    __module__ = DiseaseCountsRefreshTask.__module__
 
 
 class GARDModelCachingClinicalTrialAnnotationTask(NewClinicalTrialAnnotationTask):
@@ -136,6 +144,9 @@ class GARDModelCachingPublicationFalsePositiveFilterTask(PublicationFalsePositiv
 
 class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
 
+    # A failed task must not reach wrap-up or mark a GARD checkpoint complete.
+    raise_task_errors = True
+
     # Refresh full-database disease counts after this many completed diseases.
     DISEASE_COUNTS_REFRESH_NODE_BATCH_SIZE = 500
 
@@ -149,7 +160,7 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         self.logger.info(
             "GARDToMySQLAndMemgraphUpdateRunner initialized; "
             f"disease counts refresh every {self.DISEASE_COUNTS_REFRESH_NODE_BATCH_SIZE} GARD nodes; "
-            "person tasks run for each node."
+            "person extraction runs per node; grouping and Agent updates run after all nodes."
         )
 
 
@@ -158,8 +169,8 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         '''
         The shared follow-up step calls DiseaseCountsRefreshTask for every
         node, but that task scans all GARD nodes in Memgraph. Defer only that
-        full refresh; inherited person tasks still run and clear flags for
-        each GARD node in the normal Alert order.
+        full refresh here. Person extraction remains per node, while grouping,
+        Agent updates, and person flag cleanup form the final build phase.
         '''
         if task_class is DiseaseCountsRefreshTask:
             return
@@ -171,8 +182,20 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         elif task_class is PublicationFalsePositiveFilterTask:
             task_class = GARDModelCachingPublicationFalsePositiveFilterTask
             task_name = task_name or PublicationFalsePositiveFilterTask.__name__
+        elif task_class is NewOrganizationSourceTrackingTask:
+            task_class = GARDOrganizationSourceTrackingTask
+            task_name = task_name or NewOrganizationSourceTrackingTask.__name__
 
-        super()._run_pipeline_task(task_class, task_name=task_name, **kwargs)
+        '''
+        Reuse the shared runner's task lifecycle and timing, with a local mixin
+        that surfaces swallowed task errors. Preserve the task name and module
+        so its logger and pipeline error file still resolve correctly. Workers
+        receive the shared grouping function and plain values, not task objects.
+        '''
+        checked_task_class = task_class
+        if not issubclass(task_class, GARDTaskErrorCheckingMixin):
+            checked_task_class = type(task_class.__name__, (GARDTaskErrorCheckingMixin, task_class), {"__module__": task_class.__module__})
+        super()._run_pipeline_task(checked_task_class, task_name=task_name, **kwargs)
 
 
     def run_disease_counts_refresh(self) -> None:
@@ -195,6 +218,8 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
 
 
     def run_pipeline_for_each_gard_node(self) -> None:
+
+        self.gard_discovery_completed = False
 
         from Z_Alert.pipelines.pipeline_1_gard.task_gard_1 import GardNodeNamesTask
         from Z_Alert.pipelines.pipeline_2_clinical_trial.task_clinical_trial_1 import NewClinicalTrialDiscoveryTask
@@ -267,9 +292,15 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                     '''
                     clinical_trial_task = None
                     publication_task = None
+                    discovery_errors = GARDTaskErrorCapture()
+                    discovery_loggers = []
                     try:
                         clinical_trial_task = NewClinicalTrialDiscoveryTask()
+                        clinical_trial_task.logger.addHandler(discovery_errors)
+                        discovery_loggers.append(clinical_trial_task.logger)
                         clinical_trial_task.find_new_data(target_gard_node)
+                        if discovery_errors.had_error:
+                            raise RuntimeError(f"Clinical-trial discovery failed for {gard_node['gardId']}; leave its checkpoint pending.")
 
                         '''
                         Step 5:
@@ -278,13 +309,25 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                         discovered PMIDs are staged for later publication updates.
                         '''
                         publication_task = NewPublicationDiscoveryTask()
+                        publication_task.logger.addHandler(discovery_errors)
+                        discovery_loggers.append(publication_task.logger)
                         publication_task.find_new_data(target_gard_node)
+                        if discovery_errors.had_error:
+                            raise RuntimeError(f"Publication discovery failed for {gard_node['gardId']}; leave its checkpoint pending.")
 
                         # Stage only this GARD node's OMIM mappings and fetch
                         # missing shared OMIM entries before the next node.
                         self.run_omim_updates_for_gard_node(gard_node["gardId"])
 
                     finally:
+                        '''
+                        Discovery runs directly rather than through the task
+                        runner. Surface its logged errors before source cleanup
+                        or completion marking, then release the local handlers.
+                        '''
+                        for task_logger in discovery_loggers:
+                            task_logger.removeHandler(discovery_errors)
+                        discovery_errors.close()
                         # Later steps can run for a long time, so release these
                         # per-node database connections before starting them.
                         self._close_task_if_needed(clinical_trial_task)
@@ -302,8 +345,8 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                         )
                         self._nodes_since_counts_refresh = 0
 
-                    # Mark this disease complete after its per-node person work
-                    # and any due full-database count refresh have finished.
+                    # Save the source-processing checkpoint. Pending person
+                    # flags survive this checkpoint until finalization succeeds.
                     gard_task._set_updated_flag({gard_node["gardId"]})
 
                     total_gard_nodes += 1
@@ -320,14 +363,109 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                 )
                 self._nodes_since_counts_refresh = 0
 
-        finally:
+            # Final person processing is allowed only after the complete loop
+            # and its final count refresh return successfully, including a
+            # restart that finds no remaining GARD nodes.
             self.gard_discovery_completed = True
+
+        finally:
             self._close_task_if_needed(gard_task)
             self.logger.info(f"Processed {total_gard_nodes} GARD nodes.")
 
+
+    def run_person_extraction(self) -> None:
+
+        """Extract publication, clinical-trial, and grant people before source wrap-up."""
+
+        '''
+        These tasks consume the source tables' is_new flags and create pending
+        person rows. Finish extraction before each source wrap-up, but retain
+        the resulting person is_new flags throughout the one-time build.
+        '''
+        from pipelines.pipeline_6_person.task_person_1_publication import NewPublicationPersonTask
+        from pipelines.pipeline_6_person.task_person_2_clinical_trial import NewClinicalTrialPersonTask
+        from pipelines.pipeline_6_person.task_person_3_grant import NewGrantPersonTask
+
+        self._run_pipeline_task(NewPublicationPersonTask)
+        self._run_pipeline_task(NewClinicalTrialPersonTask)
+        self._run_pipeline_task(NewGrantPersonTask)
+
+
+    def run_person_grouping_and_graph_updates(self) -> None:
+
+        """Group the accumulated people, then build Agents from bounded source batches."""
+
+        '''
+        Agent identity depends on the group IDs assigned by the grouping task,
+        so these two tasks remain together and in this order. The rebuild-only
+        graph task reconciles all imported trials using their latest study
+        data; it does not depend on source is_new flags already cleared per node.
+        '''
+        self._run_pipeline_task(GARDPersonGroupingTask)
+        self._run_pipeline_task(GARDPersonAgentGraphTask)
+
+
+    def run_person_organization_updates(self) -> None:
+
+        """Finish organization enrichment and source tracking for the final person backlog."""
+
+        '''
+        Consume person affiliations once after Agents exist. Trial/project
+        source tracking has already run per node; replaying it here would
+        depend on source flags that have deliberately been cleared.
+        '''
+        from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_1 import OrganizationLocationRorLookupTask
+        from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_2 import OrganizationLocationGraphSyncTask
+        from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_wrapup import OrganizationLocationMaintenanceWrapUpTask
+
+        self._run_pipeline_task(OrganizationLocationRorLookupTask)
+        self._run_pipeline_task(OrganizationLocationGraphSyncTask)
+        self._run_pipeline_task(GARDOrganizationSourceTrackingTask, person_only=True)
+        self._run_pipeline_task(OrganizationLocationMaintenanceWrapUpTask)
+
+
+    def run_final_person_updates(self) -> None:
+
+        """Finalize people after all GARD nodes, retaining pending flags on any failure."""
+
+        from pipelines.pipeline_6_person.task_person_pipeline_wrapup import PersonPipelineWrapUpTask
+
+        if not self.gard_discovery_completed:
+            raise RuntimeError("Finish all GARD source processing before final person updates.")
+
+        '''
+        This phase also runs when a restart finds zero unprocessed GARD nodes.
+        Their source checkpoints can already be saved while person is_new
+        still identifies an unfinished grouping/Agent backlog. Never put the
+        person reset in finally: any failed task must leave that work pending.
+        '''
+        self._run_step_with_timing("Final person grouping and Agent graph updates", self.run_person_grouping_and_graph_updates)
+        self._run_step_with_timing("Final person organization updates", self.run_person_organization_updates)
+        self._run_pipeline_task(PersonPipelineWrapUpTask)
+
+
+    def run_pipeline_wrapup(self) -> None:
+
+        """Clear consumed source flags for one GARD node while retaining pending people."""
+
+        '''
+        Clinical-trial/publication work and their person extraction have
+        finished for this node. Clearing those source flags keeps the next
+        node's enrichment bounded. Person flags must remain set until the
+        separate final phase succeeds, so do not run PersonPipelineWrapUpTask.
+        '''
+        from pipelines.pipeline_2_clinical_trial.task_clinical_trial_pipeline_wrapup import ClinicalTrialPipelineWrapUpTask
+        from pipelines.pipeline_3_publication.task_publication_pipeline_wrapup import PublicationPipelineWrapUpTask
+        from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_wrapup import OrganizationLocationMaintenanceWrapUpTask
+
+        self._run_pipeline_task(ClinicalTrialPipelineWrapUpTask)
+        self._run_pipeline_task(PublicationPipelineWrapUpTask)
+        self._run_pipeline_task(OrganizationLocationMaintenanceWrapUpTask)
+
+
     def run_post_discovery_steps(self, gard_id: str) -> None:
 
-        """Finish MySQL, graph, person, maintenance, and wrap-up work for one node."""
+        """Finish source processing and person extraction for one GARD node."""
 
         steps = (
             ("Step 2: clinical-trial MySQL updates", self.run_clinical_trial_mysql_updates),
@@ -336,14 +474,16 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
             ("Step 6: publication graph updates", self.run_publication_graph_updates),
             ("Step 7: per-node pipeline follow-up updates", self.run_pipeline_followup_updates),
             #("Step 8: send alert emails", self.send_alert_emails), #NO NEED to send alerts
-            ("Step 9: regroup people", self.run_regroup_the_person),
+            ("Step 9a: extract people", self.run_person_extraction),
             ("Step 10: pipeline maintenance", self.run_pipeline_maintenance),
             ("Step 11: pipeline wrap-up", self.run_pipeline_wrapup),
         )
 
-        # Keep person grouping, Agent graph updates, source tracking, and
-        # person wrap-up in their normal order for each GARD node. Only the
-        # full disease-count refresh waits until the 500-node checkpoint.
+        '''
+        Extract people before source cleanup, but retain their pending flags.
+        Grouping, Agent writes, and affiliation tracking run only in the final
+        phase after this complete GARD loop. The count checkpoint is unchanged.
+        '''
         for step_name, step_func in steps:
             self._run_step_with_timing(f"{gard_id}: {step_name}", step_func)
 
@@ -356,6 +496,10 @@ if __name__ == "__main__":
         runner._run_step_with_timing(
             "GARD nodes: discovery and per-node updates",
             runner.run_pipeline_for_each_gard_node,
+        )
+        runner._run_step_with_timing(
+            "Final person processing after all GARD nodes",
+            runner.run_final_person_updates,
         )
 
     finally:
