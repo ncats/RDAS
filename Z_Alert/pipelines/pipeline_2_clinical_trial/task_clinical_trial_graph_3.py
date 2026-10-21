@@ -59,11 +59,15 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
     earlier run but are no longer present in the latest ClinicalTrials.gov JSON.
     The Condition nodes themselves are left in place because another trial may
     still use the same normalized condition.
+
+    Python supplies the current condition strings in each chunk because the
+    deployed Memgraph rejects the Cypher list projection over mapping objects.
+    Using the prepared list preserves the same stale-relationship comparison.
     '''
     BATCH_DELETE_STALE_CONDITION_RELATIONSHIPS = '''
         UNWIND $chunks AS chunk
         MATCH (ct: ClinicalTrial {nctId: chunk.nctId})
-        WITH ct, [mapping IN chunk.condition_gard_mappings | mapping.condition] AS current_conditions
+        WITH ct, chunk.current_conditions AS current_conditions
         OPTIONAL MATCH (ct)-[old_rel:has_investigated_condition]->(old:Condition)
         WHERE old_rel IS NOT NULL
         AND (
@@ -161,9 +165,16 @@ class NewClinicalTrialConditionGraphTask(PipelineBase):
                         empty_condition_nctids.append(nctid)
                         continue
 
+                    '''
+                    Derive the cleanup keep list from the exact normalized
+                    mappings used to create Condition nodes. Preparing it in
+                    Python avoids an unsupported Cypher list expression and
+                    prevents current trial relationships from being removed.
+                    '''
                     chunks.append({
                         "nctId": nctid,
-                        "condition_gard_mappings": condition_gard_mappings
+                        "condition_gard_mappings": condition_gard_mappings,
+                        "current_conditions": [mapping["condition"] for mapping in condition_gard_mappings],
                     })
 
                 if chunks:

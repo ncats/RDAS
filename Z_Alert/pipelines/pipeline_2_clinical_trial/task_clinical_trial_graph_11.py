@@ -99,11 +99,15 @@ class NewClinicalTrialOrganizationLocationGraphTask(PipelineBase):
     longer includes a previous site. This is what lets changed trials add more
     Location links while dropping only locations that disappeared from the latest
     NCTID JSON.
+
+    Read the current keys prepared in Python rather than projecting them from
+    chunk.locations in Cypher, which the deployed Memgraph does not support.
+    An empty list still removes old site links for an organization-only trial.
     '''
     BATCH_DELETE_STALE_LOCATION_RELATIONSHIPS = '''
         UNWIND $chunks AS chunk
         MATCH (ct: ClinicalTrial {nctId: chunk.nctId})
-        WITH ct, [location IN chunk.locations | location.loc_idx_key] AS current_location_keys
+        WITH ct, chunk.current_location_keys AS current_location_keys
         OPTIONAL MATCH (ct)-[old_rel:has_trial_location]->(old:Location)
         WHERE old_rel IS NOT NULL
         AND (
@@ -251,12 +255,19 @@ class NewClinicalTrialOrganizationLocationGraphTask(PipelineBase):
         if not organization and not locs:
             return {}
 
+        '''
+        Keep the cleanup keys aligned with the Location nodes this chunk will
+        create. The Python list replaces the unsupported Cypher projection;
+        locs=[] deliberately produces an empty keep list when a study retains
+        its organization but no longer has valid trial locations.
+        '''
         return {
             "nctId": nctid,
             "hasOrganization": bool(organization),
             "org_idx_key": _make_hash_key(organization) if organization else None,
             "org_name": organization,
-            "locations": locs
+            "locations": locs,
+            "current_location_keys": [location["loc_idx_key"] for location in locs],
         }
 
 

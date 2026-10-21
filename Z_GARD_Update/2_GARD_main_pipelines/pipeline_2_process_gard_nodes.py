@@ -30,10 +30,18 @@ class GARDTaskErrorCapture(logging.Handler):
 
         super().__init__(level=logging.ERROR)
         self.had_error = False
+        self.first_error = None
 
     def emit(self, record):
 
         self.had_error = True
+        '''
+        Keep the first failure message after the shared task closes its logger.
+        It explains the original failure in the runner's final traceback even
+        when the task catches the exception and returns normally.
+        '''
+        if self.first_error is None:
+            self.first_error = record.getMessage()
 
 
 class GARDTaskErrorCheckingMixin:
@@ -58,7 +66,7 @@ class GARDTaskErrorCheckingMixin:
             error_capture.close()
 
         if error_capture.had_error:
-            raise RuntimeError(f"{type(self).__name__} logged an error; pending GARD work needs a retry.")
+            raise RuntimeError(f"{type(self).__name__} logged an error: {error_capture.first_error}; pending GARD work needs a retry.")
 
 
 class GARDCountsRefreshTask(GARDTaskErrorCheckingMixin, DiseaseCountsRefreshTask):
