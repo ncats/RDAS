@@ -35,6 +35,7 @@ F_person/riea/
 Z_GARD_Update/1_GARD_DBs_update/logs/
 # Ignore the local test directory and its contents.
 test/
+poster*
 
 # Jupyter/editor checkpoint files
 .ipynb_checkpoints/

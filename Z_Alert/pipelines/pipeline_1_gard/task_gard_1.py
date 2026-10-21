@@ -41,10 +41,14 @@ class GardNodeNamesTask(PipelineBase):
     Fetch GARD id, names and synonyms from MySQL in batches.
     Default batch size is 100.
     '''
-    def get_gard_nodes(self, batch_size: int = 100, mark_updated_before_yield: bool = True) -> Iterator[List[Dict[str, Any]]]:
+    def get_gard_nodes(self, batch_size: int = 100, mark_updated_before_yield: bool = True, only_unprocessed: bool = False) -> Iterator[List[Dict[str, Any]]]:
 
         """
         Fetch GARD names and synonyms from MySQL in batches.
+
+        Set only_unprocessed=True for a GARD rebuild that resumes from NULL
+        updated dates. The default selects NULL dates or dates at least seven
+        days before the Alert discovery run's fixed start date.
         """ 
 
         # check the Label_Predicate_Mapping values
@@ -64,7 +68,43 @@ class GardNodeNamesTask(PipelineBase):
  
         #The query returns one row per GARD/MONDO/source group and combines all synonym labels into a single separated string for local filtering. 
 
-        GARD_QUERY = """
+        '''
+        A GARD rebuild uses updated as a durable completion checkpoint: any
+        non-NULL date means that row has already been processed, even when the
+        run crosses midnight or is restarted on another day. The recurring
+        Alert runner revisits nodes at least seven days after their saved
+        update date. Fix that eligibility cutoff for the whole discovery run
+        so crossing midnight does not change which dates qualify.
+        Both SQL predicates are fixed strings, independent of source data.
+        '''
+        updated_condition = "updated IS NULL" if only_unprocessed else "(updated IS NULL OR updated <= %s)"
+        query_parameters = (batch_size,)
+
+        if not only_unprocessed:
+            '''
+            Capture MySQL's date once before fetching any batches. Completion
+            markers are also written with MySQL CURDATE(), so this uses the
+            same clock even if Python and the database have different time
+            zones. Derive a separate cutoff seven days earlier and keep it
+            unchanged for the whole generator. The inclusive comparison also
+            selects dates exactly seven days before the run, while dates only
+            six days old remain ineligible even if processing crosses midnight.
+            '''
+            cursor = self.mysql.cursor()
+            try:
+                cursor.execute("SELECT CURDATE()")
+                run_start_date = cursor.fetchone()[0]
+            finally:
+                cursor.close()
+
+            cutoff_date = run_start_date - timedelta(days=7)
+            query_parameters = (cutoff_date, batch_size)
+            self.logger.info(
+                f"Using fixed GARD discovery run_start_date={run_start_date}; "
+                f"inclusive updated cutoff_date={cutoff_date}."
+            )
+
+        GARD_QUERY = f"""
             SELECT id,
                 GardID, MONDO_ID, 
                 MAX(CASE WHEN Label_Predicate_Type = 'Name' THEN Label END) AS gardName,
@@ -73,7 +113,7 @@ class GardNodeNamesTask(PipelineBase):
                 MIN(updated) AS min_updated
             FROM  gard
             WHERE  
-                (updated IS NULL OR updated != CURDATE())
+                {updated_condition}
 
                 AND Label_Predicate_Mapping != 'DEPRECATED' 
                 AND Label_Predicate_Mapping != 'AMBIGUOUS'
@@ -88,7 +128,7 @@ class GardNodeNamesTask(PipelineBase):
 
             # Each loop returns one batch of GARD rows, then marks those GardIDs as updated before yielding to the caller.
             cursor = self.mysql.cursor(dictionary=True)
-            cursor.execute(GARD_QUERY, (batch_size,))
+            cursor.execute(GARD_QUERY, query_parameters)
             rows = cursor.fetchall()
             cursor.close()
 

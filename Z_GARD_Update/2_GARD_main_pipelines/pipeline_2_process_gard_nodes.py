@@ -223,7 +223,14 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                     "Z_GARD_Update/1_GARD_DBs_update/main-run.sh before running pipeline 2."
                 )
 
-            for batch in gard_task.get_gard_nodes(mark_updated_before_yield=False):
+            '''
+            Resume this rebuild from rows whose updated date is still NULL.
+            Completed nodes keep their checkpoint across restarts and date
+            changes. Leave marking until the existing per-node downstream
+            steps finish; the shared selector's default remains date-based
+            for the recurring Alert runner.
+            '''
+            for batch in gard_task.get_gard_nodes(mark_updated_before_yield=False, only_unprocessed=True):
                 self.logger.info(f"\n\n*** Processing GARD discovery batch with {len(batch)} nodes. ***\n")
 
                 for gard_node in batch:
