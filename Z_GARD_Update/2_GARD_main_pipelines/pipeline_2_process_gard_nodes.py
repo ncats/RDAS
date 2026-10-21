@@ -2,6 +2,7 @@
 import os
 import sys
 import logging
+import re
 from pathlib import Path
 
 import spacy
@@ -21,6 +22,9 @@ from pipelines.pipeline_3_publication.task_publication_7 import PublicationFalse
 from pipelines.pipeline_5_followup.task_pipeline_followup_update_3 import DiseaseCountsRefreshTask
 from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_3 import NewOrganizationSourceTrackingTask
 from gard_person_tasks import GARDOrganizationSourceTrackingTask, GARDPersonAgentGraphTask, GARDPersonGroupingTask
+from gard_existing_data import GARDExistingDataReuse
+from gard_reuse_tasks import GARDClinicalTrialDiscoveryTask, GARDPublicationDiscoveryTask, GARDClinicalTrialPmidArticleImportTask, GARDOMIMPublicationArticleImportTask, GARDPublicationGardArticleRelationshipTask
+from utils.tools import _escape_sql_literal
 
 
 class GARDTaskErrorCapture(logging.Handler):
@@ -129,7 +133,7 @@ class GARDModelCachingPublicationFalsePositiveFilterTask(PublicationFalsePositiv
     # Keep this task's errors in the publication pipeline error log.
     __module__ = PublicationFalsePositiveFilterTask.__module__
 
-    def __init__(self):
+    def __init__(self, gard_id=None):
 
         # Bypass only the parent's spacy.load(); PipelineBase still opens per-task resources.
         PipelineBase.__init__(self, init_mysql=True, init_memgraph=False)
@@ -137,6 +141,19 @@ class GARDModelCachingPublicationFalsePositiveFilterTask(PublicationFalsePositiv
             self.api_key = os.getenv("UMLS_API_KEY")
             self.umls_search_api = os.getenv("UMLS_SEARCH_API")
             self.umls_cui_api_template = os.getenv("UMLS_CUI_API_TEMPLATE")
+
+            '''
+            A newly discovered mapping can point to an Article already fully
+            imported for another disease. Validate this GARD node's mappings
+            without marking that Article new again and re-extracting authors.
+            These query overrides belong only to the GARD caching subclass.
+            '''
+            if gard_id is not None:
+                if not re.fullmatch(r"GARD:\d{7}", gard_id):
+                    raise ValueError(f"Invalid current GARD ID: {gard_id!r}")
+                literal = _escape_sql_literal(gard_id)
+                self.SET_ABBREVIATION_SQL = self.SET_ABBREVIATION_SQL.replace("AND pa.is_new = 1", f"AND pgs.gard_id = {literal}")
+                self.FETCH_ABBREVIATION_ROWS_QUERY = self.FETCH_ABBREVIATION_ROWS_QUERY.replace("AND a.is_new = 1", f"AND gsp.gard_id = {literal}")
 
             if GARDModelCachingPublicationFalsePositiveFilterTask._cached_nlp is None:
                 GARDModelCachingPublicationFalsePositiveFilterTask._cached_nlp = spacy.load("en_core_web_sm")
@@ -164,12 +181,15 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
 
         self.START_DATE = '1971-01-01'
         self._nodes_since_counts_refresh = 0
+        self.existing_data_reuse = GARDExistingDataReuse()
+        self.current_gard_id = None
 
         self.logger.info(
             "GARDToMySQLAndMemgraphUpdateRunner initialized; "
             f"disease counts refresh every {self.DISEASE_COUNTS_REFRESH_NODE_BATCH_SIZE} GARD nodes; "
             "person extraction runs per node; grouping and Agent updates run after all nodes."
         )
+        self.logger.info("GARD discovery reuses rdas_db clinical-trial/publication data before downloading missing records.")
 
 
     def _run_pipeline_task(self, task_class, task_name=None, **kwargs) -> None:
@@ -183,6 +203,24 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         if task_class is DiseaseCountsRefreshTask:
             return
 
+        from pipelines.pipeline_2_clinical_trial.task_clinical_trial_5 import ClinicalTrialPmidArticleImportTask
+        from pipelines.pipeline_3_publication.task_publication_8 import NewOmimPublicationArticleImportTask
+        from pipelines.pipeline_3_publication.task_publication_graph_8 import NewPublicationGardArticleRelationshipTask
+
+        enrichment_task_name = task_class.__name__
+        if task_class is ClinicalTrialPmidArticleImportTask:
+            task_name = task_name or task_class.__name__
+            task_class = GARDClinicalTrialPmidArticleImportTask
+            kwargs["reuse"] = self.existing_data_reuse
+        elif task_class is NewOmimPublicationArticleImportTask:
+            task_name = task_name or task_class.__name__
+            task_class = GARDOMIMPublicationArticleImportTask
+            kwargs["reuse"] = self.existing_data_reuse
+        elif task_class is NewPublicationGardArticleRelationshipTask:
+            task_name = task_name or task_class.__name__
+            task_class = GARDPublicationGardArticleRelationshipTask
+            kwargs["gard_id"] = self.current_gard_id
+
         # Substitute model-caching tasks only for this GARD runner.
         if task_class is NewClinicalTrialAnnotationTask:
             task_class = GARDModelCachingClinicalTrialAnnotationTask
@@ -190,6 +228,7 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         elif task_class is PublicationFalsePositiveFilterTask:
             task_class = GARDModelCachingPublicationFalsePositiveFilterTask
             task_name = task_name or PublicationFalsePositiveFilterTask.__name__
+            kwargs["gard_id"] = self.current_gard_id
         elif task_class is NewOrganizationSourceTrackingTask:
             task_class = GARDOrganizationSourceTrackingTask
             task_name = task_name or NewOrganizationSourceTrackingTask.__name__
@@ -203,7 +242,15 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         checked_task_class = task_class
         if not issubclass(task_class, GARDTaskErrorCheckingMixin):
             checked_task_class = type(task_class.__name__, (GARDTaskErrorCheckingMixin, task_class), {"__module__": task_class.__module__})
-        super()._run_pipeline_task(checked_task_class, task_name=task_name, **kwargs)
+        '''
+        Reused RxNorm/annotation inputs are excluded only while their expensive
+        MySQL task runs. Restore is_new=1 before graph/person tasks, including
+        when a task fails. Skip construction entirely when no enrichment is
+        missing, so an all-cached node does not load unused annotation models.
+        '''
+        with self.existing_data_reuse.enrichment_scope(enrichment_task_name, self.logger) as has_work:
+            if has_work:
+                super()._run_pipeline_task(checked_task_class, task_name=task_name, **kwargs)
 
 
     def run_disease_counts_refresh(self) -> None:
@@ -230,8 +277,6 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         self.gard_discovery_completed = False
 
         from Z_Alert.pipelines.pipeline_1_gard.task_gard_1 import GardNodeNamesTask
-        from Z_Alert.pipelines.pipeline_2_clinical_trial.task_clinical_trial_1 import NewClinicalTrialDiscoveryTask
-        from Z_Alert.pipelines.pipeline_3_publication.task_publication_1 import NewPublicationDiscoveryTask
 
         gard_task = GardNodeNamesTask()
         total_gard_nodes = 0
@@ -243,6 +288,7 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         the downstream clinical trial and publication discovery tasks.
         '''
         try:
+            self.existing_data_reuse.recover_interrupted_scopes(gard_task.mysql, self.logger)
             cursor = gard_task.mysql.cursor()
             try:
                 cursor.execute("SELECT COUNT(*) FROM gard")
@@ -267,6 +313,8 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                 self.logger.info(f"\n\n*** Processing GARD discovery batch with {len(batch)} nodes. ***\n")
 
                 for gard_node in batch:
+                    self.current_gard_id = gard_node["gardId"]
+                    self.existing_data_reuse.begin_gard_node(self.current_gard_id)
                     '''
                     Step 2:
                     Keep the filtered_names list produced by GardNodeNamesTask.
@@ -303,7 +351,7 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                     discovery_errors = GARDTaskErrorCapture()
                     discovery_loggers = []
                     try:
-                        clinical_trial_task = NewClinicalTrialDiscoveryTask()
+                        clinical_trial_task = GARDClinicalTrialDiscoveryTask(self.existing_data_reuse)
                         clinical_trial_task.logger.addHandler(discovery_errors)
                         discovery_loggers.append(clinical_trial_task.logger)
                         clinical_trial_task.find_new_data(target_gard_node)
@@ -316,7 +364,7 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
                         normalized search window and filtered disease names. Newly
                         discovered PMIDs are staged for later publication updates.
                         '''
-                        publication_task = NewPublicationDiscoveryTask()
+                        publication_task = GARDPublicationDiscoveryTask(self.existing_data_reuse)
                         publication_task.logger.addHandler(discovery_errors)
                         discovery_loggers.append(publication_task.logger)
                         publication_task.find_new_data(target_gard_node)
@@ -379,6 +427,27 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         finally:
             self._close_task_if_needed(gard_task)
             self.logger.info(f"Processed {total_gard_nodes} GARD nodes.")
+
+
+    def run_publication_mysql_updates(self) -> None:
+
+        '''
+        Import current OMIM reference Articles before enrichment, so copied and
+        newly downloaded OMIM PMIDs receive the same classification/PubTator/
+        substance processing as direct-search and trial-reference PMIDs in this
+        GARD iteration. Source OMIM mappings were staged per current GARD ID by
+        discovery. The regular Alert runner retains its existing task order.
+        '''
+        from pipelines.pipeline_3_publication.task_publication_2_local import PublicationEpiNhsClassificationTask
+        from pipelines.pipeline_3_publication.task_publication_5 import NewPublicationPubtatorRetrievalTask
+        from pipelines.pipeline_3_publication.task_publication_6 import NewPublicationChemicalSubstanceTask
+        from pipelines.pipeline_3_publication.task_publication_8 import NewOmimPublicationArticleImportTask
+
+        self._run_pipeline_task(NewOmimPublicationArticleImportTask)
+        self._run_pipeline_task(PublicationEpiNhsClassificationTask)
+        self._run_pipeline_task(NewPublicationPubtatorRetrievalTask)
+        self._run_pipeline_task(NewPublicationChemicalSubstanceTask)
+        self._run_pipeline_task(PublicationFalsePositiveFilterTask)
 
 
     def run_person_extraction(self) -> None:

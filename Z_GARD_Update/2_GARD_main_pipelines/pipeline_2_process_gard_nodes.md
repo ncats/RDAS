@@ -24,6 +24,62 @@ already contain the GARD source data and initial graph data from
 `Z_GARD_Update/1_GARD_DBs_update`; an empty MySQL `gard` table stops this runner.
 Memgraph index initialization is handled separately by pipeline 1 in this directory.
 
+The same MySQL connection must have `SELECT` access to the existing `rdas_db`
+tables and write access to `gard_rdas_db`. The reuse tasks explicitly reject any
+selected destination database other than `gard_rdas_db`. No schema migration is
+required for reuse.
+
+## Reuse existing RDAS data before downloading
+
+[`gard_reuse_tasks.py`](./gard_reuse_tasks.py) contains the GARD-specific discovery,
+reference import, and disease relationship tasks.
+[`gard_existing_data.py`](./gard_existing_data.py) performs bounded copies of up
+to 100 IDs at a time inside MySQL. These tasks are used only by this runner.
+
+```mermaid
+flowchart TD
+    Search["Search live ClinicalTrials.gov NCT IDs or PubMed IDs for current GARD name"] --> Target{"Usable record already in gard_rdas_db?"}
+    Target -- Yes --> Existing["Reuse destination record"]
+    Target -- No --> Source{"Usable record exists in rdas_db?"}
+    Source -- Yes --> Copy["Copy metadata and available related data; assign destination IDs and is_new=1"]
+    Source -- No --> Download["Download missing study or Article with shared Alert helpers"]
+    Copy --> Mapping["Create mapping with CURRENT gard_id and search term"]
+    Existing --> Mapping
+    Download --> Mapping
+    Mapping --> Enrich["Run missing enrichment; reuse available RxNorm, annotations, classification, and PubTator"]
+    Enrich --> Graph["Run graph updates and per-node person extraction"]
+    Graph --> Wrap["Run per-node wrap-up and save GARD checkpoint"]
+```
+
+| Data | Reuse behavior and GARD mapping |
+| --- | --- |
+| `clinical_trial` | Create/reuse the searched NCT ID's row with the **current `gardId`, current disease search term, and `is_new=1`**. Other source diseases' trial mappings are not copied. |
+| `clinical_trial_unique` | Copy canonical study data for a new NCT ID. An existing valid destination study takes precedence over the source snapshot. |
+| `clinical_trial_intervention_drug` | Copy reusable RxNorm rows with **current `gardId` and disease**, setting `is_new=1`. Lookup uses the existing GARD/disease/NCT composite index. |
+| `clinical_trial_annotation` | Copy annotations after source staging is complete and its study JSON matches the chosen study; mark copied rows new. Missing annotation data without the source bulk generator's completion marker falls back to NLP. |
+| `clinical_trial_nctid_pmids_mapping` | Copy reference pairs for the NCT ID and stage current pairs for Article import and graph relationships. Referenced PMIDs receive the same publication reuse lookup. |
+| `publication_article` | Copy metadata, classification, and EPI extraction fields for a missing PMID with `is_new=1`. A usable cached source JSON is required; otherwise the Article downloader remains available. |
+| `publication_pubtator`, `publication_pubtator_parsed` | Copy cached JSON and parsed annotations for matching Article content. Missing cache data follows the shared PubTator path. Generated `source_json_len` is computed by MySQL. |
+| `publication_substance`, `publication_substance_unique` | Copy related substance records; shared substance extraction fills remaining data. |
+| `publication_gard_searchterm_pubmed_mapping` | Create mappings from the current search's **`gard_id` and search term** using the shared discovery importer. Source GARD mappings are not imported. |
+
+Tables without a GARD column remain shared by NCT ID or PMID. Their current
+disease associations are represented by the explicit mapping rows above; raw
+study and Article JSON are not rewritten to invent disease-specific metadata.
+Tables without `is_new` retain their existing schema. Source primary keys,
+timestamps, the generic `processed` marker, and generated columns are omitted.
+Other clinical completion fields are retained, while `is_new` is set for the build.
+
+An Article already completed in the destination stays completed. The GARD-only
+relationship and abbreviation queries scope their work to the **current GARD
+ID**, so a new disease relationship can be created without downloading the Article,
+rebuilding its metadata, or extracting its authors again.
+
+Copies reuse the source data **as stored**. Live ID searches do not prove that
+cached full study JSON is the latest API version. The regular Alert runner handles
+later incremental refreshes. The expected time saving depends on how many IDs
+and enrichment results are already available; it has not been benchmarked.
+
 ## Overall workflow
 
 ```mermaid
@@ -74,11 +130,11 @@ checkpoint.
 
 | Order | Method or task | Work performed |
 | --- | --- | --- |
-| 1 | `NewClinicalTrialDiscoveryTask.find_new_data()` | Discover clinical trials for the filtered disease names. |
-| 2 | `NewPublicationDiscoveryTask.find_new_data()` | Discover PubMed IDs and import article/search-term mappings. See the [PubMed retrieval workflow](../../Z_Alert/pipelines/pipeline_3_publication/task_publication_1.md). |
+| 1 | `GARDClinicalTrialDiscoveryTask.find_new_data()` | Search NCT IDs, reuse destination/source study data, then download only missing studies. |
+| 2 | `GARDPublicationDiscoveryTask.find_new_data()` | Discover complete PubMed ID slices, reuse metadata/enrichment, and create current-GARD mappings. See the [PubMed retrieval workflow](../../Z_Alert/pipelines/pipeline_3_publication/task_publication_1.md). |
 | 3 | `run_omim_updates_for_gard_node(gard_id)` | Stage this GARD ID's OMIM mappings and retrieve missing shared OMIM entries. Repeated visits to the same ID skip this work after its first successful attempt in the current run. |
 | 4 | `run_clinical_trial_mysql_updates()` | Import and enrich staged trial data, including drugs, publication mappings, article imports, and annotations. |
-| 5 | `run_publication_mysql_updates()` | Classify articles, retrieve PubTator/chemical data, filter false positives, and import OMIM articles. |
+| 5 | `run_publication_mysql_updates()` | Import/reuse current OMIM reference Articles first, then classify Articles, retrieve missing PubTator/chemical data, and validate current-GARD abbreviation mappings. |
 | 6 | `run_clinical_trial_graph_updates()` | Update trial nodes and their disease, condition, intervention, drug, participant, outcome, design, annotation, organization, and location data. |
 | 7 | `run_publication_graph_updates()` | Update article nodes, publication metadata, disease relationships, and OMIM references. |
 | 8 | `run_pipeline_followup_updates()` | Update trial/article relationships, GARD relationship counts, GeneReview flags, and dashboard counts. `DiseaseCountsRefreshTask` is deferred to the 500-record checkpoints. |
@@ -154,6 +210,15 @@ after grouping, Agent updates, and organization processing succeed.
 | `person_of_all_sources.is_new = 1` | Person work is pending for final grouping, graph updates, and affiliation tracking. | Preserved across GARD checkpoints; cleared by the last final person task. |
 | `person_of_all_sources.rdas_group_id` | Persisted person grouping identity. | Assigned during grouping; existing IDs are reused. |
 | `gard_discovery_completed` | The current process finished the GARD loop and required count refreshes. | Set in memory only; recomputed on restart. |
+| Clinical-trial `is_new = 2` | GARD-only temporary exclusion of inputs whose expensive enrichment was reused. | Restored to `1` after that one task; recovered to `1` at startup if the process was killed. This differs from completed rows marked `0`. |
+
+`enrichment_scope()` temporarily excludes reused RxNorm or annotation inputs from
+the corresponding shared MySQL task. Its `finally` block restores the exact row
+IDs to `is_new=1` before graph/person processing. If every input is reusable,
+task construction is skipped, avoiding an unused model load. Startup recovery
+restores any temporary `is_new=2` markers before selecting GARD records, so a hard
+interruption cannot hide unfinished graph work. Source `rdas_db` flags are never
+changed.
 
 A failure before the GARD checkpoint leaves that ID's existing `gard.updated`
 values unchanged; source rows still marked NULL remain eligible on restart.
@@ -182,6 +247,7 @@ closes the runner logger and archives logs in its `finally` block.
 | `GARDModelCachingPublicationFalsePositiveFilterTask` | Load `en_core_web_sm` once and reuse it across publication filtering tasks. |
 | `DISEASE_COUNTS_REFRESH_NODE_BATCH_SIZE = 500` | Defer the full `DiseaseCountsRefreshTask` scan; other follow-up count tasks still run per node. |
 | Deferred person phase | Avoid repeated grouping, Agent processing, and scans of the growing pending affiliation backlog per GARD record. |
+| Existing RDAS reuse | Avoid full study/Article downloads and reuse available enrichment; keep graph work for newly copied records. Clinical study HTTP downloads use a bounded thread pool and database writes remain in the parent. |
 | `PERSON_GROUPING_MAX_WORKERS` | Optional worker limit honored by the shared grouping task through `_resolve_worker_count()`. GARD source processing remains sequential. |
 
 Model caches live only in the current Python process and are rebuilt after a
