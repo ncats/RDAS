@@ -31,10 +31,32 @@ required for reuse.
 
 ## Reuse existing RDAS data before downloading
 
-[`gard_reuse_tasks.py`](./gard_reuse_tasks.py) contains the GARD-specific discovery,
-reference import, and disease relationship tasks.
-[`gard_existing_data.py`](./gard_existing_data.py) performs bounded copies of up
-to 100 IDs at a time inside MySQL. These tasks are used only by this runner.
+The [`tasks/`](./tasks/) directory contains one file per GARD-specific task,
+with detailed comments and example data in each module.
+[`gard_existing_data.py`](./tasks/gard_existing_data.py) performs bounded copies
+of up to 100 IDs at a time inside MySQL. It is a shared helper, so it has no task
+number. These tasks are used only by this runner.
+
+### Task file order
+
+Filenames follow `task_<ClinicalTrial|Publication|Person>_<number>_<ClassName>.py`.
+Numbers follow **first invocation** in the normal runner flow across all three
+families, including shared methods inherited from Alert. They describe the listed
+GARD-specific tasks; shared Alert tasks and the model caches kept in the runner
+retain their existing names and order.
+
+| Number | Task module | First invocation |
+| --- | --- | --- |
+| 1 | [GARDClinicalTrialDiscoveryTask](./tasks/task_ClinicalTrial_1_GARDClinicalTrialDiscoveryTask.py) | Per-node clinical-trial discovery |
+| 2 | [GARDPublicationDiscoveryTask](./tasks/task_Publication_2_GARDPublicationDiscoveryTask.py) | Per-node publication discovery |
+| 3 | [GARDOMIMPublicationMappingTask](./tasks/task_Publication_3_GARDOMIMPublicationMappingTask.py) | Current-GARD OMIM mapping |
+| 4 | [GARDOMIMDataRetrievalTask](./tasks/task_Publication_4_GARDOMIMDataRetrievalTask.py) | Current-GARD OMIM reuse/retrieval |
+| 5 | [GARDClinicalTrialPmidArticleImportTask](./tasks/task_ClinicalTrial_5_GARDClinicalTrialPmidArticleImportTask.py) | Clinical-trial MySQL updates |
+| 6 | [GARDOMIMPublicationArticleImportTask](./tasks/task_Publication_6_GARDOMIMPublicationArticleImportTask.py) | Publication MySQL updates |
+| 7 | [GARDPublicationGardArticleRelationshipTask](./tasks/task_Publication_7_GARDPublicationGardArticleRelationshipTask.py) | Publication graph updates |
+| 8 | [GARDOrganizationSourceTrackingTask](./tasks/task_Person_8_GARDOrganizationSourceTrackingTask.py) | Per-node maintenance; repeated with `person_only=True` after final Agent updates |
+| 9 | [GARDPersonGroupingTask](./tasks/task_Person_9_GARDPersonGroupingTask.py) | Final person grouping |
+| 10 | [GARDPersonAgentGraphTask](./tasks/task_Person_10_GARDPersonAgentGraphTask.py) | Final Agent graph updates |
 
 ```mermaid
 flowchart TD
@@ -185,7 +207,8 @@ flowchart TD
     PersonWrap --> Finish["Person phase complete"]
 ```
 
-These GARD-specific tasks are defined in [`gard_person_tasks.py`](./gard_person_tasks.py):
+These GARD-specific person tasks each have their own module under [`tasks/`](./tasks/),
+listed in the task file order above:
 
 - **Grouping:** discover actual pending surname prefixes in pages of 100,
   including Unicode and one-character names. The inherited grouping logic compares

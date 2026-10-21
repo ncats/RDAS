@@ -11,7 +11,32 @@ from utils.tools import _safe_get
 
 
 class GARDExistingDataReuse:
-    """Read rdas_db and write only gard_rdas_db using each caller's connection."""
+    """Read rdas_db and write only gard_rdas_db using each caller's connection.
+
+    This is shared copy infrastructure, not a separately scheduled pipeline
+    task, so its module has no invocation number. The runner creates one
+    instance and passes it to the numbered discovery/reference import tasks.
+    Metadata columns remain cached across nodes; the current GARD ID and
+    expensive-enrichment exclusion sets reset at each node boundary. Database
+    connections, cursors, and task loggers are owned by the callers.
+
+    Example lifecycle, with conditional cache states rather than live DB claims:
+        reuse = GARDExistingDataReuse()
+        reuse.begin_gard_node("GARD:0000016")
+        reuse.copy_publications(mysql, logger, ["9282845"], search_term="Coma")
+
+    If the source has valid Article data and the destination does not, the
+    helper inserts the Article with is_new=1 and assigns a new destination ID.
+    Source mappings for other diseases are excluded; current disease mappings
+    always use GARD:0000016 and the supplied term. An Article already completed
+    in the target stays completed, while its new GARD edge is handled later.
+
+    For a reused trial annotation, the helper records its NCT ID in memory.
+    enrichment_scope() temporarily changes only that task's pending input rows
+    from is_new=1 to 2, then restores them to 1 before graph/person processing.
+    If the process is killed, startup recovery restores those temporary flags.
+    Neither copying nor temporary exclusions change source rdas_db flags.
+    """
 
     SOURCE_DATABASE = "rdas_db"
     TARGET_DATABASE = "gard_rdas_db"

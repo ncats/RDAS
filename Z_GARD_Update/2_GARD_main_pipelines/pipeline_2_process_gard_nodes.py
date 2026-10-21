@@ -21,9 +21,25 @@ from pipelines.pipeline_2_clinical_trial.task_clinical_trial_6 import NewClinica
 from pipelines.pipeline_3_publication.task_publication_7 import PublicationFalsePositiveFilterTask
 from pipelines.pipeline_5_followup.task_pipeline_followup_update_3 import DiseaseCountsRefreshTask
 from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_3 import NewOrganizationSourceTrackingTask
-from gard_person_tasks import GARDOrganizationSourceTrackingTask, GARDPersonAgentGraphTask, GARDPersonGroupingTask
-from gard_existing_data import GARDExistingDataReuse
-from gard_reuse_tasks import GARDClinicalTrialDiscoveryTask, GARDPublicationDiscoveryTask, GARDClinicalTrialPmidArticleImportTask, GARDOMIMPublicationMappingTask, GARDOMIMDataRetrievalTask, GARDOMIMPublicationArticleImportTask, GARDPublicationGardArticleRelationshipTask
+'''
+Each GARD-only task has its own module under tasks/. Numbers follow the first
+invocation in the normal per-node/final flow, including inherited Alert steps:
+clinical discovery (1), publication discovery (2), OMIM staging (3-4), trial
+and OMIM reference Articles (5-6), disease edges (7), and person work (8-10).
+Organization tracking (8) also runs again in the final person-only phase.
+Keep the existing class names so task logs and shared substitutions stay stable.
+'''
+from tasks.gard_existing_data import GARDExistingDataReuse
+from tasks.task_ClinicalTrial_1_GARDClinicalTrialDiscoveryTask import GARDClinicalTrialDiscoveryTask
+from tasks.task_Publication_2_GARDPublicationDiscoveryTask import GARDPublicationDiscoveryTask
+from tasks.task_Publication_3_GARDOMIMPublicationMappingTask import GARDOMIMPublicationMappingTask
+from tasks.task_Publication_4_GARDOMIMDataRetrievalTask import GARDOMIMDataRetrievalTask
+from tasks.task_ClinicalTrial_5_GARDClinicalTrialPmidArticleImportTask import GARDClinicalTrialPmidArticleImportTask
+from tasks.task_Publication_6_GARDOMIMPublicationArticleImportTask import GARDOMIMPublicationArticleImportTask
+from tasks.task_Publication_7_GARDPublicationGardArticleRelationshipTask import GARDPublicationGardArticleRelationshipTask
+from tasks.task_Person_8_GARDOrganizationSourceTrackingTask import GARDOrganizationSourceTrackingTask
+from tasks.task_Person_9_GARDPersonGroupingTask import GARDPersonGroupingTask
+from tasks.task_Person_10_GARDPersonAgentGraphTask import GARDPersonAgentGraphTask
 from utils.tools import _escape_sql_literal
 
 

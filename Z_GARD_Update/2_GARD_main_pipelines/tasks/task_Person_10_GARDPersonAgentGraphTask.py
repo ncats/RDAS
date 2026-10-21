@@ -1,52 +1,27 @@
-"""Person tasks used only by the one-time GARD database build."""
+"""Create final Agents and reconcile clinical-trial people from current studies.
+
+Invocation: _run_person_grouping_and_graph_updates() calls this after grouping.
+The runner clears pending person flags only after graph and final organization
+processing both succeed, so interrupted final work remains eligible for retry.
+
+Illustrative grouped person and current trial identities:
+    person = {"id": 42, "first_name": "Jane", "last_name": "Smith", "rdas_group_id": "Smith_12"}
+    trial = {"nctid": "NCT01234567", "current_people": ["Jane Smith"]}
+
+Pending person pages create/reuse Agents via the inherited payload builders and
+MERGE queries. A separate bounded pass over ALL imported trials reconstructs
+current investigator/contact keep lists from each latest study JSON; it does not
+rely on trial.is_new, which per-node wrap-up already cleared. Matching person
+rows are fetched regardless of their flags, allowing earlier completed identities
+to remain linked. Graph cleanup begins only after this trial's people were found,
+grouped, and written successfully. Invalid JSON or a missing usable group ID
+stops before cleanup; a valid empty people list removes stale edges intentionally.
+These sample identities do not describe a live clinical trial."""
 
 import json
 from collections import defaultdict
 
-from pipelines.pipeline_6_person.task_person_4_grouping import NewPersonGroupingTask
 from pipelines.pipeline_6_person.task_person_5_graph import NewPersonAgentGraphTask
-from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_3 import NewOrganizationSourceTrackingTask
-
-
-class GARDPersonGroupingTask(NewPersonGroupingTask):
-    """Reuse the shared process pool while discovering prefixes from pending people."""
-
-    __module__ = NewPersonGroupingTask.__module__
-    PREFIX_BATCH_SIZE = 100
-
-    def _iter_last_name_prefixes(self):
-
-        '''
-        The final backlog can contain names outside the shared ASCII prefix
-        lists, including one-character surnames. Read actual pending prefixes
-        in bounded pages so those people are also grouped before their flags
-        are cleared. The inherited task still bounds its process-pool queue,
-        reuses existing group IDs, and applies database writes in the parent.
-        '''
-        query = f'''
-            SELECT DISTINCT LEFT(last_name, 2) AS prefix
-            FROM {self.PERSON_TABLE}
-            WHERE is_new = 1
-              AND (rdas_group_id IS NULL OR rdas_group_id = '')
-              AND last_name IS NOT NULL AND last_name <> ''
-              AND (%s IS NULL OR LEFT(last_name, 2) > %s)
-            ORDER BY prefix
-            LIMIT %s
-        '''
-        cursor = self.mysql.cursor(dictionary=True, buffered=True)
-        last_prefix = None
-        try:
-            while True:
-                cursor.execute(query, (last_prefix, last_prefix, self.PREFIX_BATCH_SIZE))
-                rows = cursor.fetchall()
-                if not rows:
-                    break
-
-                last_prefix = rows[-1]["prefix"]
-                for row in rows:
-                    yield row["prefix"]
-        finally:
-            cursor.close()
 
 
 class GARDPersonAgentGraphTask(NewPersonAgentGraphTask):
@@ -188,32 +163,3 @@ class GARDPersonAgentGraphTask(NewPersonAgentGraphTask):
         for row in rows:
             if row.get("first_name") and row.get("last_name") and self.normalize_last_name(row["last_name"]) and not row.get("rdas_group_id"):
                 raise RuntimeError(f"Person row {row['id']} has no group ID; final person flags must remain pending.")
-
-
-class GARDOrganizationSourceTrackingTask(NewOrganizationSourceTrackingTask):
-    """Separate per-node trial/project sources from final person affiliations."""
-
-    __module__ = NewOrganizationSourceTrackingTask.__module__
-
-    def __init__(self, person_only: bool = False):
-
-        super().__init__()
-        self.person_only = person_only
-
-
-    def process_new_data(self) -> None:
-
-        '''
-        Pending person flags accumulate until finalization. Scanning them in
-        every per-node maintenance step would replay a growing backlog. Track
-        trial/project sources before their flags are cleared, and consume the
-        person affiliation backlog once in the final phase instead.
-        '''
-        try:
-            if self.person_only:
-                self.track_person_sources()
-            else:
-                self.track_clinical_trial_sources()
-                self.track_core_project_sources()
-        finally:
-            self.close()
