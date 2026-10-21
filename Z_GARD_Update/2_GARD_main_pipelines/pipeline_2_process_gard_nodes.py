@@ -399,7 +399,7 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         self._run_pipeline_task(NewGrantPersonTask)
 
 
-    def run_person_grouping_and_graph_updates(self) -> None:
+    def _run_person_grouping_and_graph_updates(self) -> None:
 
         """Group the accumulated people, then build Agents from bounded source batches."""
 
@@ -413,7 +413,7 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         self._run_pipeline_task(GARDPersonAgentGraphTask)
 
 
-    def run_person_organization_updates(self) -> None:
+    def _run_person_organization_updates(self) -> None:
 
         """Finish organization enrichment and source tracking for the final person backlog."""
 
@@ -447,8 +447,8 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         still identifies an unfinished grouping/Agent backlog. Never put the
         person reset in finally: any failed task must leave that work pending.
         '''
-        self._run_step_with_timing("Final person grouping and Agent graph updates", self.run_person_grouping_and_graph_updates)
-        self._run_step_with_timing("Final person organization updates", self.run_person_organization_updates)
+        self._run_step_with_timing("Final person grouping and Agent graph updates", self._run_person_grouping_and_graph_updates)
+        self._run_step_with_timing("Final person organization updates", self._run_person_organization_updates)
         self._run_pipeline_task(PersonPipelineWrapUpTask)
 
 
