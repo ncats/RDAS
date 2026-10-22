@@ -20,7 +20,7 @@ sys.path.extend([
 
 from gard_common import GARD_NOMENCLATURE_FILE, count_csv_rows, resolve_data_file, validate_batch_size
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _na, _try_parse_int
+from utils.tools import _na, _repair_mac_roman_utf8, _try_parse_int
 
 
 INSERT_GARD_SQL = """
@@ -81,6 +81,12 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
                 self.logger.info("Skipped MySQL gard load because the table already has rows. Set clear_existing=True for a rebuild or allow_append=True for an intentional append.")
                 return
 
+            '''
+            Check both the connection and destination storage before inserts
+            or an explicitly requested TRUNCATE. UTF-8 CSV decoding alone does
+            not make a latin1 MySQL column able to store Unicode disease names.
+            '''
+            self._validate_utf8_storage()
             cursor = self.mysql.cursor()
 
             if self.clear_existing:
@@ -106,6 +112,49 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
             self.close()
 
 
+    def _validate_utf8_storage(self) -> None:
+
+        """Configure Unicode transport and reject non-UTF-8 GARD text columns."""
+
+        if self.mysql is None:
+            raise ConnectionError("A MySQL connection is required before loading GARD nomenclature.")
+
+        '''
+        Use Connector/Python's API so its Python-side encoding and the server
+        session agree. This keeps the setting local to this loader connection;
+        the shared Alert connection factory already uses utf8mb4 too.
+        '''
+        self.mysql.set_charset_collation(charset="utf8mb4", collation="utf8mb4_unicode_ci")
+        cursor = self.mysql.cursor(dictionary=True)
+        try:
+            cursor.execute('''
+                SELECT COLUMN_NAME AS column_name, CHARACTER_SET_NAME AS character_set_name
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'gard'
+                  AND CHARACTER_SET_NAME IS NOT NULL
+            ''')
+            encodings = {row["column_name"]: row["character_set_name"] for row in cursor.fetchall()}
+        finally:
+            cursor.close()
+
+        if "Label" not in encodings:
+            raise RuntimeError("The selected database must contain the gard.Label text column before loading nomenclature.")
+
+        '''
+        Existing GARD tables use utf8mb3, which supports this source's accented
+        names, including Böök. Accept that UTF-8 variant as well as utf8mb4;
+        utf8mb4 is preferred for new schemas because it also stores four-byte
+        characters. A session charset does not convert existing table columns,
+        so report incompatible columns instead of altering schemas implicitly.
+        '''
+        incompatible_columns = [f"{column}={charset}" for column, charset in encodings.items() if charset.lower() not in {"utf8", "utf8mb3", "utf8mb4"}]
+        if incompatible_columns:
+            raise RuntimeError("GARD text columns require UTF-8 storage; migrate these columns to utf8mb4 before loading: " + ", ".join(incompatible_columns))
+
+        self.logger.info("GARD insertion uses utf8mb4 transport; destination text columns are UTF-8 compatible.")
+
+
     def _get_existing_row_count(self) -> int:
         """Return the current number of rows in MySQL table `gard`."""
 
@@ -125,15 +174,31 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
 
         insert_values: List[Tuple[Any, ...]] = []
         inserted_count = 0
+        repaired_label_count = 0
 
-        with self.data_file.open("r", encoding="utf-8-sig", newline="") as csv_file:
+        '''
+        Accept UTF-8 with or without a BOM and reject invalid bytes. The input
+        already uses UTF-8, so encoding guessing or errors='replace' could hide
+        source damage rather than fix it. Known label damage is handled while
+        building the insert tuple; the original source CSV is preserved.
+        '''
+        with self.data_file.open("r", encoding="utf-8-sig", errors="strict", newline="") as csv_file:
 
             reader = csv.DictReader(csv_file)
             self.logger.info(f"GARD nomenclature CSV fields: {', '.join(reader.fieldnames or [])}")
 
             for row_index, row in enumerate(reader, start=2):
                 try:
-                    insert_values.append(self._build_insert_values(row))
+                    values = self._build_insert_values(row)
+                    '''
+                    Label is the third INSERT column. Log actual changes with
+                    their CSV row and GARD ID so operators can trace each repair
+                    back to the original source, e.g. B√∂√∂k -> Böök.
+                    '''
+                    if values[2] != row["Label"]:
+                        repaired_label_count += 1
+                        self.logger.info("Repaired CSV label before insertion: row=%s, gard_id=%s, original=%r, repaired=%r", row_index, row["GARD_ID"], row["Label"], values[2])
+                    insert_values.append(values)
 
                 except KeyError as e:
                     self.logger.error(f"Skipping CSV row {row_index}; missing required column: {e}")
@@ -144,6 +209,7 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
 
             inserted_count = self._flush_insert_batch(cursor, insert_values, inserted_count)
 
+        self.logger.info("Completed GARD label encoding repairs: %s labels corrected during insertion.", repaired_label_count)
         return inserted_count
 
 
@@ -166,8 +232,16 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
 
     @staticmethod
     def _build_insert_values(row: Dict[str, Any]) -> Tuple[Any, ...]:
+
         """Convert one raw nomenclature CSV row into the `gard` insert tuple."""
 
+        '''
+        UTF-8 decoding preserves already-garbled text such as B√∂√∂k syndrome.
+        Apply the narrow, lossless Mac Roman repair before storing Name and
+        Synonym labels. Correctly encoded accents/Greek letters are retained.
+        This affects new inserts only; existing rows need the repair migration.
+        '''
+        label = _repair_mac_roman_utf8(row["Label"])
         xref = (row["Label_Xref"] or "").strip("[]")
         label_predicate = (row["Label_Predicate"] or "").strip("[]")
         label_predicate_mapping = (row["Label_Predicate_Mapping"] or "").strip("[]")
@@ -175,7 +249,7 @@ class GardMysqlNomenclatureLoadTask(PipelineBase):
         return (
             row["GARD_ID"],
             row["MONDO_ID"],
-            row["Label"],
+            label,
             row["Label_Predicate_Type"],
             label_predicate_mapping,
             label_predicate,

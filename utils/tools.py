@@ -308,6 +308,39 @@ def _to_number_or_blank(value: Any) -> Any:
 # Encoding / File Conversion
 # -----------------------------------------------------------------------------
 
+def _repair_mac_roman_utf8(text: Any) -> Any:
+
+    """Repair recognizable UTF-8 text previously decoded as Mac Roman.
+
+    The GARD nomenclature CSV is already a valid UTF-8 file, but some labels
+    contain characters produced by an earlier incorrect decode. Examples:
+        "B√∂√∂k syndrome" -> "Böök syndrome"
+        "Beh√ßet‚Äôs disease" -> "Behçet’s disease"
+
+    File encoding detection alone cannot repair these strings. Restrict the
+    conversion to known Mac Roman corruption markers, require strict encoding
+    and decoding, and accept it only when the marker count falls. Valid names
+    such as "Müller syndrome" and "α-thalassemia" pass through unchanged.
+    A failed conversion also leaves the original text intact; never use
+    errors='ignore'/'replace' or strip accents to manufacture a repair.
+    """
+    markers = ("√", "‚Ä", "¬")
+    if not isinstance(text, str) or not any(marker in text for marker in markers):
+        return text
+
+    try:
+        repaired = text.encode("mac_roman", errors="strict").decode("utf-8", errors="strict")
+    except UnicodeError:
+        return text
+
+    if any(unicodedata.category(character) == "Cc" and character not in "\t\r\n" for character in repaired):
+        return text
+
+    original_marker_count = sum(text.count(marker) for marker in markers)
+    repaired_marker_count = sum(repaired.count(marker) for marker in markers)
+    return repaired if repaired_marker_count < original_marker_count else text
+
+
 def detect_file_encoding(filename):
     try:
         with open(filename, 'rb') as file:  # Open in binary mode
