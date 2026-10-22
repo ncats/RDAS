@@ -1,6 +1,7 @@
 """Copy reusable RDAS records for the one-time GARD build, without changing Alert."""
 
 import json
+import os
 import re
 from contextlib import contextmanager
 from datetime import date
@@ -12,7 +13,12 @@ from utils.tools import _safe_get
 
 
 class GARDExistingDataReuse:
-    """Read rdas_db and write only gard_rdas_db using each caller's connection.
+    """Copy source records into the configured target using each caller's connection.
+
+    MYSQL_COPY_SOURCE_DATABASE and MYSQL_COPY_TARGET_DATABASE select the schema
+    roles when this helper is constructed. The GARD .env.newdb configuration
+    copies rdas_db -> gard_rdas_db; .env.alert reverses those roles. The caller's
+    selected MYSQL_DATABASE must match the configured target before any writes.
 
     This is shared copy infrastructure, not a separately scheduled pipeline
     task, so its module has no invocation number. The runner creates one
@@ -36,11 +42,9 @@ class GARDExistingDataReuse:
     enrichment_scope() temporarily changes only that task's pending input rows
     from is_new=1 to 2, then restores them to 1 before graph/person processing.
     If the process is killed, startup recovery restores those temporary flags.
-    Neither copying nor temporary exclusions change source rdas_db flags.
+    Neither copying nor temporary exclusions change the source database flags.
     """
 
-    SOURCE_DATABASE = "rdas_db"
-    TARGET_DATABASE = "gard_rdas_db"
     BATCH_SIZE = 100
     TABLES = (
         "clinical_trial", "clinical_trial_unique", "clinical_trial_annotation",
@@ -52,6 +56,23 @@ class GARDExistingDataReuse:
     )
 
     def __init__(self):
+
+        '''
+        Resolve the direction once per helper so a long run keeps a consistent
+        source and target. Require explicit settings instead of silently using
+        the GARD direction when the active configuration is .env.alert.
+
+        Database identifiers cannot use SQL value placeholders. Validate these
+        names before interpolating them as backtick-quoted identifiers; record
+        IDs, disease names and other data remain ordinary query parameters.
+        '''
+        self.SOURCE_DATABASE = os.getenv("MYSQL_COPY_SOURCE_DATABASE", "").strip()
+        self.TARGET_DATABASE = os.getenv("MYSQL_COPY_TARGET_DATABASE", "").strip()
+        for setting, database in (("MYSQL_COPY_SOURCE_DATABASE", self.SOURCE_DATABASE), ("MYSQL_COPY_TARGET_DATABASE", self.TARGET_DATABASE)):
+            if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", database):
+                raise ValueError(f"{setting} must specify a database name using letters, digits and underscores, up to 64 characters.")
+        if self.SOURCE_DATABASE.lower() == self.TARGET_DATABASE.lower():
+            raise ValueError("MySQL copy source and target databases must be different.")
 
         self.columns = {}
         self.drug_nctids = set()
@@ -71,8 +92,10 @@ class GARDExistingDataReuse:
 
         '''
         Qualify every destination table and reject an accidentally selected
-        production database before any copy or temporary flag change. Source
-        access uses SELECT only, on the same MySQL server as the target.
+        database that differs from MYSQL_COPY_TARGET_DATABASE before any copy
+        or temporary flag change. This also protects the reversed Alert
+        configuration. Source access uses SELECT only, on the same MySQL server
+        as the target; MYSQL_DATABASE remains the caller's selected destination.
         '''
         cursor = mysql.cursor()
         try:
@@ -212,7 +235,7 @@ class GARDExistingDataReuse:
                 reusable = [row[0] for row in cursor.fetchall()]
                 if reusable:
                     marks = ",".join(["%s"] * len(reusable))
-                    self._copy_rows(cursor, "publication_pubtator", f"s.pubmed_id IN ({marks}) AND JSON_VALID(s.source_json) AND s.id = (SELECT MAX(p.id) FROM rdas_db.publication_pubtator p WHERE p.pubmed_id = s.pubmed_id AND JSON_VALID(p.source_json))", reusable, keys=["pubmed_id"])
+                    self._copy_rows(cursor, "publication_pubtator", f"s.pubmed_id IN ({marks}) AND JSON_VALID(s.source_json) AND s.id = (SELECT MAX(p.id) FROM `{self.SOURCE_DATABASE}`.publication_pubtator p WHERE p.pubmed_id = s.pubmed_id AND JSON_VALID(p.source_json))", reusable, keys=["pubmed_id"])
                     for table in ("publication_pubtator_parsed", "publication_substance"):
                         self._copy_rows(cursor, table, f"s.pubmed_id IN ({marks})", reusable)
                     '''
@@ -249,16 +272,16 @@ class GARDExistingDataReuse:
                         cursor, "publication_gard_searchterm_pubmed_mapping",
                         f'''s.gard_id = %s AND BINARY s.search_term = BINARY %s
                             AND s.pubmed_id IN ({placeholders})
-                            AND s.id = (SELECT MAX(m.id) FROM rdas_db.publication_gard_searchterm_pubmed_mapping m
+                            AND s.id = (SELECT MAX(m.id) FROM `{self.SOURCE_DATABASE}`.publication_gard_searchterm_pubmed_mapping m
                                 WHERE m.gard_id = s.gard_id AND BINARY m.search_term = BINARY s.search_term AND m.pubmed_id = s.pubmed_id)
-                            AND EXISTS (SELECT 1 FROM gard_rdas_db.publication_article a WHERE a.pubmed_id = s.pubmed_id)''',
+                            AND EXISTS (SELECT 1 FROM `{self.TARGET_DATABASE}`.publication_article a WHERE a.pubmed_id = s.pubmed_id)''',
                         (self.current_gard_id, search_term, *batch),
                         keys=["gard_id", "search_term", "pubmed_id"],
                         overrides={"gard_id": self.current_gard_id, "search_term": search_term, "is_abbreviation": None, "is_valid": None},
                     )
                 mysql.commit()
                 logger.info(f"Publication copy batch {batch_number}/{batch_count}: inserted {copied - copied_before} Articles; checked {start + len(batch)}/{len(identifiers)} PMIDs in {perf_counter() - batch_started:.2f}s.")
-            logger.info(f"Reused {copied} publication_article rows from rdas_db; checked {len(identifiers)} PMIDs and copied their available enrichment.")
+            logger.info(f"Reused {copied} publication_article rows from {self.SOURCE_DATABASE} into {self.TARGET_DATABASE}; checked {len(identifiers)} PMIDs and copied their available enrichment.")
         except Exception:
             mysql.rollback()
             raise
@@ -289,8 +312,8 @@ class GARDExistingDataReuse:
         copied = 0
         try:
             reader.execute(
-                '''SELECT id, year_range, total, retstart, pubmed_ids, ref_json
-                   FROM rdas_db.publication_gard_pubmed
+                f'''SELECT id, year_range, total, retstart, pubmed_ids, ref_json
+                   FROM `{self.SOURCE_DATABASE}`.publication_gard_pubmed
                    WHERE gard_id = %s AND BINARY search_term = BINARY %s ORDER BY id DESC''',
                 (gard_id, search_term),
             )
@@ -328,7 +351,7 @@ class GARDExistingDataReuse:
                     batch = identifiers[offset:offset + self.BATCH_SIZE]
                     marks = ",".join(["%s"] * len(batch))
                     writer.execute(
-                        f'''SELECT DISTINCT pubmed_id FROM gard_rdas_db.publication_gard_searchterm_pubmed_mapping
+                        f'''SELECT DISTINCT pubmed_id FROM `{self.TARGET_DATABASE}`.publication_gard_searchterm_pubmed_mapping
                             WHERE gard_id = %s AND BINARY search_term = BINARY %s AND pubmed_id IN ({marks})''',
                         (gard_id, current_search_term, *batch),
                     )
@@ -355,18 +378,18 @@ class GARDExistingDataReuse:
     def copy_gard_omim_mappings(self, mysql, logger, gard_id):
 
         '''
-        Production associations are eligible only when the NEW GARD source
+        Source associations are eligible only when the destination GARD data
         still lists that OMIM cross-reference. This avoids resurrecting retired
         associations or attaching other diseases that happen to share a PMID.
         The shared mapping task subsequently adds any new cross-references
-        missing from production; all writes explicitly use the current GARD ID.
+        missing from the copy source; all writes use the current GARD ID.
         '''
         self.validate_connection(mysql)
         if gard_id != self.current_gard_id:
             raise ValueError("OMIM mapping copies must use the current GARD node.")
         cursor = mysql.cursor(buffered=True)
         try:
-            cursor.execute("SELECT Label_Xref FROM gard_rdas_db.gard WHERE GardID = %s", (gard_id,))
+            cursor.execute(f"SELECT Label_Xref FROM `{self.TARGET_DATABASE}`.gard WHERE GardID = %s", (gard_id,))
             omim_ids = set()
             for (xrefs,) in cursor.fetchall():
                 for item in (xrefs or "").split(","):
@@ -383,7 +406,7 @@ class GARDExistingDataReuse:
                     (gard_id, *batch), keys=["gard_id", "omim_id"], overrides={"gard_id": gard_id}, restage_existing=True,
                 )
             mysql.commit()
-            logger.info(f"{gard_id}: reused {copied} current GARD/OMIM associations from rdas_db.")
+            logger.info(f"{gard_id}: reused {copied} current GARD/OMIM associations from {self.SOURCE_DATABASE} into {self.TARGET_DATABASE}.")
         except Exception:
             mysql.rollback()
             raise
@@ -408,12 +431,12 @@ class GARDExistingDataReuse:
         copied = 0
         copied_pairs = 0
         try:
-            reader.execute("SELECT DISTINCT omim_id FROM gard_rdas_db.publication_gard_omim_mapping WHERE gard_id = %s AND omim_id IS NOT NULL", (gard_id,))
+            reader.execute(f"SELECT DISTINCT omim_id FROM `{self.TARGET_DATABASE}`.publication_gard_omim_mapping WHERE gard_id = %s AND omim_id IS NOT NULL", (gard_id,))
             identifiers = [row["omim_id"] for row in reader.fetchall()]
             for start in range(0, len(identifiers), self.BATCH_SIZE):
                 batch = identifiers[start:start + self.BATCH_SIZE]
                 marks = ",".join(["%s"] * len(batch))
-                reader.execute(f"SELECT s.id, s.omim_id, s.entry_json FROM rdas_db.publication_omim s WHERE s.omim_id IN ({marks}) AND s.id = (SELECT MAX(o.id) FROM rdas_db.publication_omim o WHERE o.omim_id = s.omim_id)", batch)
+                reader.execute(f"SELECT s.id, s.omim_id, s.entry_json FROM `{self.SOURCE_DATABASE}`.publication_omim s WHERE s.omim_id IN ({marks}) AND s.id = (SELECT MAX(o.id) FROM `{self.SOURCE_DATABASE}`.publication_omim o WHERE o.omim_id = s.omim_id)", batch)
                 for row in reader.fetchall():
                     try:
                         entries = json.loads(row["entry_json"])["omim"]["entryList"]
@@ -436,14 +459,14 @@ class GARDExistingDataReuse:
                         copied_pairs += self._copy_rows(
                             writer, "publication_omim_pubmed_mapping",
                             f'''s.omim_id = %s AND s.pubmed_id IN ({ref_marks})
-                                AND EXISTS (SELECT 1 FROM gard_rdas_db.publication_omim d
+                                AND EXISTS (SELECT 1 FROM `{self.TARGET_DATABASE}`.publication_omim d
                                     WHERE d.omim_id = s.omim_id AND BINARY d.entry_json = BINARY %s)''',
                             (row["omim_id"], *refs, row["entry_json"]), keys=["omim_id", "pubmed_id"],
                         )
-                writer.execute(f"UPDATE gard_rdas_db.publication_omim SET is_new = 1 WHERE omim_id IN ({marks})", batch)
-                writer.execute(f"UPDATE gard_rdas_db.publication_gard_omim_mapping SET is_new = 1 WHERE gard_id = %s AND omim_id IN ({marks})", (gard_id, *batch))
+                writer.execute(f"UPDATE `{self.TARGET_DATABASE}`.publication_omim SET is_new = 1 WHERE omim_id IN ({marks})", batch)
+                writer.execute(f"UPDATE `{self.TARGET_DATABASE}`.publication_gard_omim_mapping SET is_new = 1 WHERE gard_id = %s AND omim_id IN ({marks})", (gard_id, *batch))
                 mysql.commit()
-            logger.info(f"{gard_id}: reused {copied} publication_omim entries and {copied_pairs} OMIM/PMID pairs from rdas_db.")
+            logger.info(f"{gard_id}: reused {copied} publication_omim entries and {copied_pairs} OMIM/PMID pairs from {self.SOURCE_DATABASE} into {self.TARGET_DATABASE}.")
         except Exception:
             mysql.rollback()
             raise
@@ -492,8 +515,8 @@ class GARDExistingDataReuse:
                 if missing_targets:
                     missing_marks = ",".join(["%s"] * len(missing_targets))
                     cursor.execute(
-                        f'''SELECT s.nctid, s.studies FROM gard_rdas_db.clinical_trial s
-                            JOIN (SELECT nctid, MAX(id) AS id FROM gard_rdas_db.clinical_trial
+                        f'''SELECT s.nctid, s.studies FROM `{self.TARGET_DATABASE}`.clinical_trial s
+                            JOIN (SELECT nctid, MAX(id) AS id FROM `{self.TARGET_DATABASE}`.clinical_trial
                                   WHERE nctid IN ({missing_marks}) GROUP BY nctid) latest ON latest.id = s.id''', missing_targets,
                     )
                     staged = {row["nctid"]: row for row in cursor.fetchall()}
@@ -557,7 +580,7 @@ class GARDExistingDataReuse:
                 if canonical_rows:
                     row_marks = ",".join(["(%s, %s, %s, %s, %s, 1)"] * len(canonical_rows))
                     writer.execute(
-                        f'''INSERT INTO gard_rdas_db.clinical_trial_unique (nctid, studies, brief_title, brief_summary, overall_status, is_new)
+                        f'''INSERT INTO `{self.TARGET_DATABASE}`.clinical_trial_unique (nctid, studies, brief_title, brief_summary, overall_status, is_new)
                             VALUES {row_marks} ON DUPLICATE KEY UPDATE nctid = nctid''',
                         [value for row in canonical_rows for value in row],
                     )
@@ -582,16 +605,16 @@ class GARDExistingDataReuse:
                     prepared_ids = list(prepared)
                     prepared_marks = ",".join(["%s"] * len(prepared_ids))
                     writer.execute(
-                        f'''INSERT INTO gard_rdas_db.clinical_trial (gardId, disease, nctid, studies, brief_title, brief_summary, url, is_new)
+                        f'''INSERT INTO `{self.TARGET_DATABASE}`.clinical_trial (gardId, disease, nctid, studies, brief_title, brief_summary, url, is_new)
                             SELECT %s, %s, s.nctid, s.studies, s.brief_title, s.brief_summary, %s, 1
-                            FROM gard_rdas_db.clinical_trial_unique s
+                            FROM `{self.TARGET_DATABASE}`.clinical_trial_unique s
                             WHERE s.nctid IN ({prepared_marks}) AND NOT EXISTS (
-                                SELECT 1 FROM gard_rdas_db.clinical_trial d
+                                SELECT 1 FROM `{self.TARGET_DATABASE}`.clinical_trial d
                                 WHERE d.gardId = %s AND d.disease = %s AND d.nctid = s.nctid)''',
                         (gard_id, disease, source_url, *prepared_ids, gard_id, disease),
                     )
                     writer.execute(
-                        f'''UPDATE gard_rdas_db.clinical_trial SET is_new = 1
+                        f'''UPDATE `{self.TARGET_DATABASE}`.clinical_trial SET is_new = 1
                             WHERE gardId = %s AND disease = %s AND nctid IN ({prepared_marks})
                             AND (is_new IS NULL OR is_new <> 1)''',
                         (gard_id, disease, *prepared_ids),
@@ -609,8 +632,8 @@ class GARDExistingDataReuse:
                 if enriched_sources:
                     compatible_marks = ",".join(["%s"] * len(enriched_sources))
                     for table, keys in (("clinical_trial_annotation", None), ("clinical_trial_nctid_pmids_mapping", ["nctid", "pmid"])):
-                        self._copy_rows(writer, table, f"s.nctid IN ({compatible_marks}) AND EXISTS (SELECT 1 FROM gard_rdas_db.clinical_trial_unique u WHERE u.nctid = s.nctid AND u.is_new = 1)", enriched_sources, keys=keys, restage_existing=True)
-                    cursor.execute(f"SELECT DISTINCT nctid FROM rdas_db.clinical_trial_annotation WHERE nctid IN ({compatible_marks})", enriched_sources)
+                        self._copy_rows(writer, table, f"s.nctid IN ({compatible_marks}) AND EXISTS (SELECT 1 FROM `{self.TARGET_DATABASE}`.clinical_trial_unique u WHERE u.nctid = s.nctid AND u.is_new = 1)", enriched_sources, keys=keys, restage_existing=True)
+                    cursor.execute(f"SELECT DISTINCT nctid FROM `{self.SOURCE_DATABASE}`.clinical_trial_annotation WHERE nctid IN ({compatible_marks})", enriched_sources)
                     annotated = {row["nctid"] for row in cursor.fetchall()}
                     annotated.update(nctid for nctid in enriched_sources if (uniques.get(nctid) or {}).get("annotation_processed") == 2)
                     self.annotation_nctids.update(annotated)
@@ -644,7 +667,7 @@ class GARDExistingDataReuse:
                     '''
                     identifiers = list(reusable_drugs)
                     placeholders = ",".join(["%s"] * len(identifiers))
-                    writer.execute(f"UPDATE gard_rdas_db.clinical_trial_intervention_drug SET is_new = 1 WHERE gardId = %s AND disease = %s AND nctid IN ({placeholders})", (gard_id, disease, *identifiers))
+                    writer.execute(f"UPDATE `{self.TARGET_DATABASE}`.clinical_trial_intervention_drug SET is_new = 1 WHERE gardId = %s AND disease = %s AND nctid IN ({placeholders})", (gard_id, disease, *identifiers))
                     self.drug_nctids.update(reusable_drugs)
                 for nctid, study in prepared.items():
                     interventions = _safe_get(study, "protocolSection", "armsInterventionsModule", "interventions", default=[]) or []
@@ -673,13 +696,13 @@ class GARDExistingDataReuse:
         self.validate_connection(mysql)
         cursor = mysql.cursor(buffered=True)
         try:
-            cursor.execute('''UPDATE gard_rdas_db.clinical_trial_nctid_pmids_mapping m
-                              JOIN gard_rdas_db.clinical_trial_unique u ON u.nctid = m.nctid
+            cursor.execute(f'''UPDATE `{self.TARGET_DATABASE}`.clinical_trial_nctid_pmids_mapping m
+                              JOIN `{self.TARGET_DATABASE}`.clinical_trial_unique u ON u.nctid = m.nctid
                               SET m.is_new = 1 WHERE u.is_new = 1''')
             mysql.commit()
             last_pmid = 0
             while True:
-                cursor.execute('''SELECT DISTINCT pmid FROM gard_rdas_db.clinical_trial_nctid_pmids_mapping
+                cursor.execute(f'''SELECT DISTINCT pmid FROM `{self.TARGET_DATABASE}`.clinical_trial_nctid_pmids_mapping
                                   WHERE is_new = 1 AND pmid > %s ORDER BY pmid LIMIT %s''', (last_pmid, self.BATCH_SIZE))
                 rows = cursor.fetchall()
                 if not rows:
@@ -721,14 +744,14 @@ class GARDExistingDataReuse:
             for start in range(0, len(identifiers), self.BATCH_SIZE):
                 batch = identifiers[start:start + self.BATCH_SIZE]
                 marks = ",".join(["%s"] * len(batch))
-                cursor.execute(f"SELECT id FROM gard_rdas_db.`{table}` WHERE is_new = 1 AND nctid IN ({marks})", batch)
+                cursor.execute(f"SELECT id FROM `{self.TARGET_DATABASE}`.`{table}` WHERE is_new = 1 AND nctid IN ({marks})", batch)
                 row_ids = [row[0] for row in cursor.fetchall()]
                 if row_ids:
                     row_marks = ",".join(["%s"] * len(row_ids))
-                    cursor.execute(f"UPDATE gard_rdas_db.`{table}` SET is_new = 2 WHERE id IN ({row_marks})", row_ids)
+                    cursor.execute(f"UPDATE `{self.TARGET_DATABASE}`.`{table}` SET is_new = 2 WHERE id IN ({row_marks})", row_ids)
                     masked_ids.extend(row_ids)
             extra_condition = "AND is_EPI IS NULL" if table == "publication_article" else ""
-            cursor.execute(f"SELECT 1 FROM gard_rdas_db.`{table}` WHERE is_new = 1 {extra_condition} LIMIT 1")
+            cursor.execute(f"SELECT 1 FROM `{self.TARGET_DATABASE}`.`{table}` WHERE is_new = 1 {extra_condition} LIMIT 1")
             has_work = cursor.fetchone() is not None
             mysql.commit()
             logger.info(f"{task_name}: reused {len(masked_ids)} input rows; missing enrichment remains={has_work}.")
@@ -739,7 +762,7 @@ class GARDExistingDataReuse:
                 for start in range(0, len(masked_ids), self.BATCH_SIZE):
                     batch = masked_ids[start:start + self.BATCH_SIZE]
                     marks = ",".join(["%s"] * len(batch))
-                    cursor.execute(f"UPDATE gard_rdas_db.`{table}` SET is_new = 1 WHERE id IN ({marks})", batch)
+                    cursor.execute(f"UPDATE `{self.TARGET_DATABASE}`.`{table}` SET is_new = 1 WHERE id IN ({marks})", batch)
                 mysql.commit()
             finally:
                 cursor.close()
@@ -757,7 +780,7 @@ class GARDExistingDataReuse:
         cursor = mysql.cursor()
         try:
             for table in ("clinical_trial", "clinical_trial_unique"):
-                cursor.execute(f"UPDATE gard_rdas_db.`{table}` SET is_new = 1 WHERE is_new = 2")
+                cursor.execute(f"UPDATE `{self.TARGET_DATABASE}`.`{table}` SET is_new = 1 WHERE is_new = 2")
                 if cursor.rowcount:
                     logger.info(f"Restored {cursor.rowcount} interrupted reuse inputs in {table} to is_new=1.")
             mysql.commit()

@@ -116,6 +116,9 @@ if __name__ == "__main__":
       and wrap-up can be enabled separately after the MySQL data is ready.
     """
 
+    #
+    # CHANGE True/False when start from the scretch !!!
+    #
     RUN_GARD_MYSQL_INITIALIZATION = True
     RUN_GARD_MEMGRAPH_INITIALIZATION = False
     RUN_GARD_UPDATE_WRAPUP = False

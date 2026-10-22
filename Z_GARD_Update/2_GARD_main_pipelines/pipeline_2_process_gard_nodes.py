@@ -206,7 +206,8 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
             f"disease counts refresh every {self.DISEASE_COUNTS_REFRESH_NODE_BATCH_SIZE} GARD nodes; "
             "person extraction runs per node; grouping and Agent updates run after all nodes."
         )
-        self.logger.info("GARD discovery reuses rdas_db clinical-trial/publication data before downloading missing records.")
+        # Log the actual configured direction, including reversed reuse configurations.
+        self.logger.info(f"GARD discovery reuses clinical-trial/publication data from {self.existing_data_reuse.SOURCE_DATABASE} into {self.existing_data_reuse.TARGET_DATABASE} before downloading missing records.")
 
 
     def _run_pipeline_task(self, task_class, task_name=None, **kwargs) -> None:
