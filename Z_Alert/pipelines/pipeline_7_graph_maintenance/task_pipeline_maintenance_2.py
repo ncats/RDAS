@@ -583,17 +583,24 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
 
     def fetch_duplicate_merge_key_batch(self, label: str, property_name: str, where_clause: str, last_merge_key: Optional[str]) -> List[str]:
+
         """Return the next bounded page of merge keys for duplicate discovery."""
 
         '''
         Labels and property names are intentionally interpolated instead of
         passed as parameters because Cypher parameters cannot replace label or
         property tokens. Callers only pass constants defined in this task.
+
+        Build the cursor condition only after the first page so the planner
+        can consider a direct property range without a nullable OR branch.
+        For example, a Location page after key 'abc' adds _idx_key > 'abc';
+        the first page still uses the caller's nonempty-key conditions.
         '''
+        cursor_condition = f"AND n.{property_name} > $lastMergeKey" if last_merge_key is not None else ""
         query = f"""
             MATCH (n:{label})
             WHERE {where_clause}
-              AND ($lastMergeKey IS NULL OR n.{property_name} > $lastMergeKey)
+              {cursor_condition}
             WITH DISTINCT n.{property_name} AS merge_key
             ORDER BY merge_key
             LIMIT $limit
@@ -608,6 +615,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
 
     def fetch_duplicate_groups_for_keys(self, label: str, property_name: str, merge_keys: List[str]) -> List[Dict[str, Any]]:
+
         """Return duplicate groups only for the current bounded key page."""
 
         if not merge_keys:
@@ -618,11 +626,17 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         internal ids to pick a keeper and rewire/delete duplicates, and keeping
         the result payload small matters when hundreds of duplicate groups are
         returned.
+
+        In 3.8.1, WHERE n.property IN $mergeKeys produces ScanAll, whereas
+        UNWIND followed by property equality uses the existing property index.
+        DISTINCT preserves IN's membership semantics: keys ['abc', 'abc']
+        must visit the 'abc' group once, not count every node twice.
         '''
         query = f"""
-            MATCH (n:{label})
-            WHERE n.{property_name} IN $mergeKeys
-            WITH n.{property_name} AS merge_key, collect(id(n)) AS node_ids, count(n) AS node_count
+            UNWIND $mergeKeys AS merge_key
+            WITH DISTINCT merge_key
+            MATCH (n:{label} {{{property_name}: merge_key}})
+            WITH merge_key, collect(id(n)) AS node_ids, count(n) AS node_count
             WHERE node_count > 1
             RETURN merge_key, node_ids, node_count
             ORDER BY node_count DESC
@@ -881,6 +895,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
 
     def delete_duplicate_nodes_without_detach(self, label: str, duplicate_ids: List[int]) -> int:
+
         """Delete duplicate nodes when rewiring already removed their relationships."""
 
         if not duplicate_ids:
@@ -891,10 +906,16 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         already have removed the relationships that pointed at duplicate nodes.
         On the observed graph this mode succeeded, and the log exposes whether
         the fallback was needed.
+
+        UNWIND plus id equality uses ScanAllById on 3.8.1; parameterized
+        id(node) IN $duplicate_ids would scan the full graph instead. Deduplicate
+        first so input [12, 12, 13] deletes and counts each existing node once.
         '''
         query = f"""
+            UNWIND $duplicate_ids AS duplicate_id
+            WITH DISTINCT duplicate_id
             MATCH (duplicate:{label})
-            WHERE id(duplicate) IN $duplicate_ids
+            WHERE id(duplicate) = duplicate_id
             WITH collect(duplicate) AS duplicates, count(duplicate) AS deleted_count
             FOREACH (duplicate IN duplicates | DELETE duplicate)
             RETURN deleted_count
@@ -905,6 +926,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
 
     def fetch_relationship_types_for_nodes(self, node_ids: List[int]) -> Set[str]:
+
         """Fetch all incoming and outgoing relationship types for duplicate nodes."""
 
         if not node_ids:
@@ -914,10 +936,17 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         Kept for compatibility with the original one-group implementation.
         The optimized scheduled path uses fetch_relationship_types_for_label()
         instead so relationship types are discovered once per label.
+
+        Resolve each distinct node id before expanding its relationships. This
+        lets 3.8.1 use ScanAllById rather than applying an IN filter after a
+        whole-graph scan, while repeated input ids still contribute once.
         '''
         query = """
+            UNWIND $node_ids AS node_id
+            WITH DISTINCT node_id
+            MATCH (n)
+            WHERE id(n) = node_id
             MATCH (n)-[r]-()
-            WHERE id(n) IN $node_ids
             RETURN DISTINCT type(r) AS relationship_type
         """
 
@@ -1110,6 +1139,7 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
 
 
     def detach_delete_duplicate_nodes(self, label: str, duplicate_ids: List[int]) -> int:
+
         """Delete duplicate nodes and any remaining relationships."""
 
         if not duplicate_ids:
@@ -1119,10 +1149,16 @@ class OrganizationLocationGraphSyncTask(PipelineBase):
         DETACH DELETE is slower but safest when unexpected relationships remain
         on a duplicate node. This is used as a fallback path and as the legacy
         behavior for external callers of delete_duplicate_nodes().
+
+        Use the same distinct-id lookup as plain DELETE so the fallback also
+        uses ScanAllById on 3.8.1. For example, ids [12, 12, 13] must delete at
+        most two nodes; the requested label is still checked before deletion.
         '''
         query = f"""
+            UNWIND $duplicate_ids AS duplicate_id
+            WITH DISTINCT duplicate_id
             MATCH (duplicate:{label})
-            WHERE id(duplicate) IN $duplicate_ids
+            WHERE id(duplicate) = duplicate_id
             WITH collect(duplicate) AS duplicates, count(duplicate) AS deleted_count
             FOREACH (duplicate IN duplicates | DETACH DELETE duplicate)
             RETURN deleted_count

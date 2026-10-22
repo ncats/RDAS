@@ -512,12 +512,20 @@ class OrganizationLocationGraphBatchUpdateTask:
 
 
     def fetch_duplicate_merge_key_batch(self, label: str, property_name: str, where_clause: str, last_merge_key: Optional[str]) -> List[str]:
+
         """Return the next bounded page of merge keys for duplicate discovery."""
 
+        '''
+        Keep the manual updater aligned with scheduled graph maintenance.
+        Omit the range on page one; subsequent pages expose a direct property
+        range, such as n._idx_key > 'abc', instead of a nullable OR filter.
+        Labels/properties/where_clause come from this task's trusted constants.
+        '''
+        cursor_condition = f"AND n.{property_name} > $lastMergeKey" if last_merge_key is not None else ""
         query = f"""
             MATCH (n:{label})
             WHERE {where_clause}
-              AND ($lastMergeKey IS NULL OR n.{property_name} > $lastMergeKey)
+              {cursor_condition}
             WITH DISTINCT n.{property_name} AS merge_key
             ORDER BY merge_key
             LIMIT $limit
@@ -532,15 +540,22 @@ class OrganizationLocationGraphBatchUpdateTask:
 
 
     def fetch_duplicate_groups_for_keys(self, label: str, property_name: str, merge_keys: List[str]) -> List[Dict[str, Any]]:
+
         """Return duplicate groups only for the current bounded key page."""
 
         if not merge_keys:
             return []
 
+        '''
+        Memgraph 3.8.1 scans the full graph for a parameterized IN filter.
+        Equality after UNWIND can use Organization(ror_id)/Location(_idx_key).
+        DISTINCT makes ['abc', 'abc'] behave like IN: count the group once.
+        '''
         query = f"""
-            MATCH (n:{label})
-            WHERE n.{property_name} IN $mergeKeys
-            WITH n.{property_name} AS merge_key, collect(id(n)) AS node_ids, count(n) AS node_count
+            UNWIND $mergeKeys AS merge_key
+            WITH DISTINCT merge_key
+            MATCH (n:{label} {{{property_name}: merge_key}})
+            WITH merge_key, collect(id(n)) AS node_ids, count(n) AS node_count
             WHERE node_count > 1
             RETURN merge_key, node_ids, node_count
             ORDER BY node_count DESC
@@ -590,14 +605,23 @@ class OrganizationLocationGraphBatchUpdateTask:
 
 
     def fetch_relationship_types_for_nodes(self, node_ids: List[int]) -> Set[str]:
+
         """Fetch all incoming and outgoing relationship types for duplicate nodes."""
 
         if not node_ids:
             return set()
 
+        '''
+        Resolve distinct ids with ScanAllById before traversing relationships.
+        Unlike id(n) IN $node_ids on 3.8.1, this avoids visiting unrelated nodes;
+        repeated ids in a batch still contribute the same relationship types.
+        '''
         query = """
+            UNWIND $node_ids AS node_id
+            WITH DISTINCT node_id
+            MATCH (n)
+            WHERE id(n) = node_id
             MATCH (n)-[r]-()
-            WHERE id(n) IN $node_ids
             RETURN DISTINCT type(r) AS relationship_type
         """
 
@@ -650,14 +674,22 @@ class OrganizationLocationGraphBatchUpdateTask:
 
 
     def delete_duplicate_nodes(self, label: str, duplicate_ids: List[int]) -> int:
+
         """Delete duplicate nodes after their relationships have been rewired."""
 
         if not duplicate_ids:
             return 0
 
+        '''
+        Match ids individually so 3.8.1 uses its internal-id lookup. DISTINCT
+        retains IN semantics: [12, 12, 13] deletes at most two nodes and the
+        label filter still excludes ids belonging to another node type.
+        '''
         query = f"""
+            UNWIND $duplicate_ids AS duplicate_id
+            WITH DISTINCT duplicate_id
             MATCH (duplicate:{label})
-            WHERE id(duplicate) IN $duplicate_ids
+            WHERE id(duplicate) = duplicate_id
             WITH collect(duplicate) AS duplicates, count(duplicate) AS deleted_count
             FOREACH (duplicate IN duplicates | DETACH DELETE duplicate)
             RETURN deleted_count

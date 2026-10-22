@@ -31,21 +31,42 @@ those indexes each input trial can trigger a full graph scan.
 """
 
 '''
-The dashboard groups all ClinicalTrial nodes by phase/status/type after each
-GARD node. Its label index avoids filtering unrelated publication/person nodes.
-The separate ClinicalTrial(nctId) index serves individual trial lookups.
+Label indexes serve queries whose starting node has no equality lookup key.
+On Memgraph 3.8.1, EXPLAIN for MATCH (n:Gene) RETURN count(n) otherwise shows
+ScanAll followed by a label filter, even when Gene(geneIdentifier) exists.
+
+GARD, Gene and Phenotype are scanned by the relationship-count refresh task;
+Disease, Article, ClinicalTrial, CoreProject and Project are also starting
+labels for relationship counts and dashboard aggregations. Organization and
+Location support maintenance queries that find missing metadata and discover
+relationship types before merging duplicates. The property indexes below
+continue to serve keyed MATCH/MERGE operations; label indexes do not replace
+them. For example, ClinicalTrial(nctId) still handles one-trial lookups.
 '''
 LABEL_INDEX_CONFIG = [
     "Article",
     "ClinicalTrial",
     "CoreProject",
     "Disease",
+    "GARD",
+    "Gene",
+    "Phenotype",
+    "Project",
+    "Organization",
+    "Location",
 ]
 
+'''
+The HPO extension loaders replace GARD_PROPERTY with mondo, omim or orphanet
+before matching GARD nodes. For example, an OMIM source row produces:
+    MATCH (gard:GARD {omim: row.diseaseId})
+An index on Disease(omim) cannot serve that GARD-only pattern, even when the
+same nodes also carry Disease. Index each actual GARD lookup property too.
+'''
 INDEX_CONFIG = [
     # GARD/Disease base graph
     {"Disease": ["gardId", "gardName", "synonyms", "countArticles", "countGenes", "countPhenotypes", "countProjects", "countTrials", "mondo", "orphanet", "omim"]},
-    {"GARD": ["gardId"]},
+    {"GARD": ["gardId", "mondo", "omim", "orphanet"]},
     {"Phenotype": ["hpoId"]},
     {"Gene": ["geneIdentifier"]},
 
