@@ -112,11 +112,12 @@ if __name__ == "__main__":
     - Runs the MySQL task, but that task skips loading if table `gard` already
       has rows unless CLEAR_EXISTING_MYSQL_GARD or ALLOW_APPEND_MYSQL_GARD is
       set to True.
-    - Runs all concrete Memgraph initialization tasks in dependency order.
+    - Runs only MySQL initialization for this load. Memgraph initialization
+      and wrap-up can be enabled separately after the MySQL data is ready.
     """
 
     RUN_GARD_MYSQL_INITIALIZATION = True
-    RUN_GARD_MEMGRAPH_INITIALIZATION = True
+    RUN_GARD_MEMGRAPH_INITIALIZATION = False
     RUN_GARD_UPDATE_WRAPUP = False
 
     # When True, Step 1 truncates MySQL table `gard` before loading the refreshed nomenclature CSV.
