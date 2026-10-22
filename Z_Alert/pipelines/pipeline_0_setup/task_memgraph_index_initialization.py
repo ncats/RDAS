@@ -24,13 +24,20 @@ _create_index(...) calls, such as F_person/initializer/agent.py:
 
     self.create_indexes('Agent', ['firstName', 'lastName', '_idx_key'])
 
-Do not add indexes for nodes that are only CREATE'd without a persisted lookup
-property, such as StudyDesign, IndividualPatientData, and PrimaryOutcome in
-the bulk clinical-trial initializers.
+Index the properties used by the current incremental loaders, even when an
+older bulk initializer originally used CREATE without a lookup key. For
+example, StudyDesign and IndividualPatientData now MERGE by nctId; without
+those indexes each input trial can trigger a full graph scan.
 """
 
+'''
+The dashboard groups all ClinicalTrial nodes by phase/status/type after each
+GARD node. Its label index avoids filtering unrelated publication/person nodes.
+The separate ClinicalTrial(nctId) index serves individual trial lookups.
+'''
 LABEL_INDEX_CONFIG = [
     "Article",
+    "ClinicalTrial",
     "CoreProject",
     "Disease",
 ]
@@ -50,6 +57,8 @@ INDEX_CONFIG = [
     {"Intervention": ["interventionName", "interventionType", "_composite_key", "_intervention_name_key"]},
     {"Participant": ["nctId"]},
     {"PrimaryOutcome": ["_composite_key"]},
+    {"StudyDesign": ["nctId"]},
+    {"IndividualPatientData": ["nctId"]},
 
     # Publication graph
     {"Article": ["pubmedId", "publicationYear", "title", "isEpidemiologicalStudy", "isNaturalHistoryStudy"]},
@@ -70,7 +79,9 @@ INDEX_CONFIG = [
     # Person
     {"Agent": ["firstName", "lastName", "_idx_key", "name"]},
 
-    # Fllow up
+    # Follow up
+    # Index the singleton's id so each FieldCounts MERGE avoids a full graph scan.
+    {"FieldCounts": ["id"]},
     {"Location": ["facility", "_idx_key"]},
     {"Organization": ["ror_id", "name", "_idx_key"]},
 ]

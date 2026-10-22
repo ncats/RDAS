@@ -32,23 +32,33 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
     BATCH_SIZE = 200
 
     '''
-    Drug nodes are keyed by RxNorm ID. A plain SET after MERGE refreshes RxNorm
-    properties when a changed trial causes a drug mapping to be reprocessed. The
-    Intervention -> Drug mapping is shared by intervention name and RxNorm ID, so
-    this task does not delete old mappings that may still be used by other
-    trials.
+    Keep the node write separate from the relationship write. On Memgraph
+    3.8.1, the former MERGE/SET/OPTIONAL MATCH query introduces an Accumulate
+    operator between writing Drug properties and reading Interventions. Two
+    bounded statements avoid carrying those property maps through that step.
+
+    Drug identity remains rxnormID. Exclude that key from the property map:
+    transform_json_object() supplies [] for missing fields, which must not
+    replace the key used by the following relationship lookup.
+    Nodes are still created when no matching Intervention exists, and mappings
+    shared by other trials are not deleted.
     '''
-    BATCH_CREATE = '''
+    BATCH_UPSERT_DRUGS = '''
         UNWIND $chunks AS chunk
-
-        MERGE (x: Drug {rxnormID: chunk.rxnormID})
+        MERGE (x:Drug {rxnormID: chunk.rxnormID})
         SET x += chunk.props
+    '''
 
-        WITH x, chunk
-        OPTIONAL MATCH (y: Intervention {_intervention_name_key: chunk._intervention_name_key})
-
-        WITH x, y, chunk
-        WHERE y IS NOT NULL
+    '''
+    Both endpoints are bound by indexed MATCH before MERGE. Memgraph 3.8.1
+    plans these lookups with IndexedJoin and expands the Intervention's drug
+    relationships. An absent Intervention simply has no edge to add; its Drug
+    node was already written by the separate upsert statement.
+    '''
+    BATCH_LINK_INTERVENTIONS = '''
+        UNWIND $chunks AS chunk
+        MATCH (y:Intervention {_intervention_name_key: chunk._intervention_name_key})
+        MATCH (x:Drug {rxnormID: chunk.rxnormID})
         MERGE (y)-[:has_rxnorm_mapping {with_spacy: chunk.wspacy}]->(x)
     '''
 
@@ -149,18 +159,37 @@ class NewClinicalTrialDrugGraphTask(PipelineBase):
                 batch_num += 1
                 self.logger.info(f'--- batch# = {batch_num} ---')
 
-                chunks = []
+                drug_chunks = {}
+                relationship_chunks = {}
 
                 for row in rows:
                     chunk = self._create_drug_chunk(row)
                     if chunk:
-                        chunks.append(chunk)
+                        '''
+                        Example: RxNorm ID "12345" can appear under two
+                        intervention names and both spaCy flags. Send its full
+                        properties once, retaining the last payload just as
+                        sequential SET statements did, but keep every distinct
+                        (RxNorm ID, name hash, spaCy flag) relationship. These
+                        dictionaries are bounded by this fetched batch only.
+                        '''
+                        drug_props = {key: value for key, value in chunk["props"].items() if key != "rxnormID"}
+                        drug_chunks[chunk["rxnormID"]] = {"rxnormID": chunk["rxnormID"], "props": drug_props}
+                        relationship_key = (chunk["rxnormID"], chunk["_intervention_name_key"], chunk["wspacy"])
+                        relationship_chunks[relationship_key] = {key: value for key, value in chunk.items() if key != "props"}
 
-                if chunks:
-                    self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                if drug_chunks:
+                    self.memgraph.execute(self.BATCH_UPSERT_DRUGS, {"chunks": list(drug_chunks.values())})
+                    '''
+                    Do not consume MySQL is_new flags between these writes.
+                    If the second statement fails, the GARD runner still stops
+                    before wrap-up; replaying both MERGE statements completes
+                    the pending batch even if the first write already committed.
+                    '''
+                    self.memgraph.execute(self.BATCH_LINK_INTERVENTIONS, {"chunks": list(relationship_chunks.values())})
 
-                    count += len(chunks)
-                    self.logger.info(f'Upserted {len(chunks)} drug mappings in memgraph. Total = {count}')
+                    count += len(relationship_chunks)
+                    self.logger.info(f'Upserted {len(drug_chunks)} Drug nodes; submitted {len(relationship_chunks)} drug mappings in memgraph. Total = {count}')
                 else:
                     self.logger.info('No valid drug mappings to upsert into memgraph.')
 

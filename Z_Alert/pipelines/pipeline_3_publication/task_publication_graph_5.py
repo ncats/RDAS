@@ -28,40 +28,43 @@ class NewPublicationJournalGraphTask(PipelineBase):
 
     BATCH_SIZE = 50
 
-    # Journal identity follows the initializer logic: use title when ISSN/eISSN
-    # are missing, otherwise use the ISSN/eISSN pair so shared journals collapse
-    # to one node across many Article records.
-    BATCH_CREATE = '''
-        WITH $chunks AS chunks
-        WHERE chunks IS NOT NULL AND size(chunks) > 0
+    '''
+    Journal identity follows the initializer: title when both ISSNs are absent,
+    otherwise the ISSN/eISSN pair. Conditional FOREACH blocks avoid the former
+    correlated CALL/UNION, which adds Apply, Union, and Distinct operators to
+    the Memgraph 3.8.1 plan for every input Article.
 
-        UNWIND chunks AS item
+    Preserve the input order within this single batch. For example, an Article
+    with known ISSNs can create Journal "Example Journal" before a later
+    Article supplies only that title. Regrouping all title-only rows ahead of
+    ISSN rows could create an extra Journal instead of reusing the first one.
+    '''
+    BATCH_CREATE = '''
+        UNWIND $chunks AS item
         MATCH (a:Article {pubmedId: item.pubmedId})
 
-        CALL {
-            WITH item, a
-            WHERE item.journal.issn = 'N/A' AND item.journal.essn = 'N/A'
+        FOREACH (_ IN CASE WHEN item.journal.issn = 'N/A' AND item.journal.essn = 'N/A' THEN [1] ELSE [] END |
             MERGE (j:Journal {title: item.journal.title})
             ON CREATE SET
                 j.issn = item.journal.issn,
                 j.essn = item.journal.essn,
                 j.nlmid = item.journal.nlmid
             MERGE (a)-[:has_journal]->(j)
-            RETURN j
-            UNION
-            WITH item, a
-            WHERE item.journal.issn <> 'N/A' OR item.journal.essn <> 'N/A'
+        )
+
+        FOREACH (_ IN CASE WHEN item.journal.issn <> 'N/A' OR item.journal.essn <> 'N/A' THEN [1] ELSE [] END |
             MERGE (j:Journal {issn: item.journal.issn, essn: item.journal.essn})
             ON CREATE SET
                 j.title = item.journal.title,
                 j.nlmid = item.journal.nlmid
             MERGE (a)-[:has_journal]->(j)
-            RETURN j
-        }
+        )
     '''
 
-    # Only new article rows are read here; source_json is required because the
-    # journal payload is nested under source_json.journalInfo.journal.
+    '''
+    Only new article rows are read here; source_json is required because the
+    journal payload is nested under source_json.journalInfo.journal.
+    '''
     FETCH_NEW_ARTICLES_QUERY = '''
         SELECT
             pubmed_id,
@@ -71,16 +74,19 @@ class NewPublicationJournalGraphTask(PipelineBase):
     '''
 
     def __init__(self):
+
         super().__init__(init_mysql=True, init_memgraph=True)
 
 
     # Not implemented
     def find_new_data(self, gard_node) -> None:
+
         self.logger.info("NewPublicationJournalGraphTask does not use find_new_data().")
 
 
     # implement
     def process_new_data(self) -> None:
+
         """Stream new article rows, extract journal data, and submit graph batches."""
 
         fetch_cursor = None
@@ -104,8 +110,10 @@ class NewPublicationJournalGraphTask(PipelineBase):
                 chunks = []
 
                 for row in rows:
-                    # Convert each MySQL row into the compact shape expected by
-                    # the Cypher batch. Invalid or incomplete rows are skipped.
+                    '''
+                    Convert each MySQL row into the compact shape expected by
+                    the Cypher batch. Invalid or incomplete rows are skipped.
+                    '''
                     journal_chunk = self._create_journal_chunk(row)
 
                     if journal_chunk is None:
@@ -138,6 +146,7 @@ class NewPublicationJournalGraphTask(PipelineBase):
 
 
     def _create_journal_chunk(self, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+
         """Build one Article-Journal mapping from a staged publication row."""
 
         try:
@@ -152,8 +161,10 @@ class NewPublicationJournalGraphTask(PipelineBase):
             self.logger.error(f"Error parsing source_json for pubmed_id={pubmed_id}: {e}")
             return None
 
-        # PubMed article metadata stores journal details in a nested object;
-        # articles without journal data cannot form a has_journal relationship.
+        '''
+        PubMed article metadata stores journal details in a nested object;
+        articles without journal data cannot form a has_journal relationship.
+        '''
         journal = (source_obj.get("journalInfo") or {}).get("journal")
 
         if not journal:

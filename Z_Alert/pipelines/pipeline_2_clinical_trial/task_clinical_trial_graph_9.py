@@ -34,7 +34,9 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
     MERGE the IPD sharing node by nctId so changed existing studies refresh the
     same keyed node. Older IPD nodes from the previous CREATE-only behavior did
     not have an nctId property, so remove stale IPD nodes still linked to this
-    ClinicalTrial after the keyed node is upserted.
+    ClinicalTrial after the keyed node is upserted. Keep deletion in a second
+    statement: combining MERGE/SET with OPTIONAL MATCH/DETACH DELETE forces an
+    Accumulate between the write and cleanup phases on Memgraph 3.8.1.
     '''
     BATCH_CREATE = '''
         UNWIND $chunks AS chunk
@@ -48,10 +50,22 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
             y.ipdSharingAccessCriteria = chunk.IPDSharingAccessCriteria
 
         MERGE (x)-[:has_individual_patient_data]->(y)
+    '''
 
-        WITH x, y
-        OPTIONAL MATCH (x)-[:has_individual_patient_data]->(old:IndividualPatientData)
+    '''
+    Example: NCT01234567 already links to a legacy IPD node without nctId.
+    First upsert its keyed replacement, then match that replacement by nctId
+    and remove only different linked nodes. MATCH emits nothing when there is
+    no stale node, avoiding an optional null row. DISTINCT prevents the same
+    legacy node from being deleted repeatedly within a batch.
+    '''
+    BATCH_DELETE_STALE = '''
+        UNWIND $chunks AS chunk
+        MATCH (x:ClinicalTrial {nctId: chunk.nctId})
+        MATCH (y:IndividualPatientData {nctId: chunk.nctId})
+        MATCH (x)-[:has_individual_patient_data]->(old:IndividualPatientData)
         WHERE old <> y
+        WITH DISTINCT old
         DETACH DELETE old
     '''
 
@@ -118,6 +132,8 @@ class NewClinicalTrialIndividualPatientDataGraphTask(PipelineBase):
 
                 if chunks:
                     self.memgraph.execute(self.BATCH_CREATE, {"chunks": chunks})
+                    # Leave source flags pending if cleanup fails after the upsert.
+                    self.memgraph.execute(self.BATCH_DELETE_STALE, {"chunks": chunks})
 
                     count += len(chunks)
                     self.logger.info(f'Upserted {len(chunks)} individual patient data mappings in memgraph. Total = {count}')
