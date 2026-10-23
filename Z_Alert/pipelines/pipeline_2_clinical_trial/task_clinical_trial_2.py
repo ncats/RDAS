@@ -226,9 +226,11 @@ class NewClinicalTrialImportTask(PipelineBase):
             if fetch_cursor:
                 fetch_cursor.close()
 
-            # Close the mysql connection for the whole NewClinicalTrialImportTask.
-            if self.mysql.is_connected():
-                self.mysql.close()
+            '''
+            The outer process_new_data() owns the connection and releases it
+            through PipelineBase.close(). Returning a pooled handle here would
+            invalidate it before that final cleanup and cause a second close.
+            '''
 
 
     ''' save the brief_title and brief_summary into the clinical_trial & clinical_trial_unique table '''

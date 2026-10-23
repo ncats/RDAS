@@ -200,9 +200,16 @@ class GARDGrantUpdateRunner(GrantPipelineRunner):
             raise
 
         finally:
-            if cursor is not None:
-                cursor.close()
-            mysql.close()
+            '''
+            A failed cursor close must still return the connection to the
+            shared pool, and cleanup must not hide the original refresh error.
+            '''
+            for resource in (cursor, mysql):
+                if resource is not None:
+                    try:
+                        resource.close()
+                    except Exception as exc:
+                        self.logger.warning(f"Error releasing grant GARD-name refresh resources: {exc}")
 
         '''
         Derive normalized terms from the rebuilt rows before the existing

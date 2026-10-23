@@ -165,26 +165,20 @@ class InitBase:
 
     def close_mysql_conn(self):
 
-        # Close update cursor if it exists
-        if hasattr(self, 'update_cursor') and self.update_cursor is not None:
-            try:
-                self.update_cursor.close()
-            except mysql.connector.Error as e:
-                print(f"{Fore.RED}Error closing MySQL update cursor: {e}{Style.RESET_ALL}")
-
-        # Close dictionary cursor if it exists
-        if hasattr(self, 'dict_cursor') and self.dict_cursor is not None:
-            try:
-                self.dict_cursor.close()
-            except mysql.connector.Error as e:
-                print(f"{Fore.RED}Error closing MySQL dict cursor: {e}{Style.RESET_ALL}")
-
-        # Close MySQL connection if it exists
-        if hasattr(self, 'mysql') and self.mysql is not None:
-            try:
-                self.mysql.close()
-            except mysql.connector.Error as e:
-                print(f"{Fore.RED}Error closing MySQL connection: {e}{Style.RESET_ALL}")
+        '''
+        Initializers use the same shared pool as Alert/GARD tasks. Detach each
+        resource before returning it so both legacy cleanup aliases can be
+        called safely without returning one pooled connection twice. A cursor
+        failure must not prevent the remaining resources from being released.
+        '''
+        for attribute in ('update_cursor', 'dict_cursor', 'mysql'):
+            resource = getattr(self, attribute, None)
+            setattr(self, attribute, None)
+            if resource is not None:
+                try:
+                    resource.close()
+                except Exception as e:
+                    print(f"{Fore.RED}Error releasing MySQL {attribute}: {e}{Style.RESET_ALL}")
 
 
     def _close_conn(self):

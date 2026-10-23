@@ -30,7 +30,11 @@ class MinMaxIdLoader:
                     cursor.close()
                 except Exception as e:
                     print(f"Error closing cursor: {e}")
-            if conn and conn.is_connected():
+            '''
+            A disconnected session still owns a checked-out pool slot. Return
+            it unconditionally; the pool reconnects it on the next checkout.
+            '''
+            if conn is not None:
                 try:
                     conn.close()
                 except Exception as e:

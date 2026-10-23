@@ -5,6 +5,7 @@ from time import sleep
 from typing import Any, Dict, List, Optional, Sequence
 
 from dotenv import load_dotenv
+from mysql.connector import InterfaceError
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -21,6 +22,7 @@ from X_epi_nhs_predict_local import (
     postEpiExtractText,
     predict_article,
 )
+from baseclass.conn import DBConnection
 from pipelines.pipeline_base import PipelineBase
 from utils.tools import _to_txt
 
@@ -137,7 +139,8 @@ class PublicationEpiNhsLocalClassificationTask(PipelineBase):
 
     def __init__(self, fetch_order: str = "ASC"):
 
-        super().__init__(init_mysql=True, init_memgraph=False)
+        # Borrow only during database phases; model work must not hold a pool slot.
+        super().__init__(init_mysql=False, init_memgraph=False)
         self.fetch_order = fetch_order.upper()
 
         if self.fetch_order not in {"ASC", "DESC"}:
@@ -149,29 +152,26 @@ class PublicationEpiNhsLocalClassificationTask(PipelineBase):
 
     def _execute_mysql_batch(self, query, values, fetch_rows: bool = False):
 
-        """Use a short database session and retry only interrupted connections.
+        """Use a short connection lease and retry only interrupted connections.
 
-        Both SELECT and UPDATE finish and disconnect before returning. Model
-        loading, classification and EPI extraction therefore hold neither an
-        idle MySQL socket nor an open read transaction. The connection object
-        retains its configuration for ping(reconnect=True) on the next call;
-        cursors are always created after reconnecting, never reused across it.
+        Both SELECT and UPDATE finish and return their handles to the shared
+        pool before model loading, classification or EPI extraction. Borrow a
+        fresh handle on every attempt: close() invalidates a pooled handle,
+        so ping(reconnect=True) on the previously released object is invalid.
+        The pool checks/reconnects its physical connection on the next checkout.
 
         UPDATE retries reuse the already prepared values, without rerunning
         inference. For example, if a 500-article batch loses its connection at
         COMMIT, replaying the same field assignments is safe even if the server
         committed but its acknowledgement was lost. There are no inserts,
-        counters or is_new changes in this operation. Closing a failed session
-        rolls back any uncommitted updates without issuing a second query on
-        a dead connection that could hide the original error.
+        counters or is_new changes in this operation. Session reset on return
+        discards uncommitted updates; cleanup failures are logged separately
+        so they cannot hide the original database error.
         """
-        if self.mysql is None:
-            raise RuntimeError("Cannot classify publications without a MySQL connection.")
-
         for attempt in range(1, 4):
             cursor = None
             try:
-                self.mysql.ping(reconnect=True, attempts=3, delay=2)
+                self.mysql = DBConnection().mysql_conn()
                 cursor = self.mysql.cursor(dictionary=fetch_rows)
                 if fetch_rows:
                     cursor.execute(query, values)
@@ -188,12 +188,21 @@ class PublicationEpiNhsLocalClassificationTask(PipelineBase):
                 either exception type, and let SQL/data/model errors propagate.
                 Recovered disconnects must be warnings: the GARD runner treats
                 every ERROR log entry as an unsuccessful task.
+
+                Pool checkout may wrap a failed reconnect in InterfaceError
+                without an errno. Retry that connection failure as well as
+                interrupted queries; SQL/data errors and pool exhaustion still
+                propagate immediately instead of repeating expensive inference.
                 '''
-                if getattr(error, "errno", None) not in {2006, 2013, 2055, 4031} or attempt == 3:
+                connection_error = getattr(error, "errno", None) in {2002, 2003, 2006, 2013, 2055, 4031}
+                reconnect_error = isinstance(error, InterfaceError) and getattr(error, "errno", None) in {-1, None}
+                if not (connection_error or reconnect_error) or attempt == 3:
                     raise
                 self.logger.warning(f"Publication MySQL connection interrupted on attempt {attempt}/3: {error}; retrying the same database batch without repeating model inference.")
             finally:
-                for name, resource in (("cursor", cursor), ("connection", self.mysql)):
+                mysql = self.mysql
+                self.mysql = None
+                for name, resource in (("cursor", cursor), ("connection", mysql)):
                     if resource is not None:
                         try:
                             resource.close()
@@ -318,11 +327,9 @@ class PublicationEpiNhsLocalClassificationTask(PipelineBase):
 
         finally:
             '''
-            Every database batch has already closed its session in finally.
-            Detach that handle before base cleanup, whose is_connected() ping
-            could otherwise raise again after an interrupted fetch or COMMIT.
+            Every database batch has already returned and detached its pooled
+            handle in finally. Base cleanup now releases the task logger only.
             '''
-            self.mysql = None
             self.close()
 
 

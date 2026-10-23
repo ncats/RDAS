@@ -420,11 +420,17 @@ def load_gard_processed_names() -> List[Dict[str, Any]]:
         rows = cursor.fetchall()
 
     finally:
-        if cursor is not None:
-            cursor.close()
-
-        if mysql is not None and mysql.is_connected():
-            mysql.close()
+        '''
+        This helper also borrows from the process-local pool. Return its slot
+        after errors as well as success, even when the server disconnected;
+        an unread/failed cursor close must not prevent connection release.
+        '''
+        for resource in (cursor, mysql):
+            if resource is not None:
+                try:
+                    resource.close()
+                except Exception as exc:
+                    get_grant_relationship_logger().warning(f"Error releasing GARD-name query resources: {exc}")
 
     return [
         {
@@ -1090,17 +1096,18 @@ def process_id_range(worker_args: Tuple[int, int, int, int]) -> Dict[str, int]:
         return summary
 
     finally:
-        if dict_cursor is not None:
-            dict_cursor.close()
-
-        if insert_cursor is not None:
-            insert_cursor.close()
-
-        if write_mysql is not None and write_mysql.is_connected():
-            write_mysql.close()
-
-        if read_mysql is not None and read_mysql.is_connected():
-            read_mysql.close()
+        '''
+        Each worker acquired its own read/write leases through DBConnection;
+        the shared pool registry separates workers by PID. Always return both
+        leases, including after network failures, so subsequent ranges in the
+        same worker cannot exhaust its pool. Guard each close independently.
+        '''
+        for resource in (dict_cursor, insert_cursor, write_mysql, read_mysql):
+            if resource is not None:
+                try:
+                    resource.close()
+                except Exception as exc:
+                    logger.warning(f"[{start_id}-{end_id}]: error releasing MySQL worker resources: {exc}")
 
 
 def merge_summary(total_summary: Dict[str, int], range_summary: Dict[str, int]) -> None:

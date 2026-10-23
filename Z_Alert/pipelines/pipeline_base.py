@@ -59,14 +59,26 @@ class PipelineBase(ABC):
     
     def close(self) -> None:
 
-        if self.mysql is not None and self.mysql.is_connected():
-            print(f"Closing MySQL connection...")
-            self.mysql.close()
-
+        '''
+        Return a pooled connection even when its network session has expired.
+        Skipping close() after is_connected() returns False would leak a pool
+        slot. Detach ownership first so repeated cleanup cannot return the same
+        lease twice; Connector/Python invalidates a pooled handle on close().
+        A failed reset/return must not hide the task's original query failure.
+        '''
+        mysql = self.mysql
         self.mysql = None
         self.memgraph = None
+        if mysql is not None:
+            try:
+                mysql.close()
+            except Exception as exc:
+                if getattr(self, "logger", None) is not None:
+                    self.logger.warning(f"Unable to cleanly return MySQL connection to its pool: {exc}")
+                else:
+                    print(f"Unable to cleanly return MySQL connection to its pool: {exc}")
 
-        print('MySQL connection closed')
+        print('MySQL connection released')
         print('Memgraph connection closed')
 
         if hasattr(self, "logger") and self.logger is not None:
