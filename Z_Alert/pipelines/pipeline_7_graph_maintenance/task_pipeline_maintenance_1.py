@@ -6,8 +6,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Tuple
 
-import requests
-
 _dir = os.path.dirname(__file__)
 sys.path.extend([
     os.path.abspath(os.path.join(_dir, "..")),
@@ -16,6 +14,7 @@ sys.path.extend([
 
 from pipelines.pipeline_base import PipelineBase
 from utils.organization_name_extractor import OrganizationNameExtractor
+from utils.https_request import HTTPSUtils
 from utils.tools import _resolve_worker_count, _time_hms, _to_float, _to_int
 
 ROR_LOOKUP_API_FAILED = "ROR_LOOKUP_API_FAILED"
@@ -51,7 +50,8 @@ def _clean_org_name(text: Any) -> Any:
     return text.strip()
 
 
-def lookup_ror_static(org_name: str, idx_key: str, timeout: int = 20):
+def lookup_ror_static(org_name: str, idx_key: str, timeout: int = 20, logger=None):
+
     """
     Query the ROR API for one organization.
 
@@ -69,14 +69,22 @@ def lookup_ror_static(org_name: str, idx_key: str, timeout: int = 20):
     if not ror_organizations_api:
         return ROR_LOOKUP_API_FAILED
 
-    try:
-        response = requests.get(
-            ror_organizations_api,
-            params={"affiliation": cleaned_org_name},
-            timeout=timeout,
-        )
-        response.raise_for_status()
+    def parse_ror_response(response):
+
         data = response.json()
+        if not isinstance(data, dict) or not isinstance(data.get("items", []), list):
+            raise ValueError("ROR returned an invalid organization response.")
+        return data
+
+    try:
+        '''
+        Threads wait on independent ROR calls and return insert-ready values.
+        An outage must remain distinct from a valid no-match: after retries,
+        return the failure sentinel without writing a false N/A organization.
+        '''
+        data = HTTPSUtils.with_api_retry_GET(ror_organizations_api, parse_ror_response, params={"affiliation": cleaned_org_name}, timeout=timeout, max_retries=4, logger=logger, description=f"ROR lookup {idx_key}")
+        if data is None:
+            return ROR_LOOKUP_API_FAILED
 
         items = data.get("items") or []
 
@@ -147,9 +155,8 @@ def lookup_ror_static(org_name: str, idx_key: str, timeout: int = 20):
             idx_key,
         )
 
-    except requests.RequestException:
-        return ROR_LOOKUP_API_FAILED
     except (KeyError, ValueError, TypeError, json.JSONDecodeError):
+        HTTPSUtils.record_failure(logger, f"ROR lookup {idx_key}", "invalid organization payload")
         return ROR_LOOKUP_API_FAILED
 
 
@@ -673,6 +680,7 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                     org.get("name"),
                     org.get("_idx_key"),
                     self.ROR_TIMEOUT,
+                    self.logger,
                 ): org
                 for org in prepared_orgs
             }
@@ -705,11 +713,11 @@ class OrganizationLocationRorLookupTask(PipelineBase):
                     failures. Do not save a not-found row or mark the graph as
                     N/A because that would hide a temporary outage.
                     '''
-                    self.logger.error(f"ROR lookup failed for extracted_name={extracted_name}, original_name={original_name}, idx_key={idx_key}: {e}")
+                    HTTPSUtils.record_failure(self.logger, f"ROR lookup {idx_key}", type(e).__name__)
                     continue
 
                 if result == ROR_LOOKUP_API_FAILED:
-                    self.logger.error(
+                    self.logger.warning(
                         f"ROR lookup API failed for extracted_name={extracted_name}, "
                         f"original_name={original_name}, idx_key={idx_key}; leaving it retryable."
                     )

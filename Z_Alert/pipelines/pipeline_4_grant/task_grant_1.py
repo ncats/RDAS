@@ -73,11 +73,19 @@ class GrantExporterDownloadTask(GrantPipelineBase):
                             self._extract_downloaded_zip(zip_path, category_dir, summary)
                         else:
                             summary["download_failed"] += 1
-                            self.logger.error(f"Failed to download NIH {category} file for year={year}: {url}")
+                            self.logger.warning(f"Failed to download NIH {category} file for year={year}; continuing with available complete files.")
 
-            if summary["download_failed"] or summary["unzip_failed"]:
+            if summary["unzip_failed"]:
                 self.logger.error(f"NIH RePORTER grant download incomplete. Summary={summary}")
-                raise RuntimeError("NIH RePORTER grant download or unzip failed; skipping UTF-8 conversion.")
+                raise RuntimeError("NIH RePORTER grant unzip failed; skipping UTF-8 conversion.")
+            '''
+            Exhausted HTTP retries leave missing downloads for the next run.
+            Other years/categories and already complete files can still be
+            processed; an outage must not raise the runner's fatal task error.
+            Corrupt archives and filesystem errors keep their existing failures.
+            '''
+            if summary["download_failed"]:
+                self.logger.warning(f"NIH RePORTER HTTP downloads incomplete; continuing with available files. Summary={summary}")
 
             summary["utf8_converted_categories"] = self._convert_directories_to_utf8([self.BASE_DIR / category for category in self.categories])
 

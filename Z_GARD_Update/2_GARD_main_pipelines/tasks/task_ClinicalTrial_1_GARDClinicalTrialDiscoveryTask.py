@@ -27,6 +27,7 @@ from itertools import repeat
 from time import perf_counter
 
 from pipelines.pipeline_2_clinical_trial.task_clinical_trial_1 import NewClinicalTrialDiscoveryTask
+from utils.https_request import HTTPSUtils
 from utils.tools import _resolve_worker_count, _safe_get
 
 
@@ -71,8 +72,17 @@ class GARDClinicalTrialDiscoveryTask(NewClinicalTrialDiscoveryTask):
                     self.logger.info(f"{gardId}: {name}; requesting NCT ID page {page_number}.")
                     result = self.call_get_nctids(initial_query, pageToken=page_token)
                     search_finished = perf_counter()
+                    '''
+                    Exhausted HTTP retries are already recorded by the shared
+                    downloader. Skip this unavailable page and try other names;
+                    it must not defer or replay the whole GARD node.
+                    '''
+                    if result is None:
+                        self.logger.warning(f"{gardId}: {name}; ID page {page_number} unavailable; continuing with other search terms.")
+                        break
                     if not isinstance(result, dict) or not result or not isinstance(result.get("studies", []), list) or ("studies" not in result and result.get("totalCount") != 0):
-                        raise RuntimeError(f"Invalid ClinicalTrials.gov ID search response for {gardId}: {name}.")
+                        HTTPSUtils.record_failure(self.logger, f"ClinicalTrials.gov ID page for {gardId}: {name}", "invalid response payload")
+                        break
                     identifiers = list(dict.fromkeys(study["protocolSection"]["identificationModule"]["nctId"] for study in result.get("studies", [])))
                     if any(not re.fullmatch(r"NCT\d{8}", nctid) for nctid in identifiers):
                         raise ValueError("ClinicalTrials.gov search returned an invalid NCT ID.")
@@ -84,7 +94,8 @@ class GARDClinicalTrialDiscoveryTask(NewClinicalTrialDiscoveryTask):
                         download_batch = missing[start:start + self.reuse.BATCH_SIZE]
                         for nctid, study in zip(download_batch, executor.map(self._fetch_study_by_nctid, repeat(studies_api), download_batch)):
                             if not isinstance(study, dict) or _safe_get(study, "protocolSection", "identificationModule", "nctId") != nctid:
-                                raise RuntimeError(f"No valid downloaded study for {nctid}; leave {gardId} pending.")
+                                self.logger.warning(f"No valid downloaded study for {nctid}; skipping it and continuing with other IDs for {gardId}.")
+                                continue
                             self.study_change_handler.save_or_update_study(gardId, name, nctid, study, initial_query)
                         '''
                         The shared change handler can update an existing trial
@@ -98,5 +109,6 @@ class GARDClinicalTrialDiscoveryTask(NewClinicalTrialDiscoveryTask):
                     if not page_token:
                         break
                     if page_token in seen_tokens:
-                        raise RuntimeError("ClinicalTrials.gov repeated a pagination token.")
+                        HTTPSUtils.record_failure(self.logger, f"ClinicalTrials.gov ID search for {gardId}: {name}", "repeated pagination token")
+                        break
                     seen_tokens.add(page_token)

@@ -8,8 +8,6 @@ sys.path.extend([
 ])
 
 import re
-import time
-import requests
 import spacy
 from spacy.matcher import Matcher
 # Setup NLP for RxNORM Mapping
@@ -20,6 +18,7 @@ matcher.add('DRUG',[pattern])
 
 from pipelines.pipeline_base import PipelineBase
 from utils.tools import _clean
+from utils.https_request import HTTPSUtils
 
 """
 Store Clinical-Trial Intervertion-Drug properties into clinical_trial_intervention_drug table
@@ -200,7 +199,7 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
                     '''
                     An extracted chemical can also have no RxNorm match, for
                     example an investigational drug code. The lookup already
-                    logs actual API failures as errors; an unmapped candidate
+                    logs actual API failures as warnings; an unmapped candidate
                     alone must not fail the GARD node's completion checkpoint.
                     '''
                     self.logger.warning(f'\t\tNo RxNorm mapping for intervention name:{intervention}, drug name: {drug}')
@@ -248,130 +247,51 @@ class ClinicalTrialDrugInterventionMappingTask(PipelineBase):
 
     def get_rxnorm_data(self, drug_name):
 
-            """
-            Fetch the RxNorm ID and expanded RxNorm properties for a drug name.
-
-            RxNav requires two calls: one to resolve a name to an RxCUI, then a
-            second call to fetch properties for that RxCUI.
-            """
-
-            if not self.rxnav_rxcui_api or not self.rxnav_all_properties_api_template:
-                self.logger.error("RXNAV_RXCUI_API or RXNAV_ALL_PROPERTIES_API_TEMPLATE is not configured.")
-                return None
-
-            ''' Initialize retry counter '''
-            retries = 0
-            rxnormid = None
-            max_retries=10
-
-            rxdata = dict()
-            while retries < max_retries:
-                try:
-                    ''' Form RxNav API request to get RxNormID based on drug name '''
-                    rq = f'{self.rxnav_rxcui_api}?name={drug_name}&search=2'
-                    response = requests.get(rq, timeout=30)
-
-                    if response.status_code >= 400:
-                        self.logger.error(f"RxNav request failed: status={response.status_code}, url={rq}")
-                        break
-
-                    '''
-                    RxNav returns an empty idGroup when a successful name
-                    search has no match, for example {"idGroup": {}} for
-                    ACZ885. Missing, null, or empty rxnormId values within a
-                    valid group are ordinary misses, so return None and let
-                    rxnorm_map() try its existing spaCy chemical fallback.
-                    Do not log these as ERROR: the GARD runner deliberately
-                    stops before checkpoints when a task logs real failures.
-
-                    Keep malformed response structures as errors so an API
-                    failure is not mistaken for a legitimate unmatched drug.
-                    '''
-                    try:
-                        obj = response.json()
-                        if not isinstance(obj, dict) or 'idGroup' not in obj:
-                            raise ValueError("Expected an idGroup object in the RxNav response.")
-
-                        id_group = obj['idGroup']
-                        if id_group is None:
-                            id_group = {}
-                        if not isinstance(id_group, dict):
-                            raise ValueError("RxNav idGroup must be an object or null.")
-
-                        rxnorm_ids = id_group.get('rxnormId')
-                        if rxnorm_ids is None or rxnorm_ids == []:
-                            self.logger.warning(f"No RxNorm match for drug_name={drug_name}; trying remaining mapping fallbacks when available.")
-                            return None
-
-                        if not isinstance(rxnorm_ids, list) or not isinstance(rxnorm_ids[0], str) or not rxnorm_ids[0].strip():
-                            raise ValueError("RxNav rxnormId must be a list of nonempty identifiers.")
-
-                        rxnormid = rxnorm_ids[0]
-                        rxdata['RxNormID'] = rxnormid
-
-                    except (TypeError, ValueError) as e:
-                        self.logger.error(f"Invalid RxNav RxCUI response for drug_name={drug_name}: {e}, url={rq}")
-                        return None
-
-                    break  # Exit the loop if successful
-                except requests.exceptions.Timeout:
-                    retries += 1
-                    '''
-                    A timeout can recover on the next attempt. Log retries as
-                    warnings; the terminal failure below remains an ERROR if
-                    all attempts fail, preserving the GARD retry checkpoint.
-                    '''
-                    self.logger.warning(f"RxNav RxCUI request timed out for drug_name={drug_name}. attempt={retries}/{max_retries}, url={rq}")
-                    time.sleep(1)
-                except requests.exceptions.RequestException as e:
-                    self.logger.error(f"RxNav RxCUI request failed for drug_name={drug_name}: {e}, url={rq}")
-                    break  # Exit the loop for non-retryable errors
-
-            if not rxnormid:
-                self.logger.error(f"RxNav returned no RxNormID for drug_name={drug_name}; no clinical_trial_intervention_drug rows inserted for this lookup.")
-                return None
-
-            # re-init
-            retries = 0
-            max_retries=10
-            while retries < max_retries:
-                try:
-
-                    ''' Form RxNav API request to get all properties of the drug using RxNormID '''
-                    rq2 = f'{self.rxnav_all_properties_api_template.format(rxnormid=rxnormid)}?prop=codes+attributes+names+sources'
-                    response = requests.get(rq2, timeout=30)
-
-                    if response.status_code >= 400:
-                        self.logger.error(f"RxNav property request failed: status={response.status_code}, url={rq2}")
-                        break
-
-                    try:
-                        results = response.json()['propConceptGroup']['propConcept']
-                    except (KeyError, TypeError, ValueError) as e:
-                        self.logger.error(f"Unable to parse RxNav properties for rxnormid={rxnormid}, drug_name={drug_name}: {e}, url={rq2}")
-                        break
-
-                    ''' Extract and organize properties of the drug '''
-                    for r in results:
-                        propName = r['propName']
-                        if propName in rxdata:
-                            rxdata[propName].append(r['propValue'])
-                        else:
-                            rxdata[propName] = [r['propValue']]
-                    return rxdata
-
-                except requests.exceptions.Timeout:
-                    retries += 1
-                    '''
-                    Apply the same retry policy to the property request: a
-                    recovered timeout must not leave a task-level ERROR that
-                    makes the GARD runner reject an otherwise complete lookup.
-                    '''
-                    self.logger.warning(f"RxNav property request timed out for rxnormid={rxnormid}, drug_name={drug_name}. attempt={retries}/{max_retries}, url={rq2}")
-                    time.sleep(1)
-                except requests.exceptions.RequestException as e:
-                    self.logger.error(f"RxNav property request failed for rxnormid={rxnormid}, drug_name={drug_name}: {e}, url={rq2}")
-                    break  # Exit the loop for non-retryable errors
-
-            self.logger.error(f"RxNav returned no property data for rxnormid={rxnormid}, drug_name={drug_name}; no clinical_trial_intervention_drug rows inserted for this lookup.")
+        """
+        Resolve a drug through both RxNav endpoints without ending the run.
+        A valid empty idGroup is an ordinary no-match, e.g. {"idGroup": {}}.
+        An unavailable RxCUI/property request returns None after bounded retries;
+        rxnorm_map() can try its existing chemical fallback and other drugs.
+        Never insert an invented RxNorm ID or empty properties after an outage.
+        """
+        if not self.rxnav_rxcui_api or not self.rxnav_all_properties_api_template:
+            self.logger.error("RXNAV_RXCUI_API or RXNAV_ALL_PROPERTIES_API_TEMPLATE is not configured.")
             return None
+
+        def parse_rxnorm_ids(response):
+
+            obj = response.json()
+            if not isinstance(obj, dict) or "idGroup" not in obj:
+                raise ValueError("Expected an RxNav idGroup.")
+            group = obj["idGroup"]
+            if group is not None and not isinstance(group, dict):
+                raise ValueError("RxNav idGroup must be an object or null.")
+            identifiers = (group or {}).get("rxnormId") or []
+            if not isinstance(identifiers, list) or any(not isinstance(value, str) or not value.strip() for value in identifiers):
+                raise ValueError("RxNav returned an invalid RxNorm identifier list.")
+            return identifiers
+
+        # Existing callers replace spaces with '+': decode those before params re-encodes them.
+        identifiers = HTTPSUtils.with_api_retry_GET(self.rxnav_rxcui_api, parse_rxnorm_ids, params={"name": drug_name.replace("+", " "), "search": 2}, logger=self.logger, description=f"RxNav RxCUI for drug {drug_name}")
+        if identifiers is None:
+            return None
+        if not identifiers:
+            self.logger.warning(f"No RxNorm match for drug_name={drug_name}; trying remaining mapping fallbacks when available.")
+            return None
+        rxnormid = identifiers[0]
+
+        def parse_properties(response):
+
+            results = response.json()["propConceptGroup"]["propConcept"]
+            if not isinstance(results, list):
+                raise ValueError("RxNav property list is malformed.")
+            rxdata = {"RxNormID": rxnormid}
+            for result in results:
+                prop_name, prop_value = result["propName"], result["propValue"]
+                if not isinstance(prop_name, str) or prop_name == "RxNormID":
+                    raise ValueError("RxNav returned an invalid property name.")
+                rxdata.setdefault(prop_name, []).append(prop_value)
+            return rxdata
+
+        properties_url = self.rxnav_all_properties_api_template.format(rxnormid=rxnormid)
+        return HTTPSUtils.with_api_retry_GET(properties_url, parse_properties, params={"prop": "codes attributes names sources"}, logger=self.logger, description=f"RxNav properties for {rxnormid}, drug {drug_name}")

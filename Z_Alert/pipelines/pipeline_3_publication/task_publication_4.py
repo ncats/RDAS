@@ -11,6 +11,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
+from utils.https_request import HTTPSUtils
 
 """
 1. Get unique omim_id list from table publication_gard_omim_mapping  which are not in publication_omim'
@@ -49,51 +50,51 @@ class PublicationOminDataRetrievalTask(PipelineBase):
 
     def get_omim(self, omim_id: int) -> Optional[dict]:
 
-        """Fetch one OMIM entry, backing off when the API returns HTTP 429."""
-
-        params = {
-            "mimNumber": omim_id,
-            "include": "all",
-            "format": "json",
-            "apiKey": self.api_key,
-        }
+        """
+        Retry one OMIM entry without making an outage fatal to the GARD loop.
+        Keep the OMIM-specific rate-limit circuit breaker: repeated HTTP 429
+        stops this task's remaining requests, while other pipeline tasks and
+        GARD nodes continue. Missing entries are never saved as empty JSON.
+        Both retries and terminal failures are warnings; an unavailable entry
+        does not defer the GARD node. Never log API-key URLs.
+        """
+        params = {"mimNumber": omim_id, "include": "all", "format": "json", "apiKey": self.api_key}
         max_attempts = 4
-
-        for attempt in range(max_attempts):
+        for attempt in range(1, max_attempts + 1):
+            response = None
+            retry_after = ""
+            rate_limited = False
+            retryable = True
             try:
                 response = requests.get(self.omim_entry_api, params=params, timeout=30)
-
-                if response.status_code == 429:
-                    if attempt == max_attempts - 1:
-                        self.omim_rate_limited = True
-                        self.logger.error(f"OMIM API remains rate limited for omim_id={omim_id} after {max_attempts} attempts.")
-                        return None
-
-                    # Respect a numeric Retry-After value; otherwise use a
-                    # bounded exponential delay before another HTTP request.
-                    retry_after = response.headers.get("Retry-After", "")
+                retry_after = response.headers.get("Retry-After", "").strip()
+                rate_limited = response.status_code == 429
+                if response.status_code >= 400:
+                    reason = f"HTTP {response.status_code}"
+                    retryable = response.status_code in {408, 425, 429} or 500 <= response.status_code <= 599
+                else:
+                    entry = response.json()
+                    if not isinstance(entry, dict) or not isinstance(entry.get("omim"), dict) or not entry["omim"]:
+                        raise ValueError("Missing OMIM entry object.")
+                    return entry
+            except (requests.RequestException, ValueError) as exc:
+                reason = type(exc).__name__
+            finally:
+                if response is not None:
                     try:
-                        delay = min(60.0, max(0.0, float(retry_after)))
-                    except ValueError:
-                        delay = min(60.0, 2 ** (attempt + 1))
-                    self.logger.warning(f"OMIM API rate limited omim_id={omim_id}; retrying in {delay:g} seconds.")
-                    time.sleep(delay)
-                    continue
+                        response.close()
+                    except (requests.RequestException, OSError):
+                        self.logger.warning(f"OMIM entry {omim_id} HTTP response cleanup failed; continuing.")
 
-                response.raise_for_status()
-                return response.json()
-
-            except requests.exceptions.HTTPError:
-                self.logger.error(f"OMIM API returned HTTP {response.status_code} for omim_id={omim_id}.")
+            if not retryable or attempt == max_attempts:
+                self.omim_rate_limited = rate_limited
+                HTTPSUtils.record_failure(self.logger, f"OMIM entry {omim_id}", f"{reason}; attempts={attempt}/{max_attempts}")
                 return None
-
-            except (requests.exceptions.RequestException, ValueError) as e:
-                # Never log the request URL: its query parameters contain the API key.
-                self.logger.error(f"OMIM API request failed for omim_id={omim_id}: {type(e).__name__}.")
-                return None
-
-        return None
-    
+            delay = min(60, 2 ** attempt)
+            if retry_after.isdigit():
+                delay = min(60, max(delay, int(retry_after)))
+            self.logger.warning(f"OMIM entry {omim_id} attempt {attempt}/{max_attempts} failed ({reason}); retrying in {delay} seconds.")
+            time.sleep(delay)
 
     # implement
     def process_new_data(self) -> None:
@@ -170,11 +171,11 @@ class PublicationOminDataRetrievalTask(PipelineBase):
                     entry_json = self.get_omim(omim_id)
 
                     if entry_json is None:
-                        self.logger.error(f"OMIM API failed for omim_id={omim_id}; no publication_omim row inserted, so it remains retryable.")
+                        self.logger.warning(f"OMIM API failed for omim_id={omim_id}; no publication_omim row inserted, so it remains retryable.")
                         continue
 
                     if not isinstance(entry_json, dict) or not entry_json.get("omim"):
-                        self.logger.error(f"OMIM API returned an unexpected payload for omim_id={omim_id}; no publication_omim row inserted, so it remains retryable.")
+                        self.logger.warning(f"OMIM API returned an unexpected payload for omim_id={omim_id}; no publication_omim row inserted, so it remains retryable.")
                         continue
 
                     # Error: Failed executing the operation; Python type dict cannot be converted

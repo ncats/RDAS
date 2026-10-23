@@ -34,23 +34,18 @@ class PubtatorWorker:
     def _get_pubtator_json(self, url):
 
         def parse_api_response(response):
-            try: 
-                response_json = response.json() 
-                return response_json
-            except TypeError as e:
-                self.logger.error(f'TypeError while parsing PubTator response: {e}\n{url}')
-            except ValueError as e:
-                self.logger.error(f'ValueError while parsing PubTator response: {e}\n{url}')
-            except AttributeError as e:
-                self.logger.error(f'AttributeError while parsing PubTator response: {e}\n{url}')
-                
-            return None
 
-        try:
-            return HttpsUtil.with_api_retry_GET(url, parse_api_response)
-        except Exception as e:
-            self.logger.error(f'Unexpected error while downloading PubTator data: {e}\n{url}')
-            return None
+            response_json = response.json()
+            if not isinstance(response_json, dict) or not isinstance(response_json.get("PubTator3"), list):
+                raise ValueError("PubTator3 is missing or is not a list.")
+            return response_json
+
+        '''
+        Return None after bounded HTTP/JSON retries. The caller keeps missing
+        PMID payloads as None and skips their inserts; an API outage must not
+        become an ERROR that stops the GARD runner or an empty annotation row.
+        '''
+        return HttpsUtil.with_api_retry_GET(url, parse_api_response, logger=self.logger, description="PubTator annotation batch")
 
 
     def download_by_pmids(self, pmids) -> Dict[str, Optional[Dict[str, Any]]]:
@@ -79,7 +74,7 @@ class PubtatorWorker:
         source_json = self._get_pubtator_json(url)
 
         if not source_json:
-            self.logger.error(f'PubTator source_json is None for PMID batch={",".join(pubmed_ids)}. url={url}')
+            self.logger.warning(f'PubTator source_json is None for PMID batch={",".join(pubmed_ids)}; continuing without unavailable annotations.')
             return result_by_pmid
 
         return self._split_pubtator_json_by_pmid(source_json, pubmed_ids)
@@ -97,7 +92,7 @@ class PubtatorWorker:
         source_json = self.download_by_pmids(pubmed_ids).get(pubmed_ids[0]) if pubmed_ids else None
             
         if not source_json: 
-            self.logger.error(f'pubmed_id={pmid}, PubTator source_json is None.')
+            self.logger.warning(f'pubmed_id={pmid}, PubTator source_json is None; continuing.')
         
         #return (pmid, json.dumps(source_json))
         return (pmid, source_json)
@@ -144,13 +139,13 @@ class PubtatorWorker:
         result_by_pmid = {pubmed_id: None for pubmed_id in requested_pmids}
 
         if not isinstance(source_json, dict):
-            self.logger.error(f'Unexpected PubTator response type: {type(source_json).__name__}')
+            HttpsUtil.record_failure(self.logger, "PubTator annotation batch", f"unexpected response type: {type(source_json).__name__}")
             return result_by_pmid
 
         documents = source_json.get('PubTator3')
 
         if not isinstance(documents, list):
-            self.logger.error('Unexpected PubTator response: PubTator3 is missing or is not a list.')
+            HttpsUtil.record_failure(self.logger, "PubTator annotation batch", "PubTator3 is missing or is not a list")
             return result_by_pmid
 
         requested_set = set(requested_pmids)

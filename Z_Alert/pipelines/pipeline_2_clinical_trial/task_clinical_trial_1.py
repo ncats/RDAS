@@ -1,7 +1,6 @@
 import os
 import sys
-import time
-import requests
+import re
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -11,6 +10,8 @@ sys.path.extend([
 
 from pipelines.pipeline_base import PipelineBase
 from pipelines.pipeline_2_clinical_trial.clinical_trial_study_change_handler import ClinicalTrialStudyChangeHandler
+from utils.https_request import HTTPSUtils
+from utils.tools import _safe_get
 
 """
 Find newly updated clinical trials for GARD diseases.
@@ -99,7 +100,7 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
                     }
                     '''
                     if not search_response:
-                        self.logger.error(f"No ClinicalTrials.gov search response for gardId={gardId}, disease={name[:200]}")
+                        self.logger.warning(f"No ClinicalTrials.gov search response for gardId={gardId}, disease={name[:200]}; continuing with other names.")
                         break
 
                     trials_list = search_response.get('studies') or []
@@ -129,7 +130,7 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
                                     self.logger.error(f"Failed to save or update clinical trial study for nctid={nctid}: {error}", exc_info=True)
 
                             else:
-                                self.logger.error(f"No ClinicalTrials.gov study detail response for nctid={nctid}")
+                                self.logger.warning(f"No ClinicalTrials.gov study detail response for nctid={nctid}; continuing with other studies.")
 
                         current_stage = "paginate_nct_ids"
                         if not 'nextPageToken' in search_response:
@@ -159,73 +160,40 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
     def _fetch_study_by_nctid(self, studies_api, nctid):
 
         '''
-        Fetch the full ClinicalTrials.gov study JSON for one NCT ID.
-
-        The search endpoint returns only the matching NCT IDs. The pipeline needs
-        the full study response so ClinicalTrialStudyChangeHandler can compare
-        the fetched study against clinical_trial_unique.studies.
+        Fetch a full study with bounded retries, returning None when unavailable.
+        For example, a 502 followed by valid NCT01204333 JSON is recovered;
+        ten failed requests leave that study missing and allow other IDs to
+        continue. Never invent empty study JSON or fail the whole GARD node:
+        the unavailable study is skipped and the normal node loop continues.
         '''
-        retries = 0
-        max_retries = 10
+        def parse_study(response):
 
-        while retries < max_retries:
-            try:
-                response = requests.get(f'{studies_api}/{nctid}', timeout=10)
+            study = response.json()
+            if not isinstance(study, dict) or _safe_get(study, "protocolSection", "identificationModule", "nctId") != nctid:
+                raise ValueError("Study response does not identify the requested NCT ID.")
+            return study
 
-                if response.status_code >= 400:
-                    self.logger.error(f"ClinicalTrials.gov study request failed for nctid={nctid}: status={response.status_code}")
-                    break
-
-                try:
-                    return response.json()
-                except ValueError as error:
-                    self.logger.error(f"Invalid ClinicalTrials.gov study JSON for nctid={nctid}: {error}")
-                    break
-
-            except requests.exceptions.Timeout:
-                retries += 1
-                '''
-                A timeout with retries remaining is not a failed discovery.
-                For example, NCT01204333 timed out on attempt 1/10 for
-                GARD:0000016, then downloaded and was inserted successfully.
-                The GARD runner remembers every ERROR in its discovery task;
-                logging that recovered attempt as ERROR incorrectly prevents
-                the node from proceeding to its remaining updates. Use WARNING
-                while retrying, but retain ERROR and return None if every
-                attempt times out so an unavailable study stays retryable.
-                The regular Alert runner uses the same download/retry policy.
-                '''
-                if retries >= max_retries:
-                    self.logger.error(f"Timeout fetching ClinicalTrials.gov study for nctid={nctid}; all {max_retries} attempts exhausted.")
-                    return None
-                self.logger.warning(f"Timeout fetching ClinicalTrials.gov study for nctid={nctid}. attempt={retries}/{max_retries}; retrying.")
-                time.sleep(1)
-
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"ClinicalTrials.gov study request failed for nctid={nctid}: {e}")
-                break
-
-        return None
+        return HTTPSUtils.with_api_retry_GET(f"{studies_api}/{nctid}", parse_study, timeout=10, logger=self.logger, description=f"ClinicalTrials.gov study {nctid}")
 
 
-    def call_get_nctids (self, query, pageToken=None):
+    def call_get_nctids(self, query, pageToken=None):
 
-        try:
-            if pageToken:
-                query += f'&pageToken={pageToken}'
+        '''
+        Validate each ID page inside the retry boundary. A failed page returns
+        None, distinct from a successful zero-match response; callers must skip
+        that search rather than pretend it found no studies or stop the process.
+        '''
+        def parse_page(response):
 
-            # Return a page of matching NCT IDs from the ClinicalTrials.gov search API.
-            #url_logger.info(query)
-            response = requests.get(query, timeout=30)
+            data = response.json()
+            if not isinstance(data, dict) or not isinstance(data.get("studies", []), list) or ("studies" not in data and data.get("totalCount") != 0):
+                raise ValueError("ClinicalTrials.gov did not return an ID page.")
+            if data.get("nextPageToken") is not None and not isinstance(data["nextPageToken"], str):
+                raise ValueError("ClinicalTrials.gov returned an invalid pagination token.")
+            for study in data.get("studies", []):
+                nctid = _safe_get(study, "protocolSection", "identificationModule", "nctId")
+                if not isinstance(nctid, str) or not re.fullmatch(r"NCT\d{8}", nctid):
+                    raise ValueError("ClinicalTrials.gov returned an invalid NCT ID.")
+            return data
 
-            if response.status_code >= 400:
-                self.logger.error(f"ClinicalTrials.gov search request failed: status={response.status_code}, query={query}")
-                return None
-
-            response_txt = response.json()
-
-        except (requests.RequestException, ValueError) as e:
-            self.logger.error(f'Unable to process ClinicalTrials.gov search query: {query}\n{e}')
-            response_txt = None
-
-        return response_txt
+        return HTTPSUtils.with_api_retry_GET(query, parse_page, params={"pageToken": pageToken} if pageToken else None, timeout=30, logger=self.logger, description="ClinicalTrials.gov ID search page")

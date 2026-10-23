@@ -9,6 +9,7 @@ import subprocess
 from typing import Any, List, Optional
 from urllib.parse import urlparse
 from utils.tools import _make_hash_key
+from utils.https_request import HTTPSUtils
 
 """
 Shared helper for extracting clean organization names with a local model API.
@@ -65,20 +66,15 @@ class OrganizationNameExtractor:
             },
         }
 
-        try:
-            response = self.session.post(url, json=payload, timeout=self.request_timeout)
-            response.raise_for_status()
+        def parse_model_response(response):
+
             data = response.json()
+            if not isinstance(data, dict) or not isinstance(data.get("response"), str):
+                raise ValueError("Model response is missing its generated text.")
+            return self.clean_model_response(data["response"])
 
-            return self.clean_model_response(data.get("response", ""))
-
-        except requests.RequestException as exc:
-            self._log_error(f"Model request failed for original_name={str(original_name)[:120]}: {exc}")
-            return None
-
-        except ValueError as exc:
-            self._log_error(f"Model response was not valid JSON for original_name={str(original_name)[:120]}: {exc}")
-            return None
+        # API exhaustion leaves extraction unknown; never save a false no-match.
+        return HTTPSUtils.with_api_retry(url, payload, parse_model_response, max_retries=3, timeout=self.request_timeout, logger=self.logger, description=f"Organization name extraction: {str(original_name)[:120]}", session=self.session)
 
 
     def check_model_server_running(self) -> bool:
@@ -106,7 +102,7 @@ class OrganizationNameExtractor:
         self._model_server_checked = True
 
         if not self._model_server_is_running:
-            self._log_error(f"Model server is not running or not reachable at {self.model_api_base_url}.")
+            HTTPSUtils.record_failure(self.logger, "Organization extraction model server", "not reachable after startup attempts")
 
         return self._model_server_is_running
 
@@ -123,7 +119,7 @@ class OrganizationNameExtractor:
         self._model_server_start_attempted = True
 
         if not self._is_local_model_api():
-            self._log_error(f"Auto-start is only supported for local model endpoints. Configured endpoint: {self.model_api_base_url}")
+            self._log_warning("Auto-start is only supported for local model endpoints; the remote model remains unavailable.")
             return False
 
         start_command = self._required_env("MODEL_START_COMMAND")

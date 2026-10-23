@@ -4,7 +4,6 @@ import sys
 from io import StringIO
 from typing import List
 
-import requests
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -13,6 +12,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
+from utils.https_request import HTTPSUtils
 
 """
 Mark Article nodes that are GeneReviews.
@@ -100,20 +100,15 @@ class ArticleGeneReviewFlagUpdateTask(PipelineBase):
             return []
 
         try:
-            response = requests.get(self.GENE_REVIEWS_TITLE_URL, timeout=30)
-
-            if response.status_code >= 400:
-                self.logger.error(
-                    f"Error fetching GeneReviews title file: HTTP {response.status_code}"
-                )
+            '''
+            An unavailable title list must not stop clinical/publication work
+            or clear existing graph flags. Return no updates after retries;
+            the GARD node continues to its normal completion checkpoint.
+            '''
+            text = HTTPSUtils.with_api_retry_GET(self.GENE_REVIEWS_TITLE_URL, lambda response: response.text, timeout=30, logger=self.logger, description="GeneReviews title list")
+            if text is None:
                 return []
-
-        except requests.RequestException as e:
-            self.logger.error(f"Error fetching GeneReviews title file: {e}")
-            return []
-
-        try:
-            reader = csv.DictReader(StringIO(response.text), delimiter="\t")
+            reader = csv.DictReader(StringIO(text), delimiter="\t")
             pmids = []
 
             for row in reader:

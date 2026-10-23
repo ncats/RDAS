@@ -41,8 +41,10 @@ flowchart TD
     People --> Finish["Close resources and archive logs"]
 ```
 
-The diagrams show the successful flow. Raised exceptions or captured task errors
-stop remaining work; resource cleanup and log archival still run.
+The diagrams show the successful flow. Exhausted HTTP retries log warnings and
+skip the unavailable data; the GARD node continues to its normal completion
+checkpoint. Database/code exceptions or captured non-HTTP task errors still stop
+remaining work; resource cleanup and log archival run in either case.
 
 ### Selection and checkpoints
 
@@ -258,8 +260,23 @@ Model caches live only in the current process. Task instances, database
 connections, and loggers retain separate lifecycles. Actual speedup depends on
 cache coverage and has not been benchmarked here.
 
-`raise_task_errors=True` propagates raised failures. The GARD error-checking
+HTTP downloads retry network errors, timeouts, HTTP 408/425/429/5xx, and unusable
+JSON with request timeouts and bounded exponential backoff. Most requests allow
+ten attempts; model/ROR and OMIM calls have smaller service-specific limits.
+Other HTTP failures return unknown immediately. API failures use warnings and
+return `None`, allowing other items, tasks, and GARD nodes to continue. OMIM
+retains its rate-limit circuit breaker, stopping that task's remaining requests
+after repeated 429 responses while the rest of the pipeline continues.
+
+Missing study/Article/annotation payloads are skipped, not saved as empty JSON.
+Unavailable nullable decisions, such as UMLS validation, remain SQL NULL.
+There is no failed-request queue or automatic whole-node replay: the GARD node
+uses its normal completion checkpoint even when individual HTTP calls fail.
+Skipped data is absent unless a separate later operation retrieves it.
+
+`raise_task_errors=True` propagates database/code failures. The GARD error-checking
 mixin also raises when a wrapped task logs an `ERROR`, preserving the first
-message. Discovery has equivalent local handlers. A captured failure prevents
+message. HTTP retries/exhaustion use `WARNING` instead. Discovery has equivalent
+local handlers. A captured non-HTTP failure prevents
 later processing and checkpointing; the entry point closes the runner and
 archives logs in `finally`.

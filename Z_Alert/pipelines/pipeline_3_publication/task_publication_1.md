@@ -16,10 +16,10 @@ flowchart TD
     E -- No --> Z["Iterator finished"]
     E -- Yes --> F["Pop a range; request PubMed ESearch with EDAT bounds and retmax 9999"]
     F --> G{"Request and response valid?"}
-    G -- "Timeout or connection failure" --> H{"Fewer than 10 attempts?"}
-    H -- Yes --> I["Wait 1 second; retry the same range"] --> F
-    H -- No --> X
-    G -- "HTTP error, malformed result, or inconsistent IDs" --> X
+    G -- "Network error, HTTP 408/425/429/5xx, or malformed result" --> H{"Fewer than 10 attempts?"}
+    H -- Yes --> I["Bounded backoff; retry the same range"] --> F
+    H -- No --> Skip["Warn and skip unavailable range"] --> E
+    G -- "Other HTTP failure" --> Skip
     G -- Yes --> J{"Reported count exceeds IDs returned?"}
     J -- Yes --> K{"Range is one day?"}
     K -- Yes --> X
@@ -48,3 +48,11 @@ Each complete response is stored with its exact `year_range`, lowercased
 raw JSON. An existing row skips the insert, but its IDs are yielded again so a
 rerun can finish article and mapping imports. A truncated single-day response
 raises an error because splitting by date cannot recover its missing IDs.
+
+## HTTP failures
+
+After retry exhaustion, the unavailable slice is neither saved nor yielded as
+an empty result. Other pending ranges and search names continue. HTTP failures
+do not defer the GARD node or replay its successful calls: the node uses its
+normal completion checkpoint. Missing results stay absent unless retrieved
+separately later. Database errors still roll back and propagate.

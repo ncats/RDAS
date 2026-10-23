@@ -19,6 +19,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
+from utils.https_request import HTTPSUtils
 
 
 class GrantPipelineBase(PipelineBase):
@@ -44,23 +45,29 @@ class GrantPipelineBase(PipelineBase):
     DEFAULT_REQUEST_TIMEOUT = (10, 120)
 
 
-    def _stream_download(self, url: str, output_path: Path, session: Optional[Session] = None, timeout: Optional[Tuple[int, int]] = None) -> None:
-        """Stream one URL to disk."""
+    def _stream_download(self, url: str, output_path: Path, session: Optional[Session] = None, timeout: Optional[Tuple[int, int]] = None) -> bool:
+
+        '''
+        Retry an interrupted HTTP download using the temporary output path.
+        Each attempt opens with wb, discarding partial bytes from the previous
+        attempt. Return False after exhaustion so callers keep any existing
+        complete file and continue; disk errors still propagate to the caller.
+        '''
 
         close_session = session is None
         http = session or requests.Session()
         timeout = timeout or self.DEFAULT_REQUEST_TIMEOUT
 
-        try:
-            with http.get(url, stream=True, timeout=timeout) as response:
-                response.raise_for_status()
+        def save_response(response):
 
-                with output_path.open("wb") as file_obj:
-                    for chunk in response.iter_content(chunk_size=self.DEFAULT_CHUNK_SIZE):
-                        if not chunk:
-                            continue
-
+            with output_path.open("wb") as file_obj:
+                for chunk in response.iter_content(chunk_size=self.DEFAULT_CHUNK_SIZE):
+                    if chunk:
                         file_obj.write(chunk)
+            return True
+
+        try:
+            return HTTPSUtils.with_api_retry_GET(url, save_response, max_retries=4, timeout=timeout, logger=self.logger, description=f"NIH grant download {output_path.name}", session=http, stream=True) is True
 
         finally:
             if close_session:
@@ -84,18 +91,28 @@ class GrantPipelineBase(PipelineBase):
             if temp_path.exists():
                 temp_path.unlink()
 
-            self._stream_download(url, temp_path, session=session, timeout=timeout)
+            if not self._stream_download(url, temp_path, session=session, timeout=timeout):
+                if temp_path.exists():
+                    temp_path.unlink()
+                return False
             temp_path.replace(output_path)
             self.logger.info(f"Saved {output_path}")
             return True
 
-        except (OSError, requests.RequestException) as e:
+        except requests.RequestException as exc:
+            HTTPSUtils.record_failure(self.logger, f"NIH grant download {output_path.name}", type(exc).__name__)
+            if temp_path.exists():
+                temp_path.unlink()
+            return False
+
+        except OSError:
             self.logger.exception(f"Failed to download {url} to {output_path}")
 
             if temp_path.exists():
                 temp_path.unlink()
 
-            return False
+            # HTTP exhaustion returns above; a local filesystem failure must still surface.
+            raise
 
 
     def _extract_zip_safely(self, zip_path: Path, output_dir: Path, overwrite: bool = False) -> List[Path]:

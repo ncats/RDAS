@@ -4,8 +4,6 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, Iterator, List, Sequence
 from collections import OrderedDict
-import requests
-import time
 import json
 import re
 
@@ -20,6 +18,7 @@ load_dotenv()
 
 from pipelines.pipeline_base import PipelineBase
 from utils.publication_worker import PublicationWorker
+from utils.https_request import HTTPSUtils
 from utils.tools import _resolve_worker_count
 
 """
@@ -153,40 +152,32 @@ class NewPublicationDiscoveryTask(PipelineBase):
                 params["api_key"] = self.api_key
 
             '''
-            Retry temporary connection failures and timeouts for this same
-            slice. HTTP errors and malformed responses fail immediately.
-            Never turn an error into an empty PMID list: that would allow the
-            runner to advance the GARD update date despite missing results.
+            Retry this exact slice through the shared HTTP helper. If it stays
+            unavailable, omit its raw-response row and continue with other
+            pending date slices/search terms. Do not yield an invented empty
+            result: log and skip only the failed range, without preventing the
+            GARD node's remaining work or its normal completion checkpoint.
             '''
-            for attempt in range(10):
-                try:
-                    response = requests.get(self.pubmed_esearch_api, params=params, timeout=30)
-                    response.raise_for_status()
-                    obj = response.json()
-                    result = obj["esearchresult"]
-                    count = int(result["count"])
-                    retmax = int(result["retmax"])
-                    retstart = int(result["retstart"])
-                    pubmed_ids = result["idlist"]
-                    '''
-                    This task never requests a nonzero offset. A mismatched
-                    offset or impossible count indicates an invalid response.
-                    '''
-                    if not isinstance(pubmed_ids, list) or retstart != 0 or count < len(pubmed_ids):
-                        raise ValueError("PubMed ESearch returned an inconsistent ID list or offset.")
-                    break
-                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-                    if attempt == 9:
-                        self.logger.exception(
-                            f"PubMed ESearch failed for {gard_id}: {search_term}, {range_start} to {range_end}."
-                        )
-                        raise
-                    time.sleep(1)
-                except (requests.exceptions.RequestException, KeyError, TypeError, ValueError):
-                    self.logger.exception(
-                        f"PubMed ESearch failed for {gard_id}: {search_term}, {range_start} to {range_end}."
-                    )
-                    raise
+            def parse_search_response(response):
+
+                obj = response.json()
+                result = obj["esearchresult"]
+                count = int(result["count"])
+                retmax = int(result["retmax"])
+                retstart = int(result["retstart"])
+                pubmed_ids = result["idlist"]
+                if not isinstance(pubmed_ids, list) or any(not str(value).isdigit() for value in pubmed_ids) or retstart != 0 or count < len(pubmed_ids) or retmax < 0:
+                    raise ValueError("PubMed ESearch returned an inconsistent ID list or offset.")
+                return obj
+
+            obj = HTTPSUtils.with_api_retry_GET(self.pubmed_esearch_api, parse_search_response, params=params, timeout=30, logger=self.logger, description=f"PubMed search for {gard_id}: {search_term}, {range_start} to {range_end}")
+            if obj is None:
+                continue
+            result = obj["esearchresult"]
+            count = int(result["count"])
+            retmax = int(result["retmax"])
+            retstart = int(result["retstart"])
+            pubmed_ids = result["idlist"]
 
             '''
             Compare count with the actual number of IDs, not with retmax.

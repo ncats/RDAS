@@ -5,7 +5,6 @@ import logging
 import re
 from pathlib import Path
 
-import requests
 import spacy
 
 
@@ -44,6 +43,7 @@ from tasks.task_Person_1_GARDOrganizationSourceTrackingTask import GARDOrganizat
 from tasks.task_Person_2_GARDPersonGroupingTask import GARDPersonGroupingTask
 from tasks.task_Person_3_GARDPersonAgentGraphTask import GARDPersonAgentGraphTask
 from utils.organization_name_extractor import OrganizationNameExtractor
+from utils.https_request import HTTPSUtils
 from utils.tools import _escape_sql_literal, _resolve_worker_count
 
 
@@ -218,25 +218,25 @@ class GARDModelCachingOrganizationNameExtractor(OrganizationNameExtractor):
             "keep_alive": -1,
             "options": {"temperature": 0},
         }
-        try:
-            response = self.session.post(f"{self.model_api_base_url}/api/generate", json=payload, timeout=self.request_timeout)
-            response.raise_for_status()
+        def parse_model_response(response):
+
             data = response.json()
-            return self.clean_model_response(data.get("response", ""))
-        except requests.RequestException as exc:
+            if not isinstance(data, dict) or not isinstance(data.get("response"), str):
+                raise ValueError("Model response is missing its generated text.")
+            return self.clean_model_response(data["response"])
+
+        result = HTTPSUtils.with_api_retry(f"{self.model_api_base_url}/api/generate", payload, parse_model_response, max_retries=3, timeout=self.request_timeout, logger=self.logger, description=f"GARD organization name extraction: {str(original_name)[:120]}", session=self.session)
+        if result is None:
             '''
-            A cached healthy-server result can become stale during a long run.
-            Invalidate it after a failed request so a later task can recheck the
-            server. Return None and log the error through the current task,
-            preserving the shared retry behavior and GARD error detection.
+            Exhausted HTTP retries are nonfatal. Invalidate the cached health
+            result so the next task can recheck the server, and leave this
+            organization unclassified rather than saving a false no-match.
+            The GARD node continues through its normal completion checkpoint.
             '''
             self._model_server_is_running = False
             self._model_server_checked = False
-            self._log_error(f"Model request failed for original_name={str(original_name)[:120]}: {exc}")
-            return None
-        except ValueError as exc:
-            self._log_error(f"Model response was not valid JSON for original_name={str(original_name)[:120]}: {exc}")
-            return None
+        return result
+
 
 
 class GARDResourceCachingOrganizationLocationRorLookupTask(OrganizationLocationRorLookupTask):
@@ -283,7 +283,7 @@ class GARDResourceCachingOrganizationLocationRorLookupTask(OrganizationLocationR
 
             self.org_name_extractor = extractor
             if not extractor._model_server_is_running:
-                raise RuntimeError("Organization extraction model server is unavailable; leave GARD work pending for a retry.")
+                self.logger.warning("Organization extraction model server is unavailable; skipping unknown extractions and continuing.")
             self.max_workers = _resolve_worker_count(self.DEFAULT_MAX_WORKERS, env_var_name="ROR_LOOKUP_MAX_WORKERS", logger=self.logger)
         except Exception:
             self.close()

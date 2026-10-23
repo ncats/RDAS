@@ -3,8 +3,6 @@ import sys
 import time
 from typing import Any, Dict, List, Optional
 
-import requests
-
 _dir = os.path.dirname(__file__)
 sys.path.extend([
     os.path.abspath(os.path.join(_dir, "..")),
@@ -13,6 +11,8 @@ sys.path.extend([
 
 from pipelines.pipeline_base import PipelineBase
 from pipelines.pipeline_2_clinical_trial.clinical_trial_study_change_handler import ClinicalTrialStudyChangeHandler
+from utils.https_request import HTTPSUtils
+from utils.tools import _safe_get
 
 
 class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
@@ -109,7 +109,7 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
                 fetched_study = self._fetch_study_by_nctid(nctid)
                 if fetched_study is None:
                     failed_count += 1
-                    self.logger.error(f"Unable to fetch current ClinicalTrials.gov study JSON for existing NCTID={nctid}.")
+                    self.logger.warning(f"Unable to fetch current ClinicalTrials.gov study JSON for existing NCTID={nctid}; continuing with other IDs.")
                     continue
 
                 try:
@@ -282,22 +282,15 @@ class ExistingClinicalTrialStudyUpdateTask(PipelineBase):
         Each existing NCT ID is checked directly by identifier, so the update
         check does not depend on disease search terms or GARD updated dates.
         '''
-        try:
-            response = requests.get(self._study_url(nctid), timeout=self.REQUEST_TIMEOUT_SECONDS)
+        def parse_study(response):
 
-            if response.status_code >= 400:
-                self.logger.error(f"ClinicalTrials.gov request failed for NCTID={nctid}: status={response.status_code}.")
-                return None
+            study = response.json()
+            if not isinstance(study, dict) or _safe_get(study, "protocolSection", "identificationModule", "nctId") != nctid:
+                raise ValueError("ClinicalTrials.gov returned an invalid study payload.")
+            return study
 
-            try:
-                return response.json()
-            except ValueError as error:
-                self.logger.error(f"Invalid ClinicalTrials.gov study JSON for NCTID={nctid}: {error}.")
-                return None
-
-        except requests.exceptions.RequestException as error:
-            self.logger.error(f"ClinicalTrials.gov request failed for NCTID={nctid}: {error}.")
-            return None
+        # Missing HTTP data leaves the existing stored study unchanged; other IDs continue.
+        return HTTPSUtils.with_api_retry_GET(self._study_url(nctid), parse_study, timeout=self.REQUEST_TIMEOUT_SECONDS, logger=self.logger, description=f"Existing ClinicalTrials.gov study {nctid}")
 
 
     def _study_url(self, nctid: str) -> str:

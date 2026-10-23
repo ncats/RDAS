@@ -332,10 +332,12 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
         lists up to four total attempts, with delays of 2, 4 and 8 seconds.
         Other HTTP failures, such as 401/403, return unknown immediately.
 
-        The shared HTTPSUtils GET helper has no request timeout/params support
-        and stops on HTTP 5xx. Keep this lookup-specific policy local instead
-        of changing unrelated API callers. Never log the prepared request URL
-        or exception text, which may contain the UMLS API key.
+        Keep this decision-specific policy local: unavailable UMLS validation
+        explicitly saves SQL NULL and does not require the GARD node to be
+        rebuilt. Other HTTP downloaders also skip unavailable data without
+        deferring the GARD node or replaying its completed requests.
+        Never log the prepared request URL or exception text, which may contain
+        the UMLS API key.
         """
         for attempt in range(1, self.UMLS_MAX_ATTEMPTS + 1):
             response = None

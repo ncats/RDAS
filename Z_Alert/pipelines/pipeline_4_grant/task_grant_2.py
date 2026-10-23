@@ -109,7 +109,14 @@ class GrantPatentClinicalStudyDownloadTask(GrantPipelineBase):
             if temp_path.exists():
                 temp_path.unlink()
 
-            self._stream_download(download_url, temp_path, session)
+            '''
+            A failed HTTP download is nonfatal and must not replace the last
+            complete CSV/ZIP with a partial file. Continue to the other source.
+            '''
+            if not self._stream_download(download_url, temp_path, session):
+                if temp_path.exists():
+                    temp_path.unlink()
+                return False
 
             if zipfile.is_zipfile(temp_path):
                 summary["zip_files_checked"] += 1
