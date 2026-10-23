@@ -713,13 +713,45 @@ class GARDExistingDataReuse:
             cursor.close()
 
     @contextmanager
+    def _enrichment_transaction(self, logger):
+
+        """Validate, commit and release a short parent-owned flag transaction.
+
+        Use separate sessions before and after the shared task, so a two-hour
+        model run cannot expire the session used to restore is_new flags.
+        Closing a session also rolls back an unfinished transaction on failure.
+        Guard resource cleanup so a dead socket cannot replace the SQL/task
+        exception with another exception from cursor.close() or rollback().
+        """
+        mysql = DBConnection().mysql_conn()
+        if mysql is None:
+            raise RuntimeError("Cannot open the GARD enrichment-scope connection.")
+        cursor = None
+        try:
+            self.validate_connection(mysql)
+            cursor = mysql.cursor(buffered=True)
+            yield cursor
+            mysql.commit()
+        finally:
+            for name, resource in (("cursor", cursor), ("connection", mysql)):
+                if resource is not None:
+                    try:
+                        resource.close()
+                    except Exception as cleanup_error:
+                        logger.warning(f"Unable to close GARD enrichment {name}: {cleanup_error}")
+
+    @contextmanager
     def enrichment_scope(self, task_name, logger):
 
         '''
         Shared enrichment tasks select is_new=1. Temporarily mark reused inputs
         is_new=2 for ONE task, then restore their exact row IDs before graph or
-        person processing. Use a separate parent-owned connection because the
-        shared task closes its own connection. Restore in finally on errors.
+        person processing. Commit and close the setup session BEFORE running
+        the shared task, then open a fresh session only if flags need restoring.
+        For example, reused trial row 42 is suspended as 2 during annotation
+        and restored to 1 for graph processing, even if annotation raises.
+        Publication classification masks no rows; after checking for work it
+        keeps no connection open and needs no cleanup queries at all.
         Marker 2 distinguishes suspended inputs from completed rows (0). A hard
         process stop leaves gard.updated NULL; recover_interrupted_scopes()
         restores suspended inputs before the restarted GARD loop begins.
@@ -733,13 +765,8 @@ class GARDExistingDataReuse:
             yield True
             return
         table, completed = specification[task_name]
-        mysql = DBConnection().mysql_conn()
-        if mysql is None:
-            raise RuntimeError("Cannot open the GARD enrichment-scope connection.")
         masked_ids = []
-        cursor = mysql.cursor(buffered=True)
-        try:
-            self.validate_connection(mysql)
+        with self._enrichment_transaction(logger) as cursor:
             identifiers = list(completed)
             for start in range(0, len(identifiers), self.BATCH_SIZE):
                 batch = identifiers[start:start + self.BATCH_SIZE]
@@ -753,20 +780,34 @@ class GARDExistingDataReuse:
             extra_condition = "AND is_EPI IS NULL" if table == "publication_article" else ""
             cursor.execute(f"SELECT 1 FROM `{self.TARGET_DATABASE}`.`{table}` WHERE is_new = 1 {extra_condition} LIMIT 1")
             has_work = cursor.fetchone() is not None
-            mysql.commit()
-            logger.info(f"{task_name}: reused {len(masked_ids)} input rows; missing enrichment remains={has_work}.")
+        logger.info(f"{task_name}: reused {len(masked_ids)} input rows; missing enrichment remains={has_work}.")
+
+        task_failed = False
+        try:
             yield has_work
+        except BaseException:
+            # Preserve failures and interrupts if restoring flags also fails.
+            task_failed = True
+            raise
         finally:
-            mysql.rollback()
-            try:
-                for start in range(0, len(masked_ids), self.BATCH_SIZE):
-                    batch = masked_ids[start:start + self.BATCH_SIZE]
-                    marks = ",".join(["%s"] * len(batch))
-                    cursor.execute(f"UPDATE `{self.TARGET_DATABASE}`.`{table}` SET is_new = 1 WHERE id IN ({marks})", batch)
-                mysql.commit()
-            finally:
-                cursor.close()
-                mysql.close()
+            if masked_ids:
+                try:
+                    with self._enrichment_transaction(logger) as cursor:
+                        for start in range(0, len(masked_ids), self.BATCH_SIZE):
+                            batch = masked_ids[start:start + self.BATCH_SIZE]
+                            marks = ",".join(["%s"] * len(batch))
+                            cursor.execute(f"UPDATE `{self.TARGET_DATABASE}`.`{table}` SET is_new = 1 WHERE id IN ({marks}) AND is_new = 2", batch)
+                except Exception:
+                    '''
+                    Never hide an active task exception with a restoration
+                    failure. Startup recovery restores suspended trial inputs
+                    next time. If the task succeeded, raise here so the runner
+                    cannot clear flags or mark this GARD node complete while
+                    its reused graph/person inputs are still suspended.
+                    '''
+                    logger.exception(f"Could not restore {task_name} enrichment inputs; restart recovery will restore remaining is_new=2 rows.")
+                    if not task_failed:
+                        raise
 
     def recover_interrupted_scopes(self, mysql, logger):
 

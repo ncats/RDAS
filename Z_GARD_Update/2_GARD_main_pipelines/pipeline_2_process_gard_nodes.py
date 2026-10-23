@@ -345,6 +345,12 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
             for the recurring Alert runner.
             '''
             for batch in gard_task.get_gard_nodes(mark_updated_before_yield=False, only_unprocessed=True):
+                '''
+                The selector has buffered this entire batch in Python. End its
+                read transaction before long downstream work instead of holding
+                a database snapshot open until the first node's checkpoint.
+                '''
+                gard_task.mysql.commit()
                 self.logger.info(f"\n\n*** Processing GARD discovery batch with {len(batch)} nodes. ***\n")
 
                 for gard_node in batch:
@@ -438,6 +444,14 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
 
                     # Save the source-processing checkpoint. Pending person
                     # flags survive this checkpoint until finalization succeeds.
+                    '''
+                    The selector connection waits while all per-node tasks run.
+                    A large disease can spend hours in local NLP, so reconnect
+                    before creating the completion-update cursor if that idle
+                    connection expired. A failed reconnect leaves updated NULL;
+                    it must never turn an incomplete node into a saved checkpoint.
+                    '''
+                    gard_task.mysql.ping(reconnect=True, attempts=3, delay=2)
                     gard_task._set_updated_flag({gard_node["gardId"]})
 
                     total_gard_nodes += 1

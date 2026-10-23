@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from time import sleep
 from typing import Any, Dict, List, Optional, Sequence
 
 from dotenv import load_dotenv
@@ -135,6 +136,7 @@ def get_epi_extract(text: str) -> Optional[Dict[str, Any]]:
 class PublicationEpiNhsLocalClassificationTask(PipelineBase):
 
     def __init__(self, fetch_order: str = "ASC"):
+
         super().__init__(init_mysql=True, init_memgraph=False)
         self.fetch_order = fetch_order.upper()
 
@@ -142,14 +144,68 @@ class PublicationEpiNhsLocalClassificationTask(PipelineBase):
             raise ValueError("fetch_order must be ASC or DESC.")
 
     def find_new_data(self, gard_node) -> None:
+
         self.logger.info("PublicationEpiNhsLocalClassificationTask does not use find_new_data().")
 
+    def _execute_mysql_batch(self, query, values, fetch_rows: bool = False):
+
+        """Use a short database session and retry only interrupted connections.
+
+        Both SELECT and UPDATE finish and disconnect before returning. Model
+        loading, classification and EPI extraction therefore hold neither an
+        idle MySQL socket nor an open read transaction. The connection object
+        retains its configuration for ping(reconnect=True) on the next call;
+        cursors are always created after reconnecting, never reused across it.
+
+        UPDATE retries reuse the already prepared values, without rerunning
+        inference. For example, if a 500-article batch loses its connection at
+        COMMIT, replaying the same field assignments is safe even if the server
+        committed but its acknowledgement was lost. There are no inserts,
+        counters or is_new changes in this operation. Closing a failed session
+        rolls back any uncommitted updates without issuing a second query on
+        a dead connection that could hide the original error.
+        """
+        if self.mysql is None:
+            raise RuntimeError("Cannot classify publications without a MySQL connection.")
+
+        for attempt in range(1, 4):
+            cursor = None
+            try:
+                self.mysql.ping(reconnect=True, attempts=3, delay=2)
+                cursor = self.mysql.cursor(dictionary=fetch_rows)
+                if fetch_rows:
+                    cursor.execute(query, values)
+                    result = cursor.fetchall()
+                else:
+                    cursor.executemany(query, values)
+                    result = cursor.rowcount
+                self.mysql.commit()
+                return result
+            except Exception as error:
+                '''
+                The installed C extension can raise its own MySQLInterfaceError
+                at COMMIT, rather than mysql.connector.Error. Inspect errno on
+                either exception type, and let SQL/data/model errors propagate.
+                Recovered disconnects must be warnings: the GARD runner treats
+                every ERROR log entry as an unsuccessful task.
+                '''
+                if getattr(error, "errno", None) not in {2006, 2013, 2055, 4031} or attempt == 3:
+                    raise
+                self.logger.warning(f"Publication MySQL connection interrupted on attempt {attempt}/3: {error}; retrying the same database batch without repeating model inference.")
+            finally:
+                for name, resource in (("cursor", cursor), ("connection", self.mysql)):
+                    if resource is not None:
+                        try:
+                            resource.close()
+                        except Exception as cleanup_error:
+                            self.logger.warning(f"Unable to close publication MySQL {name}: {cleanup_error}")
+            sleep(2 * attempt)
+
     def process_new_data(self) -> None:
+
         fetch_is_new_query = f"SELECT id, pubmed_id, title, abstract_text FROM publication_article WHERE is_EPI is null AND is_new = 1 ORDER BY id {self.fetch_order} LIMIT %s"
         update_sql = " UPDATE publication_article SET is_EPI = %s, is_NHS = %s, epi_probability =%s, epi_extract = %s WHERE pubmed_id = %s "
 
-        update_cursor = self.mysql.cursor()
-        fetch_cursor = self.mysql.cursor(dictionary=True)
         self.logger.info(f"Fetching new publication_article rows in id {self.fetch_order} order.")
 
         batch_num = 0
@@ -157,11 +213,10 @@ class PublicationEpiNhsLocalClassificationTask(PipelineBase):
         classifier_batch_size = _env_int("EPI_CLASSIFY_LOCAL_BATCH_SIZE", 32)
 
         try:
-            classifier = get_pipeline()
+            classifier = None
 
             while True:
-                fetch_cursor.execute(fetch_is_new_query, (batch_size,))
-                rows = fetch_cursor.fetchall()
+                rows = self._execute_mysql_batch(fetch_is_new_query, (batch_size,), fetch_rows=True)
 
                 batch_num += 1
                 self.logger.info(f"\n--- batch# = {batch_num} ---")
@@ -169,6 +224,16 @@ class PublicationEpiNhsLocalClassificationTask(PipelineBase):
                 if not rows:
                     self.logger.info("No more rows to fetch.")
                     break
+
+                '''
+                Fetch and disconnect before the first model load as well as
+                every later prediction batch. Keep the same classifier in
+                memory across database reconnects; do not reload its weights.
+                Already classified copied Articles still fail the is_EPI IS NULL
+                predicate and are not submitted to the models again.
+                '''
+                if classifier is None:
+                    classifier = get_pipeline()
 
                 obj_list = [{
                     "id": row["id"],
@@ -228,35 +293,36 @@ class PublicationEpiNhsLocalClassificationTask(PipelineBase):
                     self.logger.info(f"Prepared {len(val_list)} publication_article updates for batch#{batch_num}.")
 
                 except Exception as e:
-                    self.logger.error(f"Error processing batch#{batch_num}: {e}")
-                    continue
+                    raise RuntimeError(f"Error processing publication batch#{batch_num}: {e}") from e
 
-                try:
-                    if not val_list:
-                        self.logger.warning(
-                            f"No publication_article rows updated for batch#{batch_num}; "
-                            "all rows remain retryable."
-                        )
-                        continue
+                if not val_list:
+                    '''
+                    A batch with no usable extraction results cannot advance
+                    this NULL-based selector. Stop instead of loading the same
+                    rows forever; their NULL fields remain available on restart.
+                    '''
+                    raise RuntimeError(f"No usable publication classification results in batch#{batch_num}; rows remain pending for a retry.")
 
-                    update_cursor.executemany(update_sql, val_list)
-                    self.mysql.commit()
+                self._execute_mysql_batch(update_sql, val_list)
+                self.logger.info(f"Committed {len(val_list)} publication_article classification updates for batch#{batch_num}.")
 
-                except Exception as e:
-                    self.logger.error(f"Error during update: {e}")
-                    self.mysql.rollback()
-                    continue
-
-        except Exception as e:
-            self.logger.error(f"An unexpected error occurred: {e}")
+        except Exception:
+            '''
+            Exhausted database retries must reach the runner immediately. Do
+            not refetch and recompute this batch after a persistent failure;
+            successful earlier commits remain saved, and the GARD runner will
+            leave the current disease checkpoint and pending flags untouched.
+            '''
+            self.logger.exception("Publication classification failed; unfinished rows remain pending.")
+            raise
 
         finally:
-            if fetch_cursor:
-                fetch_cursor.close()
-
-            if update_cursor:
-                update_cursor.close()
-
+            '''
+            Every database batch has already closed its session in finally.
+            Detach that handle before base cleanup, whose is_connected() ping
+            could otherwise raise again after an interrupted fetch or COMMIT.
+            '''
+            self.mysql = None
             self.close()
 
 
