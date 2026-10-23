@@ -154,9 +154,10 @@ flowchart TD
 
 ### Publication reuse
 
-All ten `rdas_db.publication*` tables are covered, with corresponding destination
-tables in `gard_rdas_db`. Copies are limited to discovered PMIDs and current-GARD
-OMIM associations.
+Nine `rdas_db.publication*` tables are eligible for reuse in their corresponding
+destination tables in `gard_rdas_db`. Copies are limited to discovered PMIDs and
+current-GARD OMIM associations. `publication_gard_pubmed` is populated only by
+the live PubMed searches; historical source search responses are not copied.
 
 | Table | Copy behavior |
 | --- | --- |
@@ -164,7 +165,7 @@ OMIM associations.
 | `publication_pubtator`, `publication_pubtator_parsed` | Copy cached JSON and parsed annotations for matching pending Article content. MySQL computes generated `source_json_len`. |
 | `publication_substance`, `publication_substance_unique` | Copy relevant substance rows and their referenced unique records. |
 | `publication_gard_searchterm_pubmed_mapping` | Copy exact current-GARD/current-term/PMID tuples; reset copied abbreviation decisions for current validation. Shared discovery creates missing tuples. |
-| `publication_gard_pubmed` | After all live slices for a term finish, copy complete historical responses for that GARD/term only when every listed PMID has a current destination mapping. Live rows take precedence. |
+| `publication_gard_pubmed` | No source copy. The inherited live search saves complete responses for the current GARD/term/date slice. Previously copied rows are retained. |
 | `publication_gard_omim_mapping` | Copy current-GARD pairs only when the current GARD cross-references still include the OMIM ID; shared mapping adds new pairs. |
 | `publication_omim` | Copy valid current-GARD OMIM entries, preserve existing target JSON, and restage relevant entries for PMID import and OMIMRef graph work. |
 | `publication_omim_pubmed_mapping` | Copy relevant pairs only when source/destination entry JSON agrees and the PMID occurs in that JSON. Shared parsing fills missing pairs. |

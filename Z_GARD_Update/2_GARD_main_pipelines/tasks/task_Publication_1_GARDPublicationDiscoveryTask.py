@@ -15,9 +15,11 @@ Both mappings must be (GARD:0000016, Coma, PMID), regardless of which other GARD
 IDs were associated with the articles in production. Already completed target
 Articles stay completed; new disease edges are handled by the relationship task.
 
-After all live slices for this term are consumed, copy compatible complete search
-history. A historical coma row with total=41918 and only 9999 IDs is rejected.
-Live raw search responses take precedence over historical rows with the same key.
+Search history in publication_gard_pubmed comes only from the inherited live
+PubMed search. Do not copy source search responses: an older 1970-2025 snapshot
+for gracile syndrome is a different search from today's 1971-01-01-2026-10-23
+request and would add an unnecessary second date range. Reusing Article metadata
+and enrichment below does not require copying those historical search responses.
 These are illustrative cache states, not statements about current database rows."""
 
 from pipelines.pipeline_3_publication.task_publication_1 import NewPublicationDiscoveryTask
@@ -46,17 +48,3 @@ class GARDPublicationDiscoveryTask(NewPublicationDiscoveryTask):
             raise ValueError("Publication mappings must use the current GARD node.")
         self.reuse.copy_publications(self.mysql, self.logger, pubmed_ids, search_term=search_term)
         super().find_new_publications(gard_id, search_term, pubmed_ids)
-
-    def retrieve_pubmed_ids(self, gard_id, search_term, mindate=None, maxdate=None):
-
-        '''
-        Preserve the shared live search and complete date splitting. Copy
-        compatible source search history after every live slice has committed,
-        so historical keys cannot block later live response inserts. The helper
-        checks current mappings in batches rather than accumulating all PMIDs.
-        '''
-        if gard_id != self.reuse.current_gard_id:
-            raise ValueError("Publication searches must use the current GARD node.")
-        for pubmed_ids in super().retrieve_pubmed_ids(gard_id, search_term, mindate, maxdate):
-            yield pubmed_ids
-        self.reuse.copy_publication_search_history(self.mysql, self.logger, gard_id, search_term, mindate, maxdate)

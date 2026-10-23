@@ -4,7 +4,6 @@ import json
 import os
 import re
 from contextlib import contextmanager
-from datetime import date
 from time import perf_counter
 
 from baseclass.conn import DBConnection
@@ -46,12 +45,18 @@ class GARDExistingDataReuse:
     """
 
     BATCH_SIZE = 100
+    '''
+    publication_gard_pubmed is intentionally excluded: current PubMed searches
+    save their own complete responses through the shared discovery task. Copy
+    Article data and enrichment without importing older search-date snapshots
+    or requiring matching source/target schemas for that search-history table.
+    '''
     TABLES = (
         "clinical_trial", "clinical_trial_unique", "clinical_trial_annotation",
         "clinical_trial_intervention_drug", "clinical_trial_nctid_pmids_mapping",
         "publication_article", "publication_pubtator", "publication_pubtator_parsed",
         "publication_substance", "publication_substance_unique",
-        "publication_gard_pubmed", "publication_gard_searchterm_pubmed_mapping",
+        "publication_gard_searchterm_pubmed_mapping",
         "publication_gard_omim_mapping", "publication_omim", "publication_omim_pubmed_mapping",
     )
 
@@ -287,93 +292,6 @@ class GARDExistingDataReuse:
             raise
         finally:
             cursor.close()
-
-    def copy_publication_search_history(self, mysql, logger, gard_id, search_term, mindate, maxdate):
-
-        '''
-        Copy complete historical responses only for this exact disease/term
-        and overlapping date window, after ALL live slices for the term finish.
-        A raw response includes a whole PMID list and count: matching just one
-        PMID cannot justify rebinding a different disease's response. Requiring
-        every cached PMID to have a current target mapping avoids importing
-        unrelated IDs. Count validation rejects older truncated rows such as
-        coma's 9,999-of-41,918 response. The current live row takes
-        precedence whenever its disease/term/date key already exists.
-        '''
-        self.validate_connection(mysql)
-        if gard_id != self.current_gard_id:
-            raise ValueError("PubMed search history must use the current GARD node.")
-        current_search_term = search_term
-        search_term = search_term.lower()
-        lower = date.fromisoformat(str(mindate or date(1970, 1, 1))[:10])
-        upper = date.fromisoformat(str(maxdate or date.today())[:10])
-        reader = mysql.cursor(dictionary=True, buffered=True)
-        writer = mysql.cursor(buffered=True)
-        copied = 0
-        try:
-            reader.execute(
-                f'''SELECT id, year_range, total, retstart, pubmed_ids, ref_json
-                   FROM `{self.SOURCE_DATABASE}`.publication_gard_pubmed
-                   WHERE gard_id = %s AND BINARY search_term = BINARY %s ORDER BY id DESC''',
-                (gard_id, search_term),
-            )
-            for row in reader:
-                try:
-                    bounds = re.fullmatch(r"(\d{4}-\d{2}-\d{2})-(\d{4}-\d{2}-\d{2})", row["year_range"] or "")
-                    years = re.fullmatch(r"(\d{4})-(\d{4})", row["year_range"] or "")
-                    if bounds:
-                        start, end = date.fromisoformat(bounds[1]), date.fromisoformat(bounds[2])
-                    elif years:
-                        start, end = date(int(years[1]), 1, 1), date(int(years[2]), 12, 31)
-                    else:
-                        continue
-                    if start > end or end < lower or start > upper:
-                        continue
-                    result = json.loads(row["ref_json"])["esearchresult"]
-                    response_ids = result["idlist"]
-                    if not isinstance(response_ids, list) or any(not str(value).isdigit() for value in response_ids):
-                        continue
-                    ids = {str(value) for value in response_ids}
-                    stored_ids = set(filter(None, (row["pubmed_ids"] or "").split(",")))
-                    if int(result["count"]) != len(response_ids) or row["total"] != len(response_ids) or int(result["retstart"]) != 0 or row["retstart"] != 0 or stored_ids != ids:
-                        continue
-                except (ValueError, TypeError, KeyError):
-                    continue
-                '''
-                Verify IDs in small indexed lookups instead of collecting all
-                live search slices in memory. Run this after discovery finishes:
-                copying historical keys earlier could block a later live slice's
-                raw-row insert. Source date labels and response JSON stay intact.
-                '''
-                mapped = True
-                identifiers = list(ids)
-                for offset in range(0, len(identifiers), self.BATCH_SIZE):
-                    batch = identifiers[offset:offset + self.BATCH_SIZE]
-                    marks = ",".join(["%s"] * len(batch))
-                    writer.execute(
-                        f'''SELECT DISTINCT pubmed_id FROM `{self.TARGET_DATABASE}`.publication_gard_searchterm_pubmed_mapping
-                            WHERE gard_id = %s AND BINARY search_term = BINARY %s AND pubmed_id IN ({marks})''',
-                        (gard_id, current_search_term, *batch),
-                    )
-                    if {str(value[0]) for value in writer.fetchall()} != set(batch):
-                        mapped = False
-                        break
-                if not mapped:
-                    continue
-                copied += self._copy_rows(
-                    writer, "publication_gard_pubmed", "s.id = %s", (row["id"],),
-                    keys=["gard_id", "search_term", "year_range"],
-                    overrides={"gard_id": gard_id, "search_term": search_term},
-                )
-            mysql.commit()
-            if copied:
-                logger.info(f"{gard_id}: copied {copied} complete historical publication_gard_pubmed responses for {search_term}.")
-        except Exception:
-            mysql.rollback()
-            raise
-        finally:
-            reader.close()
-            writer.close()
 
     def copy_gard_omim_mappings(self, mysql, logger, gard_id):
 
