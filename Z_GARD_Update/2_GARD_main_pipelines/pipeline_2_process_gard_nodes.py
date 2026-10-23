@@ -5,6 +5,7 @@ import logging
 import re
 from pathlib import Path
 
+import requests
 import spacy
 
 
@@ -20,6 +21,7 @@ from pipelines.pipeline_base import PipelineBase
 from pipelines.pipeline_2_clinical_trial.task_clinical_trial_6 import NewClinicalTrialAnnotationTask
 from pipelines.pipeline_3_publication.task_publication_7 import PublicationFalsePositiveFilterTask
 from pipelines.pipeline_5_followup.task_pipeline_followup_update_3 import DiseaseCountsRefreshTask
+from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_1 import OrganizationLocationRorLookupTask
 from pipelines.pipeline_7_graph_maintenance.task_pipeline_maintenance_3 import NewOrganizationSourceTrackingTask
 '''
 Each GARD-only task has its own module under tasks/. Number each prefix domain
@@ -41,7 +43,8 @@ from tasks.task_Publication_5_GARDPublicationGardArticleRelationshipTask import 
 from tasks.task_Person_1_GARDOrganizationSourceTrackingTask import GARDOrganizationSourceTrackingTask
 from tasks.task_Person_2_GARDPersonGroupingTask import GARDPersonGroupingTask
 from tasks.task_Person_3_GARDPersonAgentGraphTask import GARDPersonAgentGraphTask
-from utils.tools import _escape_sql_literal
+from utils.organization_name_extractor import OrganizationNameExtractor
+from utils.tools import _escape_sql_literal, _resolve_worker_count
 
 
 class GARDTaskErrorCapture(logging.Handler):
@@ -184,6 +187,122 @@ class GARDModelCachingPublicationFalsePositiveFilterTask(PublicationFalsePositiv
             raise
 
 
+class GARDModelCachingOrganizationNameExtractor(OrganizationNameExtractor):
+    """Reuse organization extraction while retaining the Ollama model for GARD.
+
+    The inherited helper still provides configuration, prompts, normalization,
+    hashing and model-server management. Override only the generation request
+    to send keep_alive=-1. Merely retaining its Python object would not stop
+    Ollama's default idle timer from unloading model weights between diseases.
+    The runner explicitly unloads the model when it closes; a forced process
+    kill cannot run that cleanup. Other clients or server memory pressure can
+    still unload the model independently of this request.
+    """
+
+    def extract_organization_name(self, original_name: str):
+
+        if not self._model_server_is_running:
+            return None
+
+        '''
+        Use the shared prompt and response cleaner so only model residency
+        changes. For example, the same extractor/session handles affiliations
+        from GARD:0000016 and then GARD:0000022 without an unload/load cycle.
+        Extraction remains sequential in the parent task; inherited ROR worker
+        threads receive prepared names and never share this HTTP session.
+        '''
+        payload = {
+            "model": self.model_name,
+            "prompt": self.build_prompt(original_name),
+            "stream": False,
+            "keep_alive": -1,
+            "options": {"temperature": 0},
+        }
+        try:
+            response = self.session.post(f"{self.model_api_base_url}/api/generate", json=payload, timeout=self.request_timeout)
+            response.raise_for_status()
+            data = response.json()
+            return self.clean_model_response(data.get("response", ""))
+        except requests.RequestException as exc:
+            '''
+            A cached healthy-server result can become stale during a long run.
+            Invalidate it after a failed request so a later task can recheck the
+            server. Return None and log the error through the current task,
+            preserving the shared retry behavior and GARD error detection.
+            '''
+            self._model_server_is_running = False
+            self._model_server_checked = False
+            self._log_error(f"Model request failed for original_name={str(original_name)[:120]}: {exc}")
+            return None
+        except ValueError as exc:
+            self._log_error(f"Model response was not valid JSON for original_name={str(original_name)[:120]}: {exc}")
+            return None
+
+
+class GARDResourceCachingOrganizationLocationRorLookupTask(OrganizationLocationRorLookupTask):
+    """Borrow the GARD runner's extractor while keeping task resources separate.
+
+    Every invocation still creates its own MySQL/Memgraph handles and logger.
+    Only the organization extractor, its HTTP session and its model-server
+    ownership survive a node boundary. Inherited lookup, SQL writes, graph
+    updates and is_new handling run unchanged, including final person updates.
+    The regular Alert runner continues to instantiate the original task.
+    """
+
+    __module__ = OrganizationLocationRorLookupTask.__module__
+
+    def __init__(self, resource_owner):
+
+        self.resource_owner = resource_owner
+        self.org_name_extractor = None
+        # Bypass the parent's extractor allocation, retaining per-task DB/logger setup.
+        PipelineBase.__init__(self, init_mysql=True, init_memgraph=True)
+        try:
+            extractor = resource_owner._organization_name_extractor
+            if extractor is None:
+                extractor = GARDModelCachingOrganizationNameExtractor(logger=self.logger)
+                resource_owner._organization_name_extractor = extractor
+                self.logger.info("Created organization extractor and HTTP session for this GARD run; model residency uses keep_alive=-1 after generation.")
+            else:
+                '''
+                Task.close() removes its logging handlers. Rebind the cached
+                helper to the new task's logger so extraction failures reach
+                this invocation's GARD error handler and maintenance error log.
+                Never retain a failed health result permanently in the cache.
+                '''
+                self.org_name_extractor = extractor
+                extractor.logger = self.logger
+                if not extractor._model_server_is_running:
+                    process = extractor._model_server_process
+                    if process is None or process.poll() is not None:
+                        extractor._model_server_process = None
+                        extractor._model_server_start_attempted = False
+                    extractor._model_server_checked = False
+                    extractor.check_model_server_running()
+                self.logger.info("Reusing organization extractor, HTTP session and model-server ownership from this GARD run.")
+
+            self.org_name_extractor = extractor
+            if not extractor._model_server_is_running:
+                raise RuntimeError("Organization extraction model server is unavailable; leave GARD work pending for a retry.")
+            self.max_workers = _resolve_worker_count(self.DEFAULT_MAX_WORKERS, env_var_name="ROR_LOOKUP_MAX_WORKERS", logger=self.logger)
+        except Exception:
+            self.close()
+            raise
+
+    def close(self) -> None:
+
+        '''
+        The parent close() unloads the model and may stop its server. Those
+        resources now belong to the runner, so release only this task's DB
+        handles and logger through PipelineBase. Between nodes, use the runner
+        logger instead of retaining a task logger whose handlers were closed.
+        '''
+        if self.org_name_extractor is not None:
+            self.org_name_extractor.logger = self.resource_owner.logger
+            self.org_name_extractor = None
+        PipelineBase.close(self)
+
+
 class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
 
     # A failed task must not reach wrap-up or mark a GARD checkpoint complete.
@@ -198,6 +317,8 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
 
         self.START_DATE = '1971-01-01'
         self._nodes_since_counts_refresh = 0
+        # Own one extractor per runner; it never owns a task's database connection.
+        self._organization_name_extractor = None
         self.existing_data_reuse = GARDExistingDataReuse()
         self.current_gard_id = None
 
@@ -208,6 +329,39 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
         )
         # Log the actual configured direction, including reversed reuse configurations.
         self.logger.info(f"GARD discovery reuses clinical-trial/publication data from {self.existing_data_reuse.SOURCE_DATABASE} into {self.existing_data_reuse.TARGET_DATABASE} before downloading missing records.")
+
+
+    def close(self) -> None:
+
+        '''
+        The entrypoint calls runner.close() in finally after normal completion,
+        task failure or Ctrl+C. Release the shared organization resources once,
+        after per-node and final person tasks have finished using them. Clear
+        ownership first so repeated close() calls cannot unload twice. The
+        inherited server-stop helper stops only a process this extractor
+        started; an existing external Ollama server remains running.
+        '''
+        extractor = getattr(self, "_organization_name_extractor", None)
+        self._organization_name_extractor = None
+        try:
+            if extractor is not None:
+                extractor.logger = self.logger
+                '''
+                A timed-out generation request may still have loaded the model
+                on the server. Refresh failed health state before shutdown so
+                cleanup can unload that model if the endpoint is reachable;
+                never start a new model server just to perform cleanup.
+                '''
+                if not extractor._model_server_is_running:
+                    extractor._model_server_is_running = extractor._request_model_server_health()
+                for action in ("shutdown_model", "stop_model_server", "close"):
+                    try:
+                        getattr(extractor, action)()
+                    except Exception as exc:
+                        if self.logger is not None:
+                            self.logger.warning(f"Organization resource cleanup failed during {action}: {exc}")
+        finally:
+            super().close()
 
 
     def _run_pipeline_task(self, task_class, task_name=None, **kwargs) -> None:
@@ -263,6 +417,16 @@ class GARDToMySQLAndMemgraphUpdateRunner(AlertPipelineRunner):
             task_class = GARDModelCachingPublicationFalsePositiveFilterTask
             task_name = task_name or PublicationFalsePositiveFilterTask.__name__
             kwargs["gard_id"] = self.current_gard_id
+
+        elif task_class is OrganizationLocationRorLookupTask:
+            '''
+            Substitute only inside this runner, covering per-node maintenance
+            and final person organization enrichment through the same path.
+            Keep the original task name/module for timing and error-file routing.
+            '''
+            task_class = GARDResourceCachingOrganizationLocationRorLookupTask
+            task_name = task_name or OrganizationLocationRorLookupTask.__name__
+            kwargs["resource_owner"] = self
 
         elif task_class is NewOrganizationSourceTrackingTask:
             task_class = GARDOrganizationSourceTrackingTask
