@@ -184,7 +184,21 @@ class NewClinicalTrialDiscoveryTask(PipelineBase):
 
             except requests.exceptions.Timeout:
                 retries += 1
-                self.logger.error(f"Timeout fetching ClinicalTrials.gov study for nctid={nctid}. attempt={retries}/{max_retries}")
+                '''
+                A timeout with retries remaining is not a failed discovery.
+                For example, NCT01204333 timed out on attempt 1/10 for
+                GARD:0000016, then downloaded and was inserted successfully.
+                The GARD runner remembers every ERROR in its discovery task;
+                logging that recovered attempt as ERROR incorrectly prevents
+                the node from proceeding to its remaining updates. Use WARNING
+                while retrying, but retain ERROR and return None if every
+                attempt times out so an unavailable study stays retryable.
+                The regular Alert runner uses the same download/retry policy.
+                '''
+                if retries >= max_retries:
+                    self.logger.error(f"Timeout fetching ClinicalTrials.gov study for nctid={nctid}; all {max_retries} attempts exhausted.")
+                    return None
+                self.logger.warning(f"Timeout fetching ClinicalTrials.gov study for nctid={nctid}. attempt={retries}/{max_retries}; retrying.")
                 time.sleep(1)
 
             except requests.exceptions.RequestException as e:
