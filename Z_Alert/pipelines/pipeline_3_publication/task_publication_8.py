@@ -331,7 +331,19 @@ class NewOmimPublicationArticleImportTask(PipelineBase):
                 article_val = self.publication_worker.download_by_pmid(pubmed_id)
 
                 if not article_val:
-                    self.logger.error(f"Unable to download OMIM PubMed article: pubmed_id={pubmed_id}")
+                    '''
+                    The shared downloader returns None after HTTP retries or
+                    when Europe PMC has no usable metadata. For example, PMID
+                    2229506 must be skipped without stopping GARD:0001883.
+                    Logging ERROR here would make the GARD error-capture guard
+                    reject the task even though the download failure is meant
+                    to be nonfatal. Keep the OMIM/PMID provenance saved earlier,
+                    omit the missing Article, and continue with other PMIDs and
+                    the node's remaining steps without replaying the node.
+                    Database failures below still log ERROR and remain fatal
+                    to the GARD runner.
+                    '''
+                    self.logger.warning(f"Unable to download OMIM PubMed article: pubmed_id={pubmed_id}; skipping this PMID and continuing.")
                     continue
 
                 insert_cursor.execute(insert_article_sql, (*article_val, pubmed_id))
