@@ -13,8 +13,6 @@
 *.cypher
 *.html
 *.json
-*.md
-*.MD
 *.png
 *.sh
 Z_GARD_Update/*.sh
@@ -22,6 +20,9 @@ Z_GARD_Update/**/*.sh
 *.sql
 *.tsv
 *.txt
+
+*.md
+*.MD
 !README.md
 
 # Generated/intermediate directories
@@ -49,8 +50,7 @@ __init__.py
 !X_epi_nhs_predict_local/data/__init__.py
 !X_epi_nhs_predict_local/data/gard-id-name-synonyms.json
 
-# Keep repository instructions and documentation visible under broad
-# generated-file ignore rules.
+# Keep dependencies and alert email templates visible under broad ignore rules.
 !requirements.txt
 !Z_Alert/emails/alert_email_template.html
 !Z_Alert/emails/alert_summary_email_template.html
