@@ -22,7 +22,7 @@ Z_GARD_Update/**/*.sh
 *.sql
 *.tsv
 *.txt
-PROJECT_MEMORY.md
+!README.md
 
 # Generated/intermediate directories
 memgraph_dumps/
@@ -51,17 +51,7 @@ __init__.py
 
 # Keep repository instructions and documentation visible under broad
 # generated-file ignore rules.
-AGENTS.md
-!MODEL_INSTALLATION.md
-!README.md
 !requirements.txt
-!X_epi_nhs_predict_local/README.md
-!Z_Alert/pipeline.MD
 !Z_Alert/emails/alert_email_template.html
 !Z_Alert/emails/alert_summary_email_template.html
-!Z_Alert/pipelines/alert_sender_workflow.md
-!Z_Alert/pipelines/grant_email_alert_process.md
-!Z_Alert/pipelines/pipeline_3_publication/task_publication_1.md
-!Z_Alert/pipelines/pipeline_9_makeup/NCT06487273_location_count_mismatch_report.md
-!Z_GARD_Update/2_GARD_main_pipelines/pipeline_2_process_gard_nodes.md
 
