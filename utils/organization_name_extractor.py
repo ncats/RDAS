@@ -122,9 +122,8 @@ class OrganizationNameExtractor:
             self._log_warning("Auto-start is only supported for local model endpoints; the remote model remains unavailable.")
             return False
 
-        start_command = self._required_env("MODEL_START_COMMAND")
-
         try:
+            start_command = self._required_env("MODEL_START_COMMAND")
             start_command_args = self.build_model_start_command_args(start_command)
             self._model_server_process = subprocess.Popen(
                 start_command_args,
@@ -138,7 +137,13 @@ class OrganizationNameExtractor:
 
         except (OSError, ValueError) as exc:
             self._model_server_process = None
-            self._log_error(f"Failed to start model server with MODEL_START_COMMAND={start_command}: {exc}")
+            '''
+            Name extraction is optional enrichment. A server that is offline
+            or cannot be auto-started must leave its output unknown rather
+            than emit ERROR and stop a multi-day GARD build. The caller already
+            handles None by skipping that organization's enrichment.
+            '''
+            self._log_warning(f"Unable to start organization model server ({type(exc).__name__}); skipping unavailable extraction and continuing.")
             return False
 
 

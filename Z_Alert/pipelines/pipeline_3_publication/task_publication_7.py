@@ -357,11 +357,20 @@ class PublicationFalsePositiveFilterTask(PipelineBase):
                     if response.status_code not in {408, 429} and not 500 <= response.status_code <= 599:
                         self.logger.warning(f"{description} unavailable ({reason}); the validation decision will be SQL NULL and processing will continue.")
                         return None
-            except (requests.RequestException, ValueError) as exc:
+            except (requests.RequestException, ValueError, TypeError, AttributeError, KeyError, IndexError) as exc:
+                '''
+                Invalid JSON structure is unavailable HTTP data just like a
+                timeout. Keep decoding and response cleanup inside this
+                boundary; neither may turn an unknown decision into a fatal
+                GARD task error. Database operations occur in the caller.
+                '''
                 reason = type(exc).__name__
             finally:
                 if response is not None:
-                    response.close()
+                    try:
+                        response.close()
+                    except (requests.RequestException, OSError):
+                        self.logger.warning(f"{description} HTTP response cleanup failed; continuing with the validation result.")
 
             if attempt == self.UMLS_MAX_ATTEMPTS:
                 self.logger.warning(f"{description} unavailable after {attempt} attempts ({reason}); the validation decision will be SQL NULL and processing will continue.")

@@ -58,7 +58,15 @@ class HTTPSUtils:
                     if value is not None:
                         return value
                     reason = "response contained no usable value"
-            except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
+            except (requests.RequestException, ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
+                '''
+                A JSON response can be syntactically valid but have missing
+                objects/list entries. Treat those decode/shape failures like
+                unavailable HTTP data, so an unexpected API payload cannot
+                escape into a caller that logs a fatal task error. Callbacks
+                do not perform database writes; SQL exceptions stay outside
+                this boundary and are not mistaken for HTTP failures.
+                '''
                 reason = type(exc).__name__
             finally:
                 if response is not None:

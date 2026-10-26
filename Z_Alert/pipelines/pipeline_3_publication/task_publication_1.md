@@ -22,7 +22,7 @@ flowchart TD
     G -- "Other HTTP failure" --> Skip
     G -- Yes --> J{"Reported count exceeds IDs returned?"}
     J -- Yes --> K{"Range is one day?"}
-    K -- Yes --> X
+    K -- Yes --> Skip
     K -- No --> L["Split at midpoint; push later range, then earlier range"] --> E
     J -- No --> M["Complete response, including zero matches"]
     M --> N["Insert response into publication_gard_pubmed if GARD ID, term, and date slice are absent; commit"]
@@ -47,7 +47,8 @@ Each complete response is stored with its exact `year_range`, lowercased
 `search_term`, reported count, returned IDs, query translation, warnings, and
 raw JSON. An existing row skips the insert, but its IDs are yielded again so a
 rerun can finish article and mapping imports. A truncated single-day response
-raises an error because splitting by date cannot recover its missing IDs.
+is warned and skipped because splitting by date cannot recover its missing IDs;
+it is never stored as a complete result and does not stop other GARD work.
 
 ## HTTP failures
 

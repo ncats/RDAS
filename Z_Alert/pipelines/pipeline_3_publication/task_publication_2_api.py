@@ -5,8 +5,9 @@ import threading
 from typing import Any, Dict, Optional, Sequence, Tuple
 import requests
 import json
+from math import isfinite
 from utils.https_request import HTTPSUtils as HttpsUtil
-from utils.tools import _resolve_worker_count, _to_txt
+from utils.tools import _resolve_worker_count, _to_float, _to_txt
 
 _dir = os.path.dirname(__file__)
 sys.path.extend([
@@ -38,6 +39,7 @@ def _worker_log_prefix(article_id: Any, pubmed_id: Any) -> str:
 
 
 def get_nhs_extract(texts: Sequence[str]) -> Optional[bool]:
+
     """
     Predict whether the supplied publication text is NIH/NHS-related.
 
@@ -46,8 +48,8 @@ def get_nhs_extract(texts: Sequence[str]) -> Optional[bool]:
 
     Returns:
         True or False when the API returns a usable prediction. None means the
-        API call failed or returned an invalid payload, so the caller should
-        leave the database row unchanged and retry later.
+        API call failed or returned an invalid payload, so the caller saves
+        is_NHS as NULL while retaining any available EPI results.
     """
 
     def parse_api_response(response: requests.Response) -> Optional[bool]:
@@ -67,6 +69,9 @@ def get_nhs_extract(texts: Sequence[str]) -> Optional[bool]:
             return None
 
         try:
+            # A missing decision is unknown, never a negative NHS classification.
+            if predictions[0] not in (0, 1):
+                raise ValueError("NHS prediction is neither 0 nor 1.")
             return predictions[0] == 1
         except (IndexError, TypeError) as e:
             print(f'Unable to read NHS prediction value: {e}')
@@ -83,6 +88,7 @@ def get_nhs_extract(texts: Sequence[str]) -> Optional[bool]:
 
 
 def get_is_epi(text: str) -> Optional[Dict[str, Any]]:
+
     """
     Predict whether publication text describes epidemiology.
 
@@ -92,7 +98,8 @@ def get_is_epi(text: str) -> Optional[Dict[str, Any]]:
     Returns:
         A dictionary with isEpi and probability keys when the API returns a usable
         prediction. None means the API call failed or returned an invalid payload,
-        so the caller should leave the database row unchanged and retry later.
+        so the caller saves NULL for the EPI fields and continues with any
+        available NHS prediction without repeating the GARD node.
     """
     def parse_api_response(response: requests.Response) -> Optional[Dict[str, Any]]:
         try:
@@ -108,6 +115,8 @@ def get_is_epi(text: str) -> Optional[Dict[str, Any]]:
         if 'IsEpi' not in prediction:
             print('EPI classification response is missing IsEpi.')
             return None
+        if not isinstance(prediction['IsEpi'], bool):
+            raise ValueError("EPI classification is not a boolean decision.")
 
         return {
             'isEpi': prediction.get('IsEpi'),
@@ -125,6 +134,7 @@ def get_is_epi(text: str) -> Optional[Dict[str, Any]]:
 
 
 def get_epi_extract(text: str) -> Optional[Dict[str, Any]]:
+
     """
     Extract epidemiological entities and statistics from publication text.
 
@@ -132,7 +142,8 @@ def get_epi_extract(text: str) -> Optional[Dict[str, Any]]:
         text: Combined publication title and abstract text.
 
     Returns:
-        A dictionary of extracted epidemiology fields, or None when extraction fails.
+        A dictionary of extracted epidemiology fields, or None when extraction
+        fails. The caller saves a NULL extraction while keeping known decisions.
     """
     def parse_api_response(response: requests.Response) -> Optional[Dict[str, Any]]:
         try:
@@ -157,54 +168,49 @@ def get_epi_extract(text: str) -> Optional[Dict[str, Any]]:
     return HttpsUtil.with_api_retry(api_url, payload, parse_api_response)
 
 
-def process_publication_article(obj: Dict[str, Any]) -> Optional[Tuple[bool, bool, Any, Optional[str], Any]]:
+def process_publication_article(obj: Dict[str, Any]) -> Tuple[Optional[bool], Optional[bool], Any, Optional[str], Any]:
+
     """
-    Run all publication classifiers/extractors for one article row.
-
-    Args:
-        obj: Article data containing id, pubmed_id, title, and abstract_text.
-
-    Returns:
-        Tuple matching the publication_article update statement when the EPI
-        prediction succeeds: is_epi, is_nhs, epi_probability, epi_extract,
-        pubmed_id. None means the EPI prediction failed, and the caller should
-        skip the update so is_EPI stays NULL for a later retry.
+    Return known predictions plus None for unavailable HTTP-derived values.
+    For example, EPI can succeed while NHS times out: keep (True, None, 0.9,
+    extraction_or_None, PMID), rather than discarding the successful EPI value.
+    A failed EPI request is unknown, not False, and must not trigger a repeat of
+    the whole GARD node. Database writes stay in the parent task.
     """
+    article_id, pubmed_id = obj["id"], obj["pubmed_id"]
+    text_to_predict = (_to_txt(obj["title"]) + " " + _to_txt(obj["abstract_text"])).strip()
+    prefix = _worker_log_prefix(article_id, pubmed_id)
+    try:
+        prediction = get_is_epi(text_to_predict)
+    except requests.RequestException as error:
+        print(f"{prefix}\tEPI request unavailable ({type(error).__name__}); saving SQL NULL and continuing.")
+        prediction = None
+    prediction = prediction if isinstance(prediction, dict) else {}
+    is_epi = prediction.get("isEpi")
+    if not isinstance(is_epi, bool):
+        is_epi = None
+    epi_probability = _to_float(prediction.get("probability")) if is_epi is not None else None
+    if epi_probability is not None and (not isfinite(epi_probability) or not 0 <= epi_probability <= 1):
+        epi_probability = None
 
-    article_id = obj['id']
-    pubmed_id = obj['pubmed_id']
-    title = _to_txt(obj['title'])
-    abstract_text = _to_txt(obj['abstract_text'])
-
-    text_to_predict = (title + ' ' + abstract_text).strip()
-    worker_log_prefix = _worker_log_prefix(article_id, pubmed_id)
-
-    epi_prediction = get_is_epi(text_to_predict)
-    if epi_prediction is None:
-        print(f'{worker_log_prefix}\tEPI classification failed; database row will not be updated.')
-        return None
-
-    is_epi = epi_prediction['isEpi']
-    epi_probability = epi_prediction['probability']
-
-    is_nhs = get_nhs_extract([text_to_predict])
-    if is_nhs is None:
-        print(f'{worker_log_prefix}\tNHS prediction failed; database row will not be updated.')
-        return None
-
-    print(f'{worker_log_prefix}\tis_EPI={is_epi}\tepiProbability={epi_probability}\tis_NHS={is_nhs}')
+    try:
+        is_nhs = get_nhs_extract([text_to_predict])
+    except requests.RequestException as error:
+        print(f"{prefix}\tNHS request unavailable ({type(error).__name__}); saving SQL NULL and continuing.")
+        is_nhs = None
+    if not isinstance(is_nhs, bool):
+        is_nhs = None
 
     epi_extract = None
-
     if is_epi:
-        epi_extract_json = get_epi_extract(text_to_predict)
-        if epi_extract_json is None:
-            print(f'{worker_log_prefix}\tEPI extraction failed; database row will not be updated.')
-            return None
-
-        epi_extract = json.dumps(epi_extract_json)
-        print(f'\t\t{epi_extract}')
-
+        try:
+            extraction = get_epi_extract(text_to_predict)
+        except requests.RequestException as error:
+            print(f"{prefix}\tEPI extraction unavailable ({type(error).__name__}); saving SQL NULL and continuing.")
+            extraction = None
+        if isinstance(extraction, dict):
+            epi_extract = json.dumps(extraction)
+    print(f"{prefix}\tis_EPI={is_epi}\tepiProbability={epi_probability}\tis_NHS={is_nhs}")
     return (is_epi, is_nhs, epi_probability, epi_extract, pubmed_id)
 
 
@@ -246,7 +252,14 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
     # implement
     def process_new_data(self) -> None:
 
-        fetch_is_new_query = f'SELECT id, pubmed_id, title, abstract_text FROM publication_article WHERE is_EPI is null AND is_new = 1 ORDER BY id {self.fetch_order} LIMIT %s'
+        '''
+        NULL is a valid unknown outcome after an unavailable HTTP request.
+        Advance by primary key so even an all-NULL batch is visited once and
+        cannot repeatedly select the same failed API inputs for days.
+        '''
+        comparison = ">" if self.fetch_order == "ASC" else "<"
+        last_id = None
+        fetch_is_new_query = f"SELECT id, pubmed_id, title, abstract_text FROM publication_article WHERE is_EPI IS NULL AND is_new = 1 AND (%s IS NULL OR id {comparison} %s) ORDER BY id {self.fetch_order} LIMIT %s"
 
         update_sql = " UPDATE publication_article SET is_EPI = %s, is_NHS = %s, epi_probability =%s, epi_extract = %s WHERE pubmed_id = %s "
 
@@ -275,7 +288,7 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
                     each commit, the next SELECT only sees rows where is_EPI is
                     still NULL.
                     '''
-                    fetch_cursor.execute(fetch_is_new_query, (batch_size,))
+                    fetch_cursor.execute(fetch_is_new_query, (last_id, last_id, batch_size))
                     rows = fetch_cursor.fetchall()
 
                     batch_num += 1
@@ -285,6 +298,7 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
                         self.logger.info(f"No more rows to fetch.")
                         break
 
+                    last_id = rows[-1]["id"]
                     obj_list = [{
                         'id': row['id'],
                         'title': row['title'],
@@ -297,7 +311,7 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
                         val_list = [value for value in processed_values if value is not None]
                         skipped_count = len(processed_values) - len(val_list)
                         if skipped_count:
-                            self.logger.warning(f"Skipped {skipped_count} publication_article rows in batch#{batch_num} because EPI classification failed; is_EPI remains NULL so they can be retried.")
+                            self.logger.warning(f"Skipped {skipped_count} publication_article rows in batch#{batch_num} because EPI classification failed; unknown fields stay NULL and processing advances to the next batch.")
                         print(val_list)
                     except Exception as e:
                         self.logger.error(f"Error processing batch#{batch_num}: {e}")
@@ -305,7 +319,7 @@ class PublicationEpiNhsClassificationTask(PipelineBase):
 
                     try:
                         if not val_list:
-                            self.logger.warning(f"No publication_article rows updated for batch#{batch_num}; all rows remain retryable.")
+                            self.logger.warning(f"No publication_article rows updated for batch#{batch_num}; unknown fields remain NULL; continuing with the next batch.")
                             continue
 
                         update_cursor.executemany(update_sql, val_list)

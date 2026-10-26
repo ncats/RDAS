@@ -2,6 +2,7 @@ import json
 import os
 import sys
 from time import sleep
+from math import isfinite
 from typing import Any, Dict, List, Optional, Sequence
 
 from dotenv import load_dotenv
@@ -24,7 +25,7 @@ from X_epi_nhs_predict_local import (
 )
 from baseclass.conn import DBConnection
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _to_txt
+from utils.tools import _to_float, _to_txt
 
 """
 Local replacement for task_publication_2.py.
@@ -69,7 +70,8 @@ def _publication_text(obj: Dict[str, Any]) -> str:
     return (title + " " + abstract_text).strip()
 
 
-def get_nhs_extracts(texts: Sequence[str]) -> Optional[List[bool]]:
+def get_nhs_extracts(texts: Sequence[str]) -> Optional[List[Optional[bool]]]:
+
     """
     Predict whether supplied publication text is NIH/NHS-related locally.
 
@@ -84,6 +86,8 @@ def get_nhs_extracts(texts: Sequence[str]) -> Optional[List[bool]]:
         print(f"NHS local prediction failed: {e}")
         return None
 
+    if not isinstance(nhs_info, dict):
+        return None
     predictions = nhs_info.get("predictions")
     if predictions is None:
         print("Local NHS prediction response is missing predictions.")
@@ -94,7 +98,8 @@ def get_nhs_extracts(texts: Sequence[str]) -> Optional[List[bool]]:
         return None
 
     try:
-        return [prediction == 1 for prediction in predictions]
+        # Missing/invalid individual decisions are unknown, not negative NHS classifications.
+        return [prediction == 1 if prediction in (0, 1) else None for prediction in predictions]
     except TypeError as e:
         print(f"Unable to read local NHS prediction values: {e}")
         return None
@@ -212,124 +217,107 @@ class PublicationEpiNhsLocalClassificationTask(PipelineBase):
 
     def process_new_data(self) -> None:
 
-        fetch_is_new_query = f"SELECT id, pubmed_id, title, abstract_text FROM publication_article WHERE is_EPI is null AND is_new = 1 ORDER BY id {self.fetch_order} LIMIT %s"
-        update_sql = " UPDATE publication_article SET is_EPI = %s, is_NHS = %s, epi_probability =%s, epi_extract = %s WHERE pubmed_id = %s "
-
+        '''
+        Visit each pending Article once during this task, even when model data
+        is unavailable and is_EPI must stay NULL. The id boundary prevents a
+        failed batch from being fetched repeatedly. ASC and DESC both use the
+        existing primary key; the eligibility filters remain unchanged.
+        For example, IDs 10/11 can retain NULL predictions while ID 12 and all
+        later batches still run. No failed-request queue or GARD replay is used.
+        '''
+        comparison = ">" if self.fetch_order == "ASC" else "<"
+        fetch_is_new_query = f"SELECT id, pubmed_id, title, abstract_text FROM publication_article WHERE is_EPI IS NULL AND is_new = 1 AND (%s IS NULL OR id {comparison} %s) ORDER BY id {self.fetch_order} LIMIT %s"
+        update_sql = "UPDATE publication_article SET is_EPI = %s, is_NHS = %s, epi_probability = %s, epi_extract = %s WHERE pubmed_id = %s"
         self.logger.info(f"Fetching new publication_article rows in id {self.fetch_order} order.")
-
         batch_num = 0
+        last_id = None
         batch_size = _env_int("PUBLICATION_LOCAL_FETCH_BATCH_SIZE", 500)
         classifier_batch_size = _env_int("EPI_CLASSIFY_LOCAL_BATCH_SIZE", 32)
+        classifier = None
+        classifier_load_attempted = False
 
         try:
-            classifier = None
-
             while True:
-                rows = self._execute_mysql_batch(fetch_is_new_query, (batch_size,), fetch_rows=True)
-
-                batch_num += 1
-                self.logger.info(f"\n--- batch# = {batch_num} ---")
-
+                rows = self._execute_mysql_batch(fetch_is_new_query, (last_id, last_id, batch_size), fetch_rows=True)
                 if not rows:
                     self.logger.info("No more rows to fetch.")
                     break
+                last_id = rows[-1]["id"]
+                batch_num += 1
+                self.logger.info(f"\n--- batch# = {batch_num} ---")
+                texts_to_predict = [_publication_text(row) for row in rows]
 
                 '''
-                Fetch and disconnect before the first model load as well as
-                every later prediction batch. Keep the same classifier in
-                memory across database reconnects; do not reload its weights.
-                Already classified copied Articles still fail the is_EPI IS NULL
-                predicate and are not submitted to the models again.
+                Loading an optional predictor can itself download model files.
+                If loading fails, leave EPI fields unknown for this invocation
+                rather than retrying the same download for every database batch.
+                A later task instance can try again; successful cached models
+                still survive normal task boundaries as before. Database calls
+                stay outside these model-only exception handlers.
                 '''
-                if classifier is None:
-                    classifier = get_pipeline()
+                if not classifier_load_attempted:
+                    classifier_load_attempted = True
+                    try:
+                        classifier = get_pipeline()
+                    except Exception as error:
+                        self.logger.warning(f"EPI classifier unavailable ({type(error).__name__}); saving unknown EPI fields as SQL NULL and continuing.")
 
-                obj_list = [{
-                    "id": row["id"],
-                    "title": row["title"],
-                    "abstract_text": row["abstract_text"],
-                    "pubmed_id": row["pubmed_id"],
-                } for row in rows]
-                texts_to_predict = [_publication_text(obj) for obj in obj_list]
+                epi_predictions = [None] * len(rows)
+                if classifier is not None:
+                    try:
+                        predictions = classifier.classify_texts(texts_to_predict, batch_size=classifier_batch_size)
+                        if not isinstance(predictions, list) or len(predictions) != len(rows):
+                            raise ValueError("EPI prediction count does not match the Article batch.")
+                        epi_predictions = predictions
+                    except Exception as error:
+                        self.logger.warning(f"EPI prediction unavailable for batch#{batch_num} ({type(error).__name__}); saving SQL NULL and continuing.")
 
                 try:
-                    epi_predictions = classifier.classify_texts(
-                        texts_to_predict,
-                        batch_size=classifier_batch_size,
-                    )
                     nhs_predictions = get_nhs_extracts(texts_to_predict)
-                    if nhs_predictions is None:
-                        self.logger.warning(
-                            f"NHS local prediction unavailable for batch#{batch_num}; "
-                            "is_NHS will be updated as NULL."
-                        )
-                        nhs_predictions = [None] * len(obj_list)
-                    val_list = []
+                    if not isinstance(nhs_predictions, list) or len(nhs_predictions) != len(rows):
+                        raise ValueError("NHS predictions are unavailable or have an invalid count.")
+                except Exception as error:
+                    self.logger.warning(f"NHS prediction unavailable for batch#{batch_num} ({type(error).__name__}); saving is_NHS as SQL NULL and continuing.")
+                    nhs_predictions = [None] * len(rows)
 
-                    for obj, text_to_predict, prediction, is_nhs in zip(obj_list, texts_to_predict, epi_predictions, nhs_predictions):
-                        article_id = obj["id"]
-                        pubmed_id = obj["pubmed_id"]
-                        epi_prediction = {
-                            "isEpi": prediction.get("IsEpi"),
-                            "probability": prediction.get("EPI_PROB"),
-                        }
+                val_list = []
+                for row, text, prediction, is_nhs in zip(rows, texts_to_predict, epi_predictions, nhs_predictions):
+                    prediction = prediction if isinstance(prediction, dict) else {}
+                    is_epi = prediction.get("IsEpi")
+                    if not isinstance(is_epi, bool):
+                        is_epi = None
+                    epi_probability = _to_float(prediction.get("EPI_PROB")) if is_epi is not None else None
+                    if epi_probability is not None and (not isfinite(epi_probability) or not 0 <= epi_probability <= 1):
+                        epi_probability = None
+                    if not isinstance(is_nhs, bool):
+                        is_nhs = None
+                    self.logger.info(f"OS.process_id:{os.getpid()}\tId:{row['id']} - pubmed_id:{row['pubmed_id']}\tis_EPI={is_epi}\tepiProbability={epi_probability}\tis_NHS={is_nhs}")
 
-                        is_epi = epi_prediction["isEpi"]
-                        epi_probability = epi_prediction["probability"]
-
-                        epi_info_message = f"OS.process_id:{os.getpid()}\tId:{article_id} - pubmed_id:{pubmed_id}\tis_EPI={is_epi}\tepiProbability={epi_probability}\tis_NHS={is_nhs}"
-                        self.logger.info(epi_info_message)
-
-                        epi_extract = None
-                        if is_epi:
-                            epi_extract_json = get_epi_extract(text_to_predict)
-                            if epi_extract_json is None:
-                                epi_extract_failure_message = f"OS.process_id:{os.getpid()}\tId:{article_id} - pubmed_id:{pubmed_id}\tEPI extraction failed; database row will not be updated."
-                                self.logger.warning(epi_extract_failure_message)
-                                continue
-
-                            epi_extract = json.dumps(epi_extract_json)
+                    epi_extract = None
+                    if is_epi:
+                        try:
+                            extraction = get_epi_extract(text)
+                            if not isinstance(extraction, dict):
+                                raise ValueError("EPI extraction is unavailable.")
+                            epi_extract = json.dumps(extraction)
                             self.logger.info(f"\t\t{epi_extract}")
+                        except Exception as error:
+                            '''
+                            Keep the known EPI/NHS classifications even if NER
+                            extraction failed. For example, (True, False, 0.9,
+                            None, PMID) records a real EPI decision plus unknown
+                            extraction, without fabricating an empty JSON result.
+                            '''
+                            self.logger.warning(f"EPI extraction unavailable for pubmed_id={row['pubmed_id']} ({type(error).__name__}); saving epi_extract as SQL NULL and continuing.")
+                    val_list.append((is_epi, is_nhs, epi_probability, epi_extract, row["pubmed_id"]))
 
-                        val_list.append((is_epi, is_nhs, epi_probability, epi_extract, pubmed_id))
-
-                    skipped_count = len(obj_list) - len(val_list)
-                    if skipped_count:
-                        self.logger.warning(
-                            f"Skipped {skipped_count} publication_article rows in batch#{batch_num}; "
-                            "EPI extraction failed, so is_EPI remains NULL and they can be retried."
-                        )
-                    self.logger.info(f"Prepared {len(val_list)} publication_article updates for batch#{batch_num}.")
-
-                except Exception as e:
-                    raise RuntimeError(f"Error processing publication batch#{batch_num}: {e}") from e
-
-                if not val_list:
-                    '''
-                    A batch with no usable extraction results cannot advance
-                    this NULL-based selector. Stop instead of loading the same
-                    rows forever; their NULL fields remain available on restart.
-                    '''
-                    raise RuntimeError(f"No usable publication classification results in batch#{batch_num}; rows remain pending for a retry.")
-
+                # Python None is SQL NULL; even an all-unknown batch advances by last_id.
                 self._execute_mysql_batch(update_sql, val_list)
                 self.logger.info(f"Committed {len(val_list)} publication_article classification updates for batch#{batch_num}.")
-
         except Exception:
-            '''
-            Exhausted database retries must reach the runner immediately. Do
-            not refetch and recompute this batch after a persistent failure;
-            successful earlier commits remain saved, and the GARD runner will
-            leave the current disease checkpoint and pending flags untouched.
-            '''
-            self.logger.exception("Publication classification failed; unfinished rows remain pending.")
+            self.logger.exception("Publication database update failed; unfinished rows remain pending.")
             raise
-
         finally:
-            '''
-            Every database batch has already returned and detached its pooled
-            handle in finally. Base cleanup now releases the task logger only.
-            '''
             self.close()
 
 

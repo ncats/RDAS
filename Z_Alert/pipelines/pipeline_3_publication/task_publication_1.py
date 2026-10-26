@@ -187,13 +187,15 @@ class NewPublicationDiscoveryTask(PipelineBase):
             if count > len(pubmed_ids):
                 if range_start == range_end:
                     '''
-                    A single day cannot be split by date any further. Stop
-                    explicitly so the missing IDs are visible and retryable.
+                    A single day cannot be split by date any further. Skip
+                    that incomplete download instead of stopping the GARD
+                    pipeline or saving a truncated list as a complete result.
                     '''
-                    raise RuntimeError(
+                    self.logger.warning(
                         f"PubMed returned only {len(pubmed_ids)} of {count} PMIDs for "
-                        f"{gard_id}: {search_term} on {range_start}; date splitting cannot recover the rest."
+                        f"{gard_id}: {search_term} on {range_start}; skipping this incomplete slice and continuing."
                     )
+                    continue
 
                 '''
                 The left slice ends on midpoint; the right starts the next

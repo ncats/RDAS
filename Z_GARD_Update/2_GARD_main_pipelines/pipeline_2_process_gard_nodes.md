@@ -270,9 +270,16 @@ after repeated 429 responses while the rest of the pipeline continues.
 
 Missing study/Article/annotation payloads are skipped, not saved as empty JSON.
 Unavailable nullable decisions, such as UMLS validation, remain SQL NULL.
+Publication classification also saves known EPI/NHS results when another model
+or extraction is unavailable; only the missing fields become NULL. Both local
+and HTTP classification advance by Article primary key, so an all-NULL batch
+cannot be fetched indefinitely or force the GARD node to stop. The original
+`is_EPI IS NULL AND is_new=1` eligibility checks still apply.
 There is no failed-request queue or automatic whole-node replay: the GARD node
 uses its normal completion checkpoint even when individual HTTP calls fail.
 Skipped data is absent unless a separate later operation retrieves it.
+An incomplete single-day PubMed response that cannot be split further is also
+warned and skipped, without storing a truncated result as a complete search.
 
 `raise_task_errors=True` propagates database/code failures. The GARD error-checking
 mixin also raises when a wrapped task logs an `ERROR`, preserving the first
