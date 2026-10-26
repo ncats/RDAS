@@ -10,7 +10,7 @@ sys.path.extend([
 ])
 
 from pipelines.pipeline_base import PipelineBase
-from utils.tools import _gard_text_normalize, _is_english, _is_under_char_threshold
+from utils.tools import _gard_text_normalize, _is_english, _is_under_char_threshold, _repair_mac_roman_utf8
 
 class GardNodeNamesTask(PipelineBase):
     """
@@ -145,8 +145,19 @@ class GardNodeNamesTask(PipelineBase):
                 gardId = row["GardID"] 
                 gard_id_set.add(gardId) 
 
-                gardName = row["gardName"]
-                synonyms = self._split_values(row["synonyms"], self.SYNONYM_SEPARATOR)
+                '''
+                Older GARD rows can contain UTF-8 text that was previously
+                decoded as Mac Roman. For example, GARD:0000932 supplied
+                "B√∂√∂k syndrome" instead of "Böök syndrome" and caused the
+                Alert publication search-term comparison to fail against a
+                legacy latin1 column. Repair names before filtering, external
+                searches, and database inserts so every downstream task uses
+                the same corrected value. The shared helper requires a strict,
+                recognizable repair; valid Unicode stays intact. This changes
+                the yielded data only, not existing labels or table schemas.
+                '''
+                gardName = _repair_mac_roman_utf8(row["gardName"])
+                synonyms = [_repair_mac_roman_utf8(value) for value in self._split_values(row["synonyms"], self.SYNONYM_SEPARATOR)]
 
                 # filtered_names is the disease-name list used by clinical trial and publication discovery.
                 batch.append({

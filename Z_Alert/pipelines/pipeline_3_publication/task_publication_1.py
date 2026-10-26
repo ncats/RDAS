@@ -19,7 +19,7 @@ load_dotenv()
 from pipelines.pipeline_base import PipelineBase
 from utils.publication_worker import PublicationWorker
 from utils.https_request import HTTPSUtils
-from utils.tools import _resolve_worker_count
+from utils.tools import _repair_mac_roman_utf8, _resolve_worker_count
 
 """
 Find and store newly published PubMed articles for updated GARD diseases.
@@ -77,6 +77,15 @@ class NewPublicationDiscoveryTask(PipelineBase):
         for name in names:
 
             '''
+            Standalone callers can supply names without GardNodeNamesTask.
+            Repair recognizable mojibake here as well, so the PubMed search,
+            saved search response, and PMID mappings all use the same name.
+            For example, "B√∂√∂k syndrome" becomes "Böök syndrome"; do not
+            delete the row or drop accents to bypass a database error.
+            '''
+            name = _repair_mac_roman_utf8(name)
+
+            '''
             Process each complete date slice before fetching the next one, so
             a broad search never holds every matching PMID in memory at once.
             '''
@@ -108,7 +117,15 @@ class NewPublicationDiscoveryTask(PipelineBase):
         if not self.pubmed_esearch_api:
             raise RuntimeError("PUBMED_ESEARCH_API is not configured.")
 
-        search_term = search_term.lower()  # Store the same lowercase term in every slice.
+        '''
+        Keep direct retrieve_pubmed_ids() calls consistent with discovery.
+        The connection already sends utf8mb4; encoding a Python string again
+        does not fix a name decoded incorrectly in older source data. Repair
+        only known Mac Roman corruption before lowercasing and binding the
+        search term. This does not make a latin1 column support all Unicode;
+        UTF-8 storage is still required for genuinely unsupported characters.
+        '''
+        search_term = _repair_mac_roman_utf8(search_term).lower()
         '''
         Both runners supply full dates: the regular Alert runner uses MySQL
         dates and the GARD update runner uses an ISO date string. Converting
@@ -276,6 +293,14 @@ class NewPublicationDiscoveryTask(PipelineBase):
 
     # Step 2
     def find_new_publications(self, gard_id, search_term, pubmed_ids):
+
+        '''
+        This method is also called directly by reuse/standalone tasks. Match
+        their term preparation to retrieve_pubmed_ids() without changing the
+        caller's case convention. Keeping the corrected Unicode string in all
+        mapping checks/inserts avoids mixing corrupt and repaired spellings.
+        '''
+        search_term = _repair_mac_roman_utf8(search_term)
 
         '''
         PubMed can return thousands of IDs for one complete date slice. Keep
