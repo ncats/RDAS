@@ -1,0 +1,16 @@
+[
+  {
+    "author_id": "SYNTH_AUTH_1",
+    "first_name": "Avery",
+    "last_name": "Example",
+    "affiliation": ["Example Institute"],
+    "orc_id": []
+  },
+  {
+    "author_id": "SYNTH_AUTH_2",
+    "first_name": "Blake",
+    "last_name": "Example",
+    "affiliation": ["Example Institute"],
+    "orc_id": []
+  }
+]
