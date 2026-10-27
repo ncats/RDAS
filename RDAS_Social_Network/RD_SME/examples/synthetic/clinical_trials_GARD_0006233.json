@@ -1,0 +1,9 @@
+[
+  {
+    "nctid": "SYNTH_TRIAL_1",
+    "briefTitle": "Example study",
+    "officialTitle": "Example clinical study",
+    "briefSummary": "Invented study summary.",
+    "intervention": ["Example intervention"]
+  }
+]

@@ -1,0 +1,6 @@
+[
+  {"author_id": "SYNTH_AUTH_1", "associate_id": "SYNTH_ARTICLE_1"},
+  {"author_id": "SYNTH_AUTH_1", "associate_id": "SYNTH_GRANT_1"},
+  {"author_id": "SYNTH_AUTH_2", "associate_id": "SYNTH_ARTICLE_1"},
+  {"author_id": "SYNTH_AUTH_2", "associate_id": "SYNTH_TRIAL_1"}
+]

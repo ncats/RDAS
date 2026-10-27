@@ -1,0 +1,10 @@
+[
+  {
+    "application_id": "SYNTH_GRANT_1",
+    "title": "Example grant",
+    "abstract": "Invented grant summary.",
+    "terms": "example",
+    "year": 2024,
+    "gard_id": "GARD:0006233"
+  }
+]

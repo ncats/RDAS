@@ -1,0 +1,17 @@
+-r requirements-smoke.txt
+pymysql==1.1.2
+hdbscan==0.8.40
+scikit-learn==1.5.1
+sentence-transformers==4.1.0
+transformers==4.52.4
+torch==2.7.0
+umap-learn==0.5.7
+tqdm==4.67.1
+ijson==3.4.0
+neo4j==5.28.1
+pycountry==24.6.1
+geonamescache==3.0.0
+Unidecode==1.4.0
+spacy==3.8.11
+matplotlib==3.9.2
+seaborn==0.13.2
